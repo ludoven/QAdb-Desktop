@@ -57,7 +57,7 @@ import com.ludoven.adbtool.viewmodel.DevicesViewModel
 // 确保你导入了 @ExperimentalMaterial3Api
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DevicesScreen(viewModel: DevicesViewModel) {
+fun HomeScreen(viewModel: DevicesViewModel) {
 
     val devices by viewModel.devices.collectAsState()
     val selectedDevice by viewModel.selectedDevice.collectAsState()
@@ -275,7 +275,7 @@ fun InfoCard(
             )
             Spacer(modifier = Modifier.width(12.dp))
             Column {
-                Text(text = value, style = MaterialTheme.typography.titleMedium)
+                Text(text = value, style = MaterialTheme.typography.bodySmall)
                 Text(text = title, style = MaterialTheme.typography.bodySmall, color = Color.Gray)
             }
         }

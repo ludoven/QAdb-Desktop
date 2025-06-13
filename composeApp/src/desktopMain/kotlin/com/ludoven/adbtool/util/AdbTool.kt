@@ -14,6 +14,25 @@ object AdbTool {
     // 例如：val adbPath = "C:\\Users\\YourUser\\AppData\\Local\\Android\\Sdk\\platform-tools\\adb.exe"
     // 或者在 macOS/Linux 上：val adbPath = "/Users/YourUser/Library/Android/sdk/platform-tools/adb"
     private const val ADB_COMMAND = "adb"
+    private var adbPath: String? = null
+
+    fun setAdbPath(path: String) {
+        adbPath = path
+        // 可选：保存到本地配置，例如 Preferences 或文件
+    }
+
+    fun getAdbPath(): String? = adbPath
+
+    fun getSystemAdbPath(): String? {
+        return try {
+            val cmd = if (System.getProperty("os.name").startsWith("Windows")) "where adb" else "which adb"
+            val process = Runtime.getRuntime().exec(cmd)
+            process.inputStream.bufferedReader().readLine()?.takeIf { it.isNotEmpty() }
+        } catch (e: Exception) {
+            null
+        }
+    }
+
 
     fun executeAdbCommand(vararg args: String): String {
         val command = mutableListOf(ADB_COMMAND).apply { addAll(args) }

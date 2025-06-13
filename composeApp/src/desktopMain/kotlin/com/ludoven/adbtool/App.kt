@@ -19,15 +19,13 @@ import org.jetbrains.compose.ui.tooling.preview.Preview
 import adbtool_desktop.composeapp.generated.resources.Res
 import adbtool_desktop.composeapp.generated.resources.compose_multiplatform
 import adbtool_desktop.composeapp.generated.resources.img
-import androidx.compose.ui.unit.TextUnit
+import androidx.compose.material.icons.filled.Apps
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.ludoven.adbtool.pages.AppScreen
 import com.ludoven.adbtool.pages.CommonScreen
-import com.ludoven.adbtool.pages.DevicesScreen
-import com.ludoven.adbtool.pages.KeyEventScreen
+import com.ludoven.adbtool.pages.HomeScreen
 import com.ludoven.adbtool.pages.SettingScreen
-import com.ludoven.adbtool.pages.SystemScreen
 import com.ludoven.adbtool.viewmodel.DevicesViewModel
 
 @ExperimentalMaterial3Api
@@ -43,7 +41,7 @@ fun App() {
             listOf(
                 TabItem("首页", Icons.Default.Home),
                 TabItem("常用", Icons.Default.Info),
-                TabItem("应用", Icons.Default.Settings),
+                TabItem("应用", Icons.Default.Apps),
 //                TabItem("系统", Icons.Default.Settings),
 //                TabItem("按键", Icons.Default.Settings),
                 TabItem("设置", Icons.Default.Settings)
@@ -103,7 +101,7 @@ fun App() {
                 ) {
                     // 根据选中的Tab索引显示不同的页面
                     when (selectedTabIndex) {
-                        0 -> DevicesScreen(devicesViewModel) // 你的设备管理页面
+                        0 -> HomeScreen(devicesViewModel) // 你的设备管理页面
                         1 -> CommonScreen()     // 你的常用页面
                         2 -> AppScreen()    // 你的应用管理页面
 //                        3 -> SystemScreen()        // 你的系统页面

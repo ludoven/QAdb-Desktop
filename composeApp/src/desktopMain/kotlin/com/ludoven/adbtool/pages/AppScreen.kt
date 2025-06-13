@@ -49,6 +49,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.ludoven.adbtool.LightColorScheme
 import com.ludoven.adbtool.entity.AdbFunction
+import com.ludoven.adbtool.iconColors
 import com.ludoven.adbtool.util.AdbTool
 import com.ludoven.adbtool.util.FileUtils
 import kotlinx.coroutines.CoroutineScope
@@ -256,11 +257,6 @@ fun AppScreen() {
         }
     )
 
-
-    val iconColors = listOf(
-        Color(0xFFEF5350), Color(0xFF42A5F5), Color(0xFF66BB6A),
-        Color(0xFFFFA726), Color(0xFFAB47BC), Color(0xFFFF7043), Color(0xFF26C6DA)
-    )
 
     Scaffold(containerColor = Color.White) { paddingValues ->
         val scrollState = rememberLazyListState()

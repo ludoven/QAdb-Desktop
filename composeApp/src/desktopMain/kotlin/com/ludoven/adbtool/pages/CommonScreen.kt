@@ -60,6 +60,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import com.ludoven.adbtool.LightColorScheme
 import com.ludoven.adbtool.entity.AdbFunction
+import com.ludoven.adbtool.iconColors
 import com.ludoven.adbtool.util.AdbTool
 import com.ludoven.adbtool.util.AdbTool.runAdbAndShowResult
 import com.ludoven.adbtool.util.FileUtils
@@ -220,15 +221,6 @@ fun CommonScreen() {
     )
 
 
-    val iconColors = listOf(
-        Color(0xFFEF5350), // Red
-        Color(0xFF42A5F5), // Blue
-        Color(0xFF66BB6A), // Green
-        Color(0xFFFFA726), // Orange
-        Color(0xFFAB47BC), // Purple
-        Color(0xFFFF7043), // Deep Orange
-        Color(0xFF26C6DA), // Cyan
-    )
 
     Scaffold(containerColor = Color.White) { paddingValues ->
         val scrollState = rememberLazyListState()

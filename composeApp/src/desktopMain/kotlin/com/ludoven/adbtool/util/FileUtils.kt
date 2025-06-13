@@ -51,4 +51,13 @@ object FileUtils {
         } else null
     }
 
+
+    fun selectFile(title: String = "选择文件"): String? {
+        val chooser = JFileChooser()
+        chooser.dialogTitle = title
+        val result = chooser.showOpenDialog(null)
+        return if (result == JFileChooser.APPROVE_OPTION) {
+            chooser.selectedFile.absolutePath
+        } else null
+    }
 }
