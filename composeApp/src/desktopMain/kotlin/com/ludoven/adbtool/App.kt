@@ -3,11 +3,7 @@ package com.ludoven.adbtool
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.selection.selectable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Info
@@ -16,8 +12,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.unit.dp
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.ui.tooling.preview.Preview
@@ -27,6 +21,7 @@ import adbtool_desktop.composeapp.generated.resources.compose_multiplatform
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.ludoven.adbtool.pages.AppScreen
 import com.ludoven.adbtool.pages.CommonScreen
+import com.ludoven.adbtool.pages.DevicesScreen
 import com.ludoven.adbtool.pages.KeyEventScreen
 import com.ludoven.adbtool.pages.SettingScreen
 import com.ludoven.adbtool.pages.SystemScreen
@@ -39,11 +34,11 @@ fun App() {
 
     val devicesViewModel: DevicesViewModel = viewModel() // 仅初始化一次
 
-    MaterialTheme {
+    MaterialTheme(colorScheme = LightColorScheme) {
         // 定义Tab数据，通常是数据类或枚举
         val tabs = remember {
             listOf(
-                TabItem("设备", Icons.Default.Home),
+                TabItem("首页", Icons.Default.Home),
                 TabItem("常用", Icons.Default.Info),
                 TabItem("应用", Icons.Default.Settings),
                 TabItem("系统", Icons.Default.Settings),
@@ -57,17 +52,16 @@ fun App() {
         // 使用Scaffold来构建基本布局
         Scaffold(
             modifier = Modifier.fillMaxSize(),
-            containerColor = MaterialTheme.colorScheme.background // 设置背景颜色
+            containerColor = LightColorScheme.background // 设置背景颜色
         ) { paddingValues -> // paddingValues 会自动处理系统栏（如Android上的状态栏、桌面窗口的标题栏）
             Row(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(paddingValues) // 应用Scaffold提供的内边距
             ) {
 
                 NavigationRail(
                     modifier = Modifier.fillMaxHeight().padding(top = 30.dp),
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant // 侧边栏背景色
+                    containerColor = LightColorScheme.background,
                 ) {
                     tabs.forEachIndexed { index, item ->
                         NavigationRailItem(
@@ -75,7 +69,13 @@ fun App() {
                             label = { Text(item.title) },
                             selected = selectedTabIndex == index,
                             onClick = { selectedTabIndex = index },
-                            modifier = Modifier.padding(bottom = 15.dp)
+                            modifier = Modifier.padding(bottom = 15.dp),
+                            colors = NavigationRailItemDefaults.colors(
+                                selectedIconColor =LightColorScheme.primary,      // 选中时图标颜色
+                                unselectedIconColor = LightColorScheme.onSurface,  // 未选中图标颜色
+                                selectedTextColor = LightColorScheme.primary,      // 选中时文字颜色
+                                unselectedTextColor = LightColorScheme.onSurface   // 未选中文字颜色
+                            )
                         )
                     }
                 }
@@ -85,8 +85,8 @@ fun App() {
                     modifier = Modifier
                         .weight(1f) // 右侧占据剩余空间
                         .fillMaxHeight()
-                        .background(MaterialTheme.colorScheme.surface) // 内容区域背景色
-                        .padding(16.dp) // 内容区域内边距
+                        .background(LightColorScheme.surface) // 内容区域背景色
+//                        .padding(16.dp) // 内容区域内边距
                 ) {
                     // 根据选中的Tab索引显示不同的页面
                     when (selectedTabIndex) {

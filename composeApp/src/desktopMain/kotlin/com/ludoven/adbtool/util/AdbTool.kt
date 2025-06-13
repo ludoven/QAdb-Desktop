@@ -63,6 +63,53 @@ object AdbTool {
         return executeAdbCommand("-s", deviceId, "shell", "input", "text", escapedText)
     }
 
+
+
+    fun installApk(apkPath: String): Boolean {
+        return try {
+            val process = ProcessBuilder("adb", "install", "-r", apkPath)
+                .redirectErrorStream(true)
+                .start()
+
+            val output = BufferedReader(InputStreamReader(process.inputStream)).readText()
+            val exitCode = process.waitFor()
+            println("ADB Output: $output")
+            exitCode == 0 && output.contains("Success")
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
+    }
+
+
+    fun inputText(text: String, escapeSpaces: Boolean = true): Boolean {
+        println("尝试输入文本: '$text'")
+        println("是否转义空格: $escapeSpaces")
+
+        // 处理转义空格
+        val processedText = if (escapeSpaces) text.replace(" ", "%s") else text
+        println("处理后的文本: '$processedText'")
+
+        return try {
+            // 执行 adb 命令
+            val process = ProcessBuilder("adb", "shell", "input", "text", processedText)
+                .redirectErrorStream(true)
+                .start()
+
+            val output = process.inputStream.bufferedReader().readText()
+            val exitCode = process.waitFor()
+
+            println("adb 执行输出:\n$output")
+            println("adb 返回码: $exitCode")
+
+            exitCode == 0
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
+    }
+
+
     // 更多ADB命令的包装...
     // adb -s <deviceId> shell screencap /sdcard/screen.png
     // adb -s <deviceId> pull /sdcard/screen.png .

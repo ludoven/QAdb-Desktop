@@ -26,6 +26,13 @@ kotlin {
             // JetBrains Compose Multiplatform 的 ViewModel 支持
             implementation("org.jetbrains.androidx.lifecycle:lifecycle-viewmodel-compose:2.9.0")
 
+
+            implementation("org.openjfx:javafx-base:21:win")     // 根据平台选择
+            implementation("org.openjfx:javafx-graphics:21:win")
+            implementation("org.openjfx:javafx-controls:21:win")
+            implementation("org.openjfx:javafx-base:21:mac")     // 根据平台选择
+            implementation("org.openjfx:javafx-graphics:21:mac")
+            implementation("org.openjfx:javafx-controls:21:mac")
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
