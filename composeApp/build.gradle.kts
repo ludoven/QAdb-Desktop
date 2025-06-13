@@ -50,9 +50,19 @@ compose.desktop {
         mainClass = "com.ludoven.adbtool.MainKt"
 
         nativeDistributions {
-            targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
-            packageName = "com.ludoven.adbtool"
+            targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Exe)
+
             packageVersion = "1.0.0"
+            packageName = "QAdb" // <-- 将这里改为你想要的应用名称
+
+            macOS {
+//                iconFile.set(project.file("src/jvmMain/resources/icon.icns")) // 应用图标路径
+                bundleID = "com.ludoven.adbtool" // Bundle Identifier
+                signing {
+
+                }
+
+            }
         }
     }
 }

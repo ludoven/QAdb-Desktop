@@ -1,5 +1,10 @@
 package com.ludoven.adbtool.util
 
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.BufferedReader
 import java.io.InputStreamReader
 
@@ -109,6 +114,76 @@ object AdbTool {
         }
     }
 
+
+
+    fun takeScreenshot(savePath: String): Boolean {
+        try {
+            // 1. 截图到设备
+            val screenshotCmd = listOf("adb", "shell", "screencap", "-p", "/sdcard/screen.png")
+            val screenshotResult = ProcessBuilder(screenshotCmd).start().waitFor()
+            if (screenshotResult != 0) return false
+
+            // 2. 拉取到电脑
+            val pullCmd = listOf("adb", "pull", "/sdcard/screen.png", savePath)
+            val pullResult = ProcessBuilder(pullCmd).start().waitFor()
+            if (pullResult != 0) return false
+
+            // 3. 可选：删除设备上的临时文件
+            ProcessBuilder("adb", "shell", "rm", "/sdcard/screen.png").start()
+
+            return true
+        } catch (e: Exception) {
+            e.printStackTrace()
+            return false
+        }
+    }
+
+
+    fun getCurrentActivity(): String? {
+        val result = Runtime.getRuntime().exec("adb shell dumpsys activity activities").inputStream
+            .bufferedReader().use { it.readText() }
+
+        // 示例行：ResumedActivity: ActivityRecord{... com.example/.MainActivity}
+        val regex = Regex("""ResumedActivity:.* ([\w\.]+\/[\w\.\$]+)""")
+        val match = regex.find(result)
+        return match?.groups?.get(1)?.value
+    }
+
+    fun exec(command: String): String {
+        return try {
+            val process = ProcessBuilder("adb", "shell", command)
+                .redirectErrorStream(true)
+                .start()
+            process.inputStream.bufferedReader().use { it.readText() }.trim()
+        } catch (e: Exception) {
+            "执行失败：${e.message}"
+        }
+    }
+
+    suspend fun execSuspend(command: String): String = withContext(Dispatchers.IO) {
+        exec(command)
+    }
+
+    fun runAdbAndShowResult(
+        coroutineScope: CoroutineScope,
+        command: String,
+        setDialogText: (String) -> Unit,
+        setShowDialog: (Boolean) -> Unit
+    ) {
+        coroutineScope.launch {
+            val result = withContext(Dispatchers.IO) {
+                AdbTool.exec(command)
+            }
+            setDialogText(result.ifEmpty { "无返回结果" })
+            setShowDialog(true)
+        }
+    }
+
+
+    fun pullFile(devicePath: String, localPath: String): Boolean {
+        val result = exec("adb pull \"$devicePath\" \"$localPath\"")
+        return result?.contains("1 file pulled") == true || result?.contains("pulled") == true
+    }
 
     // 更多ADB命令的包装...
     // adb -s <deviceId> shell screencap /sdcard/screen.png

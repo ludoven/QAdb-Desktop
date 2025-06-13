@@ -18,6 +18,9 @@ import org.jetbrains.compose.ui.tooling.preview.Preview
 
 import adbtool_desktop.composeapp.generated.resources.Res
 import adbtool_desktop.composeapp.generated.resources.compose_multiplatform
+import adbtool_desktop.composeapp.generated.resources.img
+import androidx.compose.ui.unit.TextUnit
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.ludoven.adbtool.pages.AppScreen
 import com.ludoven.adbtool.pages.CommonScreen
@@ -41,8 +44,8 @@ fun App() {
                 TabItem("首页", Icons.Default.Home),
                 TabItem("常用", Icons.Default.Info),
                 TabItem("应用", Icons.Default.Settings),
-                TabItem("系统", Icons.Default.Settings),
-                TabItem("按键", Icons.Default.Settings),
+//                TabItem("系统", Icons.Default.Settings),
+//                TabItem("按键", Icons.Default.Settings),
                 TabItem("设置", Icons.Default.Settings)
             )
         }
@@ -59,25 +62,35 @@ fun App() {
                     .fillMaxSize()
             ) {
 
-                NavigationRail(
-                    modifier = Modifier.fillMaxHeight().padding(top = 30.dp),
-                    containerColor = LightColorScheme.background,
-                ) {
-                    tabs.forEachIndexed { index, item ->
-                        NavigationRailItem(
-                            icon = { Icon(item.icon, contentDescription = item.title) },
-                            label = { Text(item.title) },
-                            selected = selectedTabIndex == index,
-                            onClick = { selectedTabIndex = index },
-                            modifier = Modifier.padding(bottom = 15.dp),
-                            colors = NavigationRailItemDefaults.colors(
-                                selectedIconColor =LightColorScheme.primary,      // 选中时图标颜色
-                                unselectedIconColor = LightColorScheme.onSurface,  // 未选中图标颜色
-                                selectedTextColor = LightColorScheme.primary,      // 选中时文字颜色
-                                unselectedTextColor = LightColorScheme.onSurface   // 未选中文字颜色
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Image(
+                        painter = painterResource(Res.drawable.img),
+                        modifier = Modifier.size(60.dp).padding(top = 30.dp),
+                        contentDescription = "图标"
+                    )
+                    Text("QADB", fontSize = 13.sp)
+
+                    NavigationRail(
+                        modifier = Modifier.fillMaxHeight().padding(top = 30.dp),
+                        containerColor = LightColorScheme.background,
+                    ) {
+                        tabs.forEachIndexed { index, item ->
+                            NavigationRailItem(
+                                icon = { Icon(item.icon, contentDescription = item.title) },
+                                label = { Text(item.title) },
+                                selected = selectedTabIndex == index,
+                                onClick = { selectedTabIndex = index },
+                                modifier = Modifier.padding(bottom = 15.dp),
+                                colors = NavigationRailItemDefaults.colors(
+                                    selectedIconColor =LightColorScheme.primary,      // 选中时图标颜色
+                                    unselectedIconColor = LightColorScheme.onSurface,  // 未选中图标颜色
+                                    selectedTextColor = LightColorScheme.primary,      // 选中时文字颜色
+                                    unselectedTextColor = LightColorScheme.onSurface   // 未选中文字颜色
+                                )
                             )
-                        )
+                        }
                     }
+
                 }
 
                 // 右侧内容区域
@@ -93,9 +106,9 @@ fun App() {
                         0 -> DevicesScreen(devicesViewModel) // 你的设备管理页面
                         1 -> CommonScreen()     // 你的常用页面
                         2 -> AppScreen()    // 你的应用管理页面
-                        3 -> SystemScreen()        // 你的系统页面
-                        4 -> KeyEventScreen()         // 你的按键输入页面
-                        5 -> SettingScreen()         // 你的设置页面
+//                        3 -> SystemScreen()        // 你的系统页面
+//                        4 -> KeyEventScreen()         // 你的按键输入页面
+                        3 -> SettingScreen()         // 你的设置页面
                     }
                 }
             }

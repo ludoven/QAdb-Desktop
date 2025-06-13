@@ -22,13 +22,17 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.BatteryStd
+import androidx.compose.material.icons.filled.DeveloperMode
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.InstallMobile
+import androidx.compose.material.icons.filled.Memory
+import androidx.compose.material.icons.filled.NetworkCheck
 import androidx.compose.material.icons.filled.Notes
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.RestartAlt
-import androidx.compose.material.icons.filled.Videocam
+import androidx.compose.material.icons.filled.ScreenSearchDesktop
+import androidx.compose.material.icons.filled.VerifiedUser
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material3.AlertDialog
@@ -57,6 +61,7 @@ import androidx.compose.ui.unit.dp
 import com.ludoven.adbtool.LightColorScheme
 import com.ludoven.adbtool.entity.AdbFunction
 import com.ludoven.adbtool.util.AdbTool
+import com.ludoven.adbtool.util.AdbTool.runAdbAndShowResult
 import com.ludoven.adbtool.util.FileUtils
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -88,7 +93,6 @@ fun CommonScreen() {
                 // 2. 启动后台安装任务
                 coroutineScope.launch(Dispatchers.IO) { // 在 IO 线程执行耗时操作
                     val success = AdbTool.installApk(apkPath) // 执行安装
-
                     withContext(Dispatchers.Main) { // 切换回主线程更新 UI
                         // 3. 根据安装结果更新弹窗文本
                         dialogText = if (success) "安装成功" else "安装失败"
@@ -112,33 +116,109 @@ fun CommonScreen() {
             showTextInputDialog = true
         },
         AdbFunction("截图保存", Icons.Default.PhotoCamera) {
+            coroutineScope.launch {
+                // 不要放 IO 线程，否则 Swing UI 不会弹窗！
+                val folderPath = FileUtils.selectFolder()
 
+                if (folderPath == null) {
+                    dialogText = "未选择文件夹"
+                    showDialog = true
+                    delay(2000)
+                    showDialog = false
+                    return@launch
+                }
+
+                val savePath = "$folderPath/screen_${System.currentTimeMillis()}.png"
+
+                // 截图可放 IO 线程
+                val success = withContext(Dispatchers.IO) {
+                    AdbTool.takeScreenshot(savePath)
+                }
+
+                dialogText = if (success) "截图保存成功！" else "截图失败"
+                showDialog = true
+                delay(2000)
+                showDialog = false
+            }
         },
         AdbFunction("查看Activity", Icons.Default.Visibility) {
-
+            coroutineScope.launch {
+                val activity = withContext(Dispatchers.IO) {
+                    AdbTool.getCurrentActivity()
+                }
+                dialogText = activity?.let { "当前 Activity:\n\n$it" } ?: "无法获取 Activity"
+                showDialog = true
+            }
         }
     )
 
-    val items = listOf(
+    val sysItems = listOf(
         AdbFunction("重启设备", Icons.Default.RestartAlt) {
-
+            runAdbAndShowResult(
+                coroutineScope,
+                "reboot",
+                setDialogText = { dialogText = it },
+                setShowDialog = { showDialog = it }
+            )
         },
-        AdbFunction("日志查看", Icons.Default.Notes) {
-
+        AdbFunction("是否已Root", Icons.Default.VerifiedUser) {
+            runAdbAndShowResult(
+                coroutineScope,
+                "su -c id",
+                setDialogText = { dialogText = it },
+                setShowDialog = { showDialog = it }
+            )
         },
-        AdbFunction("卸载应用", Icons.Default.Delete) {
-
+        AdbFunction("WiFi信息", Icons.Default.Wifi) {
+            runAdbAndShowResult(
+                coroutineScope,
+                "dumpsys wifi",
+                setDialogText = { dialogText = it },
+                setShowDialog = { showDialog = it }
+            )
         },
-        AdbFunction("录屏保存", Icons.Default.Videocam) {
-
+        AdbFunction("CPU情况", Icons.Default.Memory) {
+            runAdbAndShowResult(
+                coroutineScope,
+                "top -n 1",
+                setDialogText = { dialogText = it },
+                setShowDialog = { showDialog = it }
+            )
         },
-        AdbFunction("无线连接", Icons.Default.Wifi) {
-
+        AdbFunction("网络状态", Icons.Default.NetworkCheck) {
+            runAdbAndShowResult(
+                coroutineScope,
+                "dumpsys connectivity",
+                setDialogText = { dialogText = it },
+                setShowDialog = { showDialog = it }
+            )
         },
-        AdbFunction("无线连接", Icons.Default.Wifi) {
-
+        AdbFunction("电池状态", Icons.Default.BatteryStd) {
+            runAdbAndShowResult(
+                coroutineScope,
+                "dumpsys battery",
+                setDialogText = { dialogText = it },
+                setShowDialog = { showDialog = it }
+            )
+        },
+        AdbFunction("屏幕分辨率", Icons.Default.ScreenSearchDesktop) {
+            runAdbAndShowResult(
+                coroutineScope,
+                "wm size",
+                setDialogText = { dialogText = it },
+                setShowDialog = { showDialog = it }
+            )
+        },
+        AdbFunction("开发者界面", Icons.Default.DeveloperMode) {
+            runAdbAndShowResult(
+                coroutineScope,
+                "am start -a android.settings.APPLICATION_DEVELOPMENT_SETTINGS",
+                setDialogText = { dialogText = it },
+                setShowDialog = { showDialog = it }
+            )
         }
     )
+
 
     val iconColors = listOf(
         Color(0xFFEF5350), // Red
@@ -168,7 +248,7 @@ fun CommonScreen() {
                             .fillMaxWidth()
                             .background(LightColorScheme.background, RoundedCornerShape(12.dp))
                     ) {
-                        SectionTitle("常用功能", Color.Red)
+                        SectionTitle("常用功能", Color.Red, modifier = Modifier.padding(top = 12.dp, start = 15.dp))
                         FlowRow(
                             modifier = Modifier.padding(horizontal = 12.dp, vertical = 20.dp),
                             horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -196,7 +276,7 @@ fun CommonScreen() {
                             .padding(top = 15.dp)
                             .background(LightColorScheme.background, RoundedCornerShape(12.dp))
                     ) {
-                        SectionTitle("系统功能", Color.Blue)
+                        SectionTitle("系统功能", Color.Blue, modifier = Modifier.padding(top = 12.dp, start = 15.dp))
                         FlowRow(
                             modifier = Modifier.fillMaxWidth()
                                 .padding(horizontal = 12.dp, vertical = 20.dp),
@@ -204,7 +284,7 @@ fun CommonScreen() {
                             verticalArrangement = Arrangement.spacedBy(12.dp),
                             maxItemsInEachRow = 5
                         ) {
-                            items.forEachIndexed { index, item ->
+                            sysItems.forEachIndexed { index, item ->
                                 val color = iconColors[index % iconColors.size]
                                 GridItemCard(
                                     title = item.title,
@@ -217,65 +297,7 @@ fun CommonScreen() {
                     }
                 }
 
-                item {
-                    // 系统功能模块
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 15.dp)
-                            .background(LightColorScheme.background, RoundedCornerShape(12.dp))
-                    ) {
-                        SectionTitle("系统功能", Color.Blue)
-                        FlowRow(
-                            modifier = Modifier.fillMaxWidth()
-                                .padding(horizontal = 12.dp, vertical = 20.dp),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            verticalArrangement = Arrangement.spacedBy(12.dp),
-                            maxItemsInEachRow = 5
-                        ) {
-                            items.forEachIndexed { index, item ->
-                                val color = iconColors[index % iconColors.size]
-                                GridItemCard(
-                                    title = item.title,
-                                    icon = item.icon,
-                                    iconColor = color,
-                                    onClick = item.onClick,
-                                )
-                            }
-                        }
-                    }
-                }
-
-                item {
-                    // 系统功能模块
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 15.dp)
-                            .background(LightColorScheme.background, RoundedCornerShape(12.dp))
-                    ) {
-                        SectionTitle("系统功能", Color.Blue)
-                        FlowRow(
-                            modifier = Modifier.fillMaxWidth()
-                                .padding(horizontal = 12.dp, vertical = 20.dp),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            verticalArrangement = Arrangement.spacedBy(12.dp),
-                            maxItemsInEachRow = 5
-                        ) {
-                            items.forEachIndexed { index, item ->
-                                val color = iconColors[index % iconColors.size]
-                                GridItemCard(
-                                    title = item.title,
-                                    icon = item.icon,
-                                    iconColor = color,
-                                    onClick = item.onClick,
-                                )
-                            }
-                        }
-                    }
-                }
             }
-
             VerticalScrollbar(
                 adapter = rememberScrollbarAdapter(scrollState),
                 modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight()
@@ -290,17 +312,16 @@ fun CommonScreen() {
         }
     }
 
-    // --- 文本输入弹窗 ---
     if (showTextInputDialog) {
         textInputDialog(coroutineScope) { showTextInputDialog = false }
     }
 }
 
 @Composable
-fun SectionTitle(title: String, barColor: Color) {
+fun SectionTitle(title: String, barColor: Color,modifier: Modifier = Modifier) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.padding(top = 12.dp, start = 15.dp)
+        modifier = modifier
     ) {
         Box(
             modifier = Modifier
@@ -318,12 +339,13 @@ fun GridItemCard(
     title: String,
     icon: ImageVector,
     iconColor: Color = LightColorScheme.primary,
+    modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
     Card(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         shape = RoundedCornerShape(12.dp),
-        modifier = Modifier.width(110.dp)
+        modifier = modifier.fillMaxWidth(0.18f)
             .clickable { onClick() }
     ) {
         Column(

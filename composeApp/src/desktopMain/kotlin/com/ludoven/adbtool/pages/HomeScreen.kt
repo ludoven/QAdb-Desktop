@@ -201,11 +201,7 @@ fun DevicesScreen(viewModel: DevicesViewModel) {
                 )
             ) {
                 Column(modifier = Modifier.padding(top = 16.dp, start = 16.dp, end = 16.dp)) {
-                    Text(
-                        text = "设备信息",
-                        style = MaterialTheme.typography.titleLarge,
-                        modifier = Modifier.padding(bottom = 8.dp)
-                    )
+                    SectionTitle("设备信息", Color.Blue, modifier = Modifier.padding(bottom = 10.dp))
                     if (selectedDevice == null) {
                         Text("请选择一个设备以查看其信息。")
                     } else if (deviceInfo.isEmpty() && !isLoading) {

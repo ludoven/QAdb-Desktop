@@ -1,6 +1,8 @@
 package com.ludoven.adbtool.util
 
 
+import javafx.stage.DirectoryChooser
+import java.awt.FileDialog
 import java.io.File
 import javax.swing.JFileChooser
 import javax.swing.filechooser.FileNameExtensionFilter
@@ -36,4 +38,17 @@ object FileUtils {
         }
         return null // 用户取消选择
     }
+
+
+    fun selectFolder(): String? {
+        val chooser = JFileChooser()
+        chooser.fileSelectionMode = JFileChooser.DIRECTORIES_ONLY
+        chooser.dialogTitle = "选择保存截图的文件夹"
+
+        val result = chooser.showOpenDialog(null)
+        return if (result == JFileChooser.APPROVE_OPTION) {
+            chooser.selectedFile.absolutePath
+        } else null
+    }
+
 }
