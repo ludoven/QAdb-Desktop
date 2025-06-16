@@ -155,41 +155,43 @@ fun HomeScreen(viewModel: DevicesViewModel) {
                 Spacer(modifier = Modifier.height(16.dp))
             }
 
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(IntrinsicSize.Min)
-                    .padding(bottom = 30.dp, top = 12.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                InfoCard(
-                    modifier = Modifier.weight(1f),
-                    title = "CPU",
-                    value = "${centerInfo["CPU"]}",
-                    icon = Icons.Default.Memory,
-                    iconColor = Color(0xFFEF5350) // 红色
-                )
-                InfoCard(
-                    modifier = Modifier.weight(1f),
-                    title = "内存占用",
-                    value = "${centerInfo["内存"]}",
-                    icon = Icons.Default.Storage,
-                    iconColor = Color(0xFF42A5F5) // 蓝色
-                )
-                InfoCard(
-                    modifier = Modifier.weight(1f),
-                    title = "存储占用",
-                    value = "${centerInfo["存储"]}",
-                    icon = Icons.Default.SdStorage,
-                    iconColor = Color(0xFF66BB6A) // 绿色
-                )
-                InfoCard(
-                    modifier = Modifier.weight(1f),
-                    title = "电池",
-                    value = "${centerInfo["电量"]}",
-                    icon = Icons.Default.BatteryFull,
-                    iconColor = Color(0xFFFFA726) // 橙色
-                )
+            if (selectedDevice != null){
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(IntrinsicSize.Max)
+                        .padding(bottom = 30.dp, top = 12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    InfoCard(
+                        modifier = Modifier.weight(1f),
+                        title = "CPU",
+                        value = "${centerInfo["CPU"]}",
+                        icon = Icons.Default.Memory,
+                        iconColor = Color(0xFFEF5350) // 红色
+                    )
+                    InfoCard(
+                        modifier = Modifier.weight(1f),
+                        title = "内存占用",
+                        value = "${centerInfo["内存"]}",
+                        icon = Icons.Default.Storage,
+                        iconColor = Color(0xFF42A5F5) // 蓝色
+                    )
+                    InfoCard(
+                        modifier = Modifier.weight(1f),
+                        title = "存储占用",
+                        value = "${centerInfo["存储"]}",
+                        icon = Icons.Default.SdStorage,
+                        iconColor = Color(0xFF66BB6A) // 绿色
+                    )
+                    InfoCard(
+                        modifier = Modifier.weight(1f),
+                        title = "电池",
+                        value = "${centerInfo["电量"]}",
+                        icon = Icons.Default.BatteryFull,
+                        iconColor = Color(0xFFFFA726) // 橙色
+                    )
+                }
             }
 
 
@@ -200,7 +202,7 @@ fun HomeScreen(viewModel: DevicesViewModel) {
                     containerColor = LightColorScheme.background
                 )
             ) {
-                Column(modifier = Modifier.padding(top = 16.dp, start = 16.dp, end = 16.dp)) {
+                Column(modifier = Modifier.padding(top = 16.dp, start = 16.dp, end = 16.dp, bottom = 16.dp)) {
                     SectionTitle("设备信息", Color.Blue, modifier = Modifier.padding(bottom = 10.dp))
                     if (selectedDevice == null) {
                         Text("请选择一个设备以查看其信息。")
@@ -210,30 +212,33 @@ fun HomeScreen(viewModel: DevicesViewModel) {
                         Column(
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            deviceInfo.entries.toList()
-                                .forEach { (key, value) -> // 使用 forEach 代替 items
-                                    SelectionContainer {
-                                        Column {
-                                            Row(
-                                                modifier = Modifier
-                                                    .fillMaxWidth()
-                                                    .padding(vertical = 6.dp, horizontal = 12.dp)
-                                            ) {
-                                                Text(
-                                                    text = "$key:",
-                                                    modifier = Modifier.weight(0.4f),
-                                                    style = MaterialTheme.typography.bodyMedium,
-                                                    maxLines = 1
-                                                )
-                                                Text(
-                                                    text = value,
-                                                    modifier = Modifier.weight(0.6f),
-                                                    style = MaterialTheme.typography.bodyMedium
-                                                )
-                                            }
+                            deviceInfo.entries.toList().forEachIndexed { index, (key, value) ->
+                                SelectionContainer {
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 12.dp, vertical = 10.dp)
+                                            .padding(bottom = if (index < deviceInfo.size - 1) 3.dp else 0.dp)
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth()
+                                        ) {
+                                            Text(
+                                                text = "$key:",
+                                                modifier = Modifier.weight(0.4f),
+                                                style = MaterialTheme.typography.bodyMedium.copy(color = Color.Gray),
+                                                maxLines = 1
+                                            )
+                                            Text(
+                                                text = value,
+                                                modifier = Modifier.weight(0.6f),
+                                                style = MaterialTheme.typography.bodyMedium.copy(color = Color.Black)
+                                            )
                                         }
                                     }
                                 }
+                            }
+
                         }
 
                     }

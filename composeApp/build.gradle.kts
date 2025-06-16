@@ -53,15 +53,11 @@ compose.desktop {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Exe)
 
             packageVersion = "1.0.0"
-            packageName = "QAdb" // <-- 将这里改为你想要的应用名称
+            packageName = "QAdb"
 
             macOS {
-//                iconFile.set(project.file("src/jvmMain/resources/icon.icns")) // 应用图标路径
                 bundleID = "com.ludoven.adbtool" // Bundle Identifier
-                signing {
-
-                }
-
+                iconFile.set(project.file("desktopMain/composeResources/drawable/img.png"))
             }
         }
     }

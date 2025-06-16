@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -17,6 +18,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
@@ -29,15 +31,19 @@ import androidx.compose.material.icons.filled.RestartAlt
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Storage
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -52,14 +58,19 @@ import com.ludoven.adbtool.entity.AdbFunction
 import com.ludoven.adbtool.iconColors
 import com.ludoven.adbtool.util.AdbTool
 import com.ludoven.adbtool.util.FileUtils
+import com.ludoven.adbtool.viewmodel.AppViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.collections.component1
+import kotlin.collections.component2
 
 @Composable
-fun AppScreen() {
+fun AppScreen(viewModel: AppViewModel) {
+    val appInfo by viewModel.appInfo.collectAsState()
+
     var showDialog by remember { mutableStateOf(false) }
     var dialogText by remember { mutableStateOf("") }
     var showTextInputDialog by remember { mutableStateOf(false) }
@@ -308,9 +319,62 @@ fun AppScreen() {
                                         onClick = {
                                             selectedApp = app
                                             expanded = false
+                                            viewModel.loadAppInfo(app.packageName)
                                         }
                                     )
                                 }
+                            }
+                        }
+                    }
+                }
+
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 20.dp),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = LightColorScheme.background
+                        )
+                    ) {
+                        Column(modifier = Modifier.padding(top = 16.dp, start = 16.dp, end = 16.dp, bottom = 16.dp)) {
+                            SectionTitle("设备信息", Color.Blue, modifier = Modifier.padding(bottom = 10.dp))
+                            if (selectedApp == null) {
+                                Text("请选择一个应用以查看其信息。")
+                            } else if (appInfo.isEmpty()) {
+                                Text("未能获取到应用详细信息。", color = Color.Gray)
+                            } else {
+                                Column(
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    appInfo.entries.toList().forEachIndexed { index, (key, value) ->
+                                        SelectionContainer {
+                                            Column(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(horizontal = 12.dp, vertical = 10.dp)
+                                                    .padding(bottom = if (index < appInfo.size - 1) 3.dp else 0.dp)
+                                            ) {
+                                                Row(
+                                                    modifier = Modifier.fillMaxWidth()
+                                                ) {
+                                                    Text(
+                                                        text = "$key:",
+                                                        modifier = Modifier.weight(0.4f),
+                                                        style = MaterialTheme.typography.bodyMedium.copy(color = Color.Gray),
+                                                        maxLines = 1
+                                                    )
+                                                    Text(
+                                                        text = value,
+                                                        modifier = Modifier.weight(0.6f),
+                                                        style = MaterialTheme.typography.bodyMedium.copy(color = Color.Black)
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                }
+
                             }
                         }
                     }

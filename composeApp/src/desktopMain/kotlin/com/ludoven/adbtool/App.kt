@@ -26,6 +26,7 @@ import com.ludoven.adbtool.pages.AppScreen
 import com.ludoven.adbtool.pages.CommonScreen
 import com.ludoven.adbtool.pages.HomeScreen
 import com.ludoven.adbtool.pages.SettingScreen
+import com.ludoven.adbtool.viewmodel.AppViewModel
 import com.ludoven.adbtool.viewmodel.DevicesViewModel
 
 @ExperimentalMaterial3Api
@@ -34,6 +35,7 @@ import com.ludoven.adbtool.viewmodel.DevicesViewModel
 fun App() {
 
     val devicesViewModel: DevicesViewModel = viewModel() // 仅初始化一次
+    val appViewModel: AppViewModel = viewModel() // 仅初始化一次
 
     MaterialTheme(colorScheme = LightColorScheme) {
         // 定义Tab数据，通常是数据类或枚举
@@ -103,7 +105,7 @@ fun App() {
                     when (selectedTabIndex) {
                         0 -> HomeScreen(devicesViewModel) // 你的设备管理页面
                         1 -> CommonScreen()     // 你的常用页面
-                        2 -> AppScreen()    // 你的应用管理页面
+                        2 -> AppScreen(appViewModel)    // 你的应用管理页面
 //                        3 -> SystemScreen()        // 你的系统页面
 //                        4 -> KeyEventScreen()         // 你的按键输入页面
                         3 -> SettingScreen()         // 你的设置页面
