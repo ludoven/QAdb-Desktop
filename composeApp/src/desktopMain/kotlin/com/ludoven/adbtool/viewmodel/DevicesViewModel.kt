@@ -43,6 +43,7 @@ class DevicesViewModel : ViewModel() {
     fun selectDevice(deviceId: String?) {
         _selectedDevice.value = deviceId
         if (deviceId != null) {
+            AdbTool.selectDeviceId = deviceId
             loadDeviceInfo(deviceId)
         } else {
             _deviceInfo.value = emptyMap()
@@ -152,6 +153,4 @@ class DevicesViewModel : ViewModel() {
             _isLoading.value = false
         }
     }
-
-
 }

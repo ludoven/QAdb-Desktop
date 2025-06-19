@@ -330,7 +330,7 @@ fun AppScreen(viewModel: AppViewModel) {
 
                 item {
                     Card(
-                        modifier = Modifier.fillMaxWidth().padding(bottom = 20.dp),
+                        modifier = Modifier.fillMaxWidth().padding(top = 20.dp,bottom = 20.dp),
                         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
                         colors = CardDefaults.cardColors(
                             containerColor = LightColorScheme.background
@@ -352,7 +352,6 @@ fun AppScreen(viewModel: AppViewModel) {
                                                 modifier = Modifier
                                                     .fillMaxWidth()
                                                     .padding(horizontal = 12.dp, vertical = 10.dp)
-                                                    .padding(bottom = if (index < appInfo.size - 1) 3.dp else 0.dp)
                                             ) {
                                                 Row(
                                                     modifier = Modifier.fillMaxWidth()

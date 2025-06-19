@@ -403,7 +403,7 @@ fun textInputDialog(coroutineScope: CoroutineScope, onDismiss: () -> Unit) {
                         onDismiss.invoke()
                         coroutineScope.launch {
                             val success =
-                                AdbTool.inputText(text = inputText, escapeSpaces = escapeSpaces)
+                                AdbTool.inputText(text = inputText)
                             if (success) {
                                 println("输入成功")
                             } else {

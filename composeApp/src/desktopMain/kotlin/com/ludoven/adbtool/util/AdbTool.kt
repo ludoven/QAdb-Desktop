@@ -10,15 +10,11 @@ import java.io.InputStreamReader
 
 object AdbTool {
 
-    // 假设 adb 已经添加到系统 PATH 中，或者你需要提供 adb 可执行文件的完整路径
-    // 例如：val adbPath = "C:\\Users\\YourUser\\AppData\\Local\\Android\\Sdk\\platform-tools\\adb.exe"
-    // 或者在 macOS/Linux 上：val adbPath = "/Users/YourUser/Library/Android/sdk/platform-tools/adb"
-    private const val ADB_COMMAND = "adb"
     private var adbPath: String? = null
+    var selectDeviceId: String? = null
 
     fun setAdbPath(path: String) {
         adbPath = path
-        // 可选：保存到本地配置，例如 Preferences 或文件
     }
 
     fun getAdbPath(): String? = adbPath
@@ -26,161 +22,141 @@ object AdbTool {
     fun getSystemAdbPath(): String? {
         return try {
             val cmd = if (System.getProperty("os.name").startsWith("Windows")) "where adb" else "which adb"
-            val process = Runtime.getRuntime().exec(cmd)
-            process.inputStream.bufferedReader().readLine()?.takeIf { it.isNotEmpty() }
+            Runtime.getRuntime().exec(cmd).inputStream.bufferedReader().readLine()
         } catch (e: Exception) {
             null
         }
     }
 
-
-    fun executeAdbCommand(vararg args: String): String {
-        val command = mutableListOf(ADB_COMMAND).apply { addAll(args) }
-        val processBuilder = ProcessBuilder(command)
-        processBuilder.redirectErrorStream(true) // 合并标准错误流到标准输出流
-
-        val process = processBuilder.start()
-        val reader = BufferedReader(InputStreamReader(process.inputStream))
-        val output = StringBuilder()
-        var line: String?
-        while (reader.readLine().also { line = it } != null) {
-            output.append(line).append("\n")
-        }
-
-        val exitCode = process.waitFor() // 等待命令执行完成
-        if (exitCode != 0) {
-            System.err.println("ADB command failed with exit code $exitCode: ${command.joinToString(" ")}")
-        }
-        return output.toString()
-    }
-
-    // 示例：获取已连接设备列表
-    fun getConnectedDevices(): List<String> {
-        val output = executeAdbCommand("devices")
-        // 解析输出，通常第一行是 "List of devices attached"，需要跳过
-        return output.lines()
-            .drop(1) // 跳过标题行
-            .mapNotNull { line ->
-                // 示例输出：emulator-5554    device
-                val parts = line.split("\\s+".toRegex())
-                if (parts.size >= 2 && parts[1] == "device") {
-                    parts[0] // 返回设备ID
-                } else {
-                    null
-                }
-            }
-            .filter { it.isNotBlank() } // 过滤空行
-    }
-
-    // 示例：断开指定设备连接
-    fun disconnectDevice(deviceId: String): String {
-        // ADB本身没有直接的"disconnect device"命令，通常是"adb kill-server"和"adb start-server"来重置
-        // 或者对于TCP连接，可以使用 adb disconnect host:port
-        // 如果是USB设备，拔掉就是断开
-        // 这里只是一个示例，如果需要精确控制某个设备断开，可能需要更复杂的逻辑或用户手动操作
-        return executeAdbCommand("disconnect", deviceId) // 假设这是一个TCP/IP连接的设备
-    }
-
-    // 示例：向指定设备输入文本
-    fun inputTextToDevice(deviceId: String, text: String): String {
-        val escapedText = text.replace(" ", "%s").replace("'", "\\'") // 简单的转义处理
-        return executeAdbCommand("-s", deviceId, "shell", "input", "text", escapedText)
-    }
-
-
-
-    fun installApk(apkPath: String): Boolean {
+    private fun runCommand(vararg args: String): String {
+        val fullCmd = mutableListOf(adbPath ?: "adb").apply { addAll(args) }
         return try {
-            val process = ProcessBuilder("adb", "install", "-r", apkPath)
-                .redirectErrorStream(true)
-                .start()
-
-            val output = BufferedReader(InputStreamReader(process.inputStream)).readText()
-            val exitCode = process.waitFor()
-            println("ADB Output: $output")
-            exitCode == 0 && output.contains("Success")
-        } catch (e: Exception) {
-            e.printStackTrace()
-            false
-        }
-    }
-
-
-    fun inputText(text: String, escapeSpaces: Boolean = true): Boolean {
-        println("尝试输入文本: '$text'")
-        println("是否转义空格: $escapeSpaces")
-
-        // 处理转义空格
-        val processedText = if (escapeSpaces) text.replace(" ", "%s") else text
-        println("处理后的文本: '$processedText'")
-
-        return try {
-            // 执行 adb 命令
-            val process = ProcessBuilder("adb", "shell", "input", "text", processedText)
-                .redirectErrorStream(true)
-                .start()
-
+            val process = ProcessBuilder(fullCmd).redirectErrorStream(true).start()
             val output = process.inputStream.bufferedReader().readText()
-            val exitCode = process.waitFor()
-
-            println("adb 执行输出:\n$output")
-            println("adb 返回码: $exitCode")
-
-            exitCode == 0
-        } catch (e: Exception) {
-            e.printStackTrace()
-            false
-        }
-    }
-
-
-
-    fun takeScreenshot(savePath: String): Boolean {
-        try {
-            // 1. 截图到设备
-            val screenshotCmd = listOf("adb", "shell", "screencap", "-p", "/sdcard/screen.png")
-            val screenshotResult = ProcessBuilder(screenshotCmd).start().waitFor()
-            if (screenshotResult != 0) return false
-
-            // 2. 拉取到电脑
-            val pullCmd = listOf("adb", "pull", "/sdcard/screen.png", savePath)
-            val pullResult = ProcessBuilder(pullCmd).start().waitFor()
-            if (pullResult != 0) return false
-
-            // 3. 可选：删除设备上的临时文件
-            ProcessBuilder("adb", "shell", "rm", "/sdcard/screen.png").start()
-
-            return true
-        } catch (e: Exception) {
-            e.printStackTrace()
-            return false
-        }
-    }
-
-
-    fun getCurrentActivity(): String? {
-        val result = Runtime.getRuntime().exec("adb shell dumpsys activity activities").inputStream
-            .bufferedReader().use { it.readText() }
-
-        // 示例行：ResumedActivity: ActivityRecord{... com.example/.MainActivity}
-        val regex = Regex("""ResumedActivity:.* ([\w\.]+\/[\w\.\$]+)""")
-        val match = regex.find(result)
-        return match?.groups?.get(1)?.value
-    }
-
-    fun exec(command: String): String {
-        return try {
-            val process = ProcessBuilder("adb", "shell", command)
-                .redirectErrorStream(true)
-                .start()
-            process.inputStream.bufferedReader().use { it.readText() }.trim()
+            process.waitFor()
+            output.trim()
         } catch (e: Exception) {
             "执行失败：${e.message}"
         }
     }
 
-    suspend fun execSuspend(command: String): String = withContext(Dispatchers.IO) {
-        exec(command)
+    fun execShell(command: String, deviceId: String? = selectDeviceId): String {
+        val args = mutableListOf<String>()
+        if (!deviceId.isNullOrBlank()) args += listOf("-s", deviceId)
+        args += listOf("shell", command)
+        return runCommand(*args.toTypedArray())
+    }
+
+    fun exec(command: String): String = execShell(command)
+
+    suspend fun getConnectedDevices(): List<String> {
+        return runCommand("devices").lines().drop(1).mapNotNull {
+            val parts = it.trim().split("\\s+".toRegex())
+            if (parts.size >= 2 && parts[1] == "device") parts[0] else null
+        }
+    }
+
+    fun takeScreenshot(savePath: String, deviceId: String? = selectDeviceId): Boolean {
+        if (deviceId.isNullOrBlank()) return false
+        return try {
+            val remote = "/sdcard/screen.png"
+            runCommand("-s", deviceId, "shell", "screencap", "-p", remote)
+            runCommand("-s", deviceId, "pull", remote, savePath)
+            runCommand("-s", deviceId, "shell", "rm", remote)
+            true
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    fun pullFile(devicePath: String, localPath: String, deviceId: String? = selectDeviceId): Boolean {
+        if (deviceId.isNullOrBlank()) return false
+        val result = runCommand("-s", deviceId, "pull", devicePath, localPath)
+        return result.contains("pulled")
+    }
+
+    fun installApk(apkPath: String, deviceId: String? = selectDeviceId): Boolean {
+        if (deviceId.isNullOrBlank()) return false
+        val output = runCommand("-s", deviceId, "install", "-r", apkPath)
+        return output.contains("Success")
+    }
+
+    fun uninstallApp(packageName: String, deviceId: String? = selectDeviceId): Boolean {
+        if (deviceId.isNullOrBlank()) return false
+        val output = runCommand("-s", deviceId, "uninstall", packageName)
+        return output.contains("Success")
+    }
+
+    fun inputText(text: String, deviceId: String? = selectDeviceId): Boolean {
+        if (deviceId.isNullOrBlank()) return false
+        val processedText = text.replace(" ", "%s")
+        val output = runCommand("-s", deviceId, "shell", "input", "text", processedText)
+        return output.isNotBlank()
+    }
+
+    fun getCurrentActivity(deviceId: String? = selectDeviceId): String? {
+        val result = runCommand("-s", deviceId ?: return null, "shell", "dumpsys", "activity", "activities")
+        val regex = Regex("""ResumedActivity:.* ([\w\.]+\/[\w\.\$]+)""")
+        return regex.find(result)?.groups?.get(1)?.value
+    }
+
+    fun startApp(packageName: String, deviceId: String? = selectDeviceId): Boolean {
+        val component = execShell("cmd package resolve-activity --brief $packageName", deviceId).lines().lastOrNull()
+        return if (!component.isNullOrBlank()) {
+            execShell("am start -n $component", deviceId)
+            true
+        } else false
+    }
+
+    fun stopApp(packageName: String, deviceId: String? = selectDeviceId): Boolean {
+        execShell("am force-stop $packageName", deviceId)
+        return true
+    }
+
+    fun clearAppData(packageName: String, deviceId: String? = selectDeviceId): Boolean {
+        return execShell("pm clear $packageName", deviceId).contains("Success")
+    }
+
+    fun resetPermissions(packageName: String, deviceId: String? = selectDeviceId): Boolean {
+        execShell("pm reset-permissions $packageName", deviceId)
+        return true
+    }
+
+    fun grantAllPermissions(packageName: String, deviceId: String? = selectDeviceId): Boolean {
+        val result = execShell("dumpsys package $packageName", deviceId)
+        val permissions = Regex("android.permission.[A-Z_\\.]+").findAll(result).map { it.value }.toSet()
+        permissions.forEach { perm ->
+            execShell("pm grant $packageName $perm", deviceId)
+        }
+        return true
+    }
+
+    fun getAppPath(packageName: String, deviceId: String? = selectDeviceId): String {
+        return execShell("pm path $packageName", deviceId)
+    }
+
+    fun getInstallTime(packageName: String, deviceId: String? = selectDeviceId): String {
+        return execShell("dumpsys package $packageName | grep firstInstallTime", deviceId)
+    }
+
+    fun getUpdateTime(packageName: String, deviceId: String? = selectDeviceId): String {
+        return execShell("dumpsys package $packageName | grep lastUpdateTime", deviceId)
+    }
+
+    fun isSystemApp(packageName: String, deviceId: String? = selectDeviceId): Boolean {
+        return execShell("dumpsys package $packageName", deviceId).contains("flags=[ SYSTEM")
+    }
+
+    fun getSupportedAbis(deviceId: String? = selectDeviceId): String {
+        return execShell("getprop ro.product.cpu.abilist", deviceId)
+    }
+
+    fun getTargetSdkVersion(packageName: String, deviceId: String? = selectDeviceId): String {
+        return execShell("dumpsys package $packageName | grep targetSdk", deviceId)
+    }
+
+    fun getMinSdkVersion(packageName: String, deviceId: String? = selectDeviceId): String {
+        return execShell("dumpsys package $packageName | grep minSdk", deviceId)
     }
 
     fun runAdbAndShowResult(
@@ -190,22 +166,35 @@ object AdbTool {
         setShowDialog: (Boolean) -> Unit
     ) {
         coroutineScope.launch {
-            val result = withContext(Dispatchers.IO) {
-                AdbTool.exec(command)
-            }
-            setDialogText(result.ifEmpty { "无返回结果" })
+            val result = withContext(Dispatchers.IO) { exec(command) }
+            setDialogText(result.ifBlank { "无返回结果" })
             setShowDialog(true)
         }
     }
 
 
-    fun pullFile(devicePath: String, localPath: String): Boolean {
-        val result = exec("adb pull \"$devicePath\" \"$localPath\"")
-        return result?.contains("1 file pulled") == true || result?.contains("pulled") == true
+    suspend fun executeAdbCommand(vararg args: String): String {
+        return withContext(Dispatchers.IO) {
+            try {
+                val command = mutableListOf("adb") + args
+                val process = ProcessBuilder(command).redirectErrorStream(true).start()
+                val output = process.inputStream.bufferedReader().readText()
+                process.waitFor()
+                output.trim()
+            } catch (e: Exception) {
+                e.printStackTrace()
+                "执行失败：${e.message}"
+            }
+        }
     }
 
-    // 更多ADB命令的包装...
-    // adb -s <deviceId> shell screencap /sdcard/screen.png
-    // adb -s <deviceId> pull /sdcard/screen.png .
-    // adb -s <deviceId> shell pm list packages
+    suspend fun disconnectDevice(deviceId: String): String {
+        return executeAdbCommand("disconnect", deviceId)
+    }
+/*
+    suspend fun getConnectedDevices(): List<String> {
+        val output = executeAdbCommand("devices")
+        return output.lines().drop(1)
+            .mapNotNull { line -> line.split("\\s+".toRegex()).takeIf { it.size >= 2 && it[1] == "device" }?.get(0) }
+    }*/
 }
