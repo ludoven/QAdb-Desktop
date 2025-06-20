@@ -25,6 +25,7 @@ kotlin {
             implementation(compose.materialIconsExtended)
             // JetBrains Compose Multiplatform 的 ViewModel 支持
             implementation("org.jetbrains.androidx.lifecycle:lifecycle-viewmodel-compose:2.9.0")
+            implementation("org.jetbrains.androidx.navigation:navigation-compose:2.9.0-beta03")
 
 
             implementation("org.openjfx:javafx-base:21:win")     // 根据平台选择
@@ -56,8 +57,7 @@ compose.desktop {
             packageName = "QAdb"
 
             macOS {
-                bundleID = "com.ludoven.adbtool" // Bundle Identifier
-                iconFile.set(project.file("desktopMain/composeResources/drawable/img.png"))
+                bundleID = "com.ludoven.adbtool"
             }
         }
     }

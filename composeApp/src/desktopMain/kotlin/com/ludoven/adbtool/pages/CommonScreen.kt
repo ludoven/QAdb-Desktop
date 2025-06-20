@@ -1,5 +1,35 @@
 package com.ludoven.adbtool.pages
 
+import adbtool_desktop.composeapp.generated.resources.Res
+import adbtool_desktop.composeapp.generated.resources.activity_not_found
+import adbtool_desktop.composeapp.generated.resources.apk_not_selected
+import adbtool_desktop.composeapp.generated.resources.battery_status
+import adbtool_desktop.composeapp.generated.resources.cancel
+import adbtool_desktop.composeapp.generated.resources.common_functions
+import adbtool_desktop.composeapp.generated.resources.confirm
+import adbtool_desktop.composeapp.generated.resources.cpu
+import adbtool_desktop.composeapp.generated.resources.cpu_info
+import adbtool_desktop.composeapp.generated.resources.current_activity
+import adbtool_desktop.composeapp.generated.resources.developer_options
+import adbtool_desktop.composeapp.generated.resources.escape_spaces
+import adbtool_desktop.composeapp.generated.resources.folder_not_selected
+import adbtool_desktop.composeapp.generated.resources.input_hint
+import adbtool_desktop.composeapp.generated.resources.input_text
+import adbtool_desktop.composeapp.generated.resources.install_app
+import adbtool_desktop.composeapp.generated.resources.install_failed
+import adbtool_desktop.composeapp.generated.resources.install_success
+import adbtool_desktop.composeapp.generated.resources.installing
+import adbtool_desktop.composeapp.generated.resources.is_rooted
+import adbtool_desktop.composeapp.generated.resources.network_status
+import adbtool_desktop.composeapp.generated.resources.reboot_device
+import adbtool_desktop.composeapp.generated.resources.screen_resolution
+import adbtool_desktop.composeapp.generated.resources.screenshot
+import adbtool_desktop.composeapp.generated.resources.screenshot_failed
+import adbtool_desktop.composeapp.generated.resources.screenshot_success
+import adbtool_desktop.composeapp.generated.resources.system_functions
+import adbtool_desktop.composeapp.generated.resources.tip_title
+import adbtool_desktop.composeapp.generated.resources.view_activity
+import adbtool_desktop.composeapp.generated.resources.wifi_info
 import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -69,14 +99,26 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.jetbrains.compose.resources.stringResource
 import org.jetbrains.compose.ui.tooling.preview.Preview
 
 @ExperimentalMaterial3Api
 @Composable
 @Preview
 fun CommonScreen() {
+    val installingText = stringResource(Res.string.installing)
+    val installSuccessText = stringResource(Res.string.install_success)
+    val installFailedText = stringResource(Res.string.install_failed)
+    val apkNotSelectText = stringResource(Res.string.apk_not_selected)
+    val folderNotSelectedText = stringResource(Res.string.folder_not_selected)
+    val screenshotSuccessText = stringResource(Res.string.screenshot_success)
+    val screenshotFailedText = stringResource(Res.string.screenshot_failed)
+    val activityNotFoundText = stringResource(Res.string.activity_not_found)
+    val currentActivityText = stringResource(Res.string.current_activity)
+
+
     var showDialog by remember { mutableStateOf(false) }
-    var dialogText by remember { mutableStateOf("正在安装...") }
+    var dialogText by remember { mutableStateOf(installingText) }
     // 使用 rememberCoroutineScope 来管理协程生命周期，避免泄露
     val coroutineScope = rememberCoroutineScope()
     // 新增的状态，用于控制文本输入弹窗的显示
@@ -84,11 +126,11 @@ fun CommonScreen() {
 
 
     val commonItems = listOf(
-        AdbFunction("安装应用", Icons.Default.InstallMobile) {
+        AdbFunction(stringResource(Res.string.install_app), Icons.Default.InstallMobile) {
             val apkPath = FileUtils.selectApkFile()
             if (apkPath != null) {
                 // 1. 立即显示“正在安装...”的弹窗
-                dialogText = "正在安装..."
+                dialogText = installingText
                 showDialog = true
 
                 // 2. 启动后台安装任务
@@ -96,7 +138,7 @@ fun CommonScreen() {
                     val success = AdbTool.installApk(apkPath) // 执行安装
                     withContext(Dispatchers.Main) { // 切换回主线程更新 UI
                         // 3. 根据安装结果更新弹窗文本
-                        dialogText = if (success) "安装成功" else "安装失败"
+                        dialogText = if (success) installSuccessText else installFailedText
                         // 4. 短暂显示结果，然后关闭弹窗
                         delay(2000) // 显示结果2秒
                         showDialog = false
@@ -105,7 +147,7 @@ fun CommonScreen() {
             } else {
                 // 如果用户没有选择文件，可以给一个提示
                 coroutineScope.launch {
-                    dialogText = "未选择 APK 文件或选择有误。"
+                    dialogText = apkNotSelectText
                     showDialog = true
                     delay(2000)
                     showDialog = false
@@ -113,16 +155,16 @@ fun CommonScreen() {
             }
         },
 
-        AdbFunction("输入文本", Icons.Default.Edit) {
+        AdbFunction(stringResource(Res.string.input_text), Icons.Default.Edit) {
             showTextInputDialog = true
         },
-        AdbFunction("截图保存", Icons.Default.PhotoCamera) {
+        AdbFunction(stringResource(Res.string.screenshot), Icons.Default.PhotoCamera) {
             coroutineScope.launch {
                 // 不要放 IO 线程，否则 Swing UI 不会弹窗！
                 val folderPath = FileUtils.selectFolder()
 
                 if (folderPath == null) {
-                    dialogText = "未选择文件夹"
+                    dialogText = folderNotSelectedText
                     showDialog = true
                     delay(2000)
                     showDialog = false
@@ -136,25 +178,25 @@ fun CommonScreen() {
                     AdbTool.takeScreenshot(savePath)
                 }
 
-                dialogText = if (success) "截图保存成功！" else "截图失败"
+                dialogText = if (success) screenshotSuccessText else screenshotFailedText
                 showDialog = true
                 delay(2000)
                 showDialog = false
             }
         },
-        AdbFunction("查看Activity", Icons.Default.Visibility) {
+        AdbFunction(stringResource(Res.string.view_activity), Icons.Default.Visibility) {
             coroutineScope.launch {
                 val activity = withContext(Dispatchers.IO) {
                     AdbTool.getCurrentActivity()
                 }
-                dialogText = activity?.let { "当前 Activity:\n\n$it" } ?: "无法获取 Activity"
+                dialogText = activity?.let { currentActivityText.format(it) } ?: activityNotFoundText
                 showDialog = true
             }
         }
     )
 
     val sysItems = listOf(
-        AdbFunction("重启设备", Icons.Default.RestartAlt) {
+        AdbFunction(stringResource(Res.string.reboot_device), Icons.Default.RestartAlt) {
             runAdbAndShowResult(
                 coroutineScope,
                 "reboot",
@@ -162,7 +204,7 @@ fun CommonScreen() {
                 setShowDialog = { showDialog = it }
             )
         },
-        AdbFunction("是否已Root", Icons.Default.VerifiedUser) {
+        AdbFunction(stringResource(Res.string.is_rooted), Icons.Default.VerifiedUser) {
             runAdbAndShowResult(
                 coroutineScope,
                 "su -c id",
@@ -170,7 +212,7 @@ fun CommonScreen() {
                 setShowDialog = { showDialog = it }
             )
         },
-        AdbFunction("WiFi信息", Icons.Default.Wifi) {
+        AdbFunction(stringResource(Res.string.wifi_info), Icons.Default.Wifi) {
             runAdbAndShowResult(
                 coroutineScope,
                 "dumpsys wifi",
@@ -178,7 +220,7 @@ fun CommonScreen() {
                 setShowDialog = { showDialog = it }
             )
         },
-        AdbFunction("CPU情况", Icons.Default.Memory) {
+        AdbFunction(stringResource(Res.string.cpu_info), Icons.Default.Memory) {
             runAdbAndShowResult(
                 coroutineScope,
                 "top -n 1",
@@ -186,7 +228,7 @@ fun CommonScreen() {
                 setShowDialog = { showDialog = it }
             )
         },
-        AdbFunction("网络状态", Icons.Default.NetworkCheck) {
+        AdbFunction(stringResource(Res.string.network_status), Icons.Default.NetworkCheck) {
             runAdbAndShowResult(
                 coroutineScope,
                 "dumpsys connectivity",
@@ -194,7 +236,7 @@ fun CommonScreen() {
                 setShowDialog = { showDialog = it }
             )
         },
-        AdbFunction("电池状态", Icons.Default.BatteryStd) {
+        AdbFunction(stringResource(Res.string.battery_status), Icons.Default.BatteryStd) {
             runAdbAndShowResult(
                 coroutineScope,
                 "dumpsys battery",
@@ -202,7 +244,7 @@ fun CommonScreen() {
                 setShowDialog = { showDialog = it }
             )
         },
-        AdbFunction("屏幕分辨率", Icons.Default.ScreenSearchDesktop) {
+        AdbFunction(stringResource(Res.string.screen_resolution), Icons.Default.ScreenSearchDesktop) {
             runAdbAndShowResult(
                 coroutineScope,
                 "wm size",
@@ -210,7 +252,7 @@ fun CommonScreen() {
                 setShowDialog = { showDialog = it }
             )
         },
-        AdbFunction("开发者界面", Icons.Default.DeveloperMode) {
+        AdbFunction(stringResource(Res.string.developer_options), Icons.Default.DeveloperMode) {
             runAdbAndShowResult(
                 coroutineScope,
                 "am start -a android.settings.APPLICATION_DEVELOPMENT_SETTINGS",
@@ -240,7 +282,7 @@ fun CommonScreen() {
                             .fillMaxWidth()
                             .background(LightColorScheme.background, RoundedCornerShape(12.dp))
                     ) {
-                        SectionTitle("常用功能", Color.Red, modifier = Modifier.padding(top = 12.dp, start = 15.dp))
+                        SectionTitle(stringResource(Res.string.common_functions), Color.Red, modifier = Modifier.padding(top = 12.dp, start = 15.dp))
                         FlowRow(
                             modifier = Modifier.padding(horizontal = 12.dp, vertical = 20.dp),
                             horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -268,7 +310,7 @@ fun CommonScreen() {
                             .padding(top = 15.dp)
                             .background(LightColorScheme.background, RoundedCornerShape(12.dp))
                     ) {
-                        SectionTitle("系统功能", Color.Blue, modifier = Modifier.padding(top = 12.dp, start = 15.dp))
+                        SectionTitle(stringResource(Res.string.system_functions), Color.Blue, modifier = Modifier.padding(top = 12.dp, start = 15.dp))
                         FlowRow(
                             modifier = Modifier.fillMaxWidth()
                                 .padding(horizontal = 12.dp, vertical = 20.dp),
@@ -367,14 +409,20 @@ fun GridItemCard(
 fun textInputDialog(coroutineScope: CoroutineScope, onDismiss: () -> Unit) {
     var inputText by remember { mutableStateOf("") }
     var escapeSpaces by remember { mutableStateOf(false) }
+
+    val inputHint = stringResource(Res.string.input_hint)
+    val escapeText = stringResource(Res.string.escape_spaces)
+    val cancelText = stringResource(Res.string.cancel)
+    val confirmText = stringResource(Res.string.confirm)
+
     AlertDialog(
         onDismissRequest = { onDismiss.invoke() },
         text = {
             Column {
-                OutlinedTextField( // 使用 OutlinedTextField 更好看
+                OutlinedTextField(
                     value = inputText,
                     onValueChange = { inputText = it },
-                    label = { Text("请输入文本") },
+                    label = { Text(inputHint) },
                     modifier = Modifier.fillMaxWidth().padding(top = 20.dp)
                 )
                 Spacer(Modifier.height(8.dp))
@@ -384,7 +432,7 @@ fun textInputDialog(coroutineScope: CoroutineScope, onDismiss: () -> Unit) {
                         onCheckedChange = { escapeSpaces = it }
                     )
                     Text(
-                        "转义空格 (%s)",
+                        text = escapeText,
                         modifier = Modifier.clickable { escapeSpaces = !escapeSpaces })
                 }
             }
@@ -392,27 +440,22 @@ fun textInputDialog(coroutineScope: CoroutineScope, onDismiss: () -> Unit) {
         confirmButton = {
             Row(
                 modifier = Modifier.fillMaxWidth().padding(8.dp),
-                horizontalArrangement = Arrangement.End // 按钮靠右对齐
+                horizontalArrangement = Arrangement.End
             ) {
                 TextButton(onClick = { onDismiss.invoke() }) {
-                    Text("取消")
+                    Text(cancelText)
                 }
                 Spacer(Modifier.width(8.dp))
                 Button(
                     onClick = {
                         onDismiss.invoke()
                         coroutineScope.launch {
-                            val success =
-                                AdbTool.inputText(text = inputText)
-                            if (success) {
-                                println("输入成功")
-                            } else {
-                                println("输入失败")
-                            }
+                            val success = AdbTool.inputText(text = inputText)
+                            println(if (success) "输入成功" else "输入失败")
                         }
                     }
                 ) {
-                    Text("确定")
+                    Text(confirmText)
                 }
             }
         }, containerColor = LightColorScheme.background
@@ -421,13 +464,16 @@ fun textInputDialog(coroutineScope: CoroutineScope, onDismiss: () -> Unit) {
 
 @Composable
 fun TipDialog(dialogText: String, onDismiss: () -> Unit) {
+    val tipTitle = stringResource(Res.string.tip_title)
+    val confirmText = stringResource(Res.string.confirm)
+
     AlertDialog(
         onDismissRequest = { onDismiss.invoke() },
-        title = { Text("提示") },
+        title = { Text(tipTitle) },
         text = { Text(dialogText) },
         confirmButton = {
             TextButton(onClick = { onDismiss.invoke() }) {
-                Text("确定")
+                Text(confirmText)
             }
         }, containerColor = LightColorScheme.background
     )

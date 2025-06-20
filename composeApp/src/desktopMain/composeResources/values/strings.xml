@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<resources>
+    <string name="home">首页</string>
+    <string name="common">常用</string>
+    <string name="app">应用</string>
+    <string name="set">设置</string>
+
+    <!-- 首页功能模块 -->
+    <string name="select_device">选择设备</string>
+    <string name="no_device">无设备</string>
+    <string name="no_device_available">没有可用的设备</string>
+    <string name="refresh">刷新</string>
+    <string name="disconnect">断开连接</string>
+    <string name="cpu">CPU</string>
+    <string name="memory_usage">内存占用</string>
+    <string name="storage_usage">存储占用</string>
+    <string name="battery">电池</string>
+    <string name="device_info">设备信息</string>
+    <string name="select_device_hint">请选择一个设备以查看其信息。</string>
+    <string name="no_device_info">未能获取到设备详细信息。</string>
+
+
+    <!-- 常用功能模块 -->
+    <string name="common_functions">常用功能</string>
+    <string name="install_app">安装应用</string>
+    <string name="installing">正在安装...</string>
+    <string name="install_success">安装成功</string>
+    <string name="install_failed">安装失败</string>
+    <string name="apk_not_selected">未选择 APK 文件或选择有误。</string>
+
+    <string name="input_text">输入文本</string>
+    <string name="screenshot">截图保存</string>
+    <string name="folder_not_selected">未选择文件夹</string>
+    <string name="screenshot_success">截图保存成功！</string>
+    <string name="screenshot_failed">截图失败</string>
+    <string name="view_activity">查看Activity</string>
+    <string name="current_activity">当前 Activity:\n\n%1$s</string>
+    <string name="activity_not_found">无法获取 Activity</string>
+
+    <!-- 系统功能模块 -->
+    <string name="system_functions">系统功能</string>
+    <string name="reboot_device">重启设备</string>
+    <string name="is_rooted">是否已Root</string>
+    <string name="wifi_info">WiFi信息</string>
+    <string name="cpu_info">CPU情况</string>
+    <string name="network_status">网络状态</string>
+    <string name="battery_status">电池状态</string>
+    <string name="screen_resolution">屏幕分辨率</string>
+    <string name="developer_options">开发者界面</string>
+
+    <string name="input_hint">请输入文本</string>
+    <string name="escape_spaces">转义空格 (%%s)</string>
+    <string name="cancel">取消</string>
+    <string name="confirm">确定</string>
+    <string name="tip_title">提示</string>
+</resources>

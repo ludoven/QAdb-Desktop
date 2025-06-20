@@ -10,23 +10,28 @@ import java.io.InputStreamReader
 
 object AdbTool {
 
-    private var adbPath: String? = null
+    private var adbPath: String? = AdbPathManager.currentAdbPath
     var selectDeviceId: String? = null
 
-    fun setAdbPath(path: String) {
-        adbPath = path
-    }
-
-    fun getAdbPath(): String? = adbPath
 
     fun getSystemAdbPath(): String? {
         return try {
-            val cmd = if (System.getProperty("os.name").startsWith("Windows")) "where adb" else "which adb"
-            Runtime.getRuntime().exec(cmd).inputStream.bufferedReader().readLine()
+            val isWindows = System.getProperty("os.name").lowercase().contains("windows")
+            val cmd = if (isWindows) arrayOf("where", "adb") else arrayOf("which", "adb")
+
+            val process = ProcessBuilder(*cmd)
+                .redirectErrorStream(true)
+                .start()
+
+            val output = process.inputStream.bufferedReader().readLine()
+            process.waitFor()
+            output?.takeIf { it.isNotBlank() }
         } catch (e: Exception) {
+            e.printStackTrace()
             null
         }
     }
+
 
     private fun runCommand(vararg args: String): String {
         val fullCmd = mutableListOf(adbPath ?: "adb").apply { addAll(args) }
@@ -176,7 +181,8 @@ object AdbTool {
     suspend fun executeAdbCommand(vararg args: String): String {
         return withContext(Dispatchers.IO) {
             try {
-                val command = mutableListOf("adb") + args
+                val adb = AdbPathManager.getAdbPath() ?: error("未找到 adb")
+                val command = mutableListOf(adb) + args.toList()
                 val process = ProcessBuilder(command).redirectErrorStream(true).start()
                 val output = process.inputStream.bufferedReader().readText()
                 process.waitFor()

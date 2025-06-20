@@ -1,5 +1,19 @@
 package com.ludoven.adbtool.pages
 
+import adbtool_desktop.composeapp.generated.resources.Res
+import adbtool_desktop.composeapp.generated.resources.battery
+import adbtool_desktop.composeapp.generated.resources.cpu
+import adbtool_desktop.composeapp.generated.resources.device_info
+import adbtool_desktop.composeapp.generated.resources.disconnect
+import adbtool_desktop.composeapp.generated.resources.home
+import adbtool_desktop.composeapp.generated.resources.memory_usage
+import adbtool_desktop.composeapp.generated.resources.no_device
+import adbtool_desktop.composeapp.generated.resources.no_device_available
+import adbtool_desktop.composeapp.generated.resources.no_device_info
+import adbtool_desktop.composeapp.generated.resources.refresh
+import adbtool_desktop.composeapp.generated.resources.select_device
+import adbtool_desktop.composeapp.generated.resources.select_device_hint
+import adbtool_desktop.composeapp.generated.resources.storage_usage
 import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -51,7 +65,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import com.ludoven.adbtool.LightColorScheme
+import com.ludoven.adbtool.util.AdbPathManager
 import com.ludoven.adbtool.viewmodel.DevicesViewModel
+import org.jetbrains.compose.resources.Resource
+import org.jetbrains.compose.resources.stringResource
 
 
 // 确保你导入了 @ExperimentalMaterial3Api
@@ -94,10 +111,10 @@ fun HomeScreen(viewModel: DevicesViewModel) {
                     modifier = Modifier.weight(1f)
                 ) {
                     OutlinedTextField(
-                        value = selectedDevice ?: "无设备",
+                        value = selectedDevice ?: stringResource(Res.string.no_device),
                         onValueChange = {},
                         readOnly = true,
-                        label = { Text("选择设备") },
+                        label = { Text(stringResource(Res.string.select_device)) },
                         trailingIcon = {
                             Icon(
                                 Icons.Default.ArrowDropDown,
@@ -115,7 +132,7 @@ fun HomeScreen(viewModel: DevicesViewModel) {
                     ) {
                         if (devices.isEmpty()) {
                             DropdownMenuItem(
-                                text = { Text("没有可用的设备") },
+                                text = { Text(stringResource(Res.string.no_device_available)) },
                                 onClick = { showDropdown = false },
                                 enabled = false
                             )
@@ -137,13 +154,13 @@ fun HomeScreen(viewModel: DevicesViewModel) {
 
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(onClick = { viewModel.refreshDevices() }, enabled = !isLoading) {
-                        Text("刷新")
+                        Text(stringResource(Res.string.refresh))
                     }
                     Button(
                         onClick = { viewModel.disconnectSelectedDevice() },
                         enabled = selectedDevice != null && !isLoading
                     ) {
-                        Text("断开连接")
+                        Text(stringResource(Res.string.disconnect))
                     }
                 }
             }
@@ -165,28 +182,28 @@ fun HomeScreen(viewModel: DevicesViewModel) {
                 ) {
                     InfoCard(
                         modifier = Modifier.weight(1f),
-                        title = "CPU",
+                        title = stringResource(Res.string.cpu),
                         value = "${centerInfo["CPU"]}",
                         icon = Icons.Default.Memory,
                         iconColor = Color(0xFFEF5350) // 红色
                     )
                     InfoCard(
                         modifier = Modifier.weight(1f),
-                        title = "内存占用",
+                        title = stringResource(Res.string.memory_usage),
                         value = "${centerInfo["内存"]}",
                         icon = Icons.Default.Storage,
                         iconColor = Color(0xFF42A5F5) // 蓝色
                     )
                     InfoCard(
                         modifier = Modifier.weight(1f),
-                        title = "存储占用",
+                        title = stringResource(Res.string.storage_usage),
                         value = "${centerInfo["存储"]}",
                         icon = Icons.Default.SdStorage,
                         iconColor = Color(0xFF66BB6A) // 绿色
                     )
                     InfoCard(
                         modifier = Modifier.weight(1f),
-                        title = "电池",
+                        title = stringResource(Res.string.battery),
                         value = "${centerInfo["电量"]}",
                         icon = Icons.Default.BatteryFull,
                         iconColor = Color(0xFFFFA726) // 橙色
@@ -203,11 +220,11 @@ fun HomeScreen(viewModel: DevicesViewModel) {
                 )
             ) {
                 Column(modifier = Modifier.padding(top = 16.dp, start = 16.dp, end = 16.dp, bottom = 16.dp)) {
-                    SectionTitle("设备信息", Color.Blue, modifier = Modifier.padding(bottom = 10.dp))
+                    SectionTitle(stringResource(Res.string.device_info), Color.Blue, modifier = Modifier.padding(bottom = 10.dp))
                     if (selectedDevice == null) {
-                        Text("请选择一个设备以查看其信息。")
+                        Text(stringResource(Res.string.select_device_hint))
                     } else if (deviceInfo.isEmpty() && !isLoading) {
-                        Text("未能获取到设备详细信息。", color = Color.Gray)
+                        Text(stringResource(Res.string.no_device_info), color = Color.Gray)
                     } else {
                         Column(
                             modifier = Modifier.fillMaxWidth()
@@ -217,8 +234,7 @@ fun HomeScreen(viewModel: DevicesViewModel) {
                                     Column(
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .padding(horizontal = 12.dp, vertical = 10.dp)
-                                            .padding(bottom = if (index < deviceInfo.size - 1) 3.dp else 0.dp)
+                                            .padding(horizontal = 12.dp, vertical = 3.dp)
                                     ) {
                                         Row(
                                             modifier = Modifier.fillMaxWidth()

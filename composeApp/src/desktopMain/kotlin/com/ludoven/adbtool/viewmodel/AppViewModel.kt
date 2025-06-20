@@ -1,7 +1,13 @@
 package com.ludoven.adbtool.viewmodel
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.ludoven.adbtool.pages.AppInfo
+import com.ludoven.adbtool.pages.getInstalledApps
 import com.ludoven.adbtool.util.AdbTool
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -14,6 +20,25 @@ class AppViewModel : ViewModel() {
 
     private val _appInfo = MutableStateFlow<Map<String, String>>(emptyMap())
     val appInfo: StateFlow<Map<String, String>> = _appInfo.asStateFlow()
+
+    private val _selectedApp = MutableStateFlow<AppInfo?>(null)
+    val selectedApp: StateFlow<AppInfo?> = _selectedApp
+
+    private val _appList = MutableStateFlow<List<AppInfo>>(emptyList())
+    val appList: StateFlow<List<AppInfo>> = _appList
+
+
+    fun getAppList(){
+        viewModelScope.launch(Dispatchers.IO) {
+            val list = getInstalledApps()
+            _appList.value = list
+        }
+    }
+
+    fun selectApp(app: AppInfo?) {
+        _selectedApp.value = app
+    }
+
 
     fun loadAppInfo(packageName: String) {
         viewModelScope.launch(Dispatchers.IO) {

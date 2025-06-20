@@ -64,30 +64,21 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlin.collections.component1
-import kotlin.collections.component2
 
 @Composable
 fun AppScreen(viewModel: AppViewModel) {
     val appInfo by viewModel.appInfo.collectAsState()
+    val selectedApp by viewModel.selectedApp.collectAsState()
+    val appList by viewModel.appList.collectAsState()
+
 
     var showDialog by remember { mutableStateOf(false) }
     var dialogText by remember { mutableStateOf("") }
     var showTextInputDialog by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
 
-    // 应用列表 & 当前选中
-    var appList by remember { mutableStateOf<List<AppInfo>>(emptyList()) }
-    var selectedApp by remember { mutableStateOf<AppInfo?>(null) }
-
-    // 首次加载
     LaunchedEffect(Unit) {
-        withContext(Dispatchers.IO) {
-            val list = getInstalledApps()
-            withContext(Dispatchers.Main) {
-                appList = list
-            }
-        }
+        viewModel.getAppList()
     }
 
     val items = listOf(
@@ -102,15 +93,8 @@ fun AppScreen(viewModel: AppViewModel) {
                     "卸载失败"
                 ) { success ->
                     if (success) {
-                       coroutineScope.launch {
-                           withContext(Dispatchers.IO) {
-                               val list = getInstalledApps()
-                               withContext(Dispatchers.Main) {
-                                   appList = list
-                               }
-                           }
-                       }
-                        selectedApp = null
+                        viewModel.getAppList()
+                        viewModel.selectApp(null)
                     }
                 }
             } ?: run {
@@ -236,11 +220,13 @@ fun AppScreen(viewModel: AppViewModel) {
         AdbFunction("导出Apk", Icons.Default.Download) {
             selectedApp?.let {
                 coroutineScope.launch {
-                    val path = AdbTool.exec("pm path ${it.packageName}")?.split(":")?.getOrNull(1)?.trim()
+                    val path =
+                        AdbTool.exec("pm path ${it.packageName}")?.split(":")?.getOrNull(1)?.trim()
                     if (path != null) {
                         val folderPath = FileUtils.selectFolder()
                         if (folderPath != null) {
-                            val savePath = "$folderPath/${it.appName}_${System.currentTimeMillis()}.apk"
+                            val savePath =
+                                "$folderPath/${it.appName}_${System.currentTimeMillis()}.apk"
                             val success = AdbTool.pullFile(path, savePath)
                             dialogText = if (success) "导出成功：$savePath" else "导出失败"
                         } else {
@@ -317,7 +303,7 @@ fun AppScreen(viewModel: AppViewModel) {
                                     DropdownMenuItem(
                                         text = { Text("${app.appName} (${app.packageName})") },
                                         onClick = {
-                                            selectedApp = app
+                                            viewModel.selectApp(app)
                                             expanded = false
                                             viewModel.loadAppInfo(app.packageName)
                                         }
@@ -330,14 +316,25 @@ fun AppScreen(viewModel: AppViewModel) {
 
                 item {
                     Card(
-                        modifier = Modifier.fillMaxWidth().padding(top = 20.dp,bottom = 20.dp),
+                        modifier = Modifier.fillMaxWidth().padding(top = 20.dp, bottom = 20.dp),
                         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
                         colors = CardDefaults.cardColors(
                             containerColor = LightColorScheme.background
                         )
                     ) {
-                        Column(modifier = Modifier.padding(top = 16.dp, start = 16.dp, end = 16.dp, bottom = 16.dp)) {
-                            SectionTitle("设备信息", Color.Blue, modifier = Modifier.padding(bottom = 10.dp))
+                        Column(
+                            modifier = Modifier.padding(
+                                top = 16.dp,
+                                start = 16.dp,
+                                end = 16.dp,
+                                bottom = 16.dp
+                            )
+                        ) {
+                            SectionTitle(
+                                "设备信息",
+                                Color.Blue,
+                                modifier = Modifier.padding(bottom = 10.dp)
+                            )
                             if (selectedApp == null) {
                                 Text("请选择一个应用以查看其信息。")
                             } else if (appInfo.isEmpty()) {
@@ -351,7 +348,7 @@ fun AppScreen(viewModel: AppViewModel) {
                                             Column(
                                                 modifier = Modifier
                                                     .fillMaxWidth()
-                                                    .padding(horizontal = 12.dp, vertical = 10.dp)
+                                                    .padding(horizontal = 12.dp, vertical = 3.dp)
                                             ) {
                                                 Row(
                                                     modifier = Modifier.fillMaxWidth()
@@ -359,13 +356,17 @@ fun AppScreen(viewModel: AppViewModel) {
                                                     Text(
                                                         text = "$key:",
                                                         modifier = Modifier.weight(0.4f),
-                                                        style = MaterialTheme.typography.bodyMedium.copy(color = Color.Gray),
+                                                        style = MaterialTheme.typography.bodyMedium.copy(
+                                                            color = Color.Gray
+                                                        ),
                                                         maxLines = 1
                                                     )
                                                     Text(
                                                         text = value,
                                                         modifier = Modifier.weight(0.6f),
-                                                        style = MaterialTheme.typography.bodyMedium.copy(color = Color.Black)
+                                                        style = MaterialTheme.typography.bodyMedium.copy(
+                                                            color = Color.Black
+                                                        )
                                                     )
                                                 }
                                             }

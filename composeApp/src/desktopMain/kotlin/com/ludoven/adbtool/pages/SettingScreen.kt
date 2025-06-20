@@ -21,12 +21,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import com.ludoven.adbtool.util.AdbPathManager
 import com.ludoven.adbtool.util.AdbTool
 import com.ludoven.adbtool.util.FileUtils
 
 @Composable
 fun SettingScreen() {
-    var adbPath by remember { mutableStateOf(AdbTool.getSystemAdbPath() ?: "未设置") }
+    var adbPath by remember { mutableStateOf(AdbPathManager.currentAdbPath ?: "未设置") }
     var showDialog by remember { mutableStateOf(false) }
 
     Column(
@@ -51,7 +52,7 @@ fun SettingScreen() {
                 IconButton(onClick = {
                     val newPath = FileUtils.selectFile("选择 ADB 可执行文件")
                     if (newPath != null) {
-                        AdbTool.setAdbPath(newPath)
+                        AdbPathManager.setAdbPath(newPath)
                         adbPath = newPath
                         showDialog = true
                     }
