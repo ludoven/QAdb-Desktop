@@ -23,7 +23,7 @@
 
 ## 📦 下载地址
 
-前往 [GitHub Releases](https://github.com/ludoven/QAdb-Multiplatform/releases) 下载最新版本的 QAdb：
+前往 [GitHub Releases](https://github.com/ludoven/QAdb-Desktop/releases) 下载最新版本的 QAdb：
 
 - Windows: 下载 QAdb.exe 或 QAdb.msi
 - macOS: 下载 QAdb.dmg
