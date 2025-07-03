@@ -34,13 +34,15 @@
 
 ## 📷 截图预览
 
-![Home](qadb-1.png)
+![Home](1.png)
 
-![Common](qadb-2.png)
+![Common](2.png)
 
-![App](qadb-3.png)
+![App](3.png)
 
-![App](qadb-4.png)
+![App](4.png)
+
+![set](5.png)
 
 ---
 

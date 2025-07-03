@@ -67,6 +67,7 @@ import androidx.compose.ui.unit.dp
 import com.ludoven.adbtool.LightColorScheme
 import com.ludoven.adbtool.util.AdbPathManager
 import com.ludoven.adbtool.viewmodel.DevicesViewModel
+import com.ludoven.adbtool.widget.InfoCard
 import org.jetbrains.compose.resources.Resource
 import org.jetbrains.compose.resources.stringResource
 
@@ -242,7 +243,7 @@ fun HomeScreen(viewModel: DevicesViewModel) {
                                             Text(
                                                 text = "$key:",
                                                 modifier = Modifier.weight(0.4f),
-                                                style = MaterialTheme.typography.bodyMedium.copy(color = Color.Gray),
+                                                style = MaterialTheme.typography.titleMedium.copy(color = Color.Black),
                                                 maxLines = 1
                                             )
                                             Text(
@@ -269,7 +270,7 @@ fun HomeScreen(viewModel: DevicesViewModel) {
 }
 
 @Composable
-fun InfoCard(
+fun InfoCard2(
     modifier: Modifier,
     title: String,
     value: String,
@@ -296,8 +297,8 @@ fun InfoCard(
             )
             Spacer(modifier = Modifier.width(12.dp))
             Column {
-                Text(text = value, style = MaterialTheme.typography.bodySmall)
-                Text(text = title, style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                Text(text = value, style = MaterialTheme.typography.bodyMedium)
+                Text(text = title, style = MaterialTheme.typography.titleSmall, color = Color.Gray)
             }
         }
     }
