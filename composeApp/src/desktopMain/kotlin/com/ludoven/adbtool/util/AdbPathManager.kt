@@ -1,5 +1,8 @@
 package com.ludoven.adbtool.util
 
+import io.github.vinceglb.filekit.FileKit
+import io.github.vinceglb.filekit.absolutePath
+import io.github.vinceglb.filekit.dialogs.openFilePicker
 import java.io.File
 
 import javax.swing.JFileChooser
@@ -32,7 +35,7 @@ object AdbPathManager {
      * 4. 常见路径列表
      * 5. 用户手动选择
      */
-    fun getAdbPath(): String? {
+   suspend fun getAdbPath(): String? {
         // 1. 使用缓存
         cachedAdbPath?.takeIf { isValidAdb(it) }?.let { return it }
 
@@ -95,16 +98,9 @@ object AdbPathManager {
         }
     }
 
-    private fun showAdbPickerDialog(): String? {
-        val chooser = JFileChooser().apply {
-            dialogTitle = "请选择 adb 可执行文件"
-            fileSelectionMode = JFileChooser.FILES_ONLY
-        }
-
-        val result = chooser.showOpenDialog(null)
-        return if (result == JFileChooser.APPROVE_OPTION) {
-            chooser.selectedFile.absolutePath.takeIf { isValidAdb(it) }
-        } else null
+    private suspend fun showAdbPickerDialog(): String? {
+        val openFilePicker = FileKit.openFilePicker()
+        return openFilePicker?.absolutePath().takeIf { isValidAdb(it.toString()) }
     }
 }
 

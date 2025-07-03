@@ -1,33 +1,27 @@
 package com.ludoven.adbtool
 
-import androidx.compose.animation.AnimatedVisibility
+import adbtool_desktop.composeapp.generated.resources.Res
+import adbtool_desktop.composeapp.generated.resources.app
+import adbtool_desktop.composeapp.generated.resources.common
+import adbtool_desktop.composeapp.generated.resources.home
+import adbtool_desktop.composeapp.generated.resources.ic_logo
+import adbtool_desktop.composeapp.generated.resources.set
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.material.BottomNavigation
+import androidx.compose.material.BottomNavigationItem
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Apps
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import org.jetbrains.compose.resources.painterResource
-import org.jetbrains.compose.ui.tooling.preview.Preview
-
-import adbtool_desktop.composeapp.generated.resources.Res
-import adbtool_desktop.composeapp.generated.resources.app
-import adbtool_desktop.composeapp.generated.resources.common
-import adbtool_desktop.composeapp.generated.resources.compose_multiplatform
-import adbtool_desktop.composeapp.generated.resources.home
-import adbtool_desktop.composeapp.generated.resources.img
-import adbtool_desktop.composeapp.generated.resources.set
-import androidx.compose.animation.Crossfade
-import androidx.compose.material.BottomNavigation
-import androidx.compose.material.BottomNavigationItem
-import androidx.compose.material.icons.filled.Apps
-import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
@@ -41,7 +35,9 @@ import com.ludoven.adbtool.pages.SettingScreen
 import com.ludoven.adbtool.util.AdbPathManager
 import com.ludoven.adbtool.viewmodel.AppViewModel
 import com.ludoven.adbtool.viewmodel.DevicesViewModel
+import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
+import org.jetbrains.compose.ui.tooling.preview.Preview
 
 @ExperimentalMaterial3Api
 @Composable
@@ -81,7 +77,7 @@ fun App() {
 
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Image(
-                        painter = painterResource(Res.drawable.img),
+                        painter = painterResource(Res.drawable.ic_logo),
                         modifier = Modifier.size(60.dp).padding(top = 30.dp),
                         contentDescription = "图标"
                     )

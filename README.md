@@ -1,5 +1,7 @@
 # QAdb-Desktop
 
+![LOGO](composeApp/src/desktopMain/composeResources/drawable/ic_logo.png)
+
 一个基于 **Jetpack Compose Multiplatform** 开发的 ADB 图形化工具，支持 **Windows** 和 **macOS** 平台。通过可视化界面进行常用 ADB 操作，无需手动输入命令，简单高效。
 
 ---

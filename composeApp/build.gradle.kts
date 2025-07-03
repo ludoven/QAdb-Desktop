@@ -28,12 +28,12 @@ kotlin {
             implementation("org.jetbrains.androidx.navigation:navigation-compose:2.9.0-beta03")
 
 
-            implementation("org.openjfx:javafx-base:21:win")     // 根据平台选择
-            implementation("org.openjfx:javafx-graphics:21:win")
-            implementation("org.openjfx:javafx-controls:21:win")
-            implementation("org.openjfx:javafx-base:21:mac")     // 根据平台选择
-            implementation("org.openjfx:javafx-graphics:21:mac")
-            implementation("org.openjfx:javafx-controls:21:mac")
+            val fileKit = "0.10.0-beta04"
+            implementation("io.github.vinceglb:filekit-core:$fileKit")
+            implementation("io.github.vinceglb:filekit-dialogs:$fileKit")
+            implementation("io.github.vinceglb:filekit-dialogs-compose:$fileKit")
+            implementation("io.github.vinceglb:filekit-coil:$fileKit")
+
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
@@ -56,8 +56,12 @@ compose.desktop {
             packageVersion = "1.0.0"
             packageName = "QAdb"
 
+//            iconFile.set(project.file("src/desktopMain/composeResources/icons/app_icon.icns")) // macOS 图标
+//            windows.iconFile.set(project.file("src/main/resources/icons/app_icon.ico")) // Windows 图标
+
             macOS {
                 bundleID = "com.ludoven.adbtool"
+                iconFile.set(project.file("src/desktopMain/composeResources/drawable/app_icon.icns")) // macOS 图标
             }
         }
     }

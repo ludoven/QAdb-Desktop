@@ -197,10 +197,5 @@ object AdbTool {
     suspend fun disconnectDevice(deviceId: String): String {
         return executeAdbCommand("disconnect", deviceId)
     }
-/*
-    suspend fun getConnectedDevices(): List<String> {
-        val output = executeAdbCommand("devices")
-        return output.lines().drop(1)
-            .mapNotNull { line -> line.split("\\s+".toRegex()).takeIf { it.size >= 2 && it[1] == "device" }?.get(0) }
-    }*/
+
 }

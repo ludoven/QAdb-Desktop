@@ -127,32 +127,35 @@ fun CommonScreen() {
 
     val commonItems = listOf(
         AdbFunction(stringResource(Res.string.install_app), Icons.Default.InstallMobile) {
-            val apkPath = FileUtils.selectApkFile()
-            if (apkPath != null) {
-                // 1. 立即显示“正在安装...”的弹窗
-                dialogText = installingText
-                showDialog = true
+            coroutineScope.launch {
+                val apkPath = FileUtils.selectApkFile()
+                if (apkPath != null) {
+                    // 1. 立即显示“正在安装...”的弹窗
+                    dialogText = installingText
+                    showDialog = true
 
-                // 2. 启动后台安装任务
-                coroutineScope.launch(Dispatchers.IO) { // 在 IO 线程执行耗时操作
-                    val success = AdbTool.installApk(apkPath) // 执行安装
-                    withContext(Dispatchers.Main) { // 切换回主线程更新 UI
-                        // 3. 根据安装结果更新弹窗文本
-                        dialogText = if (success) installSuccessText else installFailedText
-                        // 4. 短暂显示结果，然后关闭弹窗
-                        delay(2000) // 显示结果2秒
+                    // 2. 启动后台安装任务
+                    coroutineScope.launch(Dispatchers.IO) { // 在 IO 线程执行耗时操作
+                        val success = AdbTool.installApk(apkPath) // 执行安装
+                        withContext(Dispatchers.Main) { // 切换回主线程更新 UI
+                            // 3. 根据安装结果更新弹窗文本
+                            dialogText = if (success) installSuccessText else installFailedText
+                            // 4. 短暂显示结果，然后关闭弹窗
+                            delay(2000) // 显示结果2秒
+                            showDialog = false
+                        }
+                    }
+                } else {
+                    // 如果用户没有选择文件，可以给一个提示
+                    coroutineScope.launch {
+                        dialogText = apkNotSelectText
+                        showDialog = true
+                        delay(2000)
                         showDialog = false
                     }
                 }
-            } else {
-                // 如果用户没有选择文件，可以给一个提示
-                coroutineScope.launch {
-                    dialogText = apkNotSelectText
-                    showDialog = true
-                    delay(2000)
-                    showDialog = false
-                }
             }
+
         },
 
         AdbFunction(stringResource(Res.string.input_text), Icons.Default.Edit) {
@@ -160,8 +163,10 @@ fun CommonScreen() {
         },
         AdbFunction(stringResource(Res.string.screenshot), Icons.Default.PhotoCamera) {
             coroutineScope.launch {
-                // 不要放 IO 线程，否则 Swing UI 不会弹窗！
-                val folderPath = FileUtils.selectFolder()
+                // 不要直接调用 Swing 弹窗，应该放到 IO 线程
+                val folderPath = withContext(Dispatchers.IO) {
+                    FileUtils.selectFolder()
+                }
 
                 if (folderPath == null) {
                     dialogText = folderNotSelectedText
@@ -173,7 +178,6 @@ fun CommonScreen() {
 
                 val savePath = "$folderPath/screen_${System.currentTimeMillis()}.png"
 
-                // 截图可放 IO 线程
                 val success = withContext(Dispatchers.IO) {
                     AdbTool.takeScreenshot(savePath)
                 }

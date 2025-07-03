@@ -17,6 +17,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -24,11 +25,13 @@ import androidx.compose.ui.unit.dp
 import com.ludoven.adbtool.util.AdbPathManager
 import com.ludoven.adbtool.util.AdbTool
 import com.ludoven.adbtool.util.FileUtils
+import kotlinx.coroutines.launch
 
 @Composable
 fun SettingScreen() {
     var adbPath by remember { mutableStateOf(AdbPathManager.currentAdbPath ?: "未设置") }
     var showDialog by remember { mutableStateOf(false) }
+    val coroutineScope = rememberCoroutineScope()
 
     Column(
         modifier = Modifier
@@ -50,11 +53,13 @@ fun SettingScreen() {
             readOnly = true,
             trailingIcon = {
                 IconButton(onClick = {
-                    val newPath = FileUtils.selectFile("选择 ADB 可执行文件")
-                    if (newPath != null) {
-                        AdbPathManager.setAdbPath(newPath)
-                        adbPath = newPath
-                        showDialog = true
+                    coroutineScope.launch {
+                        val newPath = FileUtils.selectFile()
+                        if (newPath != null) {
+                            AdbPathManager.setAdbPath(newPath)
+                            adbPath = newPath
+                            showDialog = true
+                        }
                     }
                 }) {
                     Icon(Icons.Default.FolderOpen, contentDescription = "选择 ADB")
