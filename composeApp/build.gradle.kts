@@ -57,7 +57,7 @@ compose.desktop {
             packageName = "QAdb"
 
 //            iconFile.set(project.file("src/desktopMain/composeResources/icons/app_icon.icns")) // macOS 图标
-//            windows.iconFile.set(project.file("src/main/resources/icons/app_icon.ico")) // Windows 图标
+            windows.iconFile.set(project.file("src/desktopMain/composeResources/drawable/app_icon.ico")) // Windows 图标
 
             macOS {
                 bundleID = "com.ludoven.adbtool"
