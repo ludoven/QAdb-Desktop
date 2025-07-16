@@ -2,6 +2,26 @@
 
 package com.ludoven.adbtool.pages
 
+import adbtool_desktop.composeapp.generated.resources.Res
+import adbtool_desktop.composeapp.generated.resources.app_functions_section_title
+import adbtool_desktop.composeapp.generated.resources.app_info_no_detail
+import adbtool_desktop.composeapp.generated.resources.app_info_placeholder
+import adbtool_desktop.composeapp.generated.resources.app_info_section_title
+import adbtool_desktop.composeapp.generated.resources.app_size
+import adbtool_desktop.composeapp.generated.resources.clear_and_restart
+import adbtool_desktop.composeapp.generated.resources.clear_data
+import adbtool_desktop.composeapp.generated.resources.dialog_unknown_error
+import adbtool_desktop.composeapp.generated.resources.export_apk
+import adbtool_desktop.composeapp.generated.resources.grant_all_permissions
+import adbtool_desktop.composeapp.generated.resources.launch_app
+import adbtool_desktop.composeapp.generated.resources.reset_permissions
+import adbtool_desktop.composeapp.generated.resources.reset_permissions_and_restart
+import adbtool_desktop.composeapp.generated.resources.restart_app
+import adbtool_desktop.composeapp.generated.resources.select_a_app
+import adbtool_desktop.composeapp.generated.resources.select_app
+import adbtool_desktop.composeapp.generated.resources.stop_app
+import adbtool_desktop.composeapp.generated.resources.uninstall_app
+import adbtool_desktop.composeapp.generated.resources.view_install_path
 import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -47,7 +67,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -55,15 +74,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.ludoven.adbtool.LightColorScheme
 import com.ludoven.adbtool.entity.AdbFunction
+import com.ludoven.adbtool.entity.AdbFunctionType
 import com.ludoven.adbtool.iconColors
 import com.ludoven.adbtool.util.AdbTool
-import com.ludoven.adbtool.util.FileUtils
 import com.ludoven.adbtool.viewmodel.AppViewModel
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
+import org.jetbrains.compose.resources.StringResource
+import org.jetbrains.compose.resources.stringResource
 
 @Composable
 fun AppScreen(viewModel: AppViewModel) {
@@ -71,187 +87,23 @@ fun AppScreen(viewModel: AppViewModel) {
     val selectedApp by viewModel.selectedApp.collectAsState()
     val appList by viewModel.appList.collectAsState()
 
-
-    var showDialog by remember { mutableStateOf(false) }
-    var dialogText by remember { mutableStateOf("") }
-    var showTextInputDialog by remember { mutableStateOf(false) }
-    val coroutineScope = rememberCoroutineScope()
-
     LaunchedEffect(Unit) {
         viewModel.getAppList()
     }
 
     val items = listOf(
-        AdbFunction("卸载应用", Icons.Default.Delete) {
-            selectedApp?.let { app ->
-                performAdbAction(
-                    coroutineScope,
-                    "pm uninstall ${app.packageName}",
-                    { dialogText = it },
-                    { showDialog = it },
-                    "卸载成功：${app.packageName}",
-                    "卸载失败"
-                ) { success ->
-                    if (success) {
-                        viewModel.getAppList()
-                        viewModel.selectApp(null)
-                    }
-                }
-            } ?: run {
-                coroutineScope.launch {
-                    dialogText = "请先选择一个应用"
-                    showDialog = true
-                    delay(2000)
-                    showDialog = false
-                }
-            }
-        },
-        AdbFunction("启动应用", Icons.Default.PlayArrow) {
-            selectedApp?.let {
-                performAdbAction(
-                    coroutineScope,
-                    "monkey -p ${it.packageName} -c android.intent.category.LAUNCHER 1",
-                    { dialogText = it },
-                    { showDialog = it },
-                    "启动成功：${it.packageName}",
-                    "启动失败"
-                )
-            }
-        },
-        AdbFunction("停止运行", Icons.Default.Stop) {
-            selectedApp?.let {
-                performAdbAction(
-                    coroutineScope,
-                    "am force-stop ${it.packageName}",
-                    { dialogText = it },
-                    { showDialog = it },
-                    "已停止运行：${it.packageName}",
-                    "停止失败"
-                )
-            }
-        },
-        AdbFunction("重启应用", Icons.Default.Refresh) {
-            selectedApp?.let {
-                coroutineScope.launch {
-                    AdbTool.exec("am force-stop ${it.packageName}")
-                    delay(300)
-                    AdbTool.exec("monkey -p ${it.packageName} -c android.intent.category.LAUNCHER 1")
-                    dialogText = "已重启应用：${it.packageName}"
-                    showDialog = true
-                    delay(2000)
-                    showDialog = false
-                }
-            }
-        },
-        AdbFunction("清除数据", Icons.Default.DeleteSweep) {
-            selectedApp?.let {
-                performAdbAction(
-                    coroutineScope,
-                    "pm clear ${it.packageName}",
-                    { dialogText = it },
-                    { showDialog = it },
-                    "清除成功：${it.packageName}",
-                    "清除失败"
-                )
-            }
-        },
-        AdbFunction("清除并重启", Icons.Default.RestartAlt) {
-            selectedApp?.let {
-                coroutineScope.launch {
-                    AdbTool.exec("pm clear ${it.packageName}")
-                    delay(300)
-                    AdbTool.exec("monkey -p ${it.packageName} -c android.intent.category.LAUNCHER 1")
-                    dialogText = "清除并重启成功：${it.packageName}"
-                    showDialog = true
-                    delay(2000)
-                    showDialog = false
-                }
-            }
-        },
-        AdbFunction("重置权限", Icons.Default.Security) {
-            selectedApp?.let {
-                performAdbAction(
-                    coroutineScope,
-                    "pm reset-permissions ${it.packageName}",
-                    { dialogText = it },
-                    { showDialog = it },
-                    "已重置权限：${it.packageName}",
-                    "重置失败"
-                )
-            }
-        },
-        AdbFunction("重置权限并重启", Icons.Default.RestartAlt) {
-            selectedApp?.let {
-                coroutineScope.launch {
-                    AdbTool.exec("pm reset-permissions ${it.packageName}")
-                    delay(300)
-                    AdbTool.exec("monkey -p ${it.packageName} -c android.intent.category.LAUNCHER 1")
-                    dialogText = "已重置权限并重启：${it.packageName}"
-                    showDialog = true
-                    delay(2000)
-                    showDialog = false
-                }
-            }
-        },
-        AdbFunction("授权所有权限", Icons.Default.CheckCircle) {
-            selectedApp?.let {
-                performAdbAction(
-                    coroutineScope,
-                    "pm grant ${it.packageName} android.permission.READ_EXTERNAL_STORAGE && " +
-                            "pm grant ${it.packageName} android.permission.WRITE_EXTERNAL_STORAGE",
-                    { dialogText = it },
-                    { showDialog = it },
-                    "授权完成：${it.packageName}",
-                    "授权失败"
-                )
-            }
-        },
-        AdbFunction("查看安装路径", Icons.Default.Folder) {
-            selectedApp?.let {
-                coroutineScope.launch {
-                    val result = withContext(Dispatchers.IO) {
-                        AdbTool.exec("pm path ${it.packageName}")
-                    }
-                    dialogText = result ?: "获取路径失败"
-                    showDialog = true
-                }
-            }
-        },
-        AdbFunction("导出Apk", Icons.Default.Download) {
-            selectedApp?.let {
-                coroutineScope.launch {
-                    val path =
-                        AdbTool.exec("pm path ${it.packageName}")?.split(":")?.getOrNull(1)?.trim()
-                    if (path != null) {
-                        val folderPath = FileUtils.selectFolder()
-                        if (folderPath != null) {
-                            val savePath =
-                                "$folderPath/${it.appName}_${System.currentTimeMillis()}.apk"
-                            val success = AdbTool.pullFile(path, savePath)
-                            dialogText = if (success) "导出成功：$savePath" else "导出失败"
-                        } else {
-                            dialogText = "未选择导出路径"
-                        }
-                    } else {
-                        dialogText = "获取安装路径失败"
-                    }
-                    showDialog = true
-                    delay(2000)
-                    showDialog = false
-                }
-            }
-        },
-        AdbFunction("应用大小", Icons.Default.Storage) {
-            selectedApp?.let {
-                coroutineScope.launch {
-                    val result = withContext(Dispatchers.IO) {
-                        AdbTool.exec("dumpsys package ${it.packageName} | grep 'codePath\\|dataDir'")
-                    }
-                    dialogText = result ?: "查询失败"
-                    showDialog = true
-                }
-            }
-        }
+        AdbFunction(stringResource(Res.string.uninstall_app), Icons.Default.Delete, AdbFunctionType.UNINSTALL),
+        AdbFunction(stringResource(Res.string.launch_app), Icons.Default.PlayArrow, AdbFunctionType.LAUNCH),
+        AdbFunction(stringResource(Res.string.stop_app), Icons.Default.Stop, AdbFunctionType.FORCE_STOP),
+        AdbFunction(stringResource(Res.string.restart_app), Icons.Default.Refresh, AdbFunctionType.RESTART_APP),
+        AdbFunction(stringResource(Res.string.clear_data), Icons.Default.DeleteSweep, AdbFunctionType.CLEAR_DATA),
+        AdbFunction(stringResource(Res.string.clear_and_restart), Icons.Default.RestartAlt, AdbFunctionType.CLEAR_AND_RESTART),
+        AdbFunction(stringResource(Res.string.reset_permissions), Icons.Default.Security, AdbFunctionType.RESET_PERMISSIONS),
+        AdbFunction(stringResource(Res.string.reset_permissions_and_restart), Icons.Default.RestartAlt, AdbFunctionType.RESET_PERMISSIONS_AND_RESTART),
+        AdbFunction(stringResource(Res.string.grant_all_permissions), Icons.Default.CheckCircle, AdbFunctionType.GRANT_ALL_PERMISSIONS),
+        AdbFunction(stringResource(Res.string.view_install_path), Icons.Default.Folder, AdbFunctionType.GET_PATH),
+        AdbFunction(stringResource(Res.string.export_apk), Icons.Default.Download, AdbFunctionType.EXPORT_APK),
+        AdbFunction(stringResource(Res.string.app_size), Icons.Default.Storage, AdbFunctionType.GET_APP_SIZE)
     )
 
 
@@ -281,11 +133,11 @@ fun AppScreen(viewModel: AppViewModel) {
                                 value = if (selectedApp != null) {
                                     "${selectedApp?.appName} (${selectedApp?.packageName})"
                                 } else {
-                                    "请选择一个应用"
+                                    stringResource(Res.string.select_a_app)
                                 },
                                 onValueChange = {},
                                 readOnly = true,
-                                label = { Text("选择应用") },
+                                label = { Text(stringResource(Res.string.select_app)) },
                                 trailingIcon = {
                                     ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
                                 },
@@ -331,14 +183,14 @@ fun AppScreen(viewModel: AppViewModel) {
                             )
                         ) {
                             SectionTitle(
-                                "设备信息",
+                                stringResource(Res.string.app_info_section_title),
                                 Color.Blue,
                                 modifier = Modifier.padding(bottom = 10.dp)
                             )
                             if (selectedApp == null) {
-                                Text("请选择一个应用以查看其信息。")
+                                Text(stringResource(Res.string.app_info_placeholder))
                             } else if (appInfo.isEmpty()) {
-                                Text("未能获取到应用详细信息。", color = Color.Gray)
+                                Text(stringResource(Res.string.app_info_no_detail), color = Color.Gray)
                             } else {
                                 Column(
                                     modifier = Modifier.fillMaxWidth()
@@ -390,7 +242,7 @@ fun AppScreen(viewModel: AppViewModel) {
                             .background(LightColorScheme.background, RoundedCornerShape(12.dp))
                     ) {
                         SectionTitle(
-                            "应用功能",
+                            stringResource(Res.string.app_functions_section_title),
                             Color.Red,
                             modifier = Modifier.padding(top = 12.dp, start = 15.dp)
                         )
@@ -406,7 +258,7 @@ fun AppScreen(viewModel: AppViewModel) {
                                     title = item.title,
                                     icon = item.icon,
                                     iconColor = color,
-                                    onClick = item.onClick,
+                                    onClick = { viewModel.executeAdbAction(item.type) }
                                 )
                             }
                         }
@@ -421,14 +273,14 @@ fun AppScreen(viewModel: AppViewModel) {
         }
     }
 
-    if (showDialog) {
-        TipDialog(dialogText) {
-            showDialog = false
-        }
-    }
+    // 处理对话框显示
+    val dialogMessage by viewModel.dialogMessage.collectAsState()
+    val showDialog by viewModel.showDialog.collectAsState()
 
-    if (showTextInputDialog) {
-        textInputDialog(coroutineScope) { showTextInputDialog = false }
+    if (showDialog) {
+        TipDialog(dialogMessage ?: stringResource(Res.string.dialog_unknown_error)) {
+            viewModel.dismissTipDialog()
+        }
     }
 }
 
@@ -446,29 +298,6 @@ fun getInstalledApps(): List<AppInfo> {
     }
 }
 
-
-fun performAdbAction(
-    scope: CoroutineScope,
-    command: String,
-    setDialogText: (String) -> Unit,
-    setShowDialog: (Boolean) -> Unit,
-    successMsg: String,
-    failMsg: String,
-    onComplete: ((Boolean) -> Unit)? = null,
-) {
-    scope.launch {
-        setShowDialog(true)
-        setDialogText("执行中...")
-        val result = withContext(Dispatchers.IO) {
-            AdbTool.exec(command)
-        }
-        val success = result?.contains("Success") == true
-        setDialogText(if (success) successMsg else failMsg)
-        delay(2000)
-        setShowDialog(false)
-        onComplete?.invoke(success)
-    }
-}
 
 
 

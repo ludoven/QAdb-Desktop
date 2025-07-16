@@ -7,7 +7,6 @@ import adbtool_desktop.composeapp.generated.resources.battery_status
 import adbtool_desktop.composeapp.generated.resources.cancel
 import adbtool_desktop.composeapp.generated.resources.common_functions
 import adbtool_desktop.composeapp.generated.resources.confirm
-import adbtool_desktop.composeapp.generated.resources.cpu
 import adbtool_desktop.composeapp.generated.resources.cpu_info
 import adbtool_desktop.composeapp.generated.resources.current_activity
 import adbtool_desktop.composeapp.generated.resources.developer_options
@@ -58,7 +57,6 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.InstallMobile
 import androidx.compose.material.icons.filled.Memory
 import androidx.compose.material.icons.filled.NetworkCheck
-import androidx.compose.material.icons.filled.Notes
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.RestartAlt
 import androidx.compose.material.icons.filled.ScreenSearchDesktop
@@ -78,6 +76,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -90,22 +89,19 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import com.ludoven.adbtool.LightColorScheme
 import com.ludoven.adbtool.entity.AdbFunction
+import com.ludoven.adbtool.entity.AdbFunctionType
 import com.ludoven.adbtool.iconColors
 import com.ludoven.adbtool.util.AdbTool
-import com.ludoven.adbtool.util.AdbTool.runAdbAndShowResult
-import com.ludoven.adbtool.util.FileUtils
+import com.ludoven.adbtool.viewmodel.CommonModel
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import org.jetbrains.compose.resources.stringResource
 import org.jetbrains.compose.ui.tooling.preview.Preview
 
 @ExperimentalMaterial3Api
 @Composable
 @Preview
-fun CommonScreen() {
+fun CommonScreen(viewModel: CommonModel) {
     val installingText = stringResource(Res.string.installing)
     val installSuccessText = stringResource(Res.string.install_success)
     val installFailedText = stringResource(Res.string.install_failed)
@@ -116,155 +112,171 @@ fun CommonScreen() {
     val activityNotFoundText = stringResource(Res.string.activity_not_found)
     val currentActivityText = stringResource(Res.string.current_activity)
 
-
-    var showDialog by remember { mutableStateOf(false) }
-    var dialogText by remember { mutableStateOf(installingText) }
-    // 使用 rememberCoroutineScope 来管理协程生命周期，避免泄露
     val coroutineScope = rememberCoroutineScope()
-    // 新增的状态，用于控制文本输入弹窗的显示
-    var showTextInputDialog by remember { mutableStateOf(false) }
+    val showDialog by viewModel.showDialog.collectAsState()
+    val showTextInputDialog by viewModel.showInputDialog.collectAsState()
+    val dialogMsg  by viewModel.dialogMessage.collectAsState()
 
 
     val commonItems = listOf(
-        AdbFunction(stringResource(Res.string.install_app), Icons.Default.InstallMobile) {
-            coroutineScope.launch {
-                val apkPath = FileUtils.selectApkFile()
-                if (apkPath != null) {
-                    // 1. 立即显示“正在安装...”的弹窗
-                    dialogText = installingText
-                    showDialog = true
-
-                    // 2. 启动后台安装任务
-                    coroutineScope.launch(Dispatchers.IO) { // 在 IO 线程执行耗时操作
-                        val success = AdbTool.installApk(apkPath) // 执行安装
-                        withContext(Dispatchers.Main) { // 切换回主线程更新 UI
-                            // 3. 根据安装结果更新弹窗文本
-                            dialogText = if (success) installSuccessText else installFailedText
-                            // 4. 短暂显示结果，然后关闭弹窗
-                            delay(2000) // 显示结果2秒
-                            showDialog = false
-                        }
-                    }
-                } else {
-                    // 如果用户没有选择文件，可以给一个提示
-                    coroutineScope.launch {
-                        dialogText = apkNotSelectText
-                        showDialog = true
-                        delay(2000)
-                        showDialog = false
-                    }
-                }
-            }
-
-        },
-
-        AdbFunction(stringResource(Res.string.input_text), Icons.Default.Edit) {
-            showTextInputDialog = true
-        },
-        AdbFunction(stringResource(Res.string.screenshot), Icons.Default.PhotoCamera) {
-            coroutineScope.launch {
-                // 不要直接调用 Swing 弹窗，应该放到 IO 线程
-                val folderPath = withContext(Dispatchers.IO) {
-                    FileUtils.selectFolder()
-                }
-
-                if (folderPath == null) {
-                    dialogText = folderNotSelectedText
-                    showDialog = true
-                    delay(2000)
-                    showDialog = false
-                    return@launch
-                }
-
-                val savePath = "$folderPath/screen_${System.currentTimeMillis()}.png"
-
-                val success = withContext(Dispatchers.IO) {
-                    AdbTool.takeScreenshot(savePath)
-                }
-
-                dialogText = if (success) screenshotSuccessText else screenshotFailedText
-                showDialog = true
-                delay(2000)
-                showDialog = false
-            }
-        },
-        AdbFunction(stringResource(Res.string.view_activity), Icons.Default.Visibility) {
-            coroutineScope.launch {
-                val activity = withContext(Dispatchers.IO) {
-                    AdbTool.getCurrentActivity()
-                }
-                dialogText = activity?.let { currentActivityText.format(it) } ?: activityNotFoundText
-                showDialog = true
-            }
-        }
+        AdbFunction(
+            stringResource(Res.string.install_app),
+            Icons.Default.InstallMobile,
+            AdbFunctionType.INSTALL_APK
+        ),
+        AdbFunction(
+            stringResource(Res.string.input_text),
+            Icons.Default.Edit,
+            AdbFunctionType.INPUT_TEXT
+        ),
+        AdbFunction(
+            stringResource(Res.string.screenshot),
+            Icons.Default.PhotoCamera,
+            AdbFunctionType.SCREENSHOT
+        ),
+        AdbFunction(
+            stringResource(Res.string.view_activity),
+            Icons.Default.Visibility,
+            AdbFunctionType.VIEW_CURRENT_ACTIVITY
+        ),
     )
 
     val sysItems = listOf(
-        AdbFunction(stringResource(Res.string.reboot_device), Icons.Default.RestartAlt) {
-            runAdbAndShowResult(
-                coroutineScope,
-                "reboot",
-                setDialogText = { dialogText = it },
-                setShowDialog = { showDialog = it }
-            )
-        },
-        AdbFunction(stringResource(Res.string.is_rooted), Icons.Default.VerifiedUser) {
-            runAdbAndShowResult(
-                coroutineScope,
-                "su -c id",
-                setDialogText = { dialogText = it },
-                setShowDialog = { showDialog = it }
-            )
-        },
-        AdbFunction(stringResource(Res.string.wifi_info), Icons.Default.Wifi) {
-            runAdbAndShowResult(
-                coroutineScope,
-                "dumpsys wifi",
-                setDialogText = { dialogText = it },
-                setShowDialog = { showDialog = it }
-            )
-        },
-        AdbFunction(stringResource(Res.string.cpu_info), Icons.Default.Memory) {
-            runAdbAndShowResult(
-                coroutineScope,
-                "top -n 1",
-                setDialogText = { dialogText = it },
-                setShowDialog = { showDialog = it }
-            )
-        },
-        AdbFunction(stringResource(Res.string.network_status), Icons.Default.NetworkCheck) {
-            runAdbAndShowResult(
-                coroutineScope,
-                "dumpsys connectivity",
-                setDialogText = { dialogText = it },
-                setShowDialog = { showDialog = it }
-            )
-        },
-        AdbFunction(stringResource(Res.string.battery_status), Icons.Default.BatteryStd) {
-            runAdbAndShowResult(
-                coroutineScope,
-                "dumpsys battery",
-                setDialogText = { dialogText = it },
-                setShowDialog = { showDialog = it }
-            )
-        },
-        AdbFunction(stringResource(Res.string.screen_resolution), Icons.Default.ScreenSearchDesktop) {
-            runAdbAndShowResult(
-                coroutineScope,
-                "wm size",
-                setDialogText = { dialogText = it },
-                setShowDialog = { showDialog = it }
-            )
-        },
-        AdbFunction(stringResource(Res.string.developer_options), Icons.Default.DeveloperMode) {
-            runAdbAndShowResult(
-                coroutineScope,
-                "am start -a android.settings.APPLICATION_DEVELOPMENT_SETTINGS",
-                setDialogText = { dialogText = it },
-                setShowDialog = { showDialog = it }
-            )
-        }
-    )
+        AdbFunction(
+            stringResource(Res.string.reboot_device),
+            Icons.Default.RestartAlt,
+            AdbFunctionType.REBOOT_DEVICE
+        ),
+        AdbFunction(
+            stringResource(Res.string.is_rooted),
+            Icons.Default.VerifiedUser,
+            AdbFunctionType.IS_ROOTED
+        ),
+        AdbFunction(
+            stringResource(Res.string.wifi_info),
+            Icons.Default.Wifi,
+            AdbFunctionType.WIFI_INFO
+        ),
+        AdbFunction(
+            stringResource(Res.string.cpu_info),
+            Icons.Default.Memory,
+            AdbFunctionType.CPU_INFO
+        ),
+        AdbFunction(
+            stringResource(Res.string.network_status),
+            Icons.Default.NetworkCheck,
+            AdbFunctionType.NETWORK_STATUS
+        ),
+        AdbFunction(
+            stringResource(Res.string.battery_status),
+            Icons.Default.BatteryStd,
+            AdbFunctionType.BATTERY_STATUS
+        ),
+        AdbFunction(
+            stringResource(Res.string.screen_resolution),
+            Icons.Default.ScreenSearchDesktop,
+            AdbFunctionType.SCREEN_RESOLUTION
+        ),
+        AdbFunction(
+            stringResource(Res.string.developer_options),
+            Icons.Default.DeveloperMode,
+            AdbFunctionType.DEVELOPER_OPTIONS
+        ),
+
+        )
+
+    /*       AdbFunction(stringResource(Res.string.install_app), Icons.Default.InstallMobile) {
+               coroutineScope.launch {
+
+               }
+
+           },
+
+           AdbFunction(stringResource(Res.string.input_text), Icons.Default.Edit) {
+               showTextInputDialog = true
+           },
+           AdbFunction(stringResource(Res.string.screenshot), Icons.Default.PhotoCamera) {
+               coroutineScope.launch {
+
+               }
+           },
+           AdbFunction(stringResource(Res.string.view_activity), Icons.Default.Visibility) {
+               coroutineScope.launch {
+                   val activity = withContext(Dispatchers.IO) {
+                       AdbTool.getCurrentActivity()
+                   }
+                   dialogText = activity?.let { currentActivityText.format(it) } ?: activityNotFoundText
+                   showDialog = true
+               }
+           }
+       )
+
+       val sysItems = listOf(
+           AdbFunction(stringResource(Res.string.reboot_device), Icons.Default.RestartAlt) {
+               runAdbAndShowResult(
+                   coroutineScope,
+                   "reboot",
+                   setDialogText = { dialogText = it },
+                   setShowDialog = { showDialog = it }
+               )
+           },
+           AdbFunction(stringResource(Res.string.is_rooted), Icons.Default.VerifiedUser) {
+               runAdbAndShowResult(
+                   coroutineScope,
+                   "su -c id",
+                   setDialogText = { dialogText = it },
+                   setShowDialog = { showDialog = it }
+               )
+           },
+           AdbFunction(stringResource(Res.string.wifi_info), Icons.Default.Wifi) {
+               runAdbAndShowResult(
+                   coroutineScope,
+                   "dumpsys wifi",
+                   setDialogText = { dialogText = it },
+                   setShowDialog = { showDialog = it }
+               )
+           },
+           AdbFunction(stringResource(Res.string.cpu_info), Icons.Default.Memory) {
+               runAdbAndShowResult(
+                   coroutineScope,
+                   "top -n 1",
+                   setDialogText = { dialogText = it },
+                   setShowDialog = { showDialog = it }
+               )
+           },
+           AdbFunction(stringResource(Res.string.network_status), Icons.Default.NetworkCheck) {
+               runAdbAndShowResult(
+                   coroutineScope,
+                   "dumpsys connectivity",
+                   setDialogText = { dialogText = it },
+                   setShowDialog = { showDialog = it }
+               )
+           },
+           AdbFunction(stringResource(Res.string.battery_status), Icons.Default.BatteryStd) {
+               runAdbAndShowResult(
+                   coroutineScope,
+                   "dumpsys battery",
+                   setDialogText = { dialogText = it },
+                   setShowDialog = { showDialog = it }
+               )
+           },
+           AdbFunction(stringResource(Res.string.screen_resolution), Icons.Default.ScreenSearchDesktop) {
+               runAdbAndShowResult(
+                   coroutineScope,
+                   "wm size",
+                   setDialogText = { dialogText = it },
+                   setShowDialog = { showDialog = it }
+               )
+           },
+           AdbFunction(stringResource(Res.string.developer_options), Icons.Default.DeveloperMode) {
+               runAdbAndShowResult(
+                   coroutineScope,
+                   "am start -a android.settings.APPLICATION_DEVELOPMENT_SETTINGS",
+                   setDialogText = { dialogText = it },
+                   setShowDialog = { showDialog = it }
+               )
+           }*/
+
 
 
 
@@ -286,7 +298,11 @@ fun CommonScreen() {
                             .fillMaxWidth()
                             .background(LightColorScheme.background, RoundedCornerShape(12.dp))
                     ) {
-                        SectionTitle(stringResource(Res.string.common_functions), Color.Red, modifier = Modifier.padding(top = 12.dp, start = 15.dp))
+                        SectionTitle(
+                            stringResource(Res.string.common_functions),
+                            Color.Red,
+                            modifier = Modifier.padding(top = 12.dp, start = 15.dp)
+                        )
                         FlowRow(
                             modifier = Modifier.padding(horizontal = 12.dp, vertical = 20.dp),
                             horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -299,7 +315,7 @@ fun CommonScreen() {
                                     title = item.title,
                                     icon = item.icon,
                                     iconColor = color,
-                                    onClick = item.onClick,
+                                    onClick = { viewModel.executeAdbAction(item.type) },
                                 )
                             }
                         }
@@ -314,7 +330,11 @@ fun CommonScreen() {
                             .padding(top = 15.dp)
                             .background(LightColorScheme.background, RoundedCornerShape(12.dp))
                     ) {
-                        SectionTitle(stringResource(Res.string.system_functions), Color.Blue, modifier = Modifier.padding(top = 12.dp, start = 15.dp))
+                        SectionTitle(
+                            stringResource(Res.string.system_functions),
+                            Color.Blue,
+                            modifier = Modifier.padding(top = 12.dp, start = 15.dp)
+                        )
                         FlowRow(
                             modifier = Modifier.fillMaxWidth()
                                 .padding(horizontal = 12.dp, vertical = 20.dp),
@@ -328,7 +348,7 @@ fun CommonScreen() {
                                     title = item.title,
                                     icon = item.icon,
                                     iconColor = color,
-                                    onClick = item.onClick,
+                                    onClick = { viewModel.executeAdbAction(item.type) }
                                 )
                             }
                         }
@@ -345,18 +365,22 @@ fun CommonScreen() {
 
 
     if (showDialog) {
-        TipDialog(dialogText) {
-            showDialog = false
+        dialogMsg?.let {
+            TipDialog(stringResource(it.stringResource,*it.args.toTypedArray())) {
+                viewModel.dismissTipDialog()
+            }
         }
     }
 
     if (showTextInputDialog) {
-        textInputDialog(coroutineScope) { showTextInputDialog = false }
+        textInputDialog(coroutineScope) {
+            viewModel.showInputDialog(false)
+        }
     }
 }
 
 @Composable
-fun SectionTitle(title: String, barColor: Color,modifier: Modifier = Modifier) {
+fun SectionTitle(title: String, barColor: Color, modifier: Modifier = Modifier) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier

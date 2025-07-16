@@ -34,6 +34,7 @@ import com.ludoven.adbtool.pages.HomeScreen
 import com.ludoven.adbtool.pages.SettingScreen
 import com.ludoven.adbtool.util.AdbPathManager
 import com.ludoven.adbtool.viewmodel.AppViewModel
+import com.ludoven.adbtool.viewmodel.CommonModel
 import com.ludoven.adbtool.viewmodel.DevicesViewModel
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
@@ -46,6 +47,7 @@ import org.jetbrains.compose.ui.tooling.preview.Preview
 fun App() {
     val devicesViewModel: DevicesViewModel = viewModel()
     val appViewModel: AppViewModel = viewModel()
+    val commonModel: CommonModel = viewModel()
 
     LaunchedEffect(Unit) {
         val adbPath = AdbPathManager.getAdbPath()
@@ -130,7 +132,7 @@ fun App() {
                         }
                         composable("common") {
                             stateHolder.SaveableStateProvider("common") {
-                                CommonScreen()
+                                CommonScreen(commonModel)
                             }
                         }
                         composable("app") {
