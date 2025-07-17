@@ -90,6 +90,7 @@ import androidx.compose.ui.unit.dp
 import com.ludoven.adbtool.LightColorScheme
 import com.ludoven.adbtool.entity.AdbFunction
 import com.ludoven.adbtool.entity.AdbFunctionType
+import com.ludoven.adbtool.entity.MsgContent
 import com.ludoven.adbtool.iconColors
 import com.ludoven.adbtool.util.AdbTool
 import com.ludoven.adbtool.viewmodel.CommonModel
@@ -102,20 +103,10 @@ import org.jetbrains.compose.ui.tooling.preview.Preview
 @Composable
 @Preview
 fun CommonScreen(viewModel: CommonModel) {
-    val installingText = stringResource(Res.string.installing)
-    val installSuccessText = stringResource(Res.string.install_success)
-    val installFailedText = stringResource(Res.string.install_failed)
-    val apkNotSelectText = stringResource(Res.string.apk_not_selected)
-    val folderNotSelectedText = stringResource(Res.string.folder_not_selected)
-    val screenshotSuccessText = stringResource(Res.string.screenshot_success)
-    val screenshotFailedText = stringResource(Res.string.screenshot_failed)
-    val activityNotFoundText = stringResource(Res.string.activity_not_found)
-    val currentActivityText = stringResource(Res.string.current_activity)
-
     val coroutineScope = rememberCoroutineScope()
     val showDialog by viewModel.showDialog.collectAsState()
     val showTextInputDialog by viewModel.showInputDialog.collectAsState()
-    val dialogMsg  by viewModel.dialogMessage.collectAsState()
+    val dialogMsg by viewModel.dialogMessage.collectAsState()
 
 
     val commonItems = listOf(
@@ -184,101 +175,6 @@ fun CommonScreen(viewModel: CommonModel) {
         ),
 
         )
-
-    /*       AdbFunction(stringResource(Res.string.install_app), Icons.Default.InstallMobile) {
-               coroutineScope.launch {
-
-               }
-
-           },
-
-           AdbFunction(stringResource(Res.string.input_text), Icons.Default.Edit) {
-               showTextInputDialog = true
-           },
-           AdbFunction(stringResource(Res.string.screenshot), Icons.Default.PhotoCamera) {
-               coroutineScope.launch {
-
-               }
-           },
-           AdbFunction(stringResource(Res.string.view_activity), Icons.Default.Visibility) {
-               coroutineScope.launch {
-                   val activity = withContext(Dispatchers.IO) {
-                       AdbTool.getCurrentActivity()
-                   }
-                   dialogText = activity?.let { currentActivityText.format(it) } ?: activityNotFoundText
-                   showDialog = true
-               }
-           }
-       )
-
-       val sysItems = listOf(
-           AdbFunction(stringResource(Res.string.reboot_device), Icons.Default.RestartAlt) {
-               runAdbAndShowResult(
-                   coroutineScope,
-                   "reboot",
-                   setDialogText = { dialogText = it },
-                   setShowDialog = { showDialog = it }
-               )
-           },
-           AdbFunction(stringResource(Res.string.is_rooted), Icons.Default.VerifiedUser) {
-               runAdbAndShowResult(
-                   coroutineScope,
-                   "su -c id",
-                   setDialogText = { dialogText = it },
-                   setShowDialog = { showDialog = it }
-               )
-           },
-           AdbFunction(stringResource(Res.string.wifi_info), Icons.Default.Wifi) {
-               runAdbAndShowResult(
-                   coroutineScope,
-                   "dumpsys wifi",
-                   setDialogText = { dialogText = it },
-                   setShowDialog = { showDialog = it }
-               )
-           },
-           AdbFunction(stringResource(Res.string.cpu_info), Icons.Default.Memory) {
-               runAdbAndShowResult(
-                   coroutineScope,
-                   "top -n 1",
-                   setDialogText = { dialogText = it },
-                   setShowDialog = { showDialog = it }
-               )
-           },
-           AdbFunction(stringResource(Res.string.network_status), Icons.Default.NetworkCheck) {
-               runAdbAndShowResult(
-                   coroutineScope,
-                   "dumpsys connectivity",
-                   setDialogText = { dialogText = it },
-                   setShowDialog = { showDialog = it }
-               )
-           },
-           AdbFunction(stringResource(Res.string.battery_status), Icons.Default.BatteryStd) {
-               runAdbAndShowResult(
-                   coroutineScope,
-                   "dumpsys battery",
-                   setDialogText = { dialogText = it },
-                   setShowDialog = { showDialog = it }
-               )
-           },
-           AdbFunction(stringResource(Res.string.screen_resolution), Icons.Default.ScreenSearchDesktop) {
-               runAdbAndShowResult(
-                   coroutineScope,
-                   "wm size",
-                   setDialogText = { dialogText = it },
-                   setShowDialog = { showDialog = it }
-               )
-           },
-           AdbFunction(stringResource(Res.string.developer_options), Icons.Default.DeveloperMode) {
-               runAdbAndShowResult(
-                   coroutineScope,
-                   "am start -a android.settings.APPLICATION_DEVELOPMENT_SETTINGS",
-                   setDialogText = { dialogText = it },
-                   setShowDialog = { showDialog = it }
-               )
-           }*/
-
-
-
 
     Scaffold(containerColor = Color.White) { paddingValues ->
         val scrollState = rememberLazyListState()
@@ -366,7 +262,17 @@ fun CommonScreen(viewModel: CommonModel) {
 
     if (showDialog) {
         dialogMsg?.let {
-            TipDialog(stringResource(it.stringResource,*it.args.toTypedArray())) {
+            TipDialog(
+                dialogText = when (it) {
+                    is MsgContent.Resource -> {
+                        stringResource(it.stringResource, *it.args.toTypedArray())
+                    }
+
+                    is MsgContent.Text -> {
+                        it.text
+                    }
+                }
+            ) {
                 viewModel.dismissTipDialog()
             }
         }

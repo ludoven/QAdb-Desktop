@@ -75,6 +75,7 @@ import androidx.compose.ui.unit.dp
 import com.ludoven.adbtool.LightColorScheme
 import com.ludoven.adbtool.entity.AdbFunction
 import com.ludoven.adbtool.entity.AdbFunctionType
+import com.ludoven.adbtool.entity.MsgContent
 import com.ludoven.adbtool.iconColors
 import com.ludoven.adbtool.util.AdbTool
 import com.ludoven.adbtool.viewmodel.AppViewModel
@@ -278,10 +279,23 @@ fun AppScreen(viewModel: AppViewModel) {
     val showDialog by viewModel.showDialog.collectAsState()
 
     if (showDialog) {
-        TipDialog(dialogMessage ?: stringResource(Res.string.dialog_unknown_error)) {
-            viewModel.dismissTipDialog()
+        dialogMessage?.let {
+            TipDialog(
+                dialogText = when (it) {
+                    is MsgContent.Resource -> {
+                        stringResource(it.stringResource, *it.args.toTypedArray())
+                    }
+
+                    is MsgContent.Text -> {
+                        it.text
+                    }
+                }
+            ) {
+                viewModel.dismissTipDialog()
+            }
         }
     }
+
 }
 
 

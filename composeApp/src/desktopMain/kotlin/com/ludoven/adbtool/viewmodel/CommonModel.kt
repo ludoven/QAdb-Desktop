@@ -15,7 +15,7 @@ import adbtool_desktop.composeapp.generated.resources.screenshot_success
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.ludoven.adbtool.entity.AdbFunctionType
-import com.ludoven.adbtool.entity.LocalizedText
+import com.ludoven.adbtool.entity.MsgContent
 import com.ludoven.adbtool.util.AdbTool
 import com.ludoven.adbtool.util.FileUtils
 import kotlinx.coroutines.Dispatchers
@@ -27,41 +27,15 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 
-class CommonModel : ViewModel() {
-
-    private val _dialogMessage = MutableStateFlow<LocalizedText?>(null)
-    val dialogMessage: StateFlow<LocalizedText?> = _dialogMessage.asStateFlow()
-
-    private val _showDialog = MutableStateFlow(false)
-    val showDialog: StateFlow<Boolean> = _showDialog.asStateFlow()
-
-
+class CommonModel : BaseViewModel() {
     private val _showInputDialog = MutableStateFlow(false)
     val showInputDialog: StateFlow<Boolean> = _showInputDialog.asStateFlow()
-
-
-    fun showTipDialog(tag: LocalizedText, autoDismiss: Boolean = false, delayMillis: Long = 2000L) {
-        viewModelScope.launch {
-            _dialogMessage.value = tag
-            _showDialog.value = true
-            if (autoDismiss) {
-                delay(delayMillis)
-                _showDialog.value = false
-                _dialogMessage.value = null
-            }
-        }
-    }
-
-    fun dismissTipDialog() {
-        _showDialog.value = false
-        _dialogMessage.value = null
-    }
 
     fun executeAdbAction(
         type: AdbFunctionType
     ) {
         if (AdbTool.selectDeviceId == null) {
-            showTipDialog(LocalizedText(Res.string.no_device_available))
+            showTipDialog(MsgContent.Resource(Res.string.no_device_available))
             return
         }
 
@@ -85,7 +59,35 @@ class CommonModel : ViewModel() {
                     }
 
                     AdbFunctionType.REBOOT_DEVICE -> {
+                        execResult("reboot")
+                    }
 
+                    AdbFunctionType.IS_ROOTED -> {
+                        execResult("su -c id")
+                    }
+
+                    AdbFunctionType.WIFI_INFO -> {
+                        execResult("dumpsys wifi")
+                    }
+
+                    AdbFunctionType.CPU_INFO -> {
+                        execResult("top -n 1")
+                    }
+
+                    AdbFunctionType.NETWORK_STATUS -> {
+                        execResult("dumpsys connectivity")
+                    }
+
+                    AdbFunctionType.BATTERY_STATUS -> {
+                        execResult("dumpsys battery")
+                    }
+
+                    AdbFunctionType.SCREEN_RESOLUTION -> {
+                        execResult("wm size")
+                    }
+
+                    AdbFunctionType.DEVELOPER_OPTIONS -> {
+                        execResult("am start -a android.settings.APPLICATION_DEVELOPMENT_SETTINGS")
                     }
 
                     else -> {}
@@ -93,7 +95,7 @@ class CommonModel : ViewModel() {
 
             } catch (e: Exception) {
                 showTipDialog(
-                    LocalizedText(
+                    MsgContent.Resource(
                         Res.string.dialog_operation_failed,
                         listOf("${e.message}")
                     )
@@ -106,18 +108,18 @@ class CommonModel : ViewModel() {
     private suspend fun installApp() {
         val apkPath = FileUtils.selectApkFile()
         if (apkPath != null) {
-            showTipDialog(LocalizedText(Res.string.installing))
+            showTipDialog(MsgContent.Resource(Res.string.installing))
             withContext(Dispatchers.IO) {
                 val success = AdbTool.installApk(apkPath) // 执行安装
                 withContext(Dispatchers.Main) { // 切换回主线程更新 UI
                     val localizedText =
-                        LocalizedText(if (success) Res.string.install_success else Res.string.install_failed)
+                        MsgContent.Resource(if (success) Res.string.install_success else Res.string.install_failed)
                     showTipDialog(localizedText, true)
                 }
             }
 
         } else {
-            showTipDialog(LocalizedText(Res.string.apk_not_selected), true)
+            showTipDialog(MsgContent.Resource(Res.string.apk_not_selected), true)
         }
     }
 
@@ -131,7 +133,7 @@ class CommonModel : ViewModel() {
         }
 
         if (folderPath == null) {
-            showTipDialog(LocalizedText(Res.string.folder_not_selected), true)
+            showTipDialog(MsgContent.Resource(Res.string.folder_not_selected), true)
             return
         }
 
@@ -142,7 +144,7 @@ class CommonModel : ViewModel() {
         }
 
         val localizedText =
-            LocalizedText(if (success) Res.string.screenshot_success else Res.string.screenshot_failed)
+            MsgContent.Resource(if (success) Res.string.screenshot_success else Res.string.screenshot_failed)
         showTipDialog(localizedText, true)
     }
 
@@ -152,9 +154,11 @@ class CommonModel : ViewModel() {
             AdbTool.getCurrentActivity()
         }
         val localizedText =
-            result?.let { LocalizedText(Res.string.current_activity, listOf(it)) } ?: LocalizedText(
-                Res.string.activity_not_found
-            )
+            result?.let { MsgContent.Resource(Res.string.current_activity, listOf(it)) }
+                ?: MsgContent.Resource(
+                    Res.string.activity_not_found
+                )
         showTipDialog(localizedText)
     }
+
 }
