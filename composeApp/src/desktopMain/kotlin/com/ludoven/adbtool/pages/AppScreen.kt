@@ -24,21 +24,27 @@ import adbtool_desktop.composeapp.generated.resources.uninstall_app
 import adbtool_desktop.composeapp.generated.resources.view_install_path
 import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
@@ -107,169 +113,34 @@ fun AppScreen(viewModel: AppViewModel) {
         AdbFunction(stringResource(Res.string.app_size), Icons.Default.Storage, AdbFunctionType.GET_APP_SIZE)
     )
 
-
-    Scaffold(containerColor = Color.White) { paddingValues ->
-        val scrollState = rememberLazyListState()
-        Box {
-            LazyColumn(
-                state = scrollState,
-                contentPadding = PaddingValues(12.dp),
-                modifier = Modifier.fillMaxSize().background(Color.White)
-            ) {
-                item {
-                    var expanded by remember { mutableStateOf(false) }
-
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(LightColorScheme.background, RoundedCornerShape(12.dp))
-                            .padding(12.dp)
-                    ) {
-
-                        ExposedDropdownMenuBox(
-                            expanded = expanded,
-                            onExpandedChange = { expanded = !expanded }
-                        ) {
-                            OutlinedTextField(
-                                value = if (selectedApp != null) {
-                                    "${selectedApp?.appName} (${selectedApp?.packageName})"
-                                } else {
-                                    stringResource(Res.string.select_a_app)
-                                },
-                                onValueChange = {},
-                                readOnly = true,
-                                label = { Text(stringResource(Res.string.select_app)) },
-                                trailingIcon = {
-                                    ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
-                                },
-                                modifier = Modifier
-                                    .menuAnchor()
-                                    .fillMaxWidth()
-                            )
-
-                            ExposedDropdownMenu(
-                                expanded = expanded,
-                                onDismissRequest = { expanded = false },
-                                modifier = Modifier.background(LightColorScheme.surface) // 确保这里使用 Material3 的 Colors
-                            ) {
-                                appList.forEach { app ->
-                                    DropdownMenuItem(
-                                        text = { Text("${app.appName} (${app.packageName})") },
-                                        onClick = {
-                                            viewModel.selectApp(app)
-                                            expanded = false
-                                            viewModel.loadAppInfo(app.packageName)
-                                        }
-                                    )
-                                }
-                            }
-                        }
-                    }
+    Scaffold { paddingValues ->
+        // 使用 Row 来创建左右分栏布局
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+                .background(LightColorScheme.background)
+        ) {
+            // 左侧：应用列表
+            AppListSection(
+                modifier = Modifier.weight(0.3f), // 左侧占据 30% 的宽度
+                appList = appList,
+                selectedApp = selectedApp,
+                onAppSelected = { app ->
+                    viewModel.selectApp(app)
+                    viewModel.loadAppInfo(app.packageName)
                 }
+            )
 
-                item {
-                    Card(
-                        modifier = Modifier.fillMaxWidth().padding(top = 20.dp, bottom = 20.dp),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = LightColorScheme.background
-                        )
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(
-                                top = 16.dp,
-                                start = 16.dp,
-                                end = 16.dp,
-                                bottom = 16.dp
-                            )
-                        ) {
-                            SectionTitle(
-                                stringResource(Res.string.app_info_section_title),
-                                Color.Blue,
-                                modifier = Modifier.padding(bottom = 10.dp)
-                            )
-                            if (selectedApp == null) {
-                                Text(stringResource(Res.string.app_info_placeholder))
-                            } else if (appInfo.isEmpty()) {
-                                Text(stringResource(Res.string.app_info_no_detail), color = Color.Gray)
-                            } else {
-                                Column(
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    appInfo.entries.toList().forEachIndexed { index, (key, value) ->
-                                        SelectionContainer {
-                                            Column(
-                                                modifier = Modifier
-                                                    .fillMaxWidth()
-                                                    .padding(horizontal = 12.dp, vertical = 3.dp)
-                                            ) {
-                                                Row(
-                                                    modifier = Modifier.fillMaxWidth()
-                                                ) {
-                                                    Text(
-                                                        text = "$key:",
-                                                        modifier = Modifier.weight(0.4f),
-                                                        style = MaterialTheme.typography.bodyMedium.copy(
-                                                            color = Color.Gray
-                                                        ),
-                                                        maxLines = 1
-                                                    )
-                                                    Text(
-                                                        text = value,
-                                                        modifier = Modifier.weight(0.6f),
-                                                        style = MaterialTheme.typography.bodyMedium.copy(
-                                                            color = Color.Black
-                                                        )
-                                                    )
-                                                }
-                                            }
-                                        }
-                                    }
-
-                                }
-
-                            }
-                        }
-                    }
+            // 右侧：应用信息和功能
+            AppInfoAndFunctionsSection(
+                modifier = Modifier.weight(0.7f), // 右侧占据 70% 的宽度
+                selectedApp = selectedApp,
+                appInfo = appInfo,
+                adbFunctions = items,
+                onAdbAction = { actionType ->
+                    viewModel.executeAdbAction(actionType)
                 }
-
-
-                item {
-                    // 功能区
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 15.dp)
-                            .background(LightColorScheme.background, RoundedCornerShape(12.dp))
-                    ) {
-                        SectionTitle(
-                            stringResource(Res.string.app_functions_section_title),
-                            Color.Red,
-                            modifier = Modifier.padding(top = 12.dp, start = 15.dp)
-                        )
-                        FlowRow(
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 20.dp),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            verticalArrangement = Arrangement.spacedBy(12.dp),
-                            maxItemsInEachRow = 5
-                        ) {
-                            items.forEachIndexed { index, item ->
-                                val color = iconColors[index % iconColors.size]
-                                GridItemCard(
-                                    title = item.title,
-                                    icon = item.icon,
-                                    iconColor = color,
-                                    onClick = { viewModel.executeAdbAction(item.type) }
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-
-            VerticalScrollbar(
-                adapter = rememberScrollbarAdapter(scrollState),
-                modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight()
             )
         }
     }
@@ -296,6 +167,216 @@ fun AppScreen(viewModel: AppViewModel) {
         }
     }
 
+}
+
+
+// 提取左侧应用列表为一个单独的 Composable
+@Composable
+fun AppListSection(
+    modifier: Modifier = Modifier,
+    appList: List<AppInfo>,
+    selectedApp: AppInfo?,
+    onAppSelected: (AppInfo) -> Unit
+) {
+    val listState = rememberLazyListState()
+
+    Box(
+        modifier = modifier
+            .fillMaxHeight()
+            .padding(12.dp)
+            .background(Color.White, RoundedCornerShape(12.dp))
+    ) {
+        if (appList.isEmpty()) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+        /*        Text(
+                    text = if (isAppListLoading) "加载中..." else "未找到应用",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = Color.Gray
+                )*/
+            }
+        } else {
+            LazyColumn(
+                state = listState,
+                modifier = Modifier.fillMaxSize()
+            ) {
+                items(appList.size) { index ->
+                    val app = appList[index]
+                    AppListItem(
+                        app = app,
+                        isSelected = app == selectedApp,
+                        onClick = { onAppSelected(app) }
+                    )
+                }
+            }
+            VerticalScrollbar(
+                adapter = rememberScrollbarAdapter(listState),
+                modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight()
+            )
+        }
+    }
+}
+
+// 列表项，用于展示应用的图标、名称和包名
+@Composable
+fun AppListItem(
+    app: AppInfo,
+    isSelected: Boolean,
+    onClick: () -> Unit
+) {
+    val backgroundColor = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.1f) else Color.Transparent
+    val textColor = if (isSelected) MaterialTheme.colorScheme.primary else Color.Black
+    val packageNameColor = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.7f) else Color.Gray
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(backgroundColor, RoundedCornerShape(8.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // TODO: 在这里添加应用图标，需要根据包名加载
+        // Icon(
+        //     painter = ...,
+        //     contentDescription = null,
+        //     modifier = Modifier.size(40.dp).clip(RoundedCornerShape(8.dp))
+        // )
+        Spacer(modifier = Modifier.width(12.dp))
+        Column {
+            Text(
+                text = app.appName,
+                style = MaterialTheme.typography.titleMedium,
+                color = textColor,
+                maxLines = 1
+            )
+            Text(
+                text = app.packageName,
+                style = MaterialTheme.typography.bodySmall,
+                color = packageNameColor,
+                maxLines = 1
+            )
+        }
+    }
+}
+
+
+@Composable
+fun AppInfoAndFunctionsSection(
+    modifier: Modifier = Modifier,
+    selectedApp: AppInfo?,
+    appInfo: Map<String, String>,
+    adbFunctions: List<AdbFunction>,
+    onAdbAction: (AdbFunctionType) -> Unit
+) {
+    // 为右侧内容创建一个可滚动的状态
+    val scrollState = rememberScrollState()
+
+    Box(
+        modifier = modifier
+            .fillMaxHeight()
+            .padding(12.dp)
+            .background(LightColorScheme.background, RoundedCornerShape(12.dp))
+    ) {
+        if (selectedApp == null) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "请选择一个应用",
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = Color.Gray
+                )
+            }
+        } else {
+            // 将整个 Column 变为可滚动
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp)
+                    .verticalScroll(scrollState) // <-- 关键改动：添加了垂直滚动修饰符
+            ) {
+                // 应用信息卡片
+                Card(
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 20.dp),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = Color.White
+                    )
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        SectionTitle(
+                            stringResource(Res.string.app_info_section_title),
+                            Color.Blue,
+                            modifier = Modifier.padding(bottom = 10.dp)
+                        )
+                        if (appInfo.isEmpty()) {
+                            Text(stringResource(Res.string.app_info_no_detail), color = Color.Gray)
+                        } else {
+                            // 应用信息详情
+                            Column(modifier = Modifier.fillMaxWidth()) {
+                                appInfo.entries.toList().forEach { (key, value) ->
+                                    SelectionContainer {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp),
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                        ) {
+                                            Text(
+                                                text = "$key:",
+                                                style = MaterialTheme.typography.bodyMedium.copy(color = Color.Gray)
+                                            )
+                                            Text(
+                                                text = value,
+                                                style = MaterialTheme.typography.bodyMedium
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // 功能区
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color.White, RoundedCornerShape(12.dp))
+                        .padding(16.dp)
+                ) {
+                    SectionTitle(
+                        stringResource(Res.string.app_functions_section_title),
+                        Color.Red,
+                        modifier = Modifier.padding(bottom = 12.dp)
+                    )
+                    FlowRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        adbFunctions.forEachIndexed { index, item ->
+                            val color = iconColors[index % iconColors.size]
+                            GridItemCard(
+                                title = item.title,
+                                icon = item.icon,
+                                iconColor = color,
+                                onClick = { onAdbAction(item.type) }
+                            )
+                        }
+                    }
+                }
+            }
+
+            // <-- 关键改动：为可滚动的 Column 添加滚动条
+            VerticalScrollbar(
+                adapter = rememberScrollbarAdapter(scrollState),
+                modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight()
+            )
+        }
+    }
 }
 
 

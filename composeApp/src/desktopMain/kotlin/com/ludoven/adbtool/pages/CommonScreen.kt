@@ -86,6 +86,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.ludoven.adbtool.LightColorScheme
 import com.ludoven.adbtool.entity.AdbFunction
@@ -333,7 +334,8 @@ fun GridItemCard(
             Text(
                 text = title,
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurface
+                color = MaterialTheme.colorScheme.onSurface,
+                textAlign = TextAlign.Center // 添加这一行，让 Text 内部的多行文本居中
             )
         }
     }
