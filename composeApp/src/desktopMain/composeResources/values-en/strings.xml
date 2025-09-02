@@ -1,4 +1,167 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <resources>
+    <string name="home">Home</string>
+    <string name="common">Common</string>
+    <string name="app">Apps</string>
+    <string name="set">Settings</string>
 
+    <!-- Home module functions -->
+    <string name="select_device">Select Device</string>
+    <string name="no_device">No Device</string>
+    <string name="no_device_available">No devices available</string>
+    <string name="refresh">Refresh</string>
+    <string name="disconnect">Disconnect</string>
+    <string name="cpu">CPU</string>
+    <string name="memory_usage">Memory Usage</string>
+    <string name="storage_usage">Storage Usage</string>
+    <string name="battery">Battery</string>
+    <string name="device_info">Device Info</string>
+    <string name="select_device_hint">Please select a device to view its information.</string>
+    <string name="no_device_info">Unable to retrieve device details.</string>
+
+    <!-- Common functions module -->
+    <string name="common_functions">Common Functions</string>
+    <string name="install_app">Install App</string>
+    <string name="installing">Installing...</string>
+    <string name="install_success">Installation successful</string>
+    <string name="install_failed">Installation failed</string>
+    <string name="apk_not_selected">No APK file selected or selection is invalid.</string>
+
+    <string name="input_text">Input Text</string>
+    <string name="screenshot">Take Screenshot</string>
+    <string name="folder_not_selected">No folder selected</string>
+    <string name="screenshot_success">Screenshot saved successfully!</string>
+    <string name="screenshot_failed">Screenshot failed</string>
+    <string name="view_activity">View Activity</string>
+    <string name="current_activity">Current Activity:\n\n%1$s</string>
+    <string name="activity_not_found">Unable to get Activity</string>
+
+    <!-- System functions module -->
+    <string name="system_functions">System Functions</string>
+    <string name="reboot_device">Reboot Device</string>
+    <string name="is_rooted">Is Rooted</string>
+    <string name="wifi_info">WiFi Info</string>
+    <string name="cpu_info">CPU Info</string>
+    <string name="network_status">Network Status</string>
+    <string name="battery_status">Battery Status</string>
+    <string name="screen_resolution">Screen Resolution</string>
+    <string name="developer_options">Developer Options</string>
+
+    <string name="input_hint">Please enter text</string>
+    <string name="escape_spaces">Escape spaces (%%s)</string>
+    <string name="cancel">Cancel</string>
+    <string name="confirm">Confirm</string>
+    <string name="tip_title">Tip</string>
+
+    <string name="select_a_app">Please select an app</string>
+    <string name="select_app">Select App</string>
+    <string name="app_info_section_title">Device Information</string>
+    <string name="app_functions_section_title">App Functions</string>
+    <string name="uninstall_app">Uninstall App</string>
+    <string name="launch_app">Launch App</string>
+    <string name="stop_app">Stop App</string>
+    <string name="restart_app">Restart App</string>
+    <string name="clear_data">Clear Data</string>
+    <string name="clear_and_restart">Clear and Restart</string>
+    <string name="reset_permissions">Reset Permissions</string>
+    <string name="reset_permissions_and_restart">Reset Permissions and Restart</string>
+    <string name="grant_all_permissions">Grant All Permissions</string>
+    <string name="view_install_path">View Install Path</string>
+    <string name="export_apk">Export APK</string>
+    <string name="app_size">App Size</string>
+    <string name="dialog_select_app_first">Please select an app first</string>
+    <string name="dialog_uninstall_success">Uninstall successful: %s</string>
+    <string name="dialog_uninstall_failed">Uninstall failed</string>
+    <string name="dialog_launch_success">Launch successful: %s</string>
+    <string name="dialog_launch_failed">Launch failed</string>
+    <string name="dialog_stop_success">App stopped: %s</string>
+    <string name="dialog_stop_failed">Stop failed</string>
+    <string name="dialog_restart_success">App restarted: %s</string>
+    <string name="dialog_clear_success">Clear successful: %s</string>
+    <string name="dialog_clear_failed">Clear failed</string>
+    <string name="dialog_clear_and_restart_success">Clear and restart successful: %s</string>
+    <string name="dialog_reset_permissions_success">Permissions reset: %s</string>
+    <string name="dialog_reset_permissions_failed">Reset failed</string>
+    <string name="dialog_reset_permissions_and_restart_success">Permissions reset and restarted: %s</string>
+    <string name="dialog_grant_success">Grant completed: %s</string>
+    <string name="dialog_grant_failed">Grant failed</string>
+    <string name="dialog_get_path_failed">Failed to get path</string>
+    <string name="dialog_export_success">Export successful: %s</string>
+    <string name="dialog_export_failed">Export failed</string>
+    <string name="dialog_no_export_path">No export path selected</string>
+    <string name="dialog_get_install_path_failed">Failed to get install path</string>
+    <string name="dialog_query_failed">Query failed</string>
+    <string name="dialog_operation_success">Operation successful: %s</string>
+    <string name="dialog_operation_failed">Operation failed: %s</string>
+    <string name="dialog_unknown_error">Unknown error</string>
+    <string name="app_info_no_detail">Unable to retrieve app details.</string>
+    <string name="app_info_placeholder">Please select an app to view its information.</string>
+
+    <!-- Settings Page -->
+    <string name="adb_path_setting">ADB Path Setting</string>
+    <string name="current_adb_path">Current ADB Path</string>
+    <string name="select_adb_path">Select ADB Path</string>
+    <string name="adb_path_set_success">ADB path set successfully!</string>
+    <string name="language_setting">Language Setting</string>
+    <string name="select_language">Select Language</string>
+    <string name="chinese">中文</string>
+    <string name="english">English</string>
+    <string name="language_changed">Language changed successfully!</string>
+    <string name="restart_required">Please restart the application to apply language changes.</string>
+    
+    <!-- General Status Text -->
+    <string name="not_set">Not Set</string>
+    <string name="unknown">Unknown</string>
+    <string name="none">None</string>
+    <string name="yes">Yes</string>
+    <string name="no">No</string>
+    <string name="loading">Loading...</string>
+    <string name="no_apps_found">No apps found</string>
+    <string name="input_success">Input successful</string>
+    <string name="input_failed">Input failed</string>
+    
+    <!-- Device Information -->
+    <string name="android_version">Android Version</string>
+    <string name="sdk_version">SDK</string>
+    <string name="device_model">Device Model</string>
+    <string name="manufacturer">Manufacturer</string>
+    <string name="rom_version">ROM Version</string>
+    <string name="build_fingerprint">Build Fingerprint</string>
+    <string name="ip_address">IP Address</string>
+    <string name="mac_address">MAC Address</string>
+    <string name="battery_level">Battery</string>
+    <string name="cpu_usage">CPU</string>
+    <string name="memory">Memory</string>
+    <string name="storage">Storage</string>
+    <string name="charging_status">Charging</string>
+    <string name="discharging_status">Discharging</string>
+    <string name="full_status">Full</string>
+    <string name="unknown_status">Unknown</string>
+    <string name="adb_path_found">ADB Path</string>
+    <string name="adb_not_found">Valid ADB not found, please set manually</string>
+    
+    <!-- App Information -->
+    <string name="package_name">Package Name</string>
+    <string name="version_name">Version Name</string>
+    <string name="version_code">Version Code</string>
+    <string name="uid">UID</string>
+    <string name="is_system_app">Is System App</string>
+    <string name="target_sdk">Target SDK</string>
+    <string name="min_sdk">Min SDK Version</string>
+    <string name="first_install_time">First Install Time</string>
+    <string name="last_update_time">Last Update Time</string>
+    <string name="supported_abi">Supported ABI</string>
+    
+    <!-- Page Titles -->
+    <string name="key_event_page">Key Event Page</string>
+    <string name="system_page">System Page</string>
+    
+    <!-- ADB Path Settings -->
+    <string name="adb_path_label">ADB Path</string>
+    <string name="select_adb_icon_desc">Select ADB</string>
+    <string name="adb_path_success_message">ADB path set successfully:\n%1$s</string>
+    
+    <!-- Debug Information -->
+    <string name="disconnect_device_result">Disconnect device %1$s result: %2$s</string>
+    <string name="debug_info">Debug Info</string>
 </resources>

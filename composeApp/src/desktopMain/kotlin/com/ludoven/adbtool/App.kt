@@ -1,6 +1,8 @@
 package com.ludoven.adbtool
 
 import adbtool_desktop.composeapp.generated.resources.Res
+import adbtool_desktop.composeapp.generated.resources.adb_not_found
+import adbtool_desktop.composeapp.generated.resources.adb_path_found
 import adbtool_desktop.composeapp.generated.resources.app
 import adbtool_desktop.composeapp.generated.resources.common
 import adbtool_desktop.composeapp.generated.resources.home
@@ -33,6 +35,7 @@ import com.ludoven.adbtool.pages.CommonScreen
 import com.ludoven.adbtool.pages.HomeScreen
 import com.ludoven.adbtool.pages.SettingScreen
 import com.ludoven.adbtool.util.AdbPathManager
+import com.ludoven.adbtool.util.LanguageManager
 import com.ludoven.adbtool.viewmodel.AppViewModel
 import com.ludoven.adbtool.viewmodel.CommonModel
 import com.ludoven.adbtool.viewmodel.DevicesViewModel
@@ -50,11 +53,14 @@ fun App() {
     val commonModel: CommonModel = viewModel()
 
     LaunchedEffect(Unit) {
+        // 初始化语言管理器
+        LanguageManager.initialize()
+        
         val adbPath = AdbPathManager.getAdbPath()
         if (adbPath != null) {
-            println("ADB 路径: $adbPath")
+            println("ADB path found: $adbPath")
         } else {
-            println("未找到有效的 ADB，请手动设置")
+            println("ADB not found")
         }
     }
 

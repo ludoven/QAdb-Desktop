@@ -1,19 +1,14 @@
 package com.ludoven.adbtool.pages
 
 import adbtool_desktop.composeapp.generated.resources.Res
-import adbtool_desktop.composeapp.generated.resources.battery
-import adbtool_desktop.composeapp.generated.resources.cpu
 import adbtool_desktop.composeapp.generated.resources.device_info
 import adbtool_desktop.composeapp.generated.resources.disconnect
-import adbtool_desktop.composeapp.generated.resources.home
-import adbtool_desktop.composeapp.generated.resources.memory_usage
 import adbtool_desktop.composeapp.generated.resources.no_device
 import adbtool_desktop.composeapp.generated.resources.no_device_available
 import adbtool_desktop.composeapp.generated.resources.no_device_info
 import adbtool_desktop.composeapp.generated.resources.refresh
 import adbtool_desktop.composeapp.generated.resources.select_device
 import adbtool_desktop.composeapp.generated.resources.select_device_hint
-import adbtool_desktop.composeapp.generated.resources.storage_usage
 import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -65,10 +60,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import com.ludoven.adbtool.LightColorScheme
-import com.ludoven.adbtool.util.AdbPathManager
+import com.ludoven.adbtool.entity.DeviceCenterInfoField
 import com.ludoven.adbtool.viewmodel.DevicesViewModel
 import com.ludoven.adbtool.widget.InfoCard
-import org.jetbrains.compose.resources.Resource
 import org.jetbrains.compose.resources.stringResource
 
 
@@ -181,34 +175,44 @@ fun HomeScreen(viewModel: DevicesViewModel) {
                         .padding(bottom = 30.dp, top = 12.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    InfoCard(
-                        modifier = Modifier.weight(1f),
-                        title = stringResource(Res.string.cpu),
-                        value = "${centerInfo["CPU"]}",
-                        icon = Icons.Default.Memory,
-                        iconColor = Color(0xFFEF5350) // 红色
-                    )
-                    InfoCard(
-                        modifier = Modifier.weight(1f),
-                        title = stringResource(Res.string.memory_usage),
-                        value = "${centerInfo["内存"]}",
-                        icon = Icons.Default.Storage,
-                        iconColor = Color(0xFF42A5F5) // 蓝色
-                    )
-                    InfoCard(
-                        modifier = Modifier.weight(1f),
-                        title = stringResource(Res.string.storage_usage),
-                        value = "${centerInfo["存储"]}",
-                        icon = Icons.Default.SdStorage,
-                        iconColor = Color(0xFF66BB6A) // 绿色
-                    )
-                    InfoCard(
-                        modifier = Modifier.weight(1f),
-                        title = stringResource(Res.string.battery),
-                        value = "${centerInfo["电量"]}",
-                        icon = Icons.Default.BatteryFull,
-                        iconColor = Color(0xFFFFA726) // 橙色
-                    )
+                    centerInfo?.let { info ->
+                        info.toDisplayMap().forEach { (field, value) ->
+                            when (field) {
+                                DeviceCenterInfoField.CPU_USAGE -> InfoCard(
+                                    modifier = Modifier.weight(1f),
+                                    title = stringResource(field.stringResource),
+                                    value = value,
+                                    icon = Icons.Default.Memory,
+                                    iconColor = Color(0xFFEF5350) // 红色
+                                )
+                                DeviceCenterInfoField.MEMORY_USAGE -> InfoCard(
+                                    modifier = Modifier.weight(1f),
+                                    title = stringResource(field.stringResource),
+                                    value = value,
+                                    icon = Icons.Default.Storage,
+                                    iconColor = Color(0xFF42A5F5) // 蓝色
+                                )
+                                DeviceCenterInfoField.STORAGE_USAGE -> InfoCard(
+                                    modifier = Modifier.weight(1f),
+                                    title = stringResource(field.stringResource),
+                                    value = value,
+                                    icon = Icons.Default.SdStorage,
+                                    iconColor = Color(0xFF66BB6A) // 绿色
+                                )
+                                DeviceCenterInfoField.BATTERY_LEVEL -> {
+                                    val batteryStatusText = stringResource(info.batteryStatus.stringResource)
+                                    val displayValue = if (value.isNotEmpty()) "$value（$batteryStatusText）" else ""
+                                    InfoCard(
+                                        modifier = Modifier.weight(1f),
+                                        title = stringResource(field.stringResource),
+                                        value = displayValue,
+                                        icon = Icons.Default.BatteryFull,
+                                        iconColor = Color(0xFFFFA726) // 橙色
+                                    )
+                                }
+                            }
+                        }
+                    }
                 }
             }
 
@@ -224,38 +228,39 @@ fun HomeScreen(viewModel: DevicesViewModel) {
                     SectionTitle(stringResource(Res.string.device_info), Color.Blue, modifier = Modifier.padding(bottom = 10.dp))
                     if (selectedDevice == null) {
                         Text(stringResource(Res.string.select_device_hint))
-                    } else if (deviceInfo.isEmpty() && !isLoading) {
+                    } else if (deviceInfo == null && !isLoading) {
                         Text(stringResource(Res.string.no_device_info), color = Color.Gray)
                     } else {
-                        Column(
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            deviceInfo.entries.toList().forEachIndexed { index, (key, value) ->
-                                SelectionContainer {
-                                    Column(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(horizontal = 12.dp, vertical = 3.dp)
-                                    ) {
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth()
+                        deviceInfo?.let { info ->
+                            Column(
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                info.toDisplayMap().forEach { (field, value) ->
+                                    SelectionContainer {
+                                        Column(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(horizontal = 12.dp, vertical = 3.dp)
                                         ) {
-                                            Text(
-                                                text = "$key:",
-                                                modifier = Modifier.weight(0.4f),
-                                                style = MaterialTheme.typography.titleMedium.copy(color = Color.Black),
-                                                maxLines = 1
-                                            )
-                                            Text(
-                                                text = value,
-                                                modifier = Modifier.weight(0.6f),
-                                                style = MaterialTheme.typography.bodyMedium.copy(color = Color.Black)
-                                            )
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth()
+                                            ) {
+                                                Text(
+                                                    text = "${stringResource(field.stringResource)}:",
+                                                    modifier = Modifier.weight(0.4f),
+                                                    style = MaterialTheme.typography.titleMedium.copy(color = Color.Black),
+                                                    maxLines = 1
+                                                )
+                                                Text(
+                                                    text = value,
+                                                    modifier = Modifier.weight(0.6f),
+                                                    style = MaterialTheme.typography.bodyMedium.copy(color = Color.Black)
+                                                )
+                                            }
                                         }
                                     }
                                 }
                             }
-
                         }
 
                     }

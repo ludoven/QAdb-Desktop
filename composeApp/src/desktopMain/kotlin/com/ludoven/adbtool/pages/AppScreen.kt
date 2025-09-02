@@ -22,6 +22,8 @@ import adbtool_desktop.composeapp.generated.resources.select_app
 import adbtool_desktop.composeapp.generated.resources.stop_app
 import adbtool_desktop.composeapp.generated.resources.uninstall_app
 import adbtool_desktop.composeapp.generated.resources.view_install_path
+import adbtool_desktop.composeapp.generated.resources.yes
+import adbtool_desktop.composeapp.generated.resources.no
 import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -82,6 +84,8 @@ import com.ludoven.adbtool.LightColorScheme
 import com.ludoven.adbtool.entity.AdbFunction
 import com.ludoven.adbtool.entity.AdbFunctionType
 import com.ludoven.adbtool.entity.MsgContent
+import com.ludoven.adbtool.entity.AppInfoData
+import com.ludoven.adbtool.entity.AppInfoField
 import com.ludoven.adbtool.iconColors
 import com.ludoven.adbtool.util.AdbTool
 import com.ludoven.adbtool.viewmodel.AppViewModel
@@ -267,7 +271,7 @@ fun AppListItem(
 fun AppInfoAndFunctionsSection(
     modifier: Modifier = Modifier,
     selectedApp: AppInfo?,
-    appInfo: Map<String, String>,
+    appInfo: AppInfoData?,
     adbFunctions: List<AdbFunction>,
     onAdbAction: (AdbFunctionType) -> Unit
 ) {
@@ -286,7 +290,7 @@ fun AppInfoAndFunctionsSection(
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = "请选择一个应用",
+                    text = stringResource(Res.string.select_a_app),
                     style = MaterialTheme.typography.headlineSmall,
                     color = Color.Gray
                 )
@@ -313,25 +317,29 @@ fun AppInfoAndFunctionsSection(
                             Color.Blue,
                             modifier = Modifier.padding(bottom = 10.dp)
                         )
-                        if (appInfo.isEmpty()) {
+                        if (appInfo == null) {
                             Text(stringResource(Res.string.app_info_no_detail), color = Color.Gray)
                         } else {
                             // 应用信息详情
                             Column(modifier = Modifier.fillMaxWidth()) {
-                                appInfo.entries.toList().forEach { (key, value) ->
-                                    SelectionContainer {
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp),
-                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                        ) {
-                                            Text(
-                                                text = "$key:",
-                                                style = MaterialTheme.typography.bodyMedium.copy(color = Color.Gray)
-                                            )
-                                            Text(
-                                                text = value,
-                                                style = MaterialTheme.typography.bodyMedium
-                                            )
+                                appInfo.toDisplayMap().forEach { (field, value) ->
+                                    if (value.isNotEmpty()) {
+                                        SelectionContainer {
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp),
+                                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                            ) {
+                                                Text(
+                                                    text = "${stringResource(field.stringResource)}:",
+                                                    style = MaterialTheme.typography.bodyMedium.copy(color = Color.Gray)
+                                                )
+                                                Text(
+                                                    text = if (field == AppInfoField.IS_SYSTEM_APP) {
+                                                        if (appInfo.isSystemApp) stringResource(Res.string.yes) else stringResource(Res.string.no)
+                                                    } else value,
+                                                    style = MaterialTheme.typography.bodyMedium
+                                                )
+                                            }
                                         }
                                     }
                                 }

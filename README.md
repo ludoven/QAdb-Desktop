@@ -9,6 +9,10 @@
   支持 <b>Windows</b> 与 <b>macOS</b>，让 ADB 操作更直观、更高效。
 </p>
 
+<p align="center">
+  <a href="README.md">🇨🇳 中文</a> | <a href="README_EN.md">🇺🇸 English</a>
+</p>
+
 ---
 
 ## ✨ 功能亮点
@@ -67,4 +71,4 @@
 ## 📌 声明
 
 本项目仅作为 **ADB 的图形化封装工具**，不包含或修改 ADB 本身。  
-运行依赖系统已安装的 `adb`。  
+运行依赖系统已安装的 `adb`。

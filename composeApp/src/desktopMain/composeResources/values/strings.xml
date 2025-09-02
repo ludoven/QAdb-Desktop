@@ -98,4 +98,72 @@
     <string name="dialog_unknown_error">未知错误</string>
     <string name="app_info_no_detail">未能获取到应用详细信息。</string>
     <string name="app_info_placeholder">请选择一个应用以查看其信息。</string>
+
+    <!-- 设置页面 -->
+    <string name="adb_path_setting">ADB路径设置</string>
+    <string name="current_adb_path">当前ADB路径</string>
+    <string name="select_adb_path">选择ADB路径</string>
+    <string name="adb_path_set_success">ADB路径设置成功！</string>
+    <string name="language_setting">语言设置</string>
+    <string name="select_language">选择语言</string>
+    <string name="chinese">中文</string>
+    <string name="english">English</string>
+    <string name="language_changed">语言切换成功！</string>
+    <string name="restart_required">请重启应用以应用语言更改。</string>
+    
+    <!-- 通用状态文本 -->
+    <string name="not_set">未设置</string>
+    <string name="unknown">未知</string>
+    <string name="none">无</string>
+    <string name="yes">是</string>
+    <string name="no">否</string>
+    <string name="loading">加载中...</string>
+    <string name="no_apps_found">未找到应用</string>
+    <string name="input_success">输入成功</string>
+    <string name="input_failed">输入失败</string>
+    
+    <!-- 设备信息相关 -->
+    <string name="android_version">Android 版本</string>
+    <string name="sdk_version">SDK</string>
+    <string name="device_model">设备型号</string>
+    <string name="manufacturer">厂商</string>
+    <string name="rom_version">ROM版本</string>
+    <string name="build_fingerprint">Build Fingerprint</string>
+    <string name="ip_address">IP 地址</string>
+    <string name="mac_address">MAC 地址</string>
+    <string name="battery_level">电量</string>
+    <string name="cpu_usage">CPU</string>
+    <string name="memory">内存</string>
+    <string name="storage">存储</string>
+    <string name="adb_path_found">ADB 路径</string>
+    <string name="adb_not_found">未找到有效的 ADB，请手动设置</string>
+    <string name="charging_status">正在充电</string>
+    <string name="discharging_status">放电中</string>
+    <string name="full_status">已充满</string>
+    <string name="unknown_status">未知</string>
+    
+    <!-- 应用信息相关 -->
+    <string name="package_name">包名</string>
+    <string name="version_name">版本号</string>
+    <string name="version_code">版本码</string>
+    <string name="uid">UID</string>
+    <string name="is_system_app">是否系统应用</string>
+    <string name="target_sdk">targetSdk</string>
+    <string name="min_sdk">minSdkVersion</string>
+    <string name="first_install_time">首次安装时间</string>
+    <string name="last_update_time">更新时间</string>
+    <string name="supported_abi">支持架构</string>
+    
+    <!-- 页面标题 -->
+    <string name="key_event_page">按键页面</string>
+    <string name="system_page">系统页面</string>
+    
+    <!-- ADB路径设置 -->
+    <string name="adb_path_label">ADB 路径</string>
+    <string name="select_adb_icon_desc">选择 ADB</string>
+    <string name="adb_path_success_message">ADB 路径设置成功：\n%1$s</string>
+    
+    <!-- 调试信息 -->
+    <string name="disconnect_device_result">断开设备 %1$s 的结果: %2$s</string>
+    
 </resources>
