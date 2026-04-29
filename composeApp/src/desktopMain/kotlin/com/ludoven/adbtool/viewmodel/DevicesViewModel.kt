@@ -6,18 +6,25 @@ import com.ludoven.adbtool.util.AdbTool
 import com.ludoven.adbtool.entity.DeviceInfoData
 import com.ludoven.adbtool.entity.DeviceCenterInfoData
 import com.ludoven.adbtool.entity.BatteryStatus
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 class DevicesViewModel : ViewModel() {
+    private val refreshTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
 
     private val _devices = MutableStateFlow<List<String>>(emptyList())
     val devices: StateFlow<List<String>> = _devices.asStateFlow()
 
     private val _selectedDevice = MutableStateFlow<String?>(null)
     val selectedDevice: StateFlow<String?> = _selectedDevice.asStateFlow()
+
+    private val _deviceDisplayNames = MutableStateFlow<Map<String, String>>(emptyMap())
+    val deviceDisplayNames: StateFlow<Map<String, String>> = _deviceDisplayNames.asStateFlow()
 
     private val _deviceInfo = MutableStateFlow<DeviceInfoData?>(null)
     val deviceInfo: StateFlow<DeviceInfoData?> = _deviceInfo.asStateFlow()
@@ -28,17 +35,26 @@ class DevicesViewModel : ViewModel() {
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
+    private val _lastRefreshTime = MutableStateFlow("--")
+    val lastRefreshTime: StateFlow<String> = _lastRefreshTime.asStateFlow()
+
     fun refreshDevices() {
         viewModelScope.launch {
             _isLoading.value = true
             val newDevices = withContext(Dispatchers.IO) { AdbTool.getConnectedDevices() }
             _devices.value = newDevices
+            _deviceDisplayNames.value = withContext(Dispatchers.IO) {
+                buildDeviceDisplayNameMap(newDevices)
+            }
             _selectedDevice.value = when {
                 _selectedDevice.value == null && newDevices.isNotEmpty() -> newDevices.first()
                 _selectedDevice.value != null && _selectedDevice.value !in newDevices -> newDevices.firstOrNull()
                 else -> _selectedDevice.value
             }
             selectDevice(_selectedDevice.value)
+            if (_selectedDevice.value == null) {
+                updateLastRefreshTime()
+            }
             _isLoading.value = false
         }
     }
@@ -51,6 +67,7 @@ class DevicesViewModel : ViewModel() {
         } else {
             _deviceInfo.value = null
             _centerInfo.value = null
+            updateLastRefreshTime()
         }
     }
 
@@ -86,6 +103,18 @@ class DevicesViewModel : ViewModel() {
                 val manufacturer = propMap["ro.product.manufacturer"] ?: ""
                 val romVersion = propMap["ro.build.display.id"] ?: ""
                 val buildFingerprint = propMap["ro.build.fingerprint"] ?: ""
+                val kernelVersion = AdbTool.executeAdbCommand("-s", deviceId, "shell", "uname", "-r")
+                    .lineSequence()
+                    .firstOrNull { it.isNotBlank() }
+                    ?.trim()
+                    .orEmpty()
+                val screenResolution = formatScreenResolution(
+                    sizeOutput = AdbTool.executeAdbCommand("-s", deviceId, "shell", "wm", "size"),
+                    densityOutput = AdbTool.executeAdbCommand("-s", deviceId, "shell", "wm", "density")
+                )
+                val fontScale = formatFontScale(
+                    AdbTool.executeAdbCommand("-s", deviceId, "shell", "settings", "get", "system", "font_scale")
+                )
 
                 // IP 和 MAC
                 val ifconfigOutput = AdbTool.executeAdbCommand("-s", deviceId, "shell", "ip addr show wlan0")
@@ -128,10 +157,9 @@ class DevicesViewModel : ViewModel() {
                 val storageUsage = if (storageParts.size >= 5) {
                     val total = storageParts[1].toLongOrNull() ?: 0L
                     val used = storageParts[2].toLongOrNull() ?: 0L
-                    val available = storageParts[3].toLongOrNull() ?: 0L
                     val totalGB = total / 1024.0 / 1024.0
-                    val availableGB = available / 1024.0 / 1024.0
-                    String.format("%.1fG / %.1fG", (totalGB - availableGB), totalGB)
+                    val usedGB = used / 1024.0 / 1024.0
+                    String.format(Locale.US, "%.1f/%.1fG", usedGB, totalGB)
                 } else {
                     ""
                 }
@@ -147,9 +175,12 @@ class DevicesViewModel : ViewModel() {
                 val deviceInfo = DeviceInfoData(
                     androidVersion = androidVersion,
                     sdkVersion = sdkVersion,
+                    kernelVersion = kernelVersion,
                     deviceModel = deviceModel,
                     manufacturer = manufacturer,
                     romVersion = romVersion,
+                    screenResolution = screenResolution,
+                    fontScale = fontScale,
                     buildFingerprint = buildFingerprint,
                     ipAddress = ipAddress,
                     macAddress = macAddress
@@ -165,9 +196,67 @@ class DevicesViewModel : ViewModel() {
 
                 _deviceInfo.value = deviceInfo
                 _centerInfo.value = centerInfo
+                if (deviceModel.isNotBlank()) {
+                    _deviceDisplayNames.update { it + (deviceId to deviceModel) }
+                }
+                updateLastRefreshTime()
             }
 
             _isLoading.value = false
         }
+    }
+
+    private suspend fun buildDeviceDisplayNameMap(deviceIds: List<String>): Map<String, String> {
+        if (deviceIds.isEmpty()) return emptyMap()
+        val result = mutableMapOf<String, String>()
+        deviceIds.forEach { deviceId ->
+            val model = readDeviceModel(deviceId)
+            if (model.isNotBlank()) {
+                result[deviceId] = model
+            }
+        }
+        return result
+    }
+
+    private suspend fun readDeviceModel(deviceId: String): String {
+        return runCatching {
+            AdbTool.executeAdbCommand("-s", deviceId, "shell", "getprop", "ro.product.model")
+                .lineSequence()
+                .firstOrNull { it.isNotBlank() }
+                ?.trim()
+                .orEmpty()
+        }.getOrDefault("")
+    }
+
+    private fun formatScreenResolution(sizeOutput: String, densityOutput: String): String {
+        val size = parseWmMetric(sizeOutput, metric = "size")
+        val density = parseWmMetric(densityOutput, metric = "density")
+        return when {
+            size.isNotBlank() && density.isNotBlank() -> "$size(${density}dpi)"
+            size.isNotBlank() -> size
+            else -> ""
+        }
+    }
+
+    private fun parseWmMetric(output: String, metric: String): String {
+        val override = Regex("Override $metric:\\s*([^\\n\\r]+)").find(output)?.groupValues?.get(1)?.trim()
+        if (!override.isNullOrBlank()) return override
+        return Regex("Physical $metric:\\s*([^\\n\\r]+)").find(output)?.groupValues?.get(1)?.trim().orEmpty()
+    }
+
+    private fun formatFontScale(rawScale: String): String {
+        val normalizedRaw = rawScale.trim()
+        if (normalizedRaw.isBlank() || normalizedRaw.equals("null", ignoreCase = true)) return ""
+        val scale = normalizedRaw.toFloatOrNull() ?: return normalizedRaw
+        val scaleText = if (scale.toInt().toFloat() == scale) {
+            scale.toInt().toString()
+        } else {
+            String.format(Locale.US, "%.2f", scale).trimEnd('0').trimEnd('.')
+        }
+        return "${scaleText}x"
+    }
+
+    private fun updateLastRefreshTime() {
+        _lastRefreshTime.value = LocalDateTime.now().format(refreshTimeFormatter)
     }
 }

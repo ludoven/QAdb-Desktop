@@ -12,8 +12,8 @@ import androidx.compose.ui.window.rememberWindowState
 
 fun main() = application {
     val windowState = rememberWindowState(
-        width = 960.dp,
-        height = 640.dp,
+        width = 1200.dp,
+        height = 800.dp,
         position = WindowPosition(Alignment.Center) // 推荐居中启动
     )
     Window(

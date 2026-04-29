@@ -1,406 +1,1323 @@
-@file:OptIn(ExperimentalMaterial3Api::class)
-
 package com.ludoven.adbtool.pages
 
-import adbtool_desktop.composeapp.generated.resources.Res
-import adbtool_desktop.composeapp.generated.resources.app_functions_section_title
-import adbtool_desktop.composeapp.generated.resources.app_info_no_detail
-import adbtool_desktop.composeapp.generated.resources.app_info_placeholder
-import adbtool_desktop.composeapp.generated.resources.app_info_section_title
-import adbtool_desktop.composeapp.generated.resources.app_size
-import adbtool_desktop.composeapp.generated.resources.clear_and_restart
-import adbtool_desktop.composeapp.generated.resources.clear_data
-import adbtool_desktop.composeapp.generated.resources.dialog_unknown_error
-import adbtool_desktop.composeapp.generated.resources.export_apk
-import adbtool_desktop.composeapp.generated.resources.grant_all_permissions
-import adbtool_desktop.composeapp.generated.resources.launch_app
-import adbtool_desktop.composeapp.generated.resources.reset_permissions
-import adbtool_desktop.composeapp.generated.resources.reset_permissions_and_restart
-import adbtool_desktop.composeapp.generated.resources.restart_app
-import adbtool_desktop.composeapp.generated.resources.select_a_app
-import adbtool_desktop.composeapp.generated.resources.select_app
-import adbtool_desktop.composeapp.generated.resources.stop_app
-import adbtool_desktop.composeapp.generated.resources.uninstall_app
-import adbtool_desktop.composeapp.generated.resources.view_install_path
-import adbtool_desktop.composeapp.generated.resources.yes
-import adbtool_desktop.composeapp.generated.resources.no
-import androidx.compose.foundation.VerticalScrollbar
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
+import adbtool_desktop.composeapp.generated.resources.*
+import androidx.compose.foundation.*
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.rememberScrollbarAdapter
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.DeleteSweep
-import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.Folder
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.RestartAlt
-import androidx.compose.material.icons.filled.Security
-import androidx.compose.material.icons.filled.Stop
-import androidx.compose.material.icons.filled.Storage
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Assignment
+import androidx.compose.material.icons.automirrored.filled.ViewList
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.ludoven.adbtool.LightColorScheme
-import com.ludoven.adbtool.entity.AdbFunction
+import androidx.compose.ui.unit.sp
 import com.ludoven.adbtool.entity.AdbFunctionType
-import com.ludoven.adbtool.entity.MsgContent
 import com.ludoven.adbtool.entity.AppInfoData
-import com.ludoven.adbtool.entity.AppInfoField
-import com.ludoven.adbtool.iconColors
+import com.ludoven.adbtool.entity.MsgContent
 import com.ludoven.adbtool.util.AdbTool
 import com.ludoven.adbtool.viewmodel.AppViewModel
-import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 
-@Composable
-fun AppScreen(viewModel: AppViewModel) {
-    val appInfo by viewModel.appInfo.collectAsState()
-    val selectedApp by viewModel.selectedApp.collectAsState()
-    val appList by viewModel.appList.collectAsState()
+data class AppInfo(
+    val appName: String,
+    val packageName: String,
+    val apkPath: String = "",
+    val isSystemApp: Boolean = false,
+    val versionName: String = "-",
+    val installTime: String = "-",
+    val size: String = "-",
+    val isRunning: Boolean = false
+)
 
-    LaunchedEffect(Unit) {
-        viewModel.getAppList()
-    }
-
-    val items = listOf(
-        AdbFunction(stringResource(Res.string.uninstall_app), Icons.Default.Delete, AdbFunctionType.UNINSTALL),
-        AdbFunction(stringResource(Res.string.launch_app), Icons.Default.PlayArrow, AdbFunctionType.LAUNCH),
-        AdbFunction(stringResource(Res.string.stop_app), Icons.Default.Stop, AdbFunctionType.FORCE_STOP),
-        AdbFunction(stringResource(Res.string.restart_app), Icons.Default.Refresh, AdbFunctionType.RESTART_APP),
-        AdbFunction(stringResource(Res.string.clear_data), Icons.Default.DeleteSweep, AdbFunctionType.CLEAR_DATA),
-        AdbFunction(stringResource(Res.string.clear_and_restart), Icons.Default.RestartAlt, AdbFunctionType.CLEAR_AND_RESTART),
-        AdbFunction(stringResource(Res.string.reset_permissions), Icons.Default.Security, AdbFunctionType.RESET_PERMISSIONS),
-        AdbFunction(stringResource(Res.string.reset_permissions_and_restart), Icons.Default.RestartAlt, AdbFunctionType.RESET_PERMISSIONS_AND_RESTART),
-        AdbFunction(stringResource(Res.string.grant_all_permissions), Icons.Default.CheckCircle, AdbFunctionType.GRANT_ALL_PERMISSIONS),
-        AdbFunction(stringResource(Res.string.view_install_path), Icons.Default.Folder, AdbFunctionType.GET_PATH),
-        AdbFunction(stringResource(Res.string.export_apk), Icons.Default.Download, AdbFunctionType.EXPORT_APK),
-        AdbFunction(stringResource(Res.string.app_size), Icons.Default.Storage, AdbFunctionType.GET_APP_SIZE)
-    )
-
-    Scaffold { paddingValues ->
-        // 使用 Row 来创建左右分栏布局
-        Row(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .background(LightColorScheme.background)
-        ) {
-            // 左侧：应用列表
-            AppListSection(
-                modifier = Modifier.weight(0.3f), // 左侧占据 30% 的宽度
-                appList = appList,
-                selectedApp = selectedApp,
-                onAppSelected = { app ->
-                    viewModel.selectApp(app)
-                    viewModel.loadAppInfo(app.packageName)
-                }
-            )
-
-            // 右侧：应用信息和功能
-            AppInfoAndFunctionsSection(
-                modifier = Modifier.weight(0.7f), // 右侧占据 70% 的宽度
-                selectedApp = selectedApp,
-                appInfo = appInfo,
-                adbFunctions = items,
-                onAdbAction = { actionType ->
-                    viewModel.executeAdbAction(actionType)
-                }
-            )
-        }
-    }
-
-    // 处理对话框显示
-    val dialogMessage by viewModel.dialogMessage.collectAsState()
-    val showDialog by viewModel.showDialog.collectAsState()
-
-    if (showDialog) {
-        dialogMessage?.let {
-            TipDialog(
-                dialogText = when (it) {
-                    is MsgContent.Resource -> {
-                        stringResource(it.stringResource, *it.args.toTypedArray())
-                    }
-
-                    is MsgContent.Text -> {
-                        it.text
-                    }
-                }
-            ) {
-                viewModel.dismissTipDialog()
-            }
-        }
-    }
-
+fun getInstalledApps(): List<AppInfo> {
+    val allApps = AdbTool.exec("pm list packages -f") ?: return emptyList()
+    val sysApps = AdbTool.exec("pm list packages -s") ?: ""
+    val sysPackages = sysApps.lines()
+        .mapNotNull { it.substringAfter("package:", "").takeIf { p -> p.isNotEmpty() } }
+        .toSet()
+    return allApps.lines().mapNotNull { line ->
+        val regex = Regex("""package:(.+)=([A-Za-z0-9._]+)""")
+        val match = regex.find(line)
+        val (apkPath, packageName) = match?.destructured ?: return@mapNotNull null
+        AppInfo(
+            appName = packageName,
+            packageName = packageName,
+            apkPath = apkPath,
+            isSystemApp = sysPackages.contains(packageName)
+        )
+    }.sortedBy { it.packageName }
 }
 
+private val avatarColors = listOf(
+    Color(0xFF5C6BC0), Color(0xFF42A5F5), Color(0xFF26A69A), Color(0xFF66BB6A),
+    Color(0xFFFFA726), Color(0xFFEF5350), Color(0xFFAB47BC), Color(0xFF26C6DA),
+    Color(0xFFFF7043), Color(0xFFEC407A)
+)
 
-// 提取左侧应用列表为一个单独的 Composable
+private fun avatarColor(name: String): Color {
+    val idx = (name.firstOrNull()?.code ?: 0) % avatarColors.size
+    return avatarColors[idx]
+}
+
 @Composable
-fun AppListSection(
-    modifier: Modifier = Modifier,
-    appList: List<AppInfo>,
-    selectedApp: AppInfo?,
-    onAppSelected: (AppInfo) -> Unit
-) {
-    val listState = rememberLazyListState()
-
+private fun AppAvatar(app: AppInfo, icon: ImageBitmap?, size: Int = 44) {
     Box(
-        modifier = modifier
-            .fillMaxHeight()
-            .padding(12.dp)
-            .background(Color.White, RoundedCornerShape(12.dp))
-    ) {
-        if (appList.isEmpty()) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-        /*        Text(
-                    text = if (isAppListLoading) "加载中..." else "未找到应用",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = Color.Gray
-                )*/
-            }
-        } else {
-            LazyColumn(
-                state = listState,
-                modifier = Modifier.fillMaxSize()
-            ) {
-                items(appList.size) { index ->
-                    val app = appList[index]
-                    AppListItem(
-                        app = app,
-                        isSelected = app == selectedApp,
-                        onClick = { onAppSelected(app) }
-                    )
-                }
-            }
-            VerticalScrollbar(
-                adapter = rememberScrollbarAdapter(listState),
-                modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight()
-            )
-        }
-    }
-}
-
-// 列表项，用于展示应用的图标、名称和包名
-@Composable
-fun AppListItem(
-    app: AppInfo,
-    isSelected: Boolean,
-    onClick: () -> Unit
-) {
-    val backgroundColor = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.1f) else Color.Transparent
-    val textColor = if (isSelected) MaterialTheme.colorScheme.primary else Color.Black
-    val packageNameColor = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.7f) else Color.Gray
-
-    Row(
         modifier = Modifier
-            .fillMaxWidth()
-            .background(backgroundColor, RoundedCornerShape(8.dp))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically
+            .size(size.dp)
+            .clip(RoundedCornerShape((size * 0.24f).dp)),
+        contentAlignment = Alignment.Center
     ) {
-        // TODO: 在这里添加应用图标，需要根据包名加载
-        // Icon(
-        //     painter = ...,
-        //     contentDescription = null,
-        //     modifier = Modifier.size(40.dp).clip(RoundedCornerShape(8.dp))
-        // )
-        Spacer(modifier = Modifier.width(12.dp))
-        Column {
-            Text(
-                text = app.appName,
-                style = MaterialTheme.typography.titleMedium,
-                color = textColor,
-                maxLines = 1
+        if (icon != null) {
+            Image(
+                bitmap = icon,
+                contentDescription = app.appName,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
             )
-            Text(
-                text = app.packageName,
-                style = MaterialTheme.typography.bodySmall,
-                color = packageNameColor,
-                maxLines = 1
-            )
-        }
-    }
-}
-
-
-@Composable
-fun AppInfoAndFunctionsSection(
-    modifier: Modifier = Modifier,
-    selectedApp: AppInfo?,
-    appInfo: AppInfoData?,
-    adbFunctions: List<AdbFunction>,
-    onAdbAction: (AdbFunctionType) -> Unit
-) {
-    // 为右侧内容创建一个可滚动的状态
-    val scrollState = rememberScrollState()
-
-    Box(
-        modifier = modifier
-            .fillMaxHeight()
-            .padding(12.dp)
-            .background(LightColorScheme.background, RoundedCornerShape(12.dp))
-    ) {
-        if (selectedApp == null) {
+        } else {
             Box(
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(avatarColor(app.appName)),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = stringResource(Res.string.select_a_app),
-                    style = MaterialTheme.typography.headlineSmall,
-                    color = Color.Gray
+                    text = app.appName.take(1).uppercase(),
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = (size * 0.4).sp
                 )
             }
-        } else {
-            // 将整个 Column 变为可滚动
-            Column(
+        }
+    }
+}
+
+@Composable
+fun AppScreen(viewModel: AppViewModel) {
+    val appList by viewModel.appList.collectAsState()
+    val searchText by viewModel.searchText.collectAsState()
+    val selectedTab by viewModel.selectedTab.collectAsState()
+    val isGridView by viewModel.isGridView.collectAsState()
+    val appIcons by viewModel.appIcons.collectAsState()
+    val dialogMessage by viewModel.dialogMessage.collectAsState()
+    val showDialog by viewModel.showDialog.collectAsState()
+    val appInfo by viewModel.appInfo.collectAsState()
+
+    var filterExpanded by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) { viewModel.getAppList() }
+
+    val tabs = listOf("全部应用", "用户应用", "系统应用", "可调试应用", "最近使用")
+
+    val filteredList = appList.filter { app ->
+        val matchesSearch = app.appName.contains(searchText, ignoreCase = true) ||
+            app.packageName.contains(searchText, ignoreCase = true)
+        val matchesTab = when (selectedTab) {
+            "用户应用" -> !app.isSystemApp
+            "系统应用" -> app.isSystemApp
+            else -> true
+        }
+        matchesSearch && matchesTab
+    }
+
+    Scaffold(containerColor = Color.Transparent) { paddingValues ->
+        if (appInfo != null) {
+            AppDetailPage(
+                appInfo = appInfo!!,
+                icon = appIcons[appInfo!!.packageName],
+                onBack = { viewModel.clearAppInfo() },
+                onAction = { type -> viewModel.executeAdbAction(type, appInfo!!.packageName) },
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(16.dp)
-                    .verticalScroll(scrollState) // <-- 关键改动：添加了垂直滚动修饰符
+                    .padding(paddingValues)
+                    .padding(20.dp)
+            )
+            if (showDialog) {
+                dialogMessage?.let {
+                    TipDialog(
+                        dialogText = when (it) {
+                            is MsgContent.Resource -> stringResource(it.stringResource, *it.args.toTypedArray())
+                            is MsgContent.Text -> it.text
+                        }
+                    ) { viewModel.dismissTipDialog() }
+                }
+            }
+            return@Scaffold
+        }
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+                .padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Top
             ) {
-                // 应用信息卡片
-                Card(
-                    modifier = Modifier.fillMaxWidth().padding(bottom = 20.dp),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = Color.White
-                    )
-                ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        SectionTitle(
-                            stringResource(Res.string.app_info_section_title),
-                            Color.Blue,
-                            modifier = Modifier.padding(bottom = 10.dp)
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = "应用管理",
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
                         )
-                        if (appInfo == null) {
-                            Text(stringResource(Res.string.app_info_no_detail), color = Color.Gray)
-                        } else {
-                            // 应用信息详情
-                            Column(modifier = Modifier.fillMaxWidth()) {
-                                appInfo.toDisplayMap().forEach { (field, value) ->
-                                    if (value.isNotEmpty()) {
-                                        SelectionContainer {
-                                            Row(
-                                                modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp),
-                                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                            ) {
-                                                Text(
-                                                    text = "${stringResource(field.stringResource)}:",
-                                                    style = MaterialTheme.typography.bodyMedium.copy(color = Color.Gray)
-                                                )
-                                                Text(
-                                                    text = if (field == AppInfoField.IS_SYSTEM_APP) {
-                                                        if (appInfo.isSystemApp) stringResource(Res.string.yes) else stringResource(Res.string.no)
-                                                    } else value,
-                                                    style = MaterialTheme.typography.bodyMedium
-                                                )
-                                            }
-                                        }
+                        Spacer(Modifier.width(6.dp))
+                        IconButton(
+                            onClick = { viewModel.getAppList() },
+                            modifier = Modifier.size(28.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Refresh,
+                                contentDescription = "刷新",
+                                modifier = Modifier.size(18.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                    Text(
+                        text = "已安装应用 ${appList.size} 个 | 用户应用 ${appList.count { !it.isSystemApp }} 个 | 系统应用 ${appList.count { it.isSystemApp }} 个",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    OutlinedTextField(
+                        value = searchText,
+                        onValueChange = { viewModel.setSearchText(it) },
+                        placeholder = { Text("搜索应用名称或包名") },
+                        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                        trailingIcon = {
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
+                            ) {
+                                Text(
+                                    text = "⌘F",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                )
+                            }
+                        },
+                        singleLine = true,
+                        modifier = Modifier.width(290.dp).height(52.dp),
+                        shape = RoundedCornerShape(16.dp)
+                    )
+
+                    Box {
+                        OutlinedButton(
+                            onClick = { filterExpanded = true },
+                            shape = RoundedCornerShape(14.dp),
+                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
+                            modifier = Modifier.height(52.dp)
+                        ) {
+                            Icon(Icons.Default.FilterList, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("筛选")
+                            Spacer(Modifier.width(2.dp))
+                            Icon(Icons.Default.ExpandMore, contentDescription = null, modifier = Modifier.size(16.dp))
+                        }
+                        DropdownMenu(expanded = filterExpanded, onDismissRequest = { filterExpanded = false }) {
+                            listOf("全部应用", "用户应用", "系统应用").forEach { option ->
+                                DropdownMenuItem(
+                                    text = { Text(option) },
+                                    onClick = {
+                                        viewModel.setSelectedTab(option)
+                                        filterExpanded = false
                                     }
-                                }
+                                )
                             }
                         }
                     }
-                }
 
-                // 功能区
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(Color.White, RoundedCornerShape(12.dp))
-                        .padding(16.dp)
-                ) {
-                    SectionTitle(
-                        stringResource(Res.string.app_functions_section_title),
-                        Color.Red,
-                        modifier = Modifier.padding(bottom = 12.dp)
-                    )
-                    FlowRow(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                    Surface(
+                        shape = RoundedCornerShape(14.dp),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+                        color = MaterialTheme.colorScheme.surface
                     ) {
-                        adbFunctions.forEachIndexed { index, item ->
-                            val color = iconColors[index % iconColors.size]
-                            GridItemCard(
-                                title = item.title,
-                                icon = item.icon,
-                                iconColor = color,
-                                onClick = { onAdbAction(item.type) }
+                        Row(modifier = Modifier.padding(4.dp)) {
+                            ViewToggleButton(
+                                icon = Icons.Default.GridView,
+                                selected = isGridView,
+                                onClick = { viewModel.setGridView(true) }
+                            )
+                            ViewToggleButton(
+                                icon = Icons.AutoMirrored.Filled.ViewList,
+                                selected = !isGridView,
+                                onClick = { viewModel.setGridView(false) }
                             )
                         }
                     }
                 }
             }
 
-            // <-- 关键改动：为可滚动的 Column 添加滚动条
-            VerticalScrollbar(
-                adapter = rememberScrollbarAdapter(scrollState),
-                modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight()
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                tabs.forEach { tab ->
+                    val selected = selectedTab == tab
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surface,
+                        border = BorderStroke(
+                            1.dp,
+                            if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)
+                            else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)
+                        ),
+                        modifier = Modifier.clickable { viewModel.setSelectedTab(tab) }
+                    ) {
+                        Text(
+                            text = tab,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 9.dp),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium
+                        )
+                    }
+                }
+            }
+
+            Surface(
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+                shape = RoundedCornerShape(14.dp),
+                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.65f),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f))
+            ) {
+                if (isGridView) {
+                    val gridState = rememberLazyGridState()
+                    LaunchedEffect(gridState, filteredList) {
+                        snapshotFlow {
+                            gridState.layoutInfo.visibleItemsInfo
+                                .mapNotNull { item -> filteredList.getOrNull(item.index)?.packageName }
+                        }.collect { visiblePackages ->
+                            viewModel.ensureAppAssetsVisible(visiblePackages)
+                        }
+                    }
+                    Column(modifier = Modifier.fillMaxSize().padding(14.dp)) {
+                        LazyVerticalGrid(
+                            columns = GridCells.Adaptive(240.dp),
+                            state = gridState,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            items(filteredList, key = { it.packageName }) { app ->
+                                AppGridCard(
+                                    app = app,
+                                    icon = appIcons[app.packageName],
+                                    onAction = { type -> viewModel.executeAdbAction(type, app.packageName) }
+                                )
+                            }
+                        }
+                        AppListFooter(filteredList.size)
+                    }
+                } else {
+                    val listState = rememberLazyListState()
+                    LaunchedEffect(listState, filteredList) {
+                        snapshotFlow {
+                            listState.layoutInfo.visibleItemsInfo
+                                .mapNotNull { item -> filteredList.getOrNull(item.index)?.packageName }
+                        }.collect { visiblePackages ->
+                            viewModel.ensureAppAssetsVisible(visiblePackages)
+                        }
+                    }
+                    Column(modifier = Modifier.fillMaxSize().padding(horizontal = 14.dp, vertical = 10.dp)) {
+                        AppTableHeader()
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f))
+                        Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                            LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
+                                items(filteredList, key = { it.packageName }) { app ->
+                                    AppListRow(
+                                        app = app,
+                                        icon = appIcons[app.packageName],
+                                        onAction = { type -> viewModel.executeAdbAction(type, app.packageName) }
+                                    )
+                                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.18f))
+                                }
+                            }
+                            VerticalScrollbar(
+                                adapter = rememberScrollbarAdapter(listState),
+                                modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight()
+                            )
+                        }
+                        AppListFooter(filteredList.size)
+                    }
+                }
+            }
+        }
+    }
+
+    if (showDialog) {
+        dialogMessage?.let {
+            TipDialog(
+                dialogText = when (it) {
+                    is MsgContent.Resource -> stringResource(it.stringResource, *it.args.toTypedArray())
+                    is MsgContent.Text -> it.text
+                }
+            ) { viewModel.dismissTipDialog() }
+        }
+    }
+}
+
+@Composable
+private fun ViewToggleButton(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(10.dp))
+            .background(if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f) else Color.Transparent)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(18.dp)
+        )
+    }
+}
+
+@Composable
+private fun AppTableHeader() {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = "应用名称",
+            modifier = Modifier.weight(2.6f),
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Text(
+            text = "版本",
+            modifier = Modifier.weight(1.0f),
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Text(
+            text = "大小",
+            modifier = Modifier.weight(0.9f),
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Text(
+            text = "安装时间",
+            modifier = Modifier.weight(1.5f),
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Text(
+            text = "状态",
+            modifier = Modifier.weight(0.9f),
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Text(
+            text = "操作",
+            modifier = Modifier.weight(2.0f),
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+@Composable
+private fun AppListRow(
+    app: AppInfo,
+    icon: ImageBitmap?,
+    onAction: (AdbFunctionType) -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 7.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Row(
+            modifier = Modifier.weight(2.6f),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            AppAvatar(app = app, icon = icon, size = 40)
+            Spacer(Modifier.width(10.dp))
+            Column {
+                Text(
+                    text = app.appName,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                if (app.appName != app.packageName) {
+                    Text(
+                        text = app.packageName,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+        }
+
+        Text(
+            text = app.versionName,
+            modifier = Modifier.weight(1.0f),
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+
+        Text(
+            text = app.size,
+            modifier = Modifier.weight(0.9f),
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+
+        Text(
+            text = app.installTime,
+            modifier = Modifier.weight(1.5f),
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+
+        Box(modifier = Modifier.weight(0.9f)) {
+            val statusColor = if (app.isRunning) Color(0xFF22A35A) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+            Surface(
+                color = statusColor.copy(alpha = 0.12f),
+                shape = RoundedCornerShape(999.dp)
+            ) {
+                Text(
+                    text = if (app.isRunning) "运行中" else "未运行",
+                    color = statusColor,
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Medium,
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                )
+            }
+        }
+
+        Row(
+            modifier = Modifier.weight(2.0f),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            RowActionButton(
+                icon = Icons.Default.PlayArrow,
+                text = "启动",
+                onClick = { onAction(AdbFunctionType.LAUNCH) }
+            )
+            RowActionButton(
+                icon = Icons.Default.Stop,
+                text = "停止",
+                enabled = app.isRunning,
+                onClick = { onAction(AdbFunctionType.FORCE_STOP) }
+            )
+            AppActionMenu(onAction = onAction)
+        }
+    }
+}
+
+@Composable
+private fun RowActionButton(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    text: String,
+    enabled: Boolean = true,
+    onClick: () -> Unit
+) {
+    OutlinedButton(
+        onClick = onClick,
+        enabled = enabled,
+        shape = RoundedCornerShape(10.dp),
+        contentPadding = PaddingValues(horizontal = 9.dp, vertical = 5.dp),
+        modifier = Modifier.height(34.dp)
+    ) {
+        Icon(icon, contentDescription = text, modifier = Modifier.size(15.dp))
+        Spacer(Modifier.width(4.dp))
+        Text(text, style = MaterialTheme.typography.bodySmall)
+    }
+}
+
+@Composable
+private fun AppActionMenu(
+    onAction: (AdbFunctionType) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+
+    Box {
+        Surface(
+            shape = RoundedCornerShape(10.dp),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+            color = MaterialTheme.colorScheme.surface,
+            modifier = Modifier
+                .size(width = 36.dp, height = 34.dp)
+                .clickable { expanded = true }
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    imageVector = Icons.Default.MoreVert,
+                    contentDescription = "更多操作",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false }
+        ) {
+            DropdownMenuItem(
+                text = { Text("应用详情") },
+                onClick = {
+                    expanded = false
+                    onAction(AdbFunctionType.APP_INFO)
+                },
+                leadingIcon = { Icon(Icons.Default.Info, contentDescription = null) }
+            )
+            DropdownMenuItem(
+                text = { Text("启动应用") },
+                onClick = {
+                    expanded = false
+                    onAction(AdbFunctionType.LAUNCH)
+                },
+                leadingIcon = { Icon(Icons.Default.PlayArrow, contentDescription = null) }
+            )
+            DropdownMenuItem(
+                text = { Text("停止应用") },
+                onClick = {
+                    expanded = false
+                    onAction(AdbFunctionType.FORCE_STOP)
+                },
+                leadingIcon = { Icon(Icons.Default.Stop, contentDescription = null) }
+            )
+            DropdownMenuItem(
+                text = { Text("强制停止") },
+                onClick = {
+                    expanded = false
+                    onAction(AdbFunctionType.FORCE_STOP)
+                },
+                leadingIcon = { Icon(Icons.Default.Cancel, contentDescription = null) }
+            )
+            DropdownMenuItem(
+                text = { Text("清除数据") },
+                onClick = {
+                    expanded = false
+                    onAction(AdbFunctionType.CLEAR_DATA)
+                },
+                leadingIcon = { Icon(Icons.Default.DeleteSweep, contentDescription = null) }
+            )
+            DropdownMenuItem(
+                text = { Text("卸载应用") },
+                onClick = {
+                    expanded = false
+                    onAction(AdbFunctionType.UNINSTALL)
+                },
+                leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null, tint = Color(0xFFE53935)) }
+            )
+            DropdownMenuItem(
+                text = { Text("导出 APK") },
+                onClick = {
+                    expanded = false
+                    onAction(AdbFunctionType.EXPORT_APK)
+                },
+                leadingIcon = { Icon(Icons.Default.Download, contentDescription = null) }
             )
         }
     }
 }
 
+@Composable
+private fun AppGridCard(
+    app: AppInfo,
+    icon: ImageBitmap?,
+    onAction: (AdbFunctionType) -> Unit
+) {
+    Surface(
+        shape = RoundedCornerShape(14.dp),
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f))
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                AppAvatar(app = app, icon = icon, size = 48)
+                Box(
+                    modifier = Modifier
+                        .size(10.dp)
+                        .background(
+                            if (app.isRunning) Color(0xFF22A35A) else MaterialTheme.colorScheme.outlineVariant,
+                            CircleShape
+                        )
+                )
+            }
 
-data class AppInfo(val appName: String, val packageName: String)
+            Text(
+                text = app.appName,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
 
-fun getInstalledApps(): List<AppInfo> {
-    val output = AdbTool.exec("pm list packages -f -3") ?: return emptyList()
-    return output.lines().mapNotNull { line ->
-        val regex = Regex("package:(.+)=([\\w\\.]+)")
-        val match = regex.find(line)
-        val (apkPath, packageName) = match?.destructured ?: return@mapNotNull null
-        val name = packageName.substringAfterLast(".")
-        AppInfo(appName = name, packageName = packageName)
+            if (app.appName != app.packageName) {
+                Text(
+                    text = app.packageName,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                RowActionButton(
+                    icon = Icons.Default.PlayArrow,
+                    text = "启动",
+                    onClick = { onAction(AdbFunctionType.LAUNCH) }
+                )
+                RowActionButton(
+                    icon = Icons.Default.Stop,
+                    text = "停止",
+                    enabled = app.isRunning,
+                    onClick = { onAction(AdbFunctionType.FORCE_STOP) }
+                )
+                AppActionMenu(onAction = onAction)
+            }
+        }
     }
 }
 
+@Composable
+private fun AppListFooter(count: Int) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(top = 10.dp, end = 6.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = "共 $count 个应用",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Text(
+            text = "应用按名称排序",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
 
+@Composable
+private fun AppDetailPage(
+    appInfo: AppInfoData,
+    icon: ImageBitmap?,
+    onBack: () -> Unit,
+    onAction: (AdbFunctionType) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var selectedTab by remember { mutableStateOf("应用信息") }
+    val detailTabs = listOf(
+        DetailTab("应用信息", Icons.AutoMirrored.Filled.Assignment),
+        DetailTab("权限信息", Icons.Default.PrivacyTip),
+        DetailTab("活动（Activity）", Icons.Default.PlayCircle),
+        DetailTab("服务（Service）", Icons.Default.Hub),
+        DetailTab("广播接收器", Icons.Default.SettingsInputAntenna),
+        DetailTab("内容提供者", Icons.Default.Inventory2),
+        DetailTab("签名信息", Icons.Default.VerifiedUser)
+    )
 
+    Column(
+        modifier = modifier.verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(18.dp)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            IconButton(onClick = onBack, modifier = Modifier.size(34.dp)) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回", tint = MaterialTheme.colorScheme.onSurface)
+            }
+            Text(
+                text = "应用管理",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text("/", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(
+                text = "应用详情",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                fontWeight = FontWeight.SemiBold
+            )
+        }
 
+        DetailHeaderCard(
+            appInfo = appInfo,
+            icon = icon,
+            onAction = onAction
+        )
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(18.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            detailTabs.forEach { tab ->
+                DetailTabItem(
+                    tab = tab,
+                    selected = selectedTab == tab.title,
+                    onClick = { selectedTab = tab.title }
+                )
+            }
+        }
+
+        when (selectedTab) {
+            "应用信息" -> AppInfoDetailContent(appInfo)
+            "权限信息" -> PermissionDetailContent(appInfo)
+            else -> DetailPlaceholder(selectedTab)
+        }
+    }
+}
+
+private data class DetailTab(
+    val title: String,
+    val icon: ImageVector
+)
+
+@Composable
+private fun DetailHeaderCard(
+    appInfo: AppInfoData,
+    icon: ImageBitmap?,
+    onAction: (AdbFunctionType) -> Unit
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(14.dp),
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(24.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.Top
+        ) {
+            Row(
+                modifier = Modifier.weight(1f),
+                horizontalArrangement = Arrangement.spacedBy(20.dp),
+                verticalAlignment = Alignment.Top
+            ) {
+                AppAvatar(
+                    app = AppInfo(appName = appInfo.appName.ifBlank { appInfo.packageName }, packageName = appInfo.packageName),
+                    icon = icon,
+                    size = 76
+                )
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Text(
+                            text = appInfo.appName.ifBlank { appInfo.packageName },
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        StatusPill(appInfo.isRunning)
+                    }
+                    DetailHeaderRow("包名", appInfo.packageName)
+                    DetailHeaderRow("版本", listOf(appInfo.versionName, appInfo.versionCode.takeIf { it != "-" }?.let { "($it)" }).filterNotNull().joinToString(" "))
+                    DetailHeaderRow("安装时间", appInfo.firstInstallTime)
+                    DetailHeaderRow("更新于", appInfo.lastUpdateTime)
+                    DetailHeaderRow("路径", appInfo.apkPath.ifBlank { "-" })
+                }
+            }
+
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                DetailActionButton(Icons.Default.PlayArrow, "启动", MaterialTheme.colorScheme.primary) {
+                    onAction(AdbFunctionType.LAUNCH)
+                }
+                DetailActionButton(Icons.Default.Stop, "停止", MaterialTheme.colorScheme.onSurface, enabled = appInfo.isRunning) {
+                    onAction(AdbFunctionType.FORCE_STOP)
+                }
+                DetailActionButton(Icons.Default.DeleteSweep, "清数据", MaterialTheme.colorScheme.primary) {
+                    onAction(AdbFunctionType.CLEAR_DATA)
+                }
+                DetailActionButton(Icons.Default.Delete, "卸载", Color(0xFFE53935)) {
+                    onAction(AdbFunctionType.UNINSTALL)
+                }
+                DetailMoreButton(onAction)
+            }
+        }
+    }
+}
+
+@Composable
+private fun DetailHeaderRow(label: String, value: String) {
+    Row(verticalAlignment = Alignment.Top) {
+        Text(
+            text = label,
+            modifier = Modifier.width(92.dp),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Text(
+            text = value.ifBlank { "-" },
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+@Composable
+private fun StatusPill(isRunning: Boolean) {
+    val color = if (isRunning) Color(0xFF18A957) else MaterialTheme.colorScheme.onSurfaceVariant
+    Surface(
+        color = color.copy(alpha = 0.12f),
+        shape = RoundedCornerShape(999.dp)
+    ) {
+        Text(
+            text = if (isRunning) "运行中" else "未运行",
+            color = color,
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.padding(horizontal = 11.dp, vertical = 5.dp)
+        )
+    }
+}
+
+@Composable
+private fun DetailActionButton(
+    icon: ImageVector,
+    text: String,
+    tint: Color,
+    enabled: Boolean = true,
+    onClick: () -> Unit
+) {
+    OutlinedButton(
+        onClick = onClick,
+        enabled = enabled,
+        shape = RoundedCornerShape(10.dp),
+        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
+        modifier = Modifier.height(40.dp),
+        border = BorderStroke(1.dp, tint.copy(alpha = if (enabled) 0.35f else 0.12f))
+    ) {
+        Icon(icon, contentDescription = text, tint = tint, modifier = Modifier.size(18.dp))
+        Spacer(Modifier.width(7.dp))
+        Text(text, color = tint, style = MaterialTheme.typography.labelLarge)
+    }
+}
+
+@Composable
+private fun DetailMoreButton(onAction: (AdbFunctionType) -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+    Box {
+        OutlinedButton(
+            onClick = { expanded = true },
+            shape = RoundedCornerShape(10.dp),
+            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
+            modifier = Modifier.height(40.dp)
+        ) {
+            Icon(Icons.Default.MoreVert, contentDescription = "更多", modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(6.dp))
+            Text("更多", style = MaterialTheme.typography.labelLarge)
+        }
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            DropdownMenuItem(
+                text = { Text("导出 APK") },
+                onClick = {
+                    expanded = false
+                    onAction(AdbFunctionType.EXPORT_APK)
+                },
+                leadingIcon = { Icon(Icons.Default.Download, contentDescription = null) }
+            )
+            DropdownMenuItem(
+                text = { Text("刷新详情") },
+                onClick = {
+                    expanded = false
+                    onAction(AdbFunctionType.APP_INFO)
+                },
+                leadingIcon = { Icon(Icons.Default.Refresh, contentDescription = null) }
+            )
+        }
+    }
+}
+
+@Composable
+private fun DetailTabItem(
+    tab: DetailTab,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    val color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+    Column(
+        modifier = Modifier
+            .widthIn(min = 116.dp)
+            .clickable(onClick = onClick),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(tab.icon, contentDescription = null, tint = color, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(7.dp))
+            Text(
+                text = tab.title,
+                color = color,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                maxLines = 1
+            )
+        }
+        Box(
+            modifier = Modifier
+                .height(2.dp)
+                .fillMaxWidth()
+                .background(if (selected) MaterialTheme.colorScheme.primary else Color.Transparent)
+        )
+    }
+}
+
+@Composable
+private fun AppInfoDetailContent(appInfo: AppInfoData) {
+    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+        if (maxWidth < 980.dp) {
+            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                BasicInfoCard(appInfo)
+                StorageInfoCard(appInfo)
+                ProcessInfoCard(appInfo)
+                PermissionSummaryCard(appInfo)
+                OperationLogCard(appInfo)
+            }
+        } else {
+            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                    BasicInfoCard(appInfo, Modifier.weight(1.05f))
+                    StorageInfoCard(appInfo, Modifier.weight(1f))
+                    ProcessInfoCard(appInfo, Modifier.weight(1f))
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                    PermissionSummaryCard(appInfo, Modifier.weight(1f))
+                    OperationLogCard(appInfo, Modifier.weight(1f))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DetailSectionCard(
+    title: String,
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    Surface(
+        modifier = modifier.heightIn(min = 208.dp),
+        shape = RoundedCornerShape(14.dp),
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.82f),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            content()
+        }
+    }
+}
+
+@Composable
+private fun BasicInfoCard(appInfo: AppInfoData, modifier: Modifier = Modifier) {
+    DetailSectionCard(title = "基本信息", modifier = modifier) {
+        DetailInfoRow("应用名称", appInfo.appName.ifBlank { appInfo.packageName })
+        DetailInfoRow("包名", appInfo.packageName)
+        DetailInfoRow("版本名称", appInfo.versionName)
+        DetailInfoRow("版本号", appInfo.versionCode)
+        DetailInfoRow("最小 SDK", appInfo.minSdk)
+        DetailInfoRow("目标 SDK", appInfo.targetSdk)
+        DetailInfoRow("安装位置", appInfo.installLocation)
+        DetailInfoRow("安装来源", "adb install")
+        DetailInfoRow("应用大小", appInfo.appSize)
+        DetailInfoRow("数据目录", appInfo.dataDir)
+        DetailInfoRow("APK 路径", appInfo.apkPath)
+    }
+}
+
+@Composable
+private fun StorageInfoCard(appInfo: AppInfoData, modifier: Modifier = Modifier) {
+    DetailSectionCard(title = "存储占用", modifier = modifier) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            StorageRing(total = appInfo.totalSize)
+            Column(
+                modifier = Modifier.weight(1f).padding(start = 20.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                StorageLegend(Color(0xFF1F6BFF), "应用大小", appInfo.appSize)
+                StorageLegend(Color(0xFF38C989), "应用数据", appInfo.dataSize)
+                StorageLegend(Color(0xFFFF8A1F), "缓存数据", appInfo.cacheSize)
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f))
+                DetailInfoRow("总计", appInfo.totalSize)
+            }
+        }
+    }
+}
+
+@Composable
+private fun StorageRing(total: String) {
+    Box(
+        modifier = Modifier
+            .size(126.dp)
+            .clip(CircleShape)
+            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)),
+        contentAlignment = Alignment.Center
+    ) {
+        Box(
+            modifier = Modifier
+                .size(92.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.surface),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    text = total.takeIf { it != "-" }?.substringBefore(" ") ?: "-",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = total.takeIf { it.contains(" ") }?.substringAfter(" ") ?: "",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun StorageLegend(color: Color, label: String, value: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(modifier = Modifier.size(8.dp).background(color, CircleShape))
+            Spacer(Modifier.width(8.dp))
+            Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Text(value, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
+    }
+}
+
+@Composable
+private fun ProcessInfoCard(appInfo: AppInfoData, modifier: Modifier = Modifier) {
+    DetailSectionCard(title = "进程信息", modifier = modifier) {
+        DetailInfoRow("主进程", appInfo.packageName)
+        DetailInfoRow("进程 ID (PID)", appInfo.processId)
+        DetailInfoRow("内存占用", appInfo.memoryUsage)
+        DetailInfoRow("状态", if (appInfo.isRunning) "运行中" else "未运行")
+        DetailInfoRow("启动时间", appInfo.startTime)
+    }
+}
+
+@Composable
+private fun PermissionSummaryCard(appInfo: AppInfoData, modifier: Modifier = Modifier) {
+    DetailSectionCard(title = "权限统计", modifier = modifier) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            PermissionTile("危险权限", appInfo.dangerousPermissionCount, Icons.Default.GppMaybe, Color(0xFFFF4D4F), Modifier.weight(1f))
+            PermissionTile("隐私权限", appInfo.privacyPermissionCount, Icons.Default.Lock, Color(0xFF1F6BFF), Modifier.weight(1f))
+            PermissionTile("普通权限", appInfo.normalPermissionCount, Icons.Default.Info, Color(0xFF0EA5E9), Modifier.weight(1f))
+            PermissionTile("全部权限", appInfo.totalPermissionCount, Icons.Default.Apps, MaterialTheme.colorScheme.onSurfaceVariant, Modifier.weight(1f))
+        }
+        OutlinedButton(
+            onClick = {},
+            enabled = false,
+            shape = RoundedCornerShape(10.dp),
+            modifier = Modifier.fillMaxWidth().height(42.dp)
+        ) {
+            Text("查看权限详情")
+            Spacer(Modifier.weight(1f))
+            Icon(Icons.Default.ChevronRight, contentDescription = null, modifier = Modifier.size(18.dp))
+        }
+    }
+}
+
+@Composable
+private fun PermissionTile(
+    label: String,
+    value: Int,
+    icon: ImageVector,
+    color: Color,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier.height(112.dp),
+        shape = RoundedCornerShape(10.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.28f),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f))
+    ) {
+        Column(
+            modifier = Modifier.fillMaxSize().padding(10.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.SpaceEvenly
+        ) {
+            Icon(
+                icon,
+                contentDescription = null,
+                tint = color,
+                modifier = Modifier
+                    .size(30.dp)
+                    .background(color.copy(alpha = 0.1f), RoundedCornerShape(8.dp))
+                    .padding(6.dp)
+            )
+            Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(value.toString(), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+        }
+    }
+}
+
+@Composable
+private fun OperationLogCard(appInfo: AppInfoData, modifier: Modifier = Modifier) {
+    DetailSectionCard(title = "操作记录", modifier = modifier) {
+        OperationRow("安装应用", appInfo.firstInstallTime)
+        OperationRow("更新应用", appInfo.lastUpdateTime)
+        OperationRow("读取详情", "当前会话")
+        OperationRow("运行状态", if (appInfo.isRunning) "运行中" else "未运行")
+        OutlinedButton(
+            onClick = {},
+            enabled = false,
+            shape = RoundedCornerShape(10.dp),
+            modifier = Modifier.fillMaxWidth().height(42.dp)
+        ) {
+            Text("查看更多记录")
+            Spacer(Modifier.weight(1f))
+            Icon(Icons.Default.ChevronRight, contentDescription = null, modifier = Modifier.size(18.dp))
+        }
+    }
+}
+
+@Composable
+private fun OperationRow(action: String, time: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(action, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
+        Text(time, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+@Composable
+private fun DetailInfoRow(label: String, value: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.Top
+    ) {
+        Text(
+            text = label,
+            modifier = Modifier.width(96.dp),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Text(
+            text = value.ifBlank { "-" },
+            modifier = Modifier.weight(1f),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+@Composable
+private fun PermissionDetailContent(appInfo: AppInfoData) {
+    DetailSectionCard(title = "权限信息", modifier = Modifier.fillMaxWidth()) {
+        Text(
+            text = "已解析到 ${appInfo.totalPermissionCount} 项权限，其中 ${appInfo.dangerousPermissionCount} 项可能涉及敏感能力。",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            PermissionTile("危险权限", appInfo.dangerousPermissionCount, Icons.Default.GppMaybe, Color(0xFFFF4D4F), Modifier.width(132.dp))
+            PermissionTile("隐私权限", appInfo.privacyPermissionCount, Icons.Default.Lock, Color(0xFF1F6BFF), Modifier.width(132.dp))
+            PermissionTile("普通权限", appInfo.normalPermissionCount, Icons.Default.Info, Color(0xFF0EA5E9), Modifier.width(132.dp))
+        }
+    }
+}
+
+@Composable
+private fun DetailPlaceholder(title: String) {
+    DetailSectionCard(title = title, modifier = Modifier.fillMaxWidth().heightIn(min = 280.dp)) {
+        Box(
+            modifier = Modifier.fillMaxWidth().height(180.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = "当前版本暂未解析该分类数据",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}

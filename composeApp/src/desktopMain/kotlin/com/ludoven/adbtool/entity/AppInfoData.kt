@@ -33,16 +33,32 @@ enum class AppInfoField(val stringResource: StringResource) {
  * 应用信息数据类
  */
 data class AppInfoData(
+    val appName: String = "",
     val packageName: String = "",
     val versionName: String = "",
     val versionCode: String = "",
     val uid: String = "",
     val isSystemApp: Boolean = false,
+    val isRunning: Boolean = false,
     val targetSdk: String = "",
     val minSdk: String = "",
     val firstInstallTime: String = "",
     val lastUpdateTime: String = "",
     val supportedAbi: String = "",
+    val apkPath: String = "",
+    val dataDir: String = "",
+    val installLocation: String = "",
+    val appSize: String = "-",
+    val dataSize: String = "-",
+    val cacheSize: String = "-",
+    val totalSize: String = "-",
+    val processId: String = "-",
+    val memoryUsage: String = "-",
+    val startTime: String = "-",
+    val dangerousPermissionCount: Int = 0,
+    val privacyPermissionCount: Int = 0,
+    val normalPermissionCount: Int = 0,
+    val totalPermissionCount: Int = 0,
     val contentProviders: String = ""
 ) {
     /**

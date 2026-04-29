@@ -1,4 +1,5 @@
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
@@ -64,5 +65,10 @@ compose.desktop {
                 iconFile.set(project.file("src/desktopMain/composeResources/drawable/app_icon.icns")) // macOS 图标
             }
         }
+    }
+}
+tasks.withType<KotlinCompile>().configureEach {
+    compilerOptions {
+        freeCompilerArgs.add("-Xnon-local-break-continue")
     }
 }

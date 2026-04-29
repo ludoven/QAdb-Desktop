@@ -12,9 +12,19 @@ import androidx.compose.ui.graphics.vector.ImageVector
 enum class AdbFunctionType() {
     // 新增类型 (注意有些类型可能不需要 commandTemplate，因为它们的操作更复杂，直接在 ViewModel 中实现)
     INSTALL_APK, // 安装需要文件选择器
+    INSTALL_AND_LAUNCH, // 安装后打开
     INPUT_TEXT, // 输入文本需要弹窗
+    OPEN_SHELL, // 执行 shell 命令
+    OPEN_FILE_MANAGER, // 打开文件管理
     SCREENSHOT, // 截图需要文件选择器
+    SCREEN_RECORD, // 录屏
+    CAPTURE_LOGS, // 抓日志
     VIEW_CURRENT_ACTIVITY, // 查看当前 Activity，结果需要解析
+    KEY_BACK, // 返回键
+    KEY_HOME, // Home 键
+    LAUNCH_APP_BY_PACKAGE, // 根据包名启动
+    STOP_APP_BY_PACKAGE, // 根据包名停止
+    CLEAR_CACHE_AND_RESTART, // 清缓存并重启
 
     // 系统类操作
     REBOOT_DEVICE,
@@ -38,7 +48,8 @@ enum class AdbFunctionType() {
     GRANT_ALL_PERMISSIONS, // 需要多步操作
     GET_PATH,
     EXPORT_APK, // 复杂操作
-    GET_APP_SIZE;
+    GET_APP_SIZE,
+    APP_INFO;
 
 }
 

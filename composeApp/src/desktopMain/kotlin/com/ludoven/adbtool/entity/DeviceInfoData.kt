@@ -10,9 +10,12 @@ import adbtool_desktop.composeapp.generated.resources.*
 enum class DeviceInfoField(val stringResource: StringResource) {
     ANDROID_VERSION(Res.string.android_version),
     SDK_VERSION(Res.string.sdk_version),
+    KERNEL_VERSION(Res.string.kernel_version),
     DEVICE_MODEL(Res.string.device_model),
     MANUFACTURER(Res.string.manufacturer),
     ROM_VERSION(Res.string.rom_version),
+    SCREEN_RESOLUTION(Res.string.screen_resolution),
+    FONT_SCALE(Res.string.font_scale),
     BUILD_FINGERPRINT(Res.string.build_fingerprint),
     IP_ADDRESS(Res.string.ip_address),
     MAC_ADDRESS(Res.string.mac_address)
@@ -52,9 +55,12 @@ enum class BatteryStatus(val stringResource: StringResource) {
 data class DeviceInfoData(
     val androidVersion: String = "",
     val sdkVersion: String = "",
+    val kernelVersion: String = "",
     val deviceModel: String = "",
     val manufacturer: String = "",
     val romVersion: String = "",
+    val screenResolution: String = "",
+    val fontScale: String = "",
     val buildFingerprint: String = "",
     val ipAddress: String = "",
     val macAddress: String = ""
@@ -66,9 +72,12 @@ data class DeviceInfoData(
         return mapOf(
             DeviceInfoField.ANDROID_VERSION to androidVersion,
             DeviceInfoField.SDK_VERSION to sdkVersion,
+            DeviceInfoField.KERNEL_VERSION to kernelVersion,
             DeviceInfoField.DEVICE_MODEL to deviceModel,
             DeviceInfoField.MANUFACTURER to manufacturer,
             DeviceInfoField.ROM_VERSION to romVersion,
+            DeviceInfoField.SCREEN_RESOLUTION to screenResolution,
+            DeviceInfoField.FONT_SCALE to fontScale,
             DeviceInfoField.BUILD_FINGERPRINT to buildFingerprint,
             DeviceInfoField.IP_ADDRESS to ipAddress,
             DeviceInfoField.MAC_ADDRESS to macAddress
