@@ -10,7 +10,6 @@ import adbtool_desktop.composeapp.generated.resources.key_clear
 import adbtool_desktop.composeapp.generated.resources.key_clear_records
 import adbtool_desktop.composeapp.generated.resources.key_command_preview
 import adbtool_desktop.composeapp.generated.resources.key_command_preview_hint
-import adbtool_desktop.composeapp.generated.resources.key_common_keycode
 import adbtool_desktop.composeapp.generated.resources.key_copy
 import adbtool_desktop.composeapp.generated.resources.key_custom_keycode
 import adbtool_desktop.composeapp.generated.resources.key_down
@@ -39,7 +38,6 @@ import adbtool_desktop.composeapp.generated.resources.key_volume_down
 import adbtool_desktop.composeapp.generated.resources.key_volume_mute
 import adbtool_desktop.composeapp.generated.resources.key_volume_up
 import adbtool_desktop.composeapp.generated.resources.no_device
-import adbtool_desktop.composeapp.generated.resources.tip_title
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.BorderStroke
@@ -128,7 +126,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ludoven.adbtool.UiTokens
-import com.ludoven.adbtool.entity.MsgContent
 import com.ludoven.adbtool.viewmodel.KeyEventRecord
 import com.ludoven.adbtool.viewmodel.KeyEventViewModel
 import com.ludoven.adbtool.widget.GlassCard
@@ -171,8 +168,8 @@ fun KeyEventScreen(
     selectedDevice: String? = null,
     deviceDisplayNames: Map<String, String> = emptyMap()
 ) {
-    val showDialog by viewModel.showDialog.collectAsState()
-    val dialogMsg by viewModel.dialogMessage.collectAsState()
+    val showToast by viewModel.showToast.collectAsState()
+    val toastMsg by viewModel.toastMessage.collectAsState()
     val recentRecords by viewModel.recentKeyEvents.collectAsState()
 
     var customCode by remember { mutableStateOf("") }
@@ -229,10 +226,6 @@ fun KeyEventScreen(
                             showAdbCommand = showAdbCommand,
                             onAction = { action -> dispatchKey(action.code, action.commandName) }
                         )
-                        CommandPreview(
-                            record = previewRecord,
-                            onCopy = { copyToClipboard(previewRecord.adbCommand) }
-                        )
                     }
 
                     Column(
@@ -253,9 +246,9 @@ fun KeyEventScreen(
                             },
                             onClear = { customCode = "" }
                         )
-                        CommonKeyCodePanel(
-                            showAdbCommand = showAdbCommand,
-                            onAction = { action -> dispatchKey(action.code, action.commandName) }
+                        CommandPreview(
+                            record = previewRecord,
+                            onCopy = { copyToClipboard(previewRecord.adbCommand) }
                         )
                         RecentSentPanel(
                             records = recentRecords,
@@ -272,23 +265,27 @@ fun KeyEventScreen(
         )
     }
 
-    if (showDialog) {
-        dialogMsg?.let { content ->
-            val text = when (content) {
-                is MsgContent.Resource -> stringResource(content.stringResource, *content.args.toTypedArray())
-                is MsgContent.Text -> content.text
+    if (showToast) {
+        toastMsg?.let { msg ->
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.BottomCenter
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.inverseSurface,
+                    shadowElevation = 6.dp,
+                    modifier = Modifier.padding(bottom = 24.dp)
+                ) {
+                    Text(
+                        text = msg,
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
+                        color = MaterialTheme.colorScheme.inverseOnSurface,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
             }
-            AlertDialog(
-                onDismissRequest = { viewModel.dismissTipDialog() },
-                title = { Text(stringResource(Res.string.tip_title)) },
-                text = { Text(text) },
-                confirmButton = {
-                    TextButton(onClick = { viewModel.dismissTipDialog() }) {
-                        Text(stringResource(Res.string.confirm))
-                    }
-                },
-                containerColor = MaterialTheme.colorScheme.surface
-            )
         }
     }
 
@@ -629,167 +626,6 @@ private fun CustomKeyCodePanel(
     }
 }
 
-@Composable
-private fun CommonKeyCodePanel(
-    showAdbCommand: Boolean,
-    onAction: (KeyAction) -> Unit
-) {
-    val commonActions = listOf(
-        homeAction(),
-        volumeUpAction(),
-        navAction(),
-        volumeDownAction(),
-        powerAction(),
-        menuAction()
-    )
-
-    SectionSurface(
-        title = stringResource(Res.string.key_common_keycode),
-        icon = Icons.Default.Bookmark,
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            commonActions.chunked(2).forEach { row ->
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    row.forEach { action ->
-                        CommonKeyRow(
-                            action = action,
-                            showAdbCommand = showAdbCommand,
-                            modifier = Modifier.weight(1f),
-                            onClick = { onAction(action) }
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun CommonKeyRow(
-    action: KeyAction,
-    showAdbCommand: Boolean,
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit
-) {
-    val label = if (showAdbCommand) stringResource(action.titleRes) else action.commandName
-    Surface(
-        modifier = modifier
-            .height(44.dp)
-            .clip(RoundedCornerShape(8.dp))
-            .clickable(onClick = onClick),
-        shape = RoundedCornerShape(8.dp),
-        color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.80f))
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 14.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = label,
-                modifier = Modifier.weight(1f),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurface,
-                fontWeight = FontWeight.Medium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(999.dp))
-                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.09f))
-                    .padding(horizontal = 10.dp, vertical = 4.dp)
-            ) {
-                Text(
-                    text = action.code.toString(),
-                    color = MaterialTheme.colorScheme.primary,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-            Spacer(Modifier.width(10.dp))
-            Icon(
-                imageVector = Icons.Default.Send,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(18.dp)
-            )
-        }
-    }
-}
-
-@Composable
-private fun RecentSentPanel(records: List<KeyEventRecord>, onClear: () -> Unit) {
-    SectionSurface(
-        title = stringResource(Res.string.key_recent_sent),
-        icon = Icons.Default.Schedule,
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {
-            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Spacer(Modifier.weight(1f))
-                TextButton(onClick = onClear, contentPadding = PaddingValues(horizontal = 8.dp)) {
-                    Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text(stringResource(Res.string.key_clear_records), fontSize = 12.sp)
-                }
-            }
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(8.dp),
-                color = MaterialTheme.colorScheme.surface,
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.75f))
-            ) {
-                Column {
-                    val displayRecords = records.ifEmpty {
-                        listOf(
-                            KeyEventRecord(KC.HOME, "KEYCODE_HOME", "--:--:--"),
-                            KeyEventRecord(KC.BACK, "KEYCODE_BACK", "--:--:--"),
-                            KeyEventRecord(KC.POWER, "KEYCODE_POWER", "--:--:--")
-                        )
-                    }
-                    displayRecords.take(5).forEachIndexed { index, record ->
-                        RecentRecordRow(record = record, icon = recentIconFor(record.code))
-                        if (index != displayRecords.take(5).lastIndex) {
-                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.65f))
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun RecentRecordRow(record: KeyEventRecord, icon: ImageVector) {
-    Row(
-        modifier = Modifier.fillMaxWidth().height(42.dp).padding(horizontal = 14.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = if (record.code == KC.POWER) Color(0xFFFF4D4F) else MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(20.dp)
-        )
-        Spacer(Modifier.width(12.dp))
-        Text(
-            text = record.displayText,
-            modifier = Modifier.weight(1f),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurface,
-            fontWeight = FontWeight.Medium,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
-        Text(
-            text = record.sentAt,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-    }
-}
 
 @Composable
 private fun CommandPreview(record: KeyEventRecord, onCopy: () -> Unit) {
@@ -833,6 +669,91 @@ private fun CommandPreview(record: KeyEventRecord, onCopy: () -> Unit) {
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
+}
+
+@Composable
+private fun RecentSentPanel(records: List<KeyEventRecord>, onClear: () -> Unit) {
+    SectionSurface(
+        title = stringResource(Res.string.key_recent_sent),
+        icon = Icons.Default.Schedule,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {
+            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Spacer(Modifier.weight(1f))
+                if (records.isNotEmpty()) {
+                    TextButton(onClick = onClear, contentPadding = PaddingValues(horizontal = 8.dp)) {
+                        Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text(stringResource(Res.string.key_clear_records), fontSize = 12.sp)
+                    }
+                }
+            }
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(8.dp),
+                color = MaterialTheme.colorScheme.surface,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.75f))
+            ) {
+                if (records.isEmpty()) {
+                    Text(
+                        text = "暂无发送记录",
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 16.dp),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                } else {
+                    Column {
+                        records.take(10).forEachIndexed { index, record ->
+                            RecentRecordRow(record = record)
+                            if (index != records.take(10).lastIndex) {
+                                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.65f))
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun RecentRecordRow(record: KeyEventRecord) {
+    Row(
+        modifier = Modifier.fillMaxWidth().height(40.dp).padding(horizontal = 14.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = iconForCode(record.code),
+            contentDescription = null,
+            tint = if (record.code == KC.POWER) Color(0xFFFF4D4F) else MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(18.dp)
+        )
+        Spacer(Modifier.width(10.dp))
+        Text(
+            text = record.displayText,
+            modifier = Modifier.weight(1f),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurface,
+            fontWeight = FontWeight.Medium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        Text(
+            text = record.sentAt,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+private fun iconForCode(code: Int): ImageVector = when (code) {
+    KC.HOME -> Icons.Default.Home
+    KC.BACK -> Icons.Default.ArrowBack
+    KC.POWER -> Icons.Default.PowerSettingsNew
+    KC.VOL_UP -> Icons.Default.VolumeUp
+    KC.VOL_DOWN -> Icons.Default.VolumeDown
+    else -> Icons.Default.Keyboard
 }
 
 @Composable
@@ -913,15 +834,6 @@ private fun notificationAction() = KeyAction(KC.NOTIFICATION, Res.string.key_sta
 private fun quickSettingsAction() = KeyAction(KC.SETTINGS, Res.string.key_quick_settings, "KEYCODE_SETTINGS", Icons.Default.Settings, Color(0xFF2F7DFF))
 private fun screenToggleAction() = KeyAction(KC.WAKEUP, Res.string.key_screen_toggle, "KEYCODE_WAKEUP", Icons.Default.WbSunny, Color(0xFFFF9F1A))
 private fun screenshotAction() = KeyAction(KC.SYSRQ, Res.string.key_screenshot_short, "KEYCODE_SYSRQ", Icons.Default.CropFree, Color(0xFF23B45D))
-
-private fun recentIconFor(code: Int): ImageVector = when (code) {
-    KC.HOME -> Icons.Default.Home
-    KC.BACK -> Icons.Default.ArrowBack
-    KC.POWER -> Icons.Default.PowerSettingsNew
-    KC.VOL_UP -> Icons.Default.VolumeUp
-    KC.VOL_DOWN -> Icons.Default.VolumeDown
-    else -> Icons.Default.Keyboard
-}
 
 private fun copyToClipboard(text: String) {
     runCatching {

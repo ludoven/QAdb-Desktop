@@ -316,5 +316,27 @@
     
     <!-- 调试信息 -->
     <string name="disconnect_device_result">断开设备 %1$s 的结果: %2$s</string>
-    
+
+    <!-- 日志页面 -->
+    <string name="log">日志</string>
+    <string name="log_title">Logcat 日志</string>
+    <string name="log_subtitle">实时查看和分析设备日志</string>
+    <string name="log_start">开始捕获</string>
+    <string name="log_stop">停止捕获</string>
+    <string name="log_entries_count">共 %1$d 条日志</string>
+    <string name="log_capturing">正在捕获...</string>
+    <string name="log_waiting">等待日志数据...</string>
+    <string name="log_empty">暂无日志数据</string>
+    <string name="log_dismiss">关闭</string>
+    <string name="log_filter_title">筛选日志</string>
+    <string name="log_filter_level">日志级别</string>
+    <string name="log_filter_keyword">关键词</string>
+    <string name="log_filter_tag">标签</string>
+    <string name="log_apply_filter">应用筛选</string>
+    <string name="log_export_success">日志导出成功</string>
+    <string name="log_export_failed">日志导出失败</string>
+    <string name="log_clear_confirm">确认清空所有日志？</string>
+    <string name="log_no_device">未选择设备</string>
+    <string name="log_select_device">请先选择设备</string>
+
 </resources>

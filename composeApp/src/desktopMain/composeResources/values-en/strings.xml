@@ -315,4 +315,26 @@
     <!-- Debug Information -->
     <string name="disconnect_device_result">Disconnect device %1$s result: %2$s</string>
     <string name="debug_info">Debug Info</string>
+
+    <!-- Log Page -->
+    <string name="log">Logs</string>
+    <string name="log_title">Logcat Logs</string>
+    <string name="log_subtitle">Real-time device log viewing and analysis</string>
+    <string name="log_start">Start Capture</string>
+    <string name="log_stop">Stop Capture</string>
+    <string name="log_entries_count">%1$d log entries</string>
+    <string name="log_capturing">Capturing...</string>
+    <string name="log_waiting">Waiting for log data...</string>
+    <string name="log_empty">No log data</string>
+    <string name="log_dismiss">Dismiss</string>
+    <string name="log_filter_title">Filter Logs</string>
+    <string name="log_filter_level">Log Level</string>
+    <string name="log_filter_keyword">Keyword</string>
+    <string name="log_filter_tag">Tag</string>
+    <string name="log_apply_filter">Apply Filter</string>
+    <string name="log_export_success">Logs exported successfully</string>
+    <string name="log_export_failed">Log export failed</string>
+    <string name="log_clear_confirm">Clear all logs?</string>
+    <string name="log_no_device">No device selected</string>
+    <string name="log_select_device">Please select a device first</string>
 </resources>

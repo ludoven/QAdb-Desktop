@@ -5,6 +5,7 @@ import adbtool_desktop.composeapp.generated.resources.app
 import adbtool_desktop.composeapp.generated.resources.common
 import adbtool_desktop.composeapp.generated.resources.home
 import adbtool_desktop.composeapp.generated.resources.key_event_page
+import adbtool_desktop.composeapp.generated.resources.log
 import adbtool_desktop.composeapp.generated.resources.set
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -17,6 +18,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Apps
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.VideogameAsset
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -40,6 +42,7 @@ import com.ludoven.adbtool.pages.AppScreen
 import com.ludoven.adbtool.pages.CommonScreen
 import com.ludoven.adbtool.pages.HomeScreen
 import com.ludoven.adbtool.pages.KeyEventScreen
+import com.ludoven.adbtool.pages.LogScreen
 import com.ludoven.adbtool.pages.SettingScreen
 import com.ludoven.adbtool.util.AdbPathManager
 import com.ludoven.adbtool.util.LanguageManager
@@ -47,6 +50,7 @@ import com.ludoven.adbtool.viewmodel.AppViewModel
 import com.ludoven.adbtool.viewmodel.CommonModel
 import com.ludoven.adbtool.viewmodel.DevicesViewModel
 import com.ludoven.adbtool.viewmodel.KeyEventViewModel
+import com.ludoven.adbtool.viewmodel.LogViewModel
 import com.ludoven.adbtool.widget.GlassCard
 import com.ludoven.adbtool.widget.Sidebar
 import org.jetbrains.compose.resources.stringResource
@@ -60,6 +64,7 @@ fun App() {
     val appViewModel: AppViewModel = viewModel()
     val commonModel: CommonModel = viewModel()
     val keyEventViewModel: KeyEventViewModel = viewModel()
+    val logViewModel: LogViewModel = viewModel()
     val devices by devicesViewModel.devices.collectAsState()
     val selectedDevice by devicesViewModel.selectedDevice.collectAsState()
     val deviceDisplayNames by devicesViewModel.deviceDisplayNames.collectAsState()
@@ -74,6 +79,7 @@ fun App() {
         TabItem(stringResource(Res.string.common), Icons.Default.Info, "common"),
         TabItem(stringResource(Res.string.key_event_page), Icons.Default.VideogameAsset, "keyevent"),
         TabItem(stringResource(Res.string.app), Icons.Default.Apps, "app"),
+        TabItem(stringResource(Res.string.log), Icons.Default.List, "log"),
         TabItem(stringResource(Res.string.set), Icons.Default.Settings, "setting")
     )
 
@@ -154,6 +160,17 @@ fun App() {
                                 composable("setting") {
                                     stateHolder.SaveableStateProvider("setting") {
                                         SettingScreen()
+                                    }
+                                }
+                                composable("log") {
+                                    stateHolder.SaveableStateProvider("log") {
+                                        LogScreen(
+                                            viewModel = logViewModel,
+                                            selectedDevice = selectedDevice,
+                                            onDeviceSelect = {
+                                                // You can implement device selection dialog here
+                                            }
+                                        )
                                     }
                                 }
                             }
