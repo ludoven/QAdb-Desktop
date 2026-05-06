@@ -7,6 +7,7 @@ import adbtool_desktop.composeapp.generated.resources.home
 import adbtool_desktop.composeapp.generated.resources.key_event_page
 import adbtool_desktop.composeapp.generated.resources.log
 import adbtool_desktop.composeapp.generated.resources.set
+import adbtool_desktop.composeapp.generated.resources.terminal
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -16,6 +17,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Apps
+import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.List
@@ -44,6 +46,7 @@ import com.ludoven.adbtool.pages.HomeScreen
 import com.ludoven.adbtool.pages.KeyEventScreen
 import com.ludoven.adbtool.pages.LogScreen
 import com.ludoven.adbtool.pages.SettingScreen
+import com.ludoven.adbtool.pages.TerminalScreen
 import com.ludoven.adbtool.util.AdbPathManager
 import com.ludoven.adbtool.util.LanguageManager
 import com.ludoven.adbtool.viewmodel.AppViewModel
@@ -51,6 +54,7 @@ import com.ludoven.adbtool.viewmodel.CommonModel
 import com.ludoven.adbtool.viewmodel.DevicesViewModel
 import com.ludoven.adbtool.viewmodel.KeyEventViewModel
 import com.ludoven.adbtool.viewmodel.LogViewModel
+import com.ludoven.adbtool.viewmodel.TerminalViewModel
 import com.ludoven.adbtool.widget.GlassCard
 import com.ludoven.adbtool.widget.Sidebar
 import org.jetbrains.compose.resources.stringResource
@@ -65,6 +69,7 @@ fun App() {
     val commonModel: CommonModel = viewModel()
     val keyEventViewModel: KeyEventViewModel = viewModel()
     val logViewModel: LogViewModel = viewModel()
+    val terminalViewModel: TerminalViewModel = viewModel()
     val devices by devicesViewModel.devices.collectAsState()
     val selectedDevice by devicesViewModel.selectedDevice.collectAsState()
     val deviceDisplayNames by devicesViewModel.deviceDisplayNames.collectAsState()
@@ -77,6 +82,7 @@ fun App() {
     val tabs = listOf(
         TabItem(stringResource(Res.string.home), Icons.Default.Home, "home"),
         TabItem(stringResource(Res.string.common), Icons.Default.Info, "common"),
+        TabItem(stringResource(Res.string.terminal), Icons.Default.Code, "terminal"),
         TabItem(stringResource(Res.string.key_event_page), Icons.Default.VideogameAsset, "keyevent"),
         TabItem(stringResource(Res.string.app), Icons.Default.Apps, "app"),
         TabItem(stringResource(Res.string.log), Icons.Default.List, "log"),
@@ -104,6 +110,9 @@ fun App() {
                     items = tabs,
                     selectedRoute = currentRoute,
                     connectedDeviceCount = devices.size,
+                    devices = devices,
+                    selectedDevice = selectedDevice,
+                    deviceDisplayNames = deviceDisplayNames,
                     onItemClick = { route ->
                         if (currentRoute != route) {
                             navController.navigate(route) {
@@ -114,6 +123,9 @@ fun App() {
                                 }
                             }
                         }
+                    },
+                    onDeviceSelected = { deviceId ->
+                        devicesViewModel.selectDevice(deviceId)
                     }
                 )
 
@@ -147,6 +159,15 @@ fun App() {
                                     stateHolder.SaveableStateProvider("keyevent") {
                                         KeyEventScreen(
                                             viewModel = keyEventViewModel,
+                                            selectedDevice = selectedDevice,
+                                            deviceDisplayNames = deviceDisplayNames
+                                        )
+                                    }
+                                }
+                                composable("terminal") {
+                                    stateHolder.SaveableStateProvider("terminal") {
+                                        TerminalScreen(
+                                            viewModel = terminalViewModel,
                                             selectedDevice = selectedDevice,
                                             deviceDisplayNames = deviceDisplayNames
                                         )

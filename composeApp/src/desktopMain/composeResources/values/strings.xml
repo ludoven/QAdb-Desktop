@@ -2,6 +2,7 @@
 <resources>
     <string name="home">首页</string>
     <string name="common">常用</string>
+    <string name="terminal">终端</string>
     <string name="app">应用</string>
     <string name="set">设置</string>
 
@@ -97,6 +98,19 @@
     <string name="shell_input_title">输入 Shell 命令</string>
     <string name="shell_command_hint">请输入要执行的 shell 命令（例如：getprop）</string>
     <string name="execute">执行</string>
+    <string name="terminal_input_hint">输入 shell 命令，例如：getprop</string>
+    <string name="terminal_history">历史命令</string>
+    <string name="terminal_output">终端输出</string>
+    <string name="terminal_clear_output">清空输出</string>
+    <string name="terminal_no_output">暂无输出，执行命令后会显示在这里</string>
+    <string name="terminal_copy_output">复制输出</string>
+    <string name="terminal_quick_commands">快捷命令</string>
+    <string name="terminal_recent_commands">最近命令</string>
+    <string name="terminal_command_preview">命令预览</string>
+    <string name="terminal_tips">使用技巧</string>
+    <string name="terminal_tip_text">提示：终端命令会在当前已连接设备上执行。支持输入 adb 子命令或 shell 命令。</string>
+    <string name="terminal_tab_shell">ADB Shell</string>
+    <string name="terminal_tab_logcat">Logcat</string>
 
     <!-- 系统功能模块 -->
     <string name="system_functions">系统功能</string>
@@ -219,7 +233,7 @@
     <string name="supported_abi">支持架构</string>
     
     <!-- 页面标题 -->
-    <string name="key_event_page">按键页面</string>
+    <string name="key_event_page">按键</string>
     <string name="system_page">系统页面</string>
 
     <!-- 按键模拟页面 -->

@@ -102,6 +102,13 @@ object AdbTool {
         val args = buildDeviceArgs(deviceId) + listOf("shell", command)
         return executeCommand(*args.toTypedArray())
     }
+
+    /**
+     * 执行原始 adb 子命令（例如：devices / pull / install ...）
+     */
+    suspend fun execAdbAsync(vararg args: String): AdbResult {
+        return executeCommand(*args)
+    }
     
     /**
      * 向后兼容的exec方法

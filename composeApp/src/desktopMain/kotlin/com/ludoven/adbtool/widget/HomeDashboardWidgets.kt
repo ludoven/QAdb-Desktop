@@ -17,9 +17,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.ButtonDefaults
@@ -33,6 +33,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.ludoven.adbtool.UiTokens
+import kotlin.math.roundToInt
 
 @Composable
 fun StatusBadge(
@@ -111,66 +112,98 @@ fun DashboardMetricCard(
     progress: Float = 0f
 ) {
     GlassCard(modifier = modifier) {
-        Column(
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .defaultMinSize(minHeight = 104.dp)
                 .padding(horizontal = 12.dp, vertical = 10.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Row(
-                verticalAlignment = Alignment.Top,
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .background(accentColor.copy(alpha = 0.12f), RoundedCornerShape(12.dp)),
-                    contentAlignment = Alignment.Center
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Icon(
-                        imageVector = icon,
-                        contentDescription = title,
-                        tint = accentColor,
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-
-                Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                    Box(
+                        modifier = Modifier
+                            .size(28.dp)
+                            .background(accentColor.copy(alpha = 0.12f), RoundedCornerShape(8.dp)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = icon,
+                            contentDescription = title,
+                            tint = accentColor,
+                            modifier = Modifier.size(14.dp)
+                        )
+                    }
                     Text(
                         text = title,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.bodyMedium
                     )
+                }
+                Text(
+                    text = value,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                if (!supportingText.isNullOrBlank()) {
                     Text(
-                        text = value,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
+                        text = supportingText,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodySmall,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis
                     )
-                    if (!supportingText.isNullOrBlank()) {
-                        Text(
-                            text = supportingText,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            style = MaterialTheme.typography.bodySmall,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
                 }
             }
 
-            LinearProgressIndicator(
-                progress = { progress.coerceIn(0f, 1f) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(4.dp),
-                color = accentColor,
-                trackColor = MaterialTheme.colorScheme.surfaceVariant
+            MetricRingProgress(
+                progress = progress,
+                accentColor = accentColor
             )
         }
+    }
+}
+
+@Composable
+private fun MetricRingProgress(
+    progress: Float,
+    accentColor: Color
+) {
+    val safeProgress = progress.coerceIn(0f, 1f)
+    val progressText = "${(safeProgress * 100f).roundToInt()}%"
+
+    Box(
+        modifier = Modifier.size(56.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        CircularProgressIndicator(
+            progress = { 1f },
+            modifier = Modifier.size(56.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant,
+            strokeWidth = 6.dp
+        )
+        CircularProgressIndicator(
+            progress = { safeProgress },
+            modifier = Modifier.size(56.dp),
+            color = accentColor,
+            strokeWidth = 6.dp
+        )
+        Text(
+            text = progressText,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurface,
+            fontWeight = FontWeight.SemiBold
+        )
     }
 }
 
@@ -229,8 +262,8 @@ fun DashboardPanel(
 fun DeviceInfoCell(
     label: String,
     value: String,
-    icon: ImageVector,
-    tint: Color,
+    icon: ImageVector? = null,
+    tint: Color? = null,
     modifier: Modifier = Modifier
 ) {
     Row(
@@ -238,18 +271,20 @@ fun DeviceInfoCell(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Box(
-            modifier = Modifier
-                .size(36.dp)
-                .background(tint.copy(alpha = 0.12f), RoundedCornerShape(10.dp)),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = label,
-                tint = tint,
-                modifier = Modifier.size(18.dp)
-            )
+        if (icon != null && tint != null) {
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .background(tint.copy(alpha = 0.12f), RoundedCornerShape(10.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = label,
+                    tint = tint,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
         }
 
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {

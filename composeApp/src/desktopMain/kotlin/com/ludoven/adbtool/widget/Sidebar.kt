@@ -3,6 +3,7 @@ package com.ludoven.adbtool.widget
 import adbtool_desktop.composeapp.generated.resources.Res
 import adbtool_desktop.composeapp.generated.resources.connected
 import adbtool_desktop.composeapp.generated.resources.connected_devices_count
+import adbtool_desktop.composeapp.generated.resources.no_device
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
@@ -23,11 +24,16 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -45,7 +51,11 @@ fun Sidebar(
     items: List<TabItem>,
     selectedRoute: String,
     connectedDeviceCount: Int,
+    devices: List<String>,
+    selectedDevice: String?,
+    deviceDisplayNames: Map<String, String>,
     onItemClick: (String) -> Unit,
+    onDeviceSelected: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     GlassCard(
@@ -111,7 +121,13 @@ fun Sidebar(
 
             Spacer(modifier = Modifier.weight(1f))
 
-            ConnectedStatusCard(connectedDeviceCount = connectedDeviceCount)
+            ConnectedStatusCard(
+                connectedDeviceCount = connectedDeviceCount,
+                devices = devices,
+                selectedDevice = selectedDevice,
+                deviceDisplayNames = deviceDisplayNames,
+                onDeviceSelected = onDeviceSelected
+            )
         }
     }
 }
@@ -187,50 +203,97 @@ private fun SidebarItem(
 }
 
 @Composable
-private fun ConnectedStatusCard(connectedDeviceCount: Int) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f))
-            .padding(horizontal = 12.dp, vertical = 14.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Box(
+private fun ConnectedStatusCard(
+    connectedDeviceCount: Int,
+    devices: List<String>,
+    selectedDevice: String?,
+    deviceDisplayNames: Map<String, String>,
+    onDeviceSelected: (String) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val selectedDisplay = selectedDevice
+        ?.let { formatSidebarDeviceDisplay(it, deviceDisplayNames[it]) }
+        ?: stringResource(Res.string.no_device)
+
+    Box {
+        Row(
             modifier = Modifier
-                .size(32.dp)
-                .clip(RoundedCornerShape(999.dp))
-                .background(Color(0xFFE9F9EF)),
-            contentAlignment = Alignment.Center
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(16.dp))
+                .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f))
+                .clickable(enabled = devices.isNotEmpty()) { expanded = !expanded }
+                .padding(horizontal = 12.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
+            Box(
+                modifier = Modifier
+                    .size(32.dp)
+                    .clip(RoundedCornerShape(999.dp))
+                    .background(Color(0xFFE9F9EF)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.CheckCircle,
+                    contentDescription = null,
+                    tint = Color(0xFF2DBE60),
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.width(12.dp))
+
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    text = stringResource(Res.string.connected),
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = selectedDisplay,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1
+                )
+                Text(
+                    text = stringResource(Res.string.connected_devices_count, connectedDeviceCount),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
             Icon(
-                imageVector = Icons.Default.CheckCircle,
+                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
                 contentDescription = null,
-                tint = Color(0xFF2DBE60),
-                modifier = Modifier.size(18.dp)
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
 
-        Spacer(modifier = Modifier.width(12.dp))
-
-        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(
-                text = stringResource(Res.string.connected),
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.onSurface,
-                fontWeight = FontWeight.Bold
-            )
-            Text(
-                text = stringResource(Res.string.connected_devices_count, connectedDeviceCount),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            modifier = Modifier.background(MaterialTheme.colorScheme.surface)
+        ) {
+            devices.forEach { deviceId ->
+                val displayName = formatSidebarDeviceDisplay(deviceId, deviceDisplayNames[deviceId])
+                DropdownMenuItem(
+                    text = {
+                        Text(
+                            text = displayName,
+                            maxLines = 1
+                        )
+                    },
+                    onClick = {
+                        onDeviceSelected(deviceId)
+                        expanded = false
+                    }
+                )
+            }
         }
-
-        Icon(
-            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant
-        )
     }
+}
+
+private fun formatSidebarDeviceDisplay(deviceId: String, model: String?): String {
+    val cleanModel = model?.trim().orEmpty()
+    return if (cleanModel.isNotBlank()) "$cleanModel ($deviceId)" else deviceId
 }

@@ -2,6 +2,7 @@
 <resources>
     <string name="home">Home</string>
     <string name="common">Common</string>
+    <string name="terminal">Terminal</string>
     <string name="app">Apps</string>
     <string name="set">Settings</string>
 
@@ -96,6 +97,19 @@
     <string name="shell_input_title">Input Shell Command</string>
     <string name="shell_command_hint">Please input shell command (e.g. getprop)</string>
     <string name="execute">Execute</string>
+    <string name="terminal_input_hint">Enter shell command, e.g. getprop</string>
+    <string name="terminal_history">Command History</string>
+    <string name="terminal_output">Terminal Output</string>
+    <string name="terminal_clear_output">Clear Output</string>
+    <string name="terminal_no_output">No output yet. Execute a command to view logs.</string>
+    <string name="terminal_copy_output">Copy Output</string>
+    <string name="terminal_quick_commands">Quick Commands</string>
+    <string name="terminal_recent_commands">Recent Commands</string>
+    <string name="terminal_command_preview">Command Preview</string>
+    <string name="terminal_tips">Tips</string>
+    <string name="terminal_tip_text">Tip: Commands run on the current connected device. Supports adb subcommands and shell commands.</string>
+    <string name="terminal_tab_shell">ADB Shell</string>
+    <string name="terminal_tab_logcat">Logcat</string>
 
     <!-- System functions module -->
     <string name="system_functions">System Functions</string>
@@ -217,7 +231,7 @@
     <string name="supported_abi">Supported ABI</string>
     
     <!-- Page Titles -->
-    <string name="key_event_page">Key Event Page</string>
+    <string name="key_event_page">Keys</string>
     <string name="system_page">System Page</string>
 
     <!-- Key Event Simulation Page -->

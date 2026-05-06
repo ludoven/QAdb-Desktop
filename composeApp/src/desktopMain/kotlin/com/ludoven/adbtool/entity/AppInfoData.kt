@@ -59,7 +59,13 @@ data class AppInfoData(
     val privacyPermissionCount: Int = 0,
     val normalPermissionCount: Int = 0,
     val totalPermissionCount: Int = 0,
-    val contentProviders: String = ""
+    val contentProviders: String = "",
+    val permissionDetails: List<String> = emptyList(),
+    val activityDetails: List<String> = emptyList(),
+    val serviceDetails: List<String> = emptyList(),
+    val receiverDetails: List<String> = emptyList(),
+    val providerDetails: List<String> = emptyList(),
+    val signatureDetails: List<String> = emptyList()
 ) {
     /**
      * 转换为显示用的Map，key为AppInfoField，value为对应的值

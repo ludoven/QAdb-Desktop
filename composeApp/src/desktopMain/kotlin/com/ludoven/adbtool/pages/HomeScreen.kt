@@ -14,10 +14,10 @@ import adbtool_desktop.composeapp.generated.resources.device_model
 import adbtool_desktop.composeapp.generated.resources.device_status
 import adbtool_desktop.composeapp.generated.resources.disconnected
 import adbtool_desktop.composeapp.generated.resources.disconnect
-import adbtool_desktop.composeapp.generated.resources.file_manager
 import adbtool_desktop.composeapp.generated.resources.font_scale
 import adbtool_desktop.composeapp.generated.resources.ip_address
 import adbtool_desktop.composeapp.generated.resources.install_apk_short
+import adbtool_desktop.composeapp.generated.resources.key_screenshot_short
 import adbtool_desktop.composeapp.generated.resources.kernel_version
 import adbtool_desktop.composeapp.generated.resources.last_refresh
 import adbtool_desktop.composeapp.generated.resources.mac_address
@@ -69,17 +69,16 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.DeveloperMode
 import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Memory
+import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.SdStorage
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -142,6 +141,10 @@ fun HomeScreen(viewModel: DevicesViewModel) {
     )
 
     val batterySupporting = centerInfo?.batteryStatus?.let { stringResource(it.stringResource) }.orEmpty()
+    val batteryValue = buildInlineMetricValue(
+        primary = centerInfo?.batteryLevel.orDash(),
+        suffix = batterySupporting
+    )
     val metricItems = listOf(
         HomeMetricModel(
             titleKey = Res.string.cpu_usage,
@@ -166,8 +169,7 @@ fun HomeScreen(viewModel: DevicesViewModel) {
         ),
         HomeMetricModel(
             titleKey = Res.string.battery_level,
-            value = centerInfo?.batteryLevel.orDash(),
-            supporting = batterySupporting,
+            value = batteryValue,
             icon = Icons.Default.BatteryFull,
             accentColor = Color(0xFFF59E0B),
             progress = parsePercentProgress(centerInfo?.batteryLevel)
@@ -524,69 +526,50 @@ private fun DeviceInfoPanel(
         DeviceInfoRow(
             left = DeviceInfoEntry(
                 label = stringResource(Res.string.android_version),
-                value = formatAndroidVersionWithApi(deviceInfo.androidVersion, deviceInfo.sdkVersion),
-                icon = Icons.Default.Info,
-                tint = Color(0xFF2DBE60)
+                value = formatAndroidVersionWithApi(deviceInfo.androidVersion, deviceInfo.sdkVersion)
             ),
             right = DeviceInfoEntry(
                 label = stringResource(Res.string.kernel_version),
-                value = deviceInfo.kernelVersion.orDash(),
-                icon = Icons.Default.Code,
-                tint = Color(0xFF3B82F6)
+                value = deviceInfo.kernelVersion.orDash()
             ),
             cellModifier = cellModifier
         )
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
         Spacer(modifier = Modifier.height(16.dp))
 
         DeviceInfoRow(
             left = DeviceInfoEntry(
                 label = stringResource(Res.string.device_model),
-                value = deviceInfo.deviceModel.orDash(),
-                icon = Icons.Default.Apps,
-                tint = Color(0xFF8B5CF6)
+                value = deviceInfo.deviceModel.orDash()
             ),
             right = DeviceInfoEntry(
                 label = stringResource(Res.string.manufacturer),
-                value = deviceInfo.manufacturer.orDash(),
-                icon = Icons.Default.Storage,
-                tint = Color(0xFFF59E0B)
+                value = deviceInfo.manufacturer.orDash()
             ),
             cellModifier = cellModifier
         )
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
         Spacer(modifier = Modifier.height(16.dp))
 
         DeviceInfoRow(
             left = DeviceInfoEntry(
                 label = stringResource(Res.string.rom_version),
-                value = deviceInfo.romVersion.orDash(),
-                icon = Icons.Default.DeveloperMode,
-                tint = Color(0xFF42A5F5)
+                value = deviceInfo.romVersion.orDash()
             ),
             right = DeviceInfoEntry(
                 label = stringResource(Res.string.screen_resolution),
-                value = deviceInfo.screenResolution.orDash(),
-                icon = Icons.Default.Memory,
-                tint = Color(0xFF34D399)
+                value = deviceInfo.screenResolution.orDash()
             ),
             cellModifier = cellModifier
         )
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
         Spacer(modifier = Modifier.height(16.dp))
 
         DeviceInfoRow(
             left = DeviceInfoEntry(
                 label = stringResource(Res.string.font_scale),
-                value = deviceInfo.fontScale.orDash(),
-                icon = Icons.Default.Storage,
-                tint = Color(0xFF0EA5E9)
+                value = deviceInfo.fontScale.orDash()
             ),
             right = DeviceInfoEntry(
                 label = stringResource(Res.string.mac_address),
-                value = deviceInfo.macAddress.orDash(),
-                icon = Icons.Default.Link,
-                tint = Color(0xFF8B5CF6)
+                value = deviceInfo.macAddress.orDash()
             ),
             cellModifier = cellModifier
         )
@@ -662,21 +645,21 @@ private fun QuickActionsPanel() {
         ) {
             QuickActionCard(
                 modifier = Modifier.weight(1f),
-                title = stringResource(Res.string.open_shell),
-                icon = Icons.Default.DeveloperMode,
+                title = stringResource(Res.string.key_screenshot_short),
+                icon = Icons.Default.PhotoCamera,
                 accentColor = Color(0xFF3B82F6)
-            )
-            QuickActionCard(
-                modifier = Modifier.weight(1f),
-                title = stringResource(Res.string.file_manager),
-                icon = Icons.Default.Folder,
-                accentColor = Color(0xFF22C55E)
             )
             QuickActionCard(
                 modifier = Modifier.weight(1f),
                 title = stringResource(Res.string.install_apk_short),
                 icon = Icons.Default.Download,
                 accentColor = Color(0xFF8B5CF6)
+            )
+            QuickActionCard(
+                modifier = Modifier.weight(1f),
+                title = stringResource(Res.string.open_shell),
+                icon = Icons.Default.DeveloperMode,
+                accentColor = Color(0xFF22C55E)
             )
         }
     }
@@ -695,16 +678,12 @@ private fun DeviceInfoRow(
         DeviceInfoCell(
             modifier = cellModifier,
             label = left.label,
-            value = left.value,
-            icon = left.icon,
-            tint = left.tint
+            value = left.value
         )
         DeviceInfoCell(
             modifier = cellModifier,
             label = right.label,
-            value = right.value,
-            icon = right.icon,
-            tint = right.tint
+            value = right.value
         )
     }
 }
@@ -769,9 +748,7 @@ private data class HomeMetricModel(
 
 private data class DeviceInfoEntry(
     val label: String,
-    val value: String,
-    val icon: ImageVector,
-    val tint: Color
+    val value: String
 )
 
 private fun parsePercentProgress(raw: String?): Float {
@@ -786,6 +763,12 @@ private fun parseStorageProgress(raw: String?): Float {
     val total = match.groupValues.getOrNull(2)?.toFloatOrNull() ?: return 0f
     if (total <= 0f) return 0f
     return (used / total).coerceIn(0f, 1f)
+}
+
+private fun buildInlineMetricValue(primary: String, suffix: String): String {
+    if (suffix.isBlank()) return primary
+    if (primary.isBlank() || primary == "--") return suffix
+    return "$primary $suffix"
 }
 
 private fun formatAndroidVersionWithApi(androidVersion: String?, sdkVersion: String?): String {
