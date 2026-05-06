@@ -34,6 +34,7 @@ kotlin {
             implementation("io.github.vinceglb:filekit-dialogs:$fileKit")
             implementation("io.github.vinceglb:filekit-dialogs-compose:$fileKit")
             implementation("io.github.vinceglb:filekit-coil:$fileKit")
+            implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
 
         }
         commonTest.dependencies {
