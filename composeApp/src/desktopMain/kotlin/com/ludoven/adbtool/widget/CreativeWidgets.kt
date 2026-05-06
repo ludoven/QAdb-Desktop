@@ -154,22 +154,12 @@ fun ModernSectionTitle(
         verticalAlignment = Alignment.CenterVertically
     ) {
         if (icon != null) {
-            Box(
-                modifier = Modifier
-                    .size(32.dp)
-                    .background(
-                        MaterialTheme.colorScheme.primaryContainer,
-                        RoundedCornerShape(UiTokens.RadiusSmall)
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(18.dp)
-                )
-            }
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.size(20.dp)
+            )
             Spacer(modifier = Modifier.width(12.dp))
         }
         Text(
