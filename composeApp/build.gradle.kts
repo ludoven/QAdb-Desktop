@@ -1,5 +1,36 @@
+import org.gradle.api.DefaultTask
+import org.gradle.api.file.RegularFileProperty
+import org.gradle.api.provider.Property
+import org.gradle.api.tasks.CacheableTask
+import org.gradle.api.tasks.Input
+import org.gradle.api.tasks.OutputFile
+import org.gradle.api.tasks.TaskAction
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
+
+@CacheableTask
+abstract class GenerateAppVersionTask : DefaultTask() {
+    @get:Input
+    abstract val versionName: Property<String>
+
+    @get:OutputFile
+    abstract val outputFile: RegularFileProperty
+
+    @TaskAction
+    fun generate() {
+        val file = outputFile.get().asFile
+        file.parentFile.mkdirs()
+        file.writeText(
+            """
+            package com.ludoven.adbtool
+
+            object AppVersion {
+                const val CURRENT = "${versionName.get()}"
+            }
+            """.trimIndent()
+        )
+    }
+}
 
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
@@ -8,16 +39,25 @@ plugins {
     alias(libs.plugins.composeHotReload)
 }
 
+val appVersion = "2.0.0"
+val generatedVersionSourceDir = layout.buildDirectory.dir("generated/source/appVersion/desktopMain/kotlin")
+val generateDesktopAppVersion = tasks.register<GenerateAppVersionTask>("generateDesktopAppVersion") {
+    versionName.set(appVersion)
+    outputFile.set(generatedVersionSourceDir.map { it.file("com/ludoven/adbtool/AppVersion.kt") })
+}
+
 kotlin {
     jvm("desktop")
     
     sourceSets {
-        val desktopMain by getting
+        val desktopMain by getting {
+            kotlin.srcDir(generatedVersionSourceDir)
+        }
         
         commonMain.dependencies {
             implementation(compose.runtime)
             implementation(compose.foundation)
-            implementation(compose.material3)
+            implementation(compose.material)
             implementation(compose.ui)
             implementation(compose.components.resources)
             implementation(compose.components.uiToolingPreview)
@@ -55,7 +95,7 @@ compose.desktop {
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Exe)
 
-            packageVersion = "1.0.1"
+            packageVersion = appVersion
             packageName = "QAdb"
 
 //            iconFile.set(project.file("src/desktopMain/composeResources/icons/app_icon.icns")) // macOS 图标
@@ -69,6 +109,7 @@ compose.desktop {
     }
 }
 tasks.withType<KotlinCompile>().configureEach {
+    dependsOn(generateDesktopAppVersion)
     compilerOptions {
         freeCompilerArgs.add("-Xnon-local-break-continue")
     }

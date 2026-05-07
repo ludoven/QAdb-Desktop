@@ -1,0 +1,60 @@
+name: Desktop Release Build
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build DMG
+        run: ./gradlew :composeApp:packageReleaseDmg
+
+      - name: Upload macOS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: qadb-macos-dmg
+          path: composeApp/build/compose/binaries/main-release/dmg/*.dmg
+          if-no-files-found: error
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build MSI and EXE
+        run: .\gradlew.bat :composeApp:packageReleaseMsi :composeApp:packageReleaseExe
+
+      - name: Upload Windows artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: qadb-windows-installers
+          path: |
+            composeApp/build/compose/binaries/main-release/msi/*.msi
+            composeApp/build/compose/binaries/main-release/exe/*.exe
+          if-no-files-found: error
