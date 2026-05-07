@@ -1,5 +1,7 @@
 package com.ludoven.adbtool.pages
 
+import com.ludoven.adbtool.ui.mac.*
+
 import adbtool_desktop.composeapp.generated.resources.Res
 import adbtool_desktop.composeapp.generated.resources.execute
 import adbtool_desktop.composeapp.generated.resources.no_device
@@ -44,14 +46,14 @@ import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Text
+import com.ludoven.adbtool.ui.mac.Button
+import com.ludoven.adbtool.ui.mac.ButtonDefaults
+import com.ludoven.adbtool.ui.mac.HorizontalDivider
+import com.ludoven.adbtool.ui.mac.Icon
+import com.ludoven.adbtool.ui.mac.MaterialTheme
+import com.ludoven.adbtool.ui.mac.OutlinedTextField
+import com.ludoven.adbtool.ui.mac.OutlinedTextFieldDefaults
+import com.ludoven.adbtool.ui.mac.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -300,7 +302,10 @@ private fun TerminalInputBar(
             onClick = onExecute,
             enabled = enabled,
             shape = RoundedCornerShape(12.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2563EB)),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+            ),
             modifier = Modifier.height(52.dp).width(110.dp)
         ) {
             Icon(

@@ -2,7 +2,9 @@
 
 package com.ludoven.adbtool
 
-import androidx.compose.material3.ExperimentalMaterial3Api
+import com.ludoven.adbtool.ui.mac.*
+
+import com.ludoven.adbtool.ui.mac.ExperimentalMaterial3Api
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window

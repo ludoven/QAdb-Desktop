@@ -1,11 +1,14 @@
 package com.ludoven.adbtool
 
+import com.ludoven.adbtool.ui.mac.*
+
 import adbtool_desktop.composeapp.generated.resources.Res
 import adbtool_desktop.composeapp.generated.resources.app
 import adbtool_desktop.composeapp.generated.resources.common
 import adbtool_desktop.composeapp.generated.resources.home
 import adbtool_desktop.composeapp.generated.resources.key_event_page
 import adbtool_desktop.composeapp.generated.resources.log
+import adbtool_desktop.composeapp.generated.resources.process
 import adbtool_desktop.composeapp.generated.resources.set
 import adbtool_desktop.composeapp.generated.resources.terminal
 import androidx.compose.foundation.layout.Box
@@ -21,11 +24,12 @@ import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.filled.Memory
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.VideogameAsset
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
+import com.ludoven.adbtool.ui.mac.ExperimentalMaterial3Api
+import com.ludoven.adbtool.ui.mac.MaterialTheme
+import com.ludoven.adbtool.ui.mac.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -45,10 +49,12 @@ import com.ludoven.adbtool.pages.CommonScreen
 import com.ludoven.adbtool.pages.HomeScreen
 import com.ludoven.adbtool.pages.KeyEventScreen
 import com.ludoven.adbtool.pages.LogScreen
+import com.ludoven.adbtool.pages.ProcessScreen
 import com.ludoven.adbtool.pages.SettingScreen
 import com.ludoven.adbtool.pages.TerminalScreen
 import com.ludoven.adbtool.util.AdbPathManager
 import com.ludoven.adbtool.util.LanguageManager
+import com.ludoven.adbtool.entity.AdbFunctionType
 import com.ludoven.adbtool.viewmodel.AppViewModel
 import com.ludoven.adbtool.viewmodel.CommonModel
 import com.ludoven.adbtool.viewmodel.DevicesViewModel
@@ -86,6 +92,7 @@ fun App() {
         TabItem(stringResource(Res.string.key_event_page), Icons.Default.VideogameAsset, "keyevent"),
         TabItem(stringResource(Res.string.app), Icons.Default.Apps, "app"),
         TabItem(stringResource(Res.string.log), Icons.Default.List, "log"),
+        TabItem(stringResource(Res.string.process), Icons.Default.Memory, "process"),
         TabItem(stringResource(Res.string.set), Icons.Default.Settings, "setting")
     )
 
@@ -147,7 +154,17 @@ fun App() {
                             NavHost(navController, startDestination = "home") {
                                 composable("home") {
                                     stateHolder.SaveableStateProvider("home") {
-                                        HomeScreen(devicesViewModel)
+                                        HomeScreen(
+                                            viewModel = devicesViewModel,
+                                            onScreenshot = { commonModel.executeAdbAction(AdbFunctionType.SCREENSHOT) },
+                                            onInstallApk = { commonModel.executeAdbAction(AdbFunctionType.INSTALL_APK) },
+                                            onOpenShell = {
+                                                navController.navigate("terminal") {
+                                                    launchSingleTop = true
+                                                    restoreState = true
+                                                }
+                                            }
+                                        )
                                     }
                                 }
                                 composable("common") {
@@ -187,10 +204,14 @@ fun App() {
                                     stateHolder.SaveableStateProvider("log") {
                                         LogScreen(
                                             viewModel = logViewModel,
-                                            selectedDevice = selectedDevice,
-                                            onDeviceSelect = {
-                                                // You can implement device selection dialog here
-                                            }
+                                            selectedDevice = selectedDevice
+                                        )
+                                    }
+                                }
+                                composable("process") {
+                                    stateHolder.SaveableStateProvider("process") {
+                                        ProcessScreen(
+                                            selectedDevice = selectedDevice
                                         )
                                     }
                                 }

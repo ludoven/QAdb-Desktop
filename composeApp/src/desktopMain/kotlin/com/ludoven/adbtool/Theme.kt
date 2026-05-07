@@ -1,8 +1,10 @@
 package com.ludoven.adbtool
 
+import com.ludoven.adbtool.ui.mac.*
+
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Shapes
+import com.ludoven.adbtool.ui.mac.MaterialTheme
+import com.ludoven.adbtool.ui.mac.Shapes
 import androidx.compose.runtime.Composable
 import androidx.compose.foundation.shape.RoundedCornerShape
 

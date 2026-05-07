@@ -129,11 +129,18 @@ class LogViewModel : ViewModel() {
         logProcess = null
     }
 
+    fun restartCapture(deviceSerial: String) {
+        stopCapture()
+        startCapture(deviceSerial)
+    }
+
     fun getFilteredLogs(): List<LogEntry> {
         val currentFilter = _filter.value
         return _logs.value.filter { entry ->
             (currentFilter.level == null || entry.level == currentFilter.level) &&
-            (currentFilter.keyword.isEmpty() || entry.message.contains(currentFilter.keyword, ignoreCase = true)) &&
+            (currentFilter.packageName.isEmpty() ||
+                entry.tag.contains(currentFilter.packageName, ignoreCase = true) ||
+                entry.message.contains(currentFilter.packageName, ignoreCase = true)) &&
             (currentFilter.tag.isEmpty() || entry.tag.contains(currentFilter.tag, ignoreCase = true)) &&
             (currentFilter.startTime == null || entry.timestamp >= currentFilter.startTime) &&
             (currentFilter.endTime == null || entry.timestamp <= currentFilter.endTime)

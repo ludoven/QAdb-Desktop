@@ -1,12 +1,15 @@
 package com.ludoven.adbtool.widget
 
+import com.ludoven.adbtool.ui.mac.*
+
 import adbtool_desktop.composeapp.generated.resources.Res
 import adbtool_desktop.composeapp.generated.resources.connected
 import adbtool_desktop.composeapp.generated.resources.connected_devices_count
+import adbtool_desktop.composeapp.generated.resources.ic_logo
 import adbtool_desktop.composeapp.generated.resources.no_device
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -24,11 +27,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import com.ludoven.adbtool.ui.mac.DropdownMenu
+import com.ludoven.adbtool.ui.mac.DropdownMenuItem
+import com.ludoven.adbtool.ui.mac.Icon
+import com.ludoven.adbtool.ui.mac.MaterialTheme
+import com.ludoven.adbtool.ui.mac.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -37,13 +40,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.ludoven.adbtool.TabItem
 import com.ludoven.adbtool.UiTokens
+import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 
 @Composable
@@ -62,51 +64,32 @@ fun Sidebar(
         modifier = modifier
             .fillMaxHeight()
             .width(UiTokens.SidebarWidth),
-        shape = RoundedCornerShape(28.dp)
+        shape = RoundedCornerShape(20.dp)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxHeight()
-                .padding(horizontal = 14.dp, vertical = 18.dp),
+                .padding(horizontal = 12.dp, vertical = 14.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.padding(bottom = 18.dp, start = 4.dp, top = 4.dp)
+                modifier = Modifier.padding(bottom = 12.dp, start = 6.dp, top = 2.dp)
             ) {
-                Box(
+                Image(
+                    painter = painterResource(Res.drawable.ic_logo),
+                    contentDescription = null,
                     modifier = Modifier
-                        .size(48.dp)
-                        .clip(RoundedCornerShape(18.dp))
-                        .background(
-                            Brush.radialGradient(
-                                listOf(
-                                    Color(0xFF53B7FF),
-                                    MaterialTheme.colorScheme.primary
-                                )
-                            )
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "Q",
-                        color = Color.White,
-                        fontSize = 22.sp,
-                        fontWeight = FontWeight.ExtraBold
-                    )
-                }
+                        .size(30.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                )
                 Spacer(modifier = Modifier.width(10.dp))
                 Column {
                     Text(
-                        text = "QAdb Tool",
-                        style = MaterialTheme.typography.titleMedium,
+                        text = "QADB",
+                        style = MaterialTheme.typography.titleLarge,
                         color = MaterialTheme.colorScheme.onSurface,
                         fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = "Desktop",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
@@ -140,7 +123,7 @@ private fun SidebarItem(
 ) {
     val backgroundColor by animateColorAsState(
         targetValue = if (isSelected) {
-            MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
+            MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
         } else {
             Color.Transparent
         },
@@ -156,47 +139,42 @@ private fun SidebarItem(
         animationSpec = tween(220)
     )
 
-    val indicatorHeight by animateDpAsState(
-        targetValue = if (isSelected) 22.dp else 0.dp,
-        animationSpec = tween(220)
-    )
-
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(52.dp)
-            .clip(RoundedCornerShape(16.dp))
+            .height(46.dp)
+            .clip(RoundedCornerShape(12.dp))
             .background(backgroundColor)
             .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp),
+            .padding(horizontal = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         if (isSelected) {
             Box(
                 modifier = Modifier
-                    .width(UiTokens.IndicatorWidth)
-                    .height(indicatorHeight.coerceAtLeast(28.dp))
+                    .width(UiTokens.IndicatorWidth - 1.dp)
+                    .height(24.dp)
                     .clip(RoundedCornerShape(999.dp))
                     .background(MaterialTheme.colorScheme.primary)
             )
-            Spacer(modifier = Modifier.width(12.dp))
+            Spacer(modifier = Modifier.width(10.dp))
         } else {
-            Spacer(modifier = Modifier.width(16.dp))
+            Spacer(modifier = Modifier.width(13.dp))
         }
 
         Icon(
             imageVector = item.icon,
             contentDescription = item.title,
             tint = contentColor,
-            modifier = Modifier.size(22.dp)
+            modifier = Modifier.size(20.dp)
         )
 
-        Spacer(modifier = Modifier.width(12.dp))
+        Spacer(modifier = Modifier.width(10.dp))
 
         Text(
             text = item.title,
             color = contentColor,
-            style = MaterialTheme.typography.bodyLarge,
+            style = MaterialTheme.typography.bodyMedium,
             fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium
         )
     }
@@ -219,45 +197,45 @@ private fun ConnectedStatusCard(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(16.dp))
-                .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f))
+                .clip(RoundedCornerShape(12.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
                 .clickable(enabled = devices.isNotEmpty()) { expanded = !expanded }
-                .padding(horizontal = 12.dp, vertical = 14.dp),
+                .padding(horizontal = 10.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
                 modifier = Modifier
-                    .size(32.dp)
+                    .size(24.dp)
                     .clip(RoundedCornerShape(999.dp))
-                    .background(Color(0xFFE9F9EF)),
+                    .background(Color(0xFFE9F9EF).copy(alpha = 0.9f)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = Icons.Default.CheckCircle,
                     contentDescription = null,
                     tint = Color(0xFF2DBE60),
-                    modifier = Modifier.size(18.dp)
+                    modifier = Modifier.size(14.dp)
                 )
             }
 
-            Spacer(modifier = Modifier.width(12.dp))
+            Spacer(modifier = Modifier.width(8.dp))
 
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(
                     text = stringResource(Res.string.connected),
-                    style = MaterialTheme.typography.titleSmall,
+                    style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSurface,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
                     text = selectedDisplay,
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1
                 )
                 Text(
                     text = stringResource(Res.string.connected_devices_count, connectedDeviceCount),
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }

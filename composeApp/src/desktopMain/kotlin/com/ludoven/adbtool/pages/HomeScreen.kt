@@ -1,8 +1,11 @@
 package com.ludoven.adbtool.pages
 
+import com.ludoven.adbtool.ui.mac.*
+
 import adbtool_desktop.composeapp.generated.resources.Res
 import adbtool_desktop.composeapp.generated.resources.battery_level
 import adbtool_desktop.composeapp.generated.resources.connected
+import adbtool_desktop.composeapp.generated.resources.connected_for
 import adbtool_desktop.composeapp.generated.resources.connection_info
 import adbtool_desktop.composeapp.generated.resources.connection_type
 import adbtool_desktop.composeapp.generated.resources.cpu_usage
@@ -37,6 +40,9 @@ import adbtool_desktop.composeapp.generated.resources.screen_resolution
 import adbtool_desktop.composeapp.generated.resources.select_device
 import adbtool_desktop.composeapp.generated.resources.select_device_hint
 import adbtool_desktop.composeapp.generated.resources.storage_usage
+import adbtool_desktop.composeapp.generated.resources.transfer_speed
+import adbtool_desktop.composeapp.generated.resources.updated_ago
+import adbtool_desktop.composeapp.generated.resources.latency
 import adbtool_desktop.composeapp.generated.resources.usb_connection
 import adbtool_desktop.composeapp.generated.resources.wireless_connection
 import androidx.compose.foundation.VerticalScrollbar
@@ -66,7 +72,6 @@ import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.BatteryFull
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.DeveloperMode
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Info
@@ -75,15 +80,14 @@ import androidx.compose.material.icons.filled.Memory
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.SdStorage
+import androidx.compose.material.icons.filled.Smartphone
 import androidx.compose.material.icons.filled.Storage
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Text
+import com.ludoven.adbtool.ui.mac.DropdownMenu
+import com.ludoven.adbtool.ui.mac.DropdownMenuItem
+import com.ludoven.adbtool.ui.mac.ExperimentalMaterial3Api
+import com.ludoven.adbtool.ui.mac.Icon
+import com.ludoven.adbtool.ui.mac.MaterialTheme
+import com.ludoven.adbtool.ui.mac.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -98,7 +102,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.ludoven.adbtool.UiTokens
 import com.ludoven.adbtool.entity.DeviceInfoData
 import com.ludoven.adbtool.viewmodel.DevicesViewModel
 import com.ludoven.adbtool.widget.DashboardMetricCard
@@ -109,11 +112,19 @@ import com.ludoven.adbtool.widget.LabeledValueRow
 import com.ludoven.adbtool.widget.OutlineActionButton
 import com.ludoven.adbtool.widget.QuickActionCard
 import com.ludoven.adbtool.widget.StatusBadge
+import java.time.Duration
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 import org.jetbrains.compose.resources.stringResource
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeScreen(viewModel: DevicesViewModel) {
+fun HomeScreen(
+    viewModel: DevicesViewModel,
+    onScreenshot: () -> Unit = {},
+    onInstallApk: () -> Unit = {},
+    onOpenShell: () -> Unit = {}
+) {
     val devices by viewModel.devices.collectAsState()
     val deviceDisplayNames by viewModel.deviceDisplayNames.collectAsState()
     val selectedDevice by viewModel.selectedDevice.collectAsState()
@@ -132,6 +143,9 @@ fun HomeScreen(viewModel: DevicesViewModel) {
     }
 
     val isConnected = selectedDevice != null
+    val connectedSince = remember(selectedDevice) {
+        if (selectedDevice == null) null else LocalDateTime.now()
+    }
     val wirelessConnection = isWirelessConnection(selectedDevice, deviceInfo?.ipAddress)
     val connectionType = stringResource(
         if (wirelessConnection) Res.string.wireless_connection else Res.string.usb_connection
@@ -145,6 +159,14 @@ fun HomeScreen(viewModel: DevicesViewModel) {
         primary = centerInfo?.batteryLevel.orDash(),
         suffix = batterySupporting
     )
+    val selectedDeviceLabel = selectedDevice
+        ?.let { formatPrimaryDeviceName(deviceInfo?.deviceModel, deviceDisplayNames[it], it) }
+        ?: stringResource(Res.string.no_device)
+    val androidHeadline = formatAndroidVersionWithApi(deviceInfo?.androidVersion, deviceInfo?.sdkVersion)
+    val connectionHeadline = if (isConnected) "$connectionType · $connectionStatus" else connectionStatus
+    val relativeUpdated = formatRelativeRefresh(lastRefreshTime)
+    val connectedDuration = formatConnectedDuration(connectedSince)
+
     val metricItems = listOf(
         HomeMetricModel(
             titleKey = Res.string.cpu_usage,
@@ -178,18 +200,22 @@ fun HomeScreen(viewModel: DevicesViewModel) {
 
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
         val compactLayout = maxWidth < 900.dp
-        val spacing = if (compactLayout) 10.dp else 14.dp
+        val spacing = if (compactLayout) 16.dp else 24.dp
 
         Box(modifier = Modifier.fillMaxSize()) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(start = 4.dp, top = 4.dp, bottom = 4.dp, end = 18.dp)
+                    .padding(start = 12.dp, top = 12.dp, bottom = 12.dp, end = 24.dp)
                     .verticalScroll(scrollState),
                 verticalArrangement = Arrangement.spacedBy(spacing)
             ) {
                 HomeHeader(
                     compactLayout = compactLayout,
+                    deviceName = selectedDeviceLabel,
+                    androidVersion = androidHeadline,
+                    connectionInfo = connectionHeadline,
+                    batteryInfo = batteryValue,
                     isConnected = isConnected,
                     isLoading = isLoading,
                     onRefresh = { viewModel.refreshDevices() },
@@ -200,6 +226,9 @@ fun HomeScreen(viewModel: DevicesViewModel) {
                     devices = devices,
                     deviceDisplayNames = deviceDisplayNames,
                     selectedDevice = selectedDevice,
+                    selectedDeviceLabel = selectedDeviceLabel,
+                    selectedDeviceAddress = selectedDevice.orDash(),
+                    selectedDeviceStatus = if (isConnected) connectionHeadline else stringResource(Res.string.no_device),
                     isConnected = isConnected,
                     expanded = showDropdown,
                     onExpandedChange = { showDropdown = it },
@@ -222,15 +251,20 @@ fun HomeScreen(viewModel: DevicesViewModel) {
                             connectionStatus = connectionStatus,
                             ipAddress = deviceInfo?.ipAddress.orDash(),
                             port = extractPort(selectedDevice, deviceInfo?.ipAddress),
-                            lastRefreshTime = lastRefreshTime,
+                            relativeUpdated = relativeUpdated,
+                            connectedDuration = connectedDuration,
                             isConnected = isConnected
                         )
-                        QuickActionsPanel()
+                        QuickActionsPanel(
+                            onScreenshot = onScreenshot,
+                            onInstallApk = onInstallApk,
+                            onOpenShell = onOpenShell
+                        )
                     }
                 } else {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(14.dp),
+                        horizontalArrangement = Arrangement.spacedBy(20.dp),
                         verticalAlignment = Alignment.Top
                     ) {
                         DeviceInfoPanel(
@@ -240,18 +274,23 @@ fun HomeScreen(viewModel: DevicesViewModel) {
 
                         Column(
                             modifier = Modifier.weight(1f),
-                            verticalArrangement = Arrangement.spacedBy(14.dp)
+                            verticalArrangement = Arrangement.spacedBy(16.dp)
                         ) {
                             ConnectionInfoPanel(
                                 connectionType = connectionType,
                                 connectionStatus = connectionStatus,
                                 ipAddress = deviceInfo?.ipAddress.orDash(),
                                 port = extractPort(selectedDevice, deviceInfo?.ipAddress),
-                                lastRefreshTime = lastRefreshTime,
+                                relativeUpdated = relativeUpdated,
+                                connectedDuration = connectedDuration,
                                 isConnected = isConnected
                             )
 
-                            QuickActionsPanel()
+                            QuickActionsPanel(
+                                onScreenshot = onScreenshot,
+                                onInstallApk = onInstallApk,
+                                onOpenShell = onOpenShell
+                            )
                         }
                     }
                 }
@@ -280,96 +319,135 @@ fun HomeScreen(viewModel: DevicesViewModel) {
 @Composable
 private fun HomeHeader(
     compactLayout: Boolean,
+    deviceName: String,
+    androidVersion: String,
+    connectionInfo: String,
+    batteryInfo: String,
     isConnected: Boolean,
     isLoading: Boolean,
     onRefresh: () -> Unit,
     onDisconnect: () -> Unit
 ) {
-    if (compactLayout) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+    GlassCard(modifier = Modifier.fillMaxWidth()) {
+        if (compactLayout) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 18.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                Text(
-                    text = stringResource(Res.string.device_overview),
-                    style = MaterialTheme.typography.titleLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    fontWeight = FontWeight.Bold
+                DeviceHeadline(
+                    deviceName = deviceName,
+                    androidVersion = androidVersion,
+                    connectionInfo = connectionInfo,
+                    batteryInfo = batteryInfo,
+                    isConnected = isConnected
                 )
-                StatusBadge(
-                    text = stringResource(if (isConnected) Res.string.connected else Res.string.disconnected),
-                    active = isConnected
-                )
-            }
 
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlineActionButton(
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    OutlineActionButton(
+                        modifier = Modifier.weight(1f),
+                        text = stringResource(Res.string.refresh),
+                        icon = Icons.Default.Refresh,
+                        tint = MaterialTheme.colorScheme.primary,
+                        enabled = !isLoading,
+                        onClick = onRefresh
+                    )
+                    OutlineActionButton(
+                        modifier = Modifier.weight(1f),
+                        text = stringResource(Res.string.disconnect),
+                        icon = Icons.Default.Close,
+                        tint = MaterialTheme.colorScheme.error,
+                        enabled = isConnected && !isLoading,
+                        onClick = onDisconnect
+                    )
+                }
+            }
+        } else {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 18.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(24.dp)
+            ) {
+                DeviceHeadline(
                     modifier = Modifier.weight(1f),
-                    text = stringResource(Res.string.refresh),
-                    icon = Icons.Default.Refresh,
-                    tint = MaterialTheme.colorScheme.primary,
-                    enabled = !isLoading,
-                    onClick = onRefresh
+                    deviceName = deviceName,
+                    androidVersion = androidVersion,
+                    connectionInfo = connectionInfo,
+                    batteryInfo = batteryInfo,
+                    isConnected = isConnected
                 )
-                OutlineActionButton(
-                    modifier = Modifier.weight(1f),
-                    text = stringResource(Res.string.disconnect),
-                    icon = Icons.Default.Close,
-                    tint = MaterialTheme.colorScheme.error,
-                    enabled = isConnected && !isLoading,
-                    onClick = onDisconnect
-                )
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    OutlineActionButton(
+                        text = stringResource(Res.string.refresh),
+                        icon = Icons.Default.Refresh,
+                        tint = MaterialTheme.colorScheme.primary,
+                        enabled = !isLoading,
+                        onClick = onRefresh
+                    )
+                    OutlineActionButton(
+                        text = stringResource(Res.string.disconnect),
+                        icon = Icons.Default.Close,
+                        tint = MaterialTheme.colorScheme.error,
+                        enabled = isConnected && !isLoading,
+                        onClick = onDisconnect
+                    )
+                }
             }
         }
-        return
     }
+}
 
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 10.dp),
-        verticalAlignment = Alignment.CenterVertically
+@Composable
+private fun DeviceHeadline(
+    deviceName: String,
+    androidVersion: String,
+    connectionInfo: String,
+    batteryInfo: String,
+    isConnected: Boolean,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         Row(
-            modifier = Modifier.weight(1f),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
+            Icon(
+                imageVector = Icons.Default.Smartphone,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(22.dp)
+            )
             Text(
-                text = stringResource(Res.string.device_overview),
-                style = MaterialTheme.typography.headlineMedium,
+                text = deviceName,
+                style = MaterialTheme.typography.headlineSmall,
                 color = MaterialTheme.colorScheme.onSurface,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
             StatusBadge(
                 text = stringResource(if (isConnected) Res.string.connected else Res.string.disconnected),
                 active = isConnected
             )
         }
-
-        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            OutlineActionButton(
-                text = stringResource(Res.string.refresh),
-                icon = Icons.Default.Refresh,
-                tint = MaterialTheme.colorScheme.primary,
-                enabled = !isLoading,
-                onClick = onRefresh
-            )
-            OutlineActionButton(
-                text = stringResource(Res.string.disconnect),
-                icon = Icons.Default.Close,
-                tint = MaterialTheme.colorScheme.error,
-                enabled = isConnected && !isLoading,
-                onClick = onDisconnect
-            )
-        }
+        Text(
+            text = androidVersion,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Text(
+            text = "$connectionInfo · ${stringResource(Res.string.battery_level)} $batteryInfo",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
     }
 }
 
@@ -379,6 +457,9 @@ private fun DeviceSelectorCard(
     devices: List<String>,
     deviceDisplayNames: Map<String, String>,
     selectedDevice: String?,
+    selectedDeviceLabel: String,
+    selectedDeviceAddress: String,
+    selectedDeviceStatus: String,
     isConnected: Boolean,
     expanded: Boolean,
     onExpandedChange: (Boolean) -> Unit,
@@ -398,104 +479,116 @@ private fun DeviceSelectorCard(
                 fontWeight = FontWeight.SemiBold
             )
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                Box(modifier = Modifier.weight(1f)) {
-                    OutlinedTextField(
-                        value = selectedDevice
-                            ?.let { formatDeviceDisplay(it, deviceDisplayNames[it]) }
-                            ?: stringResource(Res.string.no_device),
-                        onValueChange = {},
-                        readOnly = true,
-                        enabled = devices.isNotEmpty(),
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(14.dp),
-                        trailingIcon = {
-                            Icon(
-                                imageVector = Icons.Default.ArrowDropDown,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        },
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.28f),
-                            unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
-                            focusedContainerColor = MaterialTheme.colorScheme.surface,
-                            unfocusedContainerColor = MaterialTheme.colorScheme.surface,
-                            disabledContainerColor = MaterialTheme.colorScheme.surface
+            Box {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(
+                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.28f),
+                            RoundedCornerShape(14.dp)
                         )
-                    )
-
+                        .clickable(
+                            enabled = devices.isNotEmpty(),
+                            onClick = { onExpandedChange(!expanded) }
+                        )
+                        .padding(horizontal = 14.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
                     Box(
                         modifier = Modifier
-                            .matchParentSize()
-                            .background(Color.Transparent, RoundedCornerShape(14.dp))
-                            .clickable(
-                                enabled = devices.isNotEmpty(),
-                                onClick = { onExpandedChange(!expanded) }
-                            )
-                    )
-
-                    DropdownMenu(
-                        expanded = expanded,
-                        onDismissRequest = { onExpandedChange(false) },
-                        modifier = Modifier.background(MaterialTheme.colorScheme.surface)
+                            .size(34.dp)
+                            .background(
+                                MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                                RoundedCornerShape(10.dp)
+                            ),
+                        contentAlignment = Alignment.Center
                     ) {
-                        if (devices.isEmpty()) {
-                            DropdownMenuItem(
-                                text = { Text(stringResource(Res.string.no_device_available)) },
-                                onClick = { onExpandedChange(false) },
-                                enabled = false
-                            )
-                        } else {
-                            devices.forEach { deviceId ->
-                                val displayName = formatDeviceDisplay(deviceId, deviceDisplayNames[deviceId])
-                                DropdownMenuItem(
-                                    text = {
-                                        Text(
-                                            text = displayName,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                    },
-                                    onClick = {
-                                        onDeviceSelected(deviceId)
-                                        onExpandedChange(false)
-                                    }
+                        Icon(
+                            imageVector = Icons.Default.Smartphone,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(2.dp)
+                    ) {
+                        Text(
+                            text = selectedDeviceLabel,
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            text = selectedDeviceAddress,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            text = selectedDeviceStatus,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.ArrowDropDown,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Box(
+                            modifier = Modifier
+                                .size(8.dp)
+                                .background(
+                                    if (isConnected) Color(0xFF2DBE60) else MaterialTheme.colorScheme.outlineVariant,
+                                    RoundedCornerShape(999.dp)
                                 )
-                            }
-                        }
+                        )
                     }
                 }
 
-                Box(
-                    modifier = Modifier
-                        .size(width = 48.dp, height = 48.dp)
-                        .background(
-                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
-                            RoundedCornerShape(14.dp)
-                        ),
-                    contentAlignment = Alignment.Center
+                DropdownMenu(
+                    expanded = expanded,
+                    onDismissRequest = { onExpandedChange(false) },
+                    modifier = Modifier.background(MaterialTheme.colorScheme.surface)
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Apps,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.BottomEnd)
-                            .padding(8.dp)
-                            .size(9.dp)
-                            .background(
-                                if (isConnected) Color(0xFF2DBE60) else MaterialTheme.colorScheme.outlineVariant,
-                                RoundedCornerShape(999.dp)
+                    if (devices.isEmpty()) {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(Res.string.no_device_available)) },
+                            onClick = { onExpandedChange(false) },
+                            enabled = false
+                        )
+                    } else {
+                        devices.forEach { deviceId ->
+                            val displayName = formatDeviceDisplay(deviceId, deviceDisplayNames[deviceId])
+                            DropdownMenuItem(
+                                text = {
+                                    Text(
+                                        text = displayName,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                },
+                                onClick = {
+                                    onDeviceSelected(deviceId)
+                                    onExpandedChange(false)
+                                }
                             )
-                    )
+                        }
+                    }
                 }
             }
         }
@@ -522,41 +615,36 @@ private fun DeviceInfoPanel(
         }
 
         val cellModifier = Modifier.weight(1f)
+        val headlineModel = deviceInfo.deviceModel.orDash()
+        val headlineSystem = listOf(
+            formatAndroidVersionWithApi(deviceInfo.androidVersion, deviceInfo.sdkVersion),
+            deviceInfo.romVersion.orDash(),
+            deviceInfo.screenResolution.orDash()
+        ).joinToString(" · ")
+
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(
+                text = headlineModel,
+                style = MaterialTheme.typography.headlineSmall,
+                color = MaterialTheme.colorScheme.onSurface,
+                fontWeight = FontWeight.SemiBold
+            )
+            Text(
+                text = headlineSystem,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Spacer(modifier = Modifier.height(18.dp))
 
         DeviceInfoRow(
             left = DeviceInfoEntry(
-                label = stringResource(Res.string.android_version),
-                value = formatAndroidVersionWithApi(deviceInfo.androidVersion, deviceInfo.sdkVersion)
+                label = stringResource(Res.string.manufacturer),
+                value = deviceInfo.manufacturer.orDash()
             ),
             right = DeviceInfoEntry(
                 label = stringResource(Res.string.kernel_version),
                 value = deviceInfo.kernelVersion.orDash()
-            ),
-            cellModifier = cellModifier
-        )
-        Spacer(modifier = Modifier.height(16.dp))
-
-        DeviceInfoRow(
-            left = DeviceInfoEntry(
-                label = stringResource(Res.string.device_model),
-                value = deviceInfo.deviceModel.orDash()
-            ),
-            right = DeviceInfoEntry(
-                label = stringResource(Res.string.manufacturer),
-                value = deviceInfo.manufacturer.orDash()
-            ),
-            cellModifier = cellModifier
-        )
-        Spacer(modifier = Modifier.height(16.dp))
-
-        DeviceInfoRow(
-            left = DeviceInfoEntry(
-                label = stringResource(Res.string.rom_version),
-                value = deviceInfo.romVersion.orDash()
-            ),
-            right = DeviceInfoEntry(
-                label = stringResource(Res.string.screen_resolution),
-                value = deviceInfo.screenResolution.orDash()
             ),
             cellModifier = cellModifier
         )
@@ -570,6 +658,32 @@ private fun DeviceInfoPanel(
             right = DeviceInfoEntry(
                 label = stringResource(Res.string.mac_address),
                 value = deviceInfo.macAddress.orDash()
+            ),
+            cellModifier = cellModifier
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+
+        DeviceInfoRow(
+            left = DeviceInfoEntry(
+                label = stringResource(Res.string.android_version),
+                value = formatAndroidVersionWithApi(deviceInfo.androidVersion, deviceInfo.sdkVersion)
+            ),
+            right = DeviceInfoEntry(
+                label = stringResource(Res.string.device_model),
+                value = deviceInfo.deviceModel.orDash()
+            ),
+            cellModifier = cellModifier
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+
+        DeviceInfoRow(
+            left = DeviceInfoEntry(
+                label = stringResource(Res.string.rom_version),
+                value = deviceInfo.romVersion.orDash()
+            ),
+            right = DeviceInfoEntry(
+                label = stringResource(Res.string.screen_resolution),
+                value = deviceInfo.screenResolution.orDash()
             ),
             cellModifier = cellModifier
         )
@@ -608,7 +722,8 @@ private fun ConnectionInfoPanel(
     connectionStatus: String,
     ipAddress: String,
     port: String,
-    lastRefreshTime: String,
+    relativeUpdated: String,
+    connectedDuration: String,
     isConnected: Boolean
 ) {
     DashboardPanel(
@@ -628,13 +743,32 @@ private fun ConnectionInfoPanel(
             )
             LabeledValueRow(label = stringResource(Res.string.ip_address), value = ipAddress)
             LabeledValueRow(label = stringResource(Res.string.port), value = port)
-            LabeledValueRow(label = stringResource(Res.string.last_refresh), value = lastRefreshTime)
+            LabeledValueRow(
+                label = stringResource(Res.string.latency),
+                value = "--"
+            )
+            LabeledValueRow(
+                label = stringResource(Res.string.transfer_speed),
+                value = "--"
+            )
+            LabeledValueRow(
+                label = stringResource(Res.string.connected_for),
+                value = connectedDuration
+            )
+            LabeledValueRow(
+                label = stringResource(Res.string.last_refresh),
+                value = stringResource(Res.string.updated_ago, relativeUpdated)
+            )
         }
     }
 }
 
 @Composable
-private fun QuickActionsPanel() {
+private fun QuickActionsPanel(
+    onScreenshot: () -> Unit = {},
+    onInstallApk: () -> Unit = {},
+    onOpenShell: () -> Unit = {}
+) {
     DashboardPanel(
         title = stringResource(Res.string.quick_actions),
         icon = Icons.Default.CheckCircle
@@ -647,19 +781,22 @@ private fun QuickActionsPanel() {
                 modifier = Modifier.weight(1f),
                 title = stringResource(Res.string.key_screenshot_short),
                 icon = Icons.Default.PhotoCamera,
-                accentColor = Color(0xFF3B82F6)
+                accentColor = Color(0xFF3B82F6),
+                onClick = onScreenshot
             )
             QuickActionCard(
                 modifier = Modifier.weight(1f),
                 title = stringResource(Res.string.install_apk_short),
                 icon = Icons.Default.Download,
-                accentColor = Color(0xFF8B5CF6)
+                accentColor = Color(0xFF4F7CFF),
+                onClick = onInstallApk
             )
             QuickActionCard(
                 modifier = Modifier.weight(1f),
                 title = stringResource(Res.string.open_shell),
                 icon = Icons.Default.DeveloperMode,
-                accentColor = Color(0xFF22C55E)
+                accentColor = Color(0xFF22C55E),
+                onClick = onOpenShell
             )
         }
     }
@@ -782,6 +919,38 @@ private fun formatDeviceDisplay(deviceId: String, model: String?): String {
     return if (cleanModel.isNotBlank()) "$cleanModel （$deviceId）" else deviceId
 }
 
+private fun formatPrimaryDeviceName(
+    modelFromInfo: String?,
+    modelFromMap: String?,
+    deviceId: String
+): String {
+    val model = modelFromInfo?.takeIf { it.isNotBlank() }
+        ?: modelFromMap?.takeIf { it.isNotBlank() }
+    return model ?: deviceId
+}
+
+private fun formatConnectedDuration(connectedSince: LocalDateTime?): String {
+    if (connectedSince == null) return "--"
+    val duration = Duration.between(connectedSince, LocalDateTime.now()).coerceAtLeast(Duration.ZERO)
+    val hours = duration.toHours()
+    val minutes = duration.toMinutes() % 60
+    return if (hours > 0) "${hours}h ${minutes}m" else "${minutes}m"
+}
+
+private fun formatRelativeRefresh(rawTime: String): String {
+    val parsed = runCatching {
+        LocalDateTime.parse(rawTime, REFRESH_TIME_FORMATTER)
+    }.getOrNull() ?: return "--"
+    val duration = Duration.between(parsed, LocalDateTime.now()).coerceAtLeast(Duration.ZERO)
+    val seconds = duration.seconds
+    return when {
+        seconds < 10 -> "0s"
+        seconds < 60 -> "${seconds}s"
+        seconds < 3600 -> "${seconds / 60}m"
+        else -> "${seconds / 3600}h"
+    }
+}
+
 private fun isWirelessConnection(deviceId: String?, ipAddress: String?): Boolean {
     if (!ipAddress.isNullOrBlank()) return true
     if (deviceId.isNullOrBlank()) return false
@@ -799,3 +968,5 @@ private fun extractPort(deviceId: String?, ipAddress: String?): String {
 private fun String?.orDash(fallback: String = "--"): String {
     return if (this.isNullOrBlank()) fallback else this
 }
+
+private val REFRESH_TIME_FORMATTER: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")

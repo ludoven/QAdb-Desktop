@@ -1,5 +1,7 @@
 package com.ludoven.adbtool.widget
 
+import com.ludoven.adbtool.ui.mac.*
+
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.BorderStroke
@@ -24,15 +26,15 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Text
+import com.ludoven.adbtool.ui.mac.Button
+import com.ludoven.adbtool.ui.mac.ButtonDefaults
+import com.ludoven.adbtool.ui.mac.Card
+import com.ludoven.adbtool.ui.mac.CardDefaults
+import com.ludoven.adbtool.ui.mac.Icon
+import com.ludoven.adbtool.ui.mac.MaterialTheme
+import com.ludoven.adbtool.ui.mac.OutlinedTextField
+import com.ludoven.adbtool.ui.mac.OutlinedTextFieldDefaults
+import com.ludoven.adbtool.ui.mac.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -104,6 +106,7 @@ fun GlassCard(
     modifier: Modifier = Modifier,
     shape: Shape = RoundedCornerShape(UiTokens.RadiusLarge),
     elevation: Dp = 0.dp,
+    borderStroke: BorderStroke? = null,
     content: @Composable ColumnScope.() -> Unit
 ) {
     Card(
@@ -113,10 +116,7 @@ fun GlassCard(
             containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f)
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = elevation),
-        border = BorderStroke(
-            width = 1.dp,
-            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)
-        )
+        border = borderStroke
     ) {
         content()
     }

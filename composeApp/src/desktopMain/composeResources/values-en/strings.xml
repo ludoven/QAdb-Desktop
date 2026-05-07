@@ -3,6 +3,7 @@
     <string name="home">Home</string>
     <string name="common">Common</string>
     <string name="terminal">Terminal</string>
+    <string name="process">Process</string>
     <string name="app">Apps</string>
     <string name="set">Settings</string>
 
@@ -37,6 +38,15 @@
     <string name="install_apk_short">Install APK</string>
     <string name="select_device_hint">Please select a device to view its information.</string>
     <string name="no_device_info">Unable to retrieve device details.</string>
+    <string name="recent_activity">Recent Activity</string>
+    <string name="activity_installed_apk">Installed app.apk</string>
+    <string name="activity_screenshot">Screenshot captured</string>
+    <string name="activity_shell_opened">Opened shell</string>
+    <string name="activity_cache_cleared">Cleared cache</string>
+    <string name="latency">Latency</string>
+    <string name="transfer_speed">Transfer Speed</string>
+    <string name="connected_for">Connected for</string>
+    <string name="updated_ago">Updated %1$s ago</string>
 
     <!-- Common functions module -->
     <string name="common_functions">Common Functions</string>
@@ -343,12 +353,49 @@
     <string name="log_dismiss">Dismiss</string>
     <string name="log_filter_title">Filter Logs</string>
     <string name="log_filter_level">Log Level</string>
-    <string name="log_filter_keyword">Keyword</string>
+    <string name="log_filter_package">Package</string>
     <string name="log_filter_tag">Tag</string>
     <string name="log_apply_filter">Apply Filter</string>
+    <string name="log_level_all">All Levels</string>
+    <string name="log_filter_summary_prefix">Filters:</string>
+    <string name="log_clear_filter">Clear Filters</string>
+    <string name="log_auto_wrap">Auto Wrap</string>
+    <string name="log_scroll_bottom">Scroll Bottom</string>
+    <string name="log_restart">Restart</string>
+    <string name="log_pause">Pause</string>
+    <string name="log_resume">Resume</string>
+    <string name="log_clear">Clear</string>
     <string name="log_export_success">Logs exported successfully</string>
     <string name="log_export_failed">Log export failed</string>
     <string name="log_clear_confirm">Clear all logs?</string>
     <string name="log_no_device">No device selected</string>
     <string name="log_select_device">Please select a device first</string>
+    <string name="process_title">Process List</string>
+    <string name="process_subtitle">View running processes on the current device</string>
+    <string name="process_search_hint">Search by name / user / PID</string>
+    <string name="process_empty">No process data</string>
+    <string name="process_no_device">Please select a device first.</string>
+    <string name="process_name">Process Name</string>
+    <string name="process_cpu">%CPU</string>
+    <string name="process_cpu_time">CPU Time</string>
+    <string name="process_memory">Memory</string>
+    <string name="process_pid">PID</string>
+    <string name="process_user">USER</string>
+    <string name="process_state">STATE</string>
+
+    <!-- App Update -->
+    <string name="update_section_title">Version Update</string>
+    <string name="current_version">Current version: %1$s</string>
+    <string name="latest_version">Latest version: %1$s</string>
+    <string name="check_update">Check for Update</string>
+    <string name="update_checking">Checking for updates...</string>
+    <string name="update_up_to_date">You are already on the latest version (%1$s)</string>
+    <string name="update_available_with_version">New version available: %1$s</string>
+    <string name="update_available_no_asset">New version found: %1$s, but no auto-install package is available for this platform. Please download from Releases.</string>
+    <string name="download_and_install">Download and Install</string>
+    <string name="downloading_update">Downloading update package...</string>
+    <string name="update_download_success">Update package downloaded. Installer launch attempted:\n%1$s</string>
+    <string name="update_download_failed">Failed to download update package: %1$s</string>
+    <string name="update_check_failed">Failed to check updates: %1$s</string>
+    <string name="open_release_page">Open Releases</string>
 </resources>

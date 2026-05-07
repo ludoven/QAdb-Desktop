@@ -3,6 +3,7 @@
     <string name="home">首页</string>
     <string name="common">常用</string>
     <string name="terminal">终端</string>
+    <string name="process">进程</string>
     <string name="app">应用</string>
     <string name="set">设置</string>
 
@@ -37,6 +38,15 @@
     <string name="install_apk_short">安装 APK</string>
     <string name="select_device_hint">请选择一个设备以查看其信息。</string>
     <string name="no_device_info">未能获取到设备详细信息。</string>
+    <string name="recent_activity">最近活动</string>
+    <string name="activity_installed_apk">已安装 app.apk</string>
+    <string name="activity_screenshot">已截取屏幕截图</string>
+    <string name="activity_shell_opened">已打开 Shell</string>
+    <string name="activity_cache_cleared">已清理缓存</string>
+    <string name="latency">延迟</string>
+    <string name="transfer_speed">传输速率</string>
+    <string name="connected_for">连接时长</string>
+    <string name="updated_ago">%1$s 前更新</string>
 
 
     <!-- 常用功能模块 -->
@@ -344,13 +354,50 @@
     <string name="log_dismiss">关闭</string>
     <string name="log_filter_title">筛选日志</string>
     <string name="log_filter_level">日志级别</string>
-    <string name="log_filter_keyword">关键词</string>
+    <string name="log_filter_package">包名</string>
     <string name="log_filter_tag">标签</string>
     <string name="log_apply_filter">应用筛选</string>
+    <string name="log_level_all">全部级别</string>
+    <string name="log_filter_summary_prefix">筛选：</string>
+    <string name="log_clear_filter">清除筛选</string>
+    <string name="log_auto_wrap">自动换行</string>
+    <string name="log_scroll_bottom">滚动到底部</string>
+    <string name="log_restart">重启</string>
+    <string name="log_pause">暂停</string>
+    <string name="log_resume">继续</string>
+    <string name="log_clear">清空</string>
     <string name="log_export_success">日志导出成功</string>
     <string name="log_export_failed">日志导出失败</string>
     <string name="log_clear_confirm">确认清空所有日志？</string>
     <string name="log_no_device">未选择设备</string>
     <string name="log_select_device">请先选择设备</string>
+    <string name="process_title">进程列表</string>
+    <string name="process_subtitle">查看当前设备运行中的进程</string>
+    <string name="process_search_hint">搜索进程名 / 用户 / PID</string>
+    <string name="process_empty">暂无进程数据</string>
+    <string name="process_no_device">请先选择设备后查看进程。</string>
+    <string name="process_name">进程名称</string>
+    <string name="process_cpu">%CPU</string>
+    <string name="process_cpu_time">CPU 时间</string>
+    <string name="process_memory">内存</string>
+    <string name="process_pid">PID</string>
+    <string name="process_user">用户</string>
+    <string name="process_state">状态</string>
+
+    <!-- 版本更新 -->
+    <string name="update_section_title">版本更新</string>
+    <string name="current_version">当前版本：%1$s</string>
+    <string name="latest_version">最新版本：%1$s</string>
+    <string name="check_update">检查更新</string>
+    <string name="update_checking">正在检查更新...</string>
+    <string name="update_up_to_date">当前已是最新版本（%1$s）</string>
+    <string name="update_available_with_version">发现新版本：%1$s</string>
+    <string name="update_available_no_asset">发现新版本：%1$s，当前系统暂无自动安装包，请前往发布页下载。</string>
+    <string name="download_and_install">下载并安装</string>
+    <string name="downloading_update">正在下载更新包...</string>
+    <string name="update_download_success">更新包下载成功，已尝试启动安装：\n%1$s</string>
+    <string name="update_download_failed">更新包下载失败：%1$s</string>
+    <string name="update_check_failed">检查更新失败：%1$s</string>
+    <string name="open_release_page">打开发布页</string>
 
 </resources>

@@ -13,12 +13,13 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Assignment
 import androidx.compose.material.icons.automirrored.filled.ViewList
 import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
+import com.ludoven.adbtool.ui.mac.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -375,10 +376,10 @@ fun AppScreen(viewModel: AppViewModel) {
                     }
                     Column(modifier = Modifier.fillMaxSize().padding(14.dp)) {
                         LazyVerticalGrid(
-                            columns = GridCells.Adaptive(240.dp),
+                            columns = GridCells.Adaptive(160.dp),
                             state = gridState,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp),
                             modifier = Modifier.weight(1f)
                         ) {
                             items(displayedList, key = { it.packageName }) { app ->
@@ -551,48 +552,39 @@ private fun AppListRow(
     icon: ImageBitmap?,
     onAction: (AdbFunctionType) -> Unit
 ) {
+    val displayName = app.appName.takeIf { it.isNotBlank() && it != app.packageName } ?: app.packageName
+
     Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 7.dp),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Row(
             modifier = Modifier.weight(2.6f),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            AppAvatar(app = app, icon = icon, size = 40)
-            Spacer(Modifier.width(10.dp))
-            Column {
-                Text(
-                    text = app.appName,
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                if (app.appName != app.packageName) {
-                    Text(
-                        text = app.packageName,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-            }
+            AppAvatar(app = app, icon = icon, size = 30)
+            Spacer(Modifier.width(7.dp))
+            Text(
+                text = displayName,
+                style = MaterialTheme.typography.bodySmall,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
         }
 
         Text(
             text = app.versionName,
             modifier = Modifier.weight(1.0f),
-            style = MaterialTheme.typography.bodyLarge,
+            style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurface
         )
 
         Text(
             text = app.size,
             modifier = Modifier.weight(1.0f),
-            style = MaterialTheme.typography.bodyLarge,
+            style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurface
         )
 
@@ -607,30 +599,33 @@ private fun AppListRow(
                     color = statusColor,
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.Medium,
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                    modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
                 )
             }
         }
 
         Row(
             modifier = Modifier.weight(1.7f),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(5.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             RowActionButton(
                 icon = Icons.Default.Info,
                 contentDescription = "应用详情",
+                tint = Color(0xFF5C6BC0),
                 onClick = { onAction(AdbFunctionType.APP_INFO) }
             )
             RowActionButton(
                 icon = Icons.Default.PlayArrow,
                 contentDescription = "启动应用",
+                tint = Color(0xFF22A35A),
                 onClick = { onAction(AdbFunctionType.LAUNCH) }
             )
             RowActionButton(
                 icon = Icons.Default.Stop,
                 contentDescription = "停止应用",
                 enabled = app.isRunning,
+                tint = Color(0xFFEF6C00),
                 onClick = { onAction(AdbFunctionType.FORCE_STOP) }
             )
             AppActionMenu(onAction = onAction)
@@ -643,6 +638,7 @@ private fun RowActionButton(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     contentDescription: String,
     enabled: Boolean = true,
+    tint: Color = MaterialTheme.colorScheme.primary,
     onClick: () -> Unit
 ) {
     OutlinedButton(
@@ -650,9 +646,10 @@ private fun RowActionButton(
         enabled = enabled,
         shape = RoundedCornerShape(10.dp),
         contentPadding = PaddingValues(0.dp),
-        modifier = Modifier.size(34.dp)
+        modifier = Modifier.size(28.dp),
+        border = BorderStroke(1.dp, tint.copy(alpha = if (enabled) 0.3f else 0.1f))
     ) {
-        Icon(icon, contentDescription = contentDescription, modifier = Modifier.size(16.dp))
+        Icon(icon, contentDescription = contentDescription, modifier = Modifier.size(13.dp), tint = tint)
     }
 }
 
@@ -668,7 +665,7 @@ private fun AppActionMenu(
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
             color = MaterialTheme.colorScheme.surface,
             modifier = Modifier
-                .size(width = 36.dp, height = 34.dp)
+                .size(width = 30.dp, height = 28.dp)
                 .clickable { expanded = true }
         ) {
             Box(contentAlignment = Alignment.Center) {
@@ -682,66 +679,107 @@ private fun AppActionMenu(
 
         DropdownMenu(
             expanded = expanded,
-            onDismissRequest = { expanded = false }
+            onDismissRequest = { expanded = false },
+            modifier = Modifier
+                .width(180.dp)
+                .background(
+                    MaterialTheme.colorScheme.surface,
+                    RoundedCornerShape(12.dp)
+                )
+                .border(
+                    BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)),
+                    RoundedCornerShape(12.dp)
+                )
+                .padding(vertical = 4.dp)
         ) {
-            DropdownMenuItem(
-                text = { Text("应用详情") },
-                onClick = {
-                    expanded = false
-                    onAction(AdbFunctionType.APP_INFO)
-                },
-                leadingIcon = { Icon(Icons.Default.Info, contentDescription = null) }
+            AppActionMenuItem(
+                icon = Icons.Default.Info,
+                text = "应用详情",
+                iconTint = Color(0xFF5C6BC0)
+            ) {
+                expanded = false
+                onAction(AdbFunctionType.APP_INFO)
+            }
+            AppActionMenuItem(
+                icon = Icons.Default.PlayArrow,
+                text = "启动应用",
+                iconTint = Color(0xFF22A35A)
+            ) {
+                expanded = false
+                onAction(AdbFunctionType.LAUNCH)
+            }
+            AppActionMenuItem(
+                icon = Icons.Default.Stop,
+                text = "停止应用",
+                iconTint = Color(0xFFEF6C00)
+            ) {
+                expanded = false
+                onAction(AdbFunctionType.FORCE_STOP)
+            }
+            AppActionMenuItem(
+                icon = Icons.Default.DeleteSweep,
+                text = "清除数据",
+                iconTint = Color(0xFF1565C0)
+            ) {
+                expanded = false
+                onAction(AdbFunctionType.CLEAR_DATA)
+            }
+            HorizontalDivider(
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f)
             )
-            DropdownMenuItem(
-                text = { Text("启动应用") },
-                onClick = {
-                    expanded = false
-                    onAction(AdbFunctionType.LAUNCH)
-                },
-                leadingIcon = { Icon(Icons.Default.PlayArrow, contentDescription = null) }
-            )
-            DropdownMenuItem(
-                text = { Text("停止应用") },
-                onClick = {
-                    expanded = false
-                    onAction(AdbFunctionType.FORCE_STOP)
-                },
-                leadingIcon = { Icon(Icons.Default.Stop, contentDescription = null) }
-            )
-            DropdownMenuItem(
-                text = { Text("强制停止") },
-                onClick = {
-                    expanded = false
-                    onAction(AdbFunctionType.FORCE_STOP)
-                },
-                leadingIcon = { Icon(Icons.Default.Cancel, contentDescription = null) }
-            )
-            DropdownMenuItem(
-                text = { Text("清除数据") },
-                onClick = {
-                    expanded = false
-                    onAction(AdbFunctionType.CLEAR_DATA)
-                },
-                leadingIcon = { Icon(Icons.Default.DeleteSweep, contentDescription = null) }
-            )
-            DropdownMenuItem(
-                text = { Text("卸载应用") },
-                onClick = {
-                    expanded = false
-                    onAction(AdbFunctionType.UNINSTALL)
-                },
-                leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null, tint = Color(0xFFE53935)) }
-            )
-            DropdownMenuItem(
-                text = { Text("导出 APK") },
-                onClick = {
-                    expanded = false
-                    onAction(AdbFunctionType.EXPORT_APK)
-                },
-                leadingIcon = { Icon(Icons.Default.Download, contentDescription = null) }
-            )
+            AppActionMenuItem(
+                icon = Icons.Default.Delete,
+                text = "卸载应用",
+                iconTint = Color(0xFFE53935),
+                textColor = Color(0xFFE53935)
+            ) {
+                expanded = false
+                onAction(AdbFunctionType.UNINSTALL)
+            }
+            AppActionMenuItem(
+                icon = Icons.Default.Download,
+                text = "导出 APK",
+                iconTint = Color(0xFF00897B)
+            ) {
+                expanded = false
+                onAction(AdbFunctionType.EXPORT_APK)
+            }
         }
     }
+}
+
+@Composable
+private fun AppActionMenuItem(
+    icon: ImageVector,
+    text: String,
+    iconTint: Color,
+    textColor: Color = MaterialTheme.colorScheme.onSurface,
+    onClick: () -> Unit
+) {
+    DropdownMenuItem(
+        text = {
+            Text(
+                text,
+                style = MaterialTheme.typography.bodyMedium,
+                color = textColor,
+                fontWeight = FontWeight.Medium
+            )
+        },
+        onClick = onClick,
+        leadingIcon = {
+            Surface(
+                shape = RoundedCornerShape(8.dp),
+                color = iconTint.copy(alpha = 0.1f),
+                modifier = Modifier.size(28.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(16.dp))
+                }
+            }
+        },
+        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+    )
 }
 
 @Composable
@@ -756,18 +794,18 @@ private fun AppGridCard(
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f))
     ) {
         Column(
-            modifier = Modifier.fillMaxWidth().padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+            modifier = Modifier.fillMaxWidth().padding(11.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                AppAvatar(app = app, icon = icon, size = 48)
+                AppAvatar(app = app, icon = icon, size = 42)
                 Box(
                     modifier = Modifier
-                        .size(10.dp)
+                        .size(8.dp)
                         .background(
                             if (app.isRunning) Color(0xFF22A35A) else MaterialTheme.colorScheme.outlineVariant,
                             CircleShape
@@ -777,7 +815,7 @@ private fun AppGridCard(
 
             Text(
                 text = app.appName,
-                style = MaterialTheme.typography.titleMedium,
+                style = MaterialTheme.typography.bodyLarge,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
@@ -793,21 +831,24 @@ private fun AppGridCard(
                 )
             }
 
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 RowActionButton(
                     icon = Icons.Default.Info,
                     contentDescription = "应用详情",
+                    tint = Color(0xFF5C6BC0),
                     onClick = { onAction(AdbFunctionType.APP_INFO) }
                 )
                 RowActionButton(
                     icon = Icons.Default.PlayArrow,
                     contentDescription = "启动应用",
+                    tint = Color(0xFF22A35A),
                     onClick = { onAction(AdbFunctionType.LAUNCH) }
                 )
                 RowActionButton(
                     icon = Icons.Default.Stop,
                     contentDescription = "停止应用",
                     enabled = app.isRunning,
+                    tint = Color(0xFFEF6C00),
                     onClick = { onAction(AdbFunctionType.FORCE_STOP) }
                 )
                 AppActionMenu(onAction = onAction)
@@ -855,72 +896,87 @@ private fun AppDetailPage(
         DetailTab("签名信息", Icons.Default.VerifiedUser)
     )
 
-    Column(
-        modifier = modifier.verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(18.dp)
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            IconButton(onClick = onBack, modifier = Modifier.size(34.dp)) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回", tint = MaterialTheme.colorScheme.onSurface)
-            }
-            Text(
-                text = "应用管理",
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Text("/", color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(
-                text = "应用详情",
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-                fontWeight = FontWeight.SemiBold
-            )
-        }
+    val scrollState = rememberScrollState()
 
-        DetailHeaderCard(
-            appInfo = appInfo,
-            icon = icon,
-            onAction = onAction
-        )
-
-        val tabListState = rememberLazyListState()
+    Box(modifier = modifier) {
         Column(
-            modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(scrollState)
+                .padding(end = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(18.dp)
         ) {
-            LazyRow(
-                state = tabListState,
-                horizontalArrangement = Arrangement.spacedBy(18.dp),
+            Row(
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth()
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                items(detailTabs) { tab ->
-                    DetailTabItem(
-                        tab = tab,
-                        selected = selectedTab == tab.title,
-                        onClick = { selectedTab = tab.title }
-                    )
+                IconButton(onClick = onBack, modifier = Modifier.size(34.dp)) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回", tint = MaterialTheme.colorScheme.onSurface)
                 }
+                Text(
+                    text = "应用管理",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text("/", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(
+                    text = "应用详情",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.SemiBold
+                )
             }
-            HorizontalScrollbar(
-                adapter = rememberScrollbarAdapter(tabListState),
-                modifier = Modifier.fillMaxWidth().height(8.dp)
+
+            DetailHeaderCard(
+                appInfo = appInfo,
+                icon = icon,
+                onAction = onAction
             )
+
+            val tabListState = rememberLazyListState()
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                LazyRow(
+                    state = tabListState,
+                    horizontalArrangement = Arrangement.spacedBy(18.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    items(detailTabs) { tab ->
+                        DetailTabItem(
+                            tab = tab,
+                            selected = selectedTab == tab.title,
+                            onClick = { selectedTab = tab.title }
+                        )
+                    }
+                }
+                HorizontalScrollbar(
+                    adapter = rememberScrollbarAdapter(tabListState),
+                    modifier = Modifier.fillMaxWidth().height(8.dp)
+                )
+            }
+
+            when (selectedTab) {
+                "应用信息" -> AppInfoDetailContent(appInfo)
+                "权限信息" -> PermissionDetailContent(appInfo)
+                "活动（Activity）" -> ActivityDetailContent(appInfo)
+                "服务（Service）" -> ServiceDetailContent(appInfo)
+                "广播接收器" -> ReceiverDetailContent(appInfo)
+                "内容提供者" -> ProviderDetailContent(appInfo)
+                "签名信息" -> SignatureDetailContent(appInfo)
+                else -> DetailPlaceholder(selectedTab)
+            }
         }
 
-        when (selectedTab) {
-            "应用信息" -> AppInfoDetailContent(appInfo)
-            "权限信息" -> PermissionDetailContent(appInfo)
-            "活动（Activity）" -> ActivityDetailContent(appInfo)
-            "服务（Service）" -> ServiceDetailContent(appInfo)
-            "广播接收器" -> ReceiverDetailContent(appInfo)
-            "内容提供者" -> ProviderDetailContent(appInfo)
-            "签名信息" -> SignatureDetailContent(appInfo)
-            else -> DetailPlaceholder(selectedTab)
-        }
+        VerticalScrollbar(
+            adapter = rememberScrollbarAdapter(scrollState),
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .fillMaxHeight()
+                .width(8.dp)
+        )
     }
 }
 
@@ -1013,13 +1069,15 @@ private fun DetailHeaderRow(
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
-        Text(
-            text = value.ifBlank { "-" },
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurface,
-            maxLines = maxLines,
-            overflow = TextOverflow.Ellipsis
-        )
+        SelectionContainer {
+            SelectableValueText(
+                text = value.ifBlank { "-" },
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = maxLines,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
     }
 }
 
@@ -1058,6 +1116,25 @@ private fun HeaderStorageUsageCard(
                     StorageLegend(Color(0xFF1F6BFF), "应用大小", appInfo.appSize)
                     StorageLegend(Color(0xFF38C989), "应用数据", appInfo.dataSize)
                     StorageLegend(Color(0xFFFF8A1F), "缓存数据", appInfo.cacheSize)
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "总计",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = appInfo.totalSize,
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
                 }
             }
         }
@@ -1073,38 +1150,33 @@ private fun DetailActionsPanel(
         val icon: ImageVector,
         val text: String,
         val tint: Color,
+        val bgColor: Color,
         val enabled: Boolean = true,
         val actionType: AdbFunctionType
     )
 
     val actions = listOf(
-        HeaderAction(Icons.Default.PlayArrow, "启动", MaterialTheme.colorScheme.primary, true, AdbFunctionType.LAUNCH),
-        HeaderAction(Icons.Default.Stop, "停止", MaterialTheme.colorScheme.onSurface, appInfo.isRunning, AdbFunctionType.FORCE_STOP),
-        HeaderAction(Icons.Default.DeleteSweep, "清数据", MaterialTheme.colorScheme.primary, true, AdbFunctionType.CLEAR_DATA),
-        HeaderAction(Icons.Default.Delete, "卸载", Color(0xFFE53935), true, AdbFunctionType.UNINSTALL),
-        HeaderAction(Icons.Default.Download, "导出 APK", MaterialTheme.colorScheme.primary, true, AdbFunctionType.EXPORT_APK),
-        HeaderAction(Icons.Default.Refresh, "刷新详情", MaterialTheme.colorScheme.onSurfaceVariant, true, AdbFunctionType.APP_INFO)
+        HeaderAction(Icons.Default.PlayArrow, "启动", Color.White, Color(0xFF22A35A), true, AdbFunctionType.LAUNCH),
+        HeaderAction(Icons.Default.Stop, "停止", Color.White, Color(0xFFEF6C00), appInfo.isRunning, AdbFunctionType.FORCE_STOP),
+        HeaderAction(Icons.Default.DeleteSweep, "清除数据", Color.White, Color(0xFF1565C0), true, AdbFunctionType.CLEAR_DATA),
+        HeaderAction(Icons.Default.Delete, "卸载", Color.White, Color(0xFFE53935), true, AdbFunctionType.UNINSTALL),
+        HeaderAction(Icons.Default.Download, "导出 APK", Color.White, Color(0xFF00897B), true, AdbFunctionType.EXPORT_APK),
+        HeaderAction(Icons.Default.Refresh, "刷新", Color.White, Color(0xFF5C6BC0), true, AdbFunctionType.APP_INFO)
     )
 
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        actions.chunked(3).forEach { rowActions ->
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                rowActions.forEach { action ->
-                    DetailActionButton(
-                        icon = action.icon,
-                        text = action.text,
-                        tint = action.tint,
-                        enabled = action.enabled,
-                        modifier = Modifier.weight(1f)
-                    ) { onAction(action.actionType) }
-                }
-                repeat(3 - rowActions.size) {
-                    Spacer(modifier = Modifier.weight(1f))
-                }
-            }
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        actions.forEach { action ->
+            DetailActionButton(
+                icon = action.icon,
+                text = action.text,
+                tint = action.tint,
+                bgColor = action.bgColor,
+                enabled = action.enabled,
+                modifier = Modifier.weight(1f)
+            ) { onAction(action.actionType) }
         }
     }
 }
@@ -1131,21 +1203,38 @@ private fun DetailActionButton(
     icon: ImageVector,
     text: String,
     tint: Color,
+    bgColor: Color = MaterialTheme.colorScheme.surface,
     enabled: Boolean = true,
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
-    OutlinedButton(
+    Surface(
         onClick = onClick,
         enabled = enabled,
+        modifier = modifier.height(42.dp),
         shape = RoundedCornerShape(10.dp),
-        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
-        modifier = modifier.height(40.dp),
-        border = BorderStroke(1.dp, tint.copy(alpha = if (enabled) 0.35f else 0.12f))
+        color = if (enabled) bgColor else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+        border = BorderStroke(1.dp, if (enabled) bgColor else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f))
     ) {
-        Icon(icon, contentDescription = text, tint = tint, modifier = Modifier.size(18.dp))
-        Spacer(Modifier.width(7.dp))
-        Text(text, color = tint, style = MaterialTheme.typography.labelLarge)
+        Row(
+            modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                icon,
+                contentDescription = text,
+                tint = if (enabled) tint else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                modifier = Modifier.size(17.dp)
+            )
+            Spacer(Modifier.width(6.dp))
+            Text(
+                text,
+                color = if (enabled) tint else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold
+            )
+        }
     }
 }
 
@@ -1192,7 +1281,6 @@ private fun AppInfoDetailContent(appInfo: AppInfoData) {
         if (maxWidth < 980.dp) {
             Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 BasicInfoCard(appInfo)
-                StorageInfoCard(appInfo)
                 ProcessInfoCard(appInfo)
                 PermissionSummaryCard(appInfo)
                 OperationLogCard(appInfo)
@@ -1201,7 +1289,6 @@ private fun AppInfoDetailContent(appInfo: AppInfoData) {
             Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                     BasicInfoCard(appInfo, Modifier.weight(1.05f))
-                    StorageInfoCard(appInfo, Modifier.weight(1f))
                     ProcessInfoCard(appInfo, Modifier.weight(1f))
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -1306,13 +1393,15 @@ private fun DetailInfoGridCell(
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            Text(
-                text = value.ifBlank { "-" },
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis
-            )
+            SelectionContainer {
+                SelectableValueText(
+                    text = value.ifBlank { "-" },
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
         }
     }
 }
@@ -1346,6 +1435,11 @@ private fun StorageRing(
     size: Dp = 126.dp,
     innerSize: Dp = 92.dp
 ) {
+    val compact = size <= 92.dp
+    val normalized = total.takeIf { it.isNotBlank() && it != "-" } ?: "-"
+    val valueText = normalized.substringBefore(" ").ifBlank { normalized }
+    val unitText = normalized.substringAfter(" ", "")
+
     Box(
         modifier = Modifier
             .size(size)
@@ -1360,18 +1454,30 @@ private fun StorageRing(
                 .background(MaterialTheme.colorScheme.surface),
             contentAlignment = Alignment.Center
         ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = if (compact) 3.dp else 6.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
                 Text(
-                    text = total.takeIf { it != "-" }?.substringBefore(" ") ?: "-",
-                    style = MaterialTheme.typography.headlineSmall,
+                    text = valueText,
+                    style = if (compact) MaterialTheme.typography.titleSmall else MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
-                Text(
-                    text = total.takeIf { it.contains(" ") }?.substringAfter(" ") ?: "",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                if (unitText.isNotBlank()) {
+                    Text(
+                        text = unitText,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
             }
         }
     }
@@ -1508,19 +1614,43 @@ private fun DetailInfoRow(label: String, value: String) {
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
-        Text(
-            text = value.ifBlank { "-" },
-            modifier = Modifier.weight(1f),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurface,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis
-        )
+        SelectionContainer(modifier = Modifier.weight(1f)) {
+            SelectableValueText(
+                text = value.ifBlank { "-" },
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
     }
 }
 
 @Composable
 private fun PermissionDetailContent(appInfo: AppInfoData) {
+    var selectedFilter by remember { mutableStateOf("全部") }
+
+    val dangerousKeywords = listOf(
+        "CAMERA", "LOCATION", "RECORD_AUDIO", "CONTACTS", "SMS", "PHONE",
+        "CALENDAR", "BODY_SENSORS", "STORAGE", "BLUETOOTH"
+    )
+    val privacyKeywords = listOf("CAMERA", "LOCATION", "RECORD_AUDIO", "CONTACTS", "SMS", "PHONE")
+
+    val filteredPermissions = remember(appInfo.permissionDetails, selectedFilter) {
+        when (selectedFilter) {
+            "危险权限" -> appInfo.permissionDetails.filter { permission ->
+                dangerousKeywords.any { keyword -> permission.contains(keyword) }
+            }
+            "隐私权限" -> appInfo.permissionDetails.filter { permission ->
+                privacyKeywords.any { keyword -> permission.contains(keyword) }
+            }
+            "普通权限" -> appInfo.permissionDetails.filter { permission ->
+                dangerousKeywords.none { keyword -> permission.contains(keyword) }
+            }
+            else -> appInfo.permissionDetails
+        }
+    }
+
     DetailSectionCard(title = "权限信息", modifier = Modifier.fillMaxWidth()) {
         Text(
             text = "已解析到 ${appInfo.totalPermissionCount} 项权限，其中 ${appInfo.dangerousPermissionCount} 项可能涉及敏感能力。",
@@ -1532,10 +1662,37 @@ private fun PermissionDetailContent(appInfo: AppInfoData) {
             PermissionTile("隐私权限", appInfo.privacyPermissionCount, Icons.Default.Lock, Color(0xFF1F6BFF), Modifier.width(132.dp))
             PermissionTile("普通权限", appInfo.normalPermissionCount, Icons.Default.Info, Color(0xFF0EA5E9), Modifier.width(132.dp))
         }
+
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            listOf("全部", "危险权限", "隐私权限", "普通权限").forEach { filter ->
+                val selected = selectedFilter == filter
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                    border = BorderStroke(
+                        1.dp,
+                        if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.3f) else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
+                    ),
+                    modifier = Modifier.clickable { selectedFilter = filter }
+                ) {
+                    Text(
+                        text = filter,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium
+                    )
+                }
+            }
+        }
+
         DetailItemList(
-            title = "权限明细",
-            items = appInfo.permissionDetails,
-            emptyText = "当前未解析到权限明细"
+            title = "权限明细 (${filteredPermissions.size})",
+            items = filteredPermissions,
+            emptyText = "当前筛选条件下无权限"
         )
     }
 }
@@ -1621,26 +1778,62 @@ private fun DetailItemList(
             )
         }
     } else {
-        Column(
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.fillMaxWidth()
+        Surface(
+            shape = RoundedCornerShape(12.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f))
         ) {
-            items.forEachIndexed { index, item ->
-                Surface(
-                    shape = RoundedCornerShape(10.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.18f))
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(14.dp)
+            ) {
+                FlowRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    Text(
-                        text = "${index + 1}. $item",
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
+                    items.forEach { item ->
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = MaterialTheme.colorScheme.surface,
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f))
+                        ) {
+                            SelectionContainer {
+                                SelectableValueText(
+                                    text = item,
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }
     }
+}
+
+@Composable
+private fun SelectableValueText(
+    text: String,
+    style: androidx.compose.ui.text.TextStyle,
+    color: Color,
+    maxLines: Int,
+    overflow: TextOverflow,
+    modifier: Modifier = Modifier
+) {
+    Text(
+        text = text,
+        modifier = modifier,
+        style = style,
+        color = color,
+        maxLines = maxLines,
+        overflow = overflow
+    )
 }
 
 @Composable

@@ -1,5 +1,7 @@
 package com.ludoven.adbtool.pages
 
+import com.ludoven.adbtool.ui.mac.*
+
 import adbtool_desktop.composeapp.generated.resources.Res
 import adbtool_desktop.composeapp.generated.resources.confirm
 import adbtool_desktop.composeapp.generated.resources.tip_title
@@ -53,17 +55,17 @@ import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.Wifi
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import com.ludoven.adbtool.ui.mac.AlertDialog
+import com.ludoven.adbtool.ui.mac.Card
+import com.ludoven.adbtool.ui.mac.CardDefaults
+import com.ludoven.adbtool.ui.mac.Icon
+import com.ludoven.adbtool.ui.mac.IconButton
+import com.ludoven.adbtool.ui.mac.MaterialTheme
+import com.ludoven.adbtool.ui.mac.OutlinedTextField
+import com.ludoven.adbtool.ui.mac.OutlinedTextFieldDefaults
+import com.ludoven.adbtool.ui.mac.Scaffold
+import com.ludoven.adbtool.ui.mac.Text
+import com.ludoven.adbtool.ui.mac.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -624,7 +626,8 @@ private fun CategoryTabs(
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)
         ),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        border = BorderStroke(0.dp, Color.Transparent),
         modifier = Modifier.fillMaxWidth()
     ) {
         FlowRow(
@@ -776,13 +779,13 @@ private fun CommandListItem(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null
             ) { onSelect() }
-            .padding(horizontal = 10.dp, vertical = 8.dp),
+            .padding(horizontal = 8.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
+        horizontalArrangement = Arrangement.spacedBy(7.dp)
     ) {
         Box(
             modifier = Modifier
-                .size(32.dp)
+                .size(28.dp)
                 .background(
                     color = accent.copy(alpha = 0.14f),
                     shape = RoundedCornerShape(8.dp)
@@ -793,7 +796,7 @@ private fun CommandListItem(
                 imageVector = categoryIcon,
                 contentDescription = command.title,
                 tint = accent,
-                modifier = Modifier.size(20.dp)
+                modifier = Modifier.size(17.dp)
             )
         }
 
@@ -803,7 +806,7 @@ private fun CommandListItem(
         ) {
             Text(
                 text = displayCommandTitle(command),
-                style = MaterialTheme.typography.bodyLarge,
+                style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurface,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
@@ -901,7 +904,8 @@ private fun CommandDetailPanel(
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.55f)
                 ),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+                border = BorderStroke(0.dp, Color.Transparent)
             ) {
                 Column(
                     modifier = Modifier
@@ -949,11 +953,6 @@ private fun CommandDetailPanel(
                             .fillMaxWidth()
                             .background(
                                 MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                                RoundedCornerShape(10.dp)
-                            )
-                            .border(
-                                1.dp,
-                                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f),
                                 RoundedCornerShape(10.dp)
                             )
                             .clickable(
@@ -1019,7 +1018,8 @@ private fun CommandDetailPanel(
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)
                 ),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)),
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+                border = BorderStroke(0.dp, Color.Transparent),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(

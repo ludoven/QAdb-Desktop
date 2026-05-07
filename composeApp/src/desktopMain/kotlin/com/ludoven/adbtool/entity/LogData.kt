@@ -20,7 +20,7 @@ enum class LogLevel(val displayName: String) {
 
 data class LogFilter(
     val level: LogLevel? = null,
-    val keyword: String = "",
+    val packageName: String = "",
     val tag: String = "",
     val startTime: Long? = null,
     val endTime: Long? = null

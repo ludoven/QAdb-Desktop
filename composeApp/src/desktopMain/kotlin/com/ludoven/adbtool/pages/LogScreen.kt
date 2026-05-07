@@ -1,35 +1,37 @@
 package com.ludoven.adbtool.pages
 
 import adbtool_desktop.composeapp.generated.resources.*
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.VerticalScrollbar
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
+import com.ludoven.adbtool.ui.mac.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.ludoven.adbtool.entity.LogEntry
 import com.ludoven.adbtool.entity.LogFilter
 import com.ludoven.adbtool.entity.LogLevel
 import com.ludoven.adbtool.viewmodel.LogViewModel
-import com.ludoven.adbtool.widget.GlassCard
+import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
 import java.awt.FileDialog
 import java.awt.Frame
@@ -37,12 +39,10 @@ import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LogScreen(
     viewModel: LogViewModel,
-    selectedDevice: String?,
-    onDeviceSelect: () -> Unit
+    selectedDevice: String?
 ) {
     val logs by viewModel.logs.collectAsState()
     val filter by viewModel.filter.collectAsState()
@@ -51,16 +51,17 @@ fun LogScreen(
     val errorMessage by viewModel.errorMessage.collectAsState()
 
     val listState = rememberLazyListState()
+    val coroutineScope = rememberCoroutineScope()
     val dateFormat = remember { SimpleDateFormat("HH:mm:ss.SSS", Locale.getDefault()) }
+    var autoWrap by remember { mutableStateOf(true) }
+    var showLevelMenu by remember { mutableStateOf(false) }
 
     val filteredLogs = remember(logs, filter) {
         viewModel.getFilteredLogs()
     }
 
-    var showFilterDialog by remember { mutableStateOf(false) }
-
-    LaunchedEffect(filteredLogs.size) {
-        if (filteredLogs.isNotEmpty()) {
+    LaunchedEffect(filteredLogs.size, isCapturing) {
+        if (isCapturing && filteredLogs.isNotEmpty()) {
             listState.animateScrollToItem(filteredLogs.size - 1)
         }
     }
@@ -89,101 +90,146 @@ fun LogScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                // Filter button
-                IconButton(onClick = { showFilterDialog = true }) {
-                    Icon(Icons.Default.FilterList, "Filter")
-                }
-
-                // Clear button
-                IconButton(onClick = { viewModel.clearLogs() }) {
-                    Icon(Icons.Default.DeleteSweep, "Clear")
-                }
-
-                // Export button
-                IconButton(
-                    onClick = {
-                        val dialog = FileDialog(null as Frame?, "Export Logs", FileDialog.SAVE)
-                        dialog.isVisible = true
-                        val dir = dialog.directory
-                        val filename = dialog.file
-                        if (dir != null && filename != null) {
-                            viewModel.exportLogs(File(dir, filename))
-                        }
-                    }
-                ) {
-                    Icon(Icons.Default.FileDownload, "Export")
-                }
-            }
         }
 
-        // Filter summary
-        if (filter.level != null || filter.keyword.isNotEmpty() || filter.tag.isNotEmpty()) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f))
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    Icons.Default.FilterList,
-                    contentDescription = null,
-                    modifier = Modifier.size(16.dp),
-                    tint = MaterialTheme.colorScheme.primary
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = buildString {
-                        append("Filters: ")
-                        val filters = mutableListOf<String>()
-                        filter.level?.let { filters.add("Level: ${it.displayName}") }
-                        if (filter.keyword.isNotEmpty()) filters.add("Keyword: ${filter.keyword}")
-                        if (filter.tag.isNotEmpty()) filters.add("Tag: ${filter.tag}")
-                        append(filters.joinToString(", "))
-                    },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer
-                )
-                Spacer(modifier = Modifier.weight(1f))
-                TextButton(onClick = { viewModel.updateFilter(LogFilter()) }) {
-                    Text("Clear Filters")
-                }
-            }
-        }
-
-        // Control bar
+        // Filter and actions in one row
         Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Device selection
-            OutlinedCard(
-                modifier = Modifier.weight(1f),
-                onClick = onDeviceSelect
+            Box(
+                modifier = Modifier
+                    .height(36.dp)
+                    .width(148.dp)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f))
+                    .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.4f), RoundedCornerShape(6.dp))
+                    .clickable { showLevelMenu = true }
+                    .padding(horizontal = 10.dp),
+                contentAlignment = Alignment.CenterStart
             ) {
                 Row(
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(
-                        Icons.Default.PhoneAndroid,
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = selectedDevice ?: stringResource(Res.string.select_device),
-                        style = MaterialTheme.typography.bodyMedium
+                        text = filter.level?.displayName ?: stringResource(Res.string.log_level_all),
+                        style = MaterialTheme.typography.bodySmall,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
+                    Icon(
+                        Icons.Default.ArrowDropDown,
+                        contentDescription = stringResource(Res.string.log_filter_level)
+                    )
+                }
+
+                DropdownMenu(
+                    expanded = showLevelMenu,
+                    onDismissRequest = { showLevelMenu = false }
+                ) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(Res.string.log_level_all)) },
+                        onClick = {
+                            viewModel.updateFilter(filter.copy(level = null))
+                            showLevelMenu = false
+                        }
+                    )
+                    LogLevel.values().forEach { logLevel ->
+                        DropdownMenuItem(
+                            text = { Text(logLevel.displayName) },
+                            onClick = {
+                                viewModel.updateFilter(filter.copy(level = logLevel))
+                                showLevelMenu = false
+                            }
+                        )
+                    }
                 }
             }
 
-            // Start/Stop capture
-            Button(
+            InlineFilterInput(
+                value = filter.packageName,
+                onValueChange = { viewModel.updateFilter(filter.copy(packageName = it)) },
+                placeholder = stringResource(Res.string.log_filter_package),
+                modifier = Modifier.width(196.dp)
+            )
+
+            InlineFilterInput(
+                value = filter.tag,
+                onValueChange = { viewModel.updateFilter(filter.copy(tag = it)) },
+                placeholder = stringResource(Res.string.log_filter_tag),
+                modifier = Modifier.width(176.dp)
+            )
+
+            IconButton(
+                onClick = { viewModel.updateFilter(LogFilter()) },
+                enabled = filter.level != null || filter.packageName.isNotEmpty() || filter.tag.isNotEmpty(),
+                modifier = Modifier.size(36.dp)
+            ) {
+                Icon(
+                    Icons.Default.FilterAltOff,
+                    contentDescription = stringResource(Res.string.log_clear_filter)
+                )
+            }
+
+            IconButton(
+                onClick = {
+                    val dialog = FileDialog(null as Frame?, "Export Logs", FileDialog.SAVE)
+                    dialog.isVisible = true
+                    val dir = dialog.directory
+                    val filename = dialog.file
+                    if (dir != null && filename != null) {
+                        viewModel.exportLogs(File(dir, filename))
+                    }
+                },
+                modifier = Modifier.size(36.dp)
+            ) {
+                Icon(Icons.Default.FileDownload, contentDescription = "Export")
+            }
+
+            IconButton(
+                onClick = { autoWrap = !autoWrap },
+                modifier = Modifier.size(36.dp)
+            ) {
+                Icon(
+                    if (autoWrap) Icons.Default.WrapText else Icons.Default.DoNotDisturbAlt,
+                    contentDescription = stringResource(Res.string.log_auto_wrap)
+                )
+            }
+
+            IconButton(
+                onClick = {
+                    if (filteredLogs.isNotEmpty()) {
+                        coroutineScope.launch {
+                            listState.animateScrollToItem(filteredLogs.size - 1)
+                        }
+                    }
+                },
+                modifier = Modifier.size(36.dp)
+            ) {
+                Icon(
+                    Icons.Default.VerticalAlignBottom,
+                    contentDescription = stringResource(Res.string.log_scroll_bottom)
+                )
+            }
+
+            IconButton(
+                onClick = {
+                    if (selectedDevice != null) {
+                        viewModel.restartCapture(selectedDevice)
+                    }
+                },
+                enabled = selectedDevice != null && !isLoading,
+                modifier = Modifier.size(36.dp)
+            ) {
+                Icon(Icons.Default.Refresh, contentDescription = stringResource(Res.string.log_restart))
+            }
+
+            IconButton(
                 onClick = {
                     if (isCapturing) {
                         viewModel.stopCapture()
@@ -191,19 +237,48 @@ fun LogScreen(
                         viewModel.startCapture(selectedDevice)
                     }
                 },
-                enabled = selectedDevice != null || isCapturing,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = if (isCapturing) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
-                )
+                enabled = (selectedDevice != null || isCapturing) && !isLoading,
+                modifier = Modifier.size(36.dp)
             ) {
                 Icon(
-                    imageVector = if (isCapturing) Icons.Default.Stop else Icons.Default.PlayArrow,
-                    contentDescription = null,
+                    imageVector = if (isCapturing) Icons.Default.Pause else Icons.Default.PlayArrow,
+                    contentDescription = if (isCapturing) {
+                        stringResource(Res.string.log_pause)
+                    } else {
+                        stringResource(Res.string.log_resume)
+                    },
                     modifier = Modifier.size(18.dp)
                 )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(if (isCapturing) stringResource(Res.string.log_stop) else stringResource(Res.string.log_start))
             }
+
+            IconButton(
+                onClick = { viewModel.clearLogs() },
+                modifier = Modifier.size(36.dp)
+            ) {
+                Icon(
+                    Icons.Default.DeleteSweep,
+                    contentDescription = stringResource(Res.string.log_clear),
+                    tint = MaterialTheme.colorScheme.error
+                )
+            }
+        }
+
+        // Active filter summary
+        if (filter.level != null || filter.packageName.isNotEmpty() || filter.tag.isNotEmpty()) {
+            Text(
+                text = buildString {
+                    append("${stringResource(Res.string.log_filter_summary_prefix)} ")
+                    val filters = mutableListOf<String>()
+                    filter.level?.let { filters.add("Level: ${it.displayName}") }
+                    if (filter.packageName.isNotEmpty()) filters.add("Package: ${filter.packageName}")
+                    if (filter.tag.isNotEmpty()) filters.add("Tag: ${filter.tag}")
+                    append(filters.joinToString(", "))
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
         }
 
         // Log count info
@@ -273,7 +348,11 @@ fun LogScreen(
                         contentPadding = PaddingValues(8.dp)
                     ) {
                         items(filteredLogs) { entry ->
-                            LogEntryItem(entry, dateFormat)
+                            LogEntryItem(
+                                entry = entry,
+                                dateFormat = dateFormat,
+                                autoWrap = autoWrap
+                            )
                         }
                     }
 
@@ -293,8 +372,11 @@ fun LogScreen(
         errorMessage?.let { error ->
             Snackbar(
                 action = {
-                    TextButton(onClick = { viewModel.clearError() }) {
-                        Text(stringResource(Res.string.log_dismiss))
+                    IconButton(onClick = { viewModel.clearError() }, modifier = Modifier.size(24.dp)) {
+                        Icon(
+                            Icons.Default.Close,
+                            contentDescription = stringResource(Res.string.log_dismiss)
+                        )
                     }
                 }
             ) {
@@ -302,15 +384,40 @@ fun LogScreen(
             }
         }
     }
+}
 
-    // Filter dialog
-    if (showFilterDialog) {
-        FilterDialog(
-            currentFilter = filter,
-            onDismiss = { showFilterDialog = false },
-            onApply = { newFilter ->
-                viewModel.updateFilter(newFilter)
-                showFilterDialog = false
+@Composable
+private fun InlineFilterInput(
+    value: String,
+    onValueChange: (String) -> Unit,
+    placeholder: String,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .height(36.dp)
+            .clip(RoundedCornerShape(6.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f))
+            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.4f), RoundedCornerShape(6.dp))
+            .padding(horizontal = 10.dp),
+        contentAlignment = Alignment.CenterStart
+    ) {
+        BasicTextField(
+            value = value,
+            onValueChange = onValueChange,
+            singleLine = true,
+            textStyle = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurface),
+            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+            modifier = Modifier.fillMaxWidth(),
+            decorationBox = { innerTextField ->
+                if (value.isEmpty()) {
+                    Text(
+                        text = placeholder,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                innerTextField()
             }
         )
     }
@@ -319,7 +426,8 @@ fun LogScreen(
 @Composable
 private fun LogEntryItem(
     entry: LogEntry,
-    dateFormat: SimpleDateFormat
+    dateFormat: SimpleDateFormat,
+    autoWrap: Boolean
 ) {
     val backgroundColor = when (entry.level) {
         LogLevel.ERROR, LogLevel.FATAL -> MaterialTheme.colorScheme.error.copy(alpha = 0.1f)
@@ -380,75 +488,8 @@ private fun LogEntryItem(
             style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
             color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.weight(1f),
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis
+            maxLines = if (autoWrap) Int.MAX_VALUE else 1,
+            overflow = if (autoWrap) TextOverflow.Clip else TextOverflow.Ellipsis
         )
     }
-}
-
-@Composable
-private fun FilterDialog(
-    currentFilter: LogFilter,
-    onDismiss: () -> Unit,
-    onApply: (LogFilter) -> Unit
-) {
-    var level by remember { mutableStateOf(currentFilter.level) }
-    var keyword by remember { mutableStateOf(currentFilter.keyword) }
-    var tag by remember { mutableStateOf(currentFilter.tag) }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(Res.string.log_filter_title)) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                // Level filter
-                Column {
-                    Text(
-                        text = stringResource(Res.string.log_filter_level),
-                        style = MaterialTheme.typography.labelMedium
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        LogLevel.values().forEach { logLevel ->
-                            FilterChip(
-                                selected = level == logLevel,
-                                onClick = { level = if (level == logLevel) null else logLevel },
-                                label = { Text(logLevel.displayName) }
-                            )
-                        }
-                    }
-                }
-
-                // Keyword filter
-                OutlinedTextField(
-                    value = keyword,
-                    onValueChange = { keyword = it },
-                    label = { Text(stringResource(Res.string.log_filter_keyword)) },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
-                )
-
-                // Tag filter
-                OutlinedTextField(
-                    value = tag,
-                    onValueChange = { tag = it },
-                    label = { Text(stringResource(Res.string.log_filter_tag)) },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
-                )
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = {
-                onApply(LogFilter(level = level, keyword = keyword, tag = tag))
-            }) {
-                Text(stringResource(Res.string.log_apply_filter))
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(Res.string.cancel))
-            }
-        }
-    )
 }

@@ -1,5 +1,7 @@
 package com.ludoven.adbtool.pages
 
+import com.ludoven.adbtool.ui.mac.*
+
 import adbtool_desktop.composeapp.generated.resources.Res
 import adbtool_desktop.composeapp.generated.resources.cancel
 import adbtool_desktop.composeapp.generated.resources.confirm
@@ -91,20 +93,20 @@ import androidx.compose.material.icons.filled.VolumeDown
 import androidx.compose.material.icons.filled.VolumeMute
 import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material.icons.filled.WbSunny
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import com.ludoven.adbtool.ui.mac.AlertDialog
+import com.ludoven.adbtool.ui.mac.Button
+import com.ludoven.adbtool.ui.mac.ButtonDefaults
+import com.ludoven.adbtool.ui.mac.Checkbox
+import com.ludoven.adbtool.ui.mac.HorizontalDivider
+import com.ludoven.adbtool.ui.mac.Icon
+import com.ludoven.adbtool.ui.mac.MaterialTheme
+import com.ludoven.adbtool.ui.mac.OutlinedButton
+import com.ludoven.adbtool.ui.mac.OutlinedTextField
+import com.ludoven.adbtool.ui.mac.OutlinedTextFieldDefaults
+import com.ludoven.adbtool.ui.mac.Surface
+import com.ludoven.adbtool.ui.mac.Switch
+import com.ludoven.adbtool.ui.mac.Text
+import com.ludoven.adbtool.ui.mac.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue

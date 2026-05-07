@@ -1,8 +1,10 @@
 package com.ludoven.adbtool.pages
 
+import com.ludoven.adbtool.ui.mac.*
+
 import androidx.compose.foundation.layout.Column
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import com.ludoven.adbtool.ui.mac.MaterialTheme
+import com.ludoven.adbtool.ui.mac.Text
 import androidx.compose.runtime.Composable
 
 // 示例页面 Composable (需要你实现具体内容)
