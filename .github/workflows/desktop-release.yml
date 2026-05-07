@@ -81,6 +81,9 @@ jobs:
           name: qadb-windows-installers
           path: release-assets/windows
 
+      - name: List release assets
+        run: find release-assets -type f -print
+
       - name: Publish release assets
         uses: softprops/action-gh-release@v2
         with:
@@ -89,5 +92,5 @@ jobs:
           fail_on_unmatched_files: true
           files: |
             release-assets/macos/*.dmg
-            release-assets/windows/*.msi
-            release-assets/windows/*.exe
+            release-assets/windows/msi/*.msi
+            release-assets/windows/exe/*.exe
