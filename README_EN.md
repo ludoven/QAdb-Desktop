@@ -1,74 +1,87 @@
-# QAdb-Desktop
+# QADB 2.0.1
 
 <p align="center">
-  <img src="composeApp/src/desktopMain/composeResources/drawable/ic_logo.png" width="120" alt="QAdb Logo"/>
+  <img src="composeApp/src/desktopMain/composeResources/drawable/ic_logo.png" width="120" alt="QADB Logo"/>
 </p>
 
 <p align="center">
-  🚀 A cross-platform ADB GUI tool based on <b>Jetpack Compose Multiplatform</b><br>
-  Supports <b>Windows</b> and <b>macOS</b>, making ADB operations more intuitive and efficient.
+  A cross-platform ADB GUI tool based on <b>Jetpack Compose Multiplatform</b>, with support for <b>Windows</b> and <b>macOS</b>.
 </p>
 
 <p align="center">
-  <a href="README.md">🇨🇳 中文</a> | <a href="README_EN.md">🇺🇸 English</a>
+  <a href="README.md">中文</a> | <a href="README_EN.md">English</a>
 </p>
 
 ---
 
-## ✨ Key Features
+## Overview
 
-- 🔍 **Device Management**: Quickly identify connected devices with automatic status refresh
-- 📊 **Device Information**: View detailed information (model, system version, status, etc.)
-- 📱 **Common Operations**: Reboot, shutdown, screenshot, screen recording with one click
-- 📦 **App Management**: Install, uninstall, clear data, export APK
-- 🔌 **Plug and Play**: Automatically detect device changes without complex configuration
+QADB wraps common ADB workflows in a desktop GUI for daily debugging, device management, app management, log inspection, and command execution. After connecting an Android device, you can view device details, run common commands, manage installed apps, filter logs, and execute terminal commands from one window.
 
----
+## Features
 
-## 🖥️ Supported Platforms
+- **Device Home**: Detect online devices and show basic device information, connection status, and runtime status.
+- **Common Operations**: Run frequent ADB actions such as reboot, shutdown, screenshot, screen recording, file push, and file pull.
+- **App Management**: View installed apps, install or uninstall apps, clear app data, export APK files, and inspect app details.
+- **Key Events**: Send common Android key events quickly without repeatedly typing commands.
+- **Logcat Viewer**: View and filter Logcat output to help diagnose runtime issues.
+- **Terminal Commands**: Execute ADB commands inside the app while keeping the flexibility of direct command usage.
 
-- ✅ Windows
-- ✅ macOS
+## Interface Preview
 
----
+| Home | Common Operations |
+|------|-------------------|
+| ![Home](home.png) | ![Common Operations](common.png) |
 
-## 📦 Download
+| App List | App Details |
+|----------|-------------|
+| ![App List](applist.png) | ![App Details](appinfo.png) |
 
-Go to [👉 GitHub Releases](https://github.com/ludoven/QAdb-Desktop/releases) to get the latest version:
+| Key Events | Logcat |
+|------------|--------|
+| ![Key Events](keyevent.png) | ![Logcat](logcat.png) |
 
-- 🖥 **Windows**: `QAdb.exe` or `QAdb.msi`
-- 🍎 **macOS**: `QAdb.dmg`
+| Terminal |
+|----------|
+| ![Terminal](terminal.png) |
 
----
+## Quick Start
 
-## 📸 Interface Preview
+1. Install [ADB](https://developer.android.com/tools/adb) and make sure `adb` is available from the command line.
+2. Connect an Android device, enable USB debugging, and authorize the current computer.
+3. Launch QADB, select a device, and run the operation you need.
 
-| Home | Common Operations | App Management |
-|------|-------------------|----------------|
-| ![Home](1.png) | ![Common](2.png) | ![App](3.png) |
+## Download
 
-| App Functions | Settings |
-|---------------|----------|
-| ![App](4.png) | ![set](5.png) |
+Go to [GitHub Releases](https://github.com/ludoven/QAdb-Desktop/releases) to get the latest package.
 
----
+- Windows: `QAdb.exe` / `QAdb.msi`
+- macOS: `QAdb.dmg`
 
-## ⚡ Usage
+## Local Development
 
-1. Install [ADB](https://developer.android.com/tools/adb) and configure environment variables
-2. Open QAdb-Desktop, it will automatically load connected devices
-3. Select a device to perform corresponding operations
+Run the desktop app:
 
----
+```bash
+./gradlew :composeApp:run
+```
 
-## 📮 Feedback & Suggestions
+Run desktop tests:
 
-If you encounter problems during use or have new feature requests:  
-👉 Welcome to submit feedback through [Issues](https://github.com/ludoven/QAdb-Desktop/issues)!
+```bash
+./gradlew :composeApp:desktopTest
+```
 
----
+Package a distribution for the current OS:
 
-## 📌 Disclaimer
+```bash
+./gradlew :composeApp:packageDistributionForCurrentOS
+```
 
-This project is only a **GUI wrapper tool for ADB** and does not include or modify ADB itself.  
-Running depends on the system's installed `adb`.
+## Feedback
+
+Please submit bug reports or feature requests through [Issues](https://github.com/ludoven/QAdb-Desktop/issues).
+
+## Disclaimer
+
+This project only provides a GUI wrapper for ADB. It does not include or modify ADB itself. Runtime usage depends on the `adb` installed in the system environment.

@@ -1,74 +1,87 @@
-# QAdb-Desktop
+# QADB 2.0.1
 
 <p align="center">
-  <img src="composeApp/src/desktopMain/composeResources/drawable/ic_logo.png" width="120" alt="QAdb Logo"/>
+  <img src="composeApp/src/desktopMain/composeResources/drawable/ic_logo.png" width="120" alt="QADB Logo"/>
 </p>
 
 <p align="center">
-  🚀 一款基于 <b>Jetpack Compose Multiplatform</b> 的跨平台 ADB 图形化工具  
-  支持 <b>Windows</b> 与 <b>macOS</b>，让 ADB 操作更直观、更高效。
+  基于 <b>Jetpack Compose Multiplatform</b> 的跨平台 ADB 图形化工具，支持 <b>Windows</b> 与 <b>macOS</b>。
 </p>
 
 <p align="center">
-  <a href="README.md">🇨🇳 中文</a> | <a href="README_EN.md">🇺🇸 English</a>
+  <a href="README.md">中文</a> | <a href="README_EN.md">English</a>
 </p>
 
 ---
 
-## ✨ 功能亮点
+## 项目简介
 
-- 🔍 **设备管理**：快速识别已连接的设备，自动刷新状态
-- 📊 **设备信息**：查看详细信息（型号、系统版本、状态等）
-- 📱 **常用操作**：重启、关机、截屏、录屏等一键完成
-- 📦 **应用管理**：安装、卸载、清除数据、导出 APK
-- 🔌 **即插即用**：自动检测设备变化，无需复杂配置
+QADB 将常见 ADB 操作封装为桌面端图形界面，面向日常调试、设备管理、应用管理、日志排查和命令执行场景。连接 Android 设备后，可以在一个窗口内完成设备信息查看、常用命令执行、应用列表管理、日志过滤和终端操作。
 
----
+## 功能概览
 
-## 🖥️ 支持平台
+- **设备首页**：识别在线设备，展示设备基础信息、连接状态和运行状态。
+- **常用操作**：提供重启、关机、截屏、录屏、文件推送/拉取等高频 ADB 操作。
+- **应用管理**：查看应用列表，支持安装、卸载、清理数据、导出 APK 和应用详情查看。
+- **按键事件**：快速发送常见按键事件，减少手动输入命令的重复操作。
+- **日志查看**：查看并过滤 Logcat 日志，辅助定位运行问题。
+- **终端命令**：在应用内执行 ADB 命令，保留可视化工具之外的灵活性。
 
-- ✅ Windows
-- ✅ macOS
+## 界面预览
 
----
+| 首页 | 常用操作 |
+|------|----------|
+| ![首页](home.png) | ![常用操作](common.png) |
 
-## 📦 下载
+| 应用列表 | 应用详情 |
+|----------|----------|
+| ![应用列表](applist.png) | ![应用详情](appinfo.png) |
 
-前往 [👉 GitHub Releases](https://github.com/ludoven/QAdb-Desktop/releases) 获取最新版本：
+| 按键事件 | Logcat |
+|----------|--------|
+| ![按键事件](keyevent.png) | ![Logcat](logcat.png) |
 
-- 🖥 **Windows**：`QAdb.exe` 或 `QAdb.msi`
-- 🍎 **macOS**：`QAdb.dmg`
+| 终端 |
+|------|
+| ![终端](terminal.png) |
 
----
+## 快速开始
 
-## 📸 界面预览
+1. 安装 [ADB](https://developer.android.com/tools/adb)，并确保命令行可以执行 `adb`。
+2. 连接 Android 设备，开启 USB 调试并授权当前电脑。
+3. 启动 QADB，选择设备后执行对应操作。
 
-| 首页 | 常用操作 | 应用管理 |
-|------|----------|----------|
-| ![Home](1.png) | ![Common](2.png) | ![App](3.png) |
+## 下载发布版
 
-| 应用功能 | 设置 |
-|----------|------|
-| ![App](4.png) | ![set](5.png) |
+请前往 [GitHub Releases](https://github.com/ludoven/QAdb-Desktop/releases) 获取最新安装包。
 
----
+- Windows：`QAdb.exe` / `QAdb.msi`
+- macOS：`QAdb.dmg`
 
-## ⚡ 使用方法
+## 本地开发
 
-1. 安装 [ADB](https://developer.android.com/tools/adb) 并配置环境变量
-2. 打开 QAdb-Desktop，自动加载已连接设备
-3. 选中设备后即可进行相应操作
+运行桌面应用：
 
----
+```bash
+./gradlew :composeApp:run
+```
 
-## 📮 反馈与建议
+运行桌面测试：
 
-如果你在使用过程中遇到问题，或有新功能需求：  
-👉 欢迎通过 [Issues](https://github.com/ludoven/QAdb-Desktop/issues) 提交反馈！
+```bash
+./gradlew :composeApp:desktopTest
+```
 
----
+打包当前系统发行版：
 
-## 📌 声明
+```bash
+./gradlew :composeApp:packageDistributionForCurrentOS
+```
 
-本项目仅作为 **ADB 的图形化封装工具**，不包含或修改 ADB 本身。  
-运行依赖系统已安装的 `adb`。
+## 反馈
+
+问题反馈或功能建议请提交到 [Issues](https://github.com/ludoven/QAdb-Desktop/issues)。
+
+## 声明
+
+本项目仅提供 ADB 图形化封装能力，不包含或修改 ADB 本体。运行依赖系统环境中的 `adb`。
