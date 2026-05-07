@@ -6,6 +6,9 @@ on:
     tags:
       - "v*"
 
+permissions:
+  contents: write
+
 jobs:
   build-macos:
     runs-on: macos-latest
@@ -58,3 +61,33 @@ jobs:
             composeApp/build/compose/binaries/main-release/msi/*.msi
             composeApp/build/compose/binaries/main-release/exe/*.exe
           if-no-files-found: error
+
+  publish-release:
+    needs:
+      - build-macos
+      - build-windows
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - name: Download macOS artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: qadb-macos-dmg
+          path: release-assets/macos
+
+      - name: Download Windows artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: qadb-windows-installers
+          path: release-assets/windows
+
+      - name: Publish release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: |
+            release-assets/macos/*.dmg
+            release-assets/windows/*.msi
+            release-assets/windows/*.exe
