@@ -1,4 +1,4 @@
-<h1 align="center">QADB-Desktop</h1>
+<h1 align="center">QADB</h1>
 
 <p align="center">
   <b>一款开源、跨平台、现代化的 ADB 桌面调试工具</b>
@@ -15,17 +15,17 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/github/stars/ludoven/QADB-Desktop?style=flat-square" alt="GitHub Stars" />
-  <img src="https://img.shields.io/github/forks/ludoven/QADB-Desktop?style=flat-square" alt="GitHub Forks" />
-  <img src="https://img.shields.io/github/v/release/ludoven/QADB-Desktop?style=flat-square" alt="GitHub Release" />
-  <img src="https://img.shields.io/github/license/ludoven/QADB-Desktop?style=flat-square" alt="License" />
+  <img src="https://img.shields.io/github/stars/ludoven/QADB?style=flat-square" alt="GitHub Stars" />
+  <img src="https://img.shields.io/github/forks/ludoven/QADB?style=flat-square" alt="GitHub Forks" />
+  <img src="https://img.shields.io/github/v/release/ludoven/QADB?style=flat-square" alt="GitHub Release" />
+  <img src="https://img.shields.io/github/license/ludoven/QADB?style=flat-square" alt="License" />
 </p>
 
 ---
 
 ## 🚀 项目介绍
 
-**QADB-Desktop** 是一款基于 **Jetpack Compose Multiplatform** 开发的跨平台 ADB 图形化工具，支持 **Windows** 和 **macOS**。
+**QADB** 是一款基于 **Jetpack Compose Multiplatform** 开发的跨平台 ADB 图形化工具，支持 **Windows** 和 **macOS**。
 
 它面向 Android 开发者、测试人员、Android TV / 电视盒子调试人员以及经常使用 ADB 命令的高级用户，将常用 ADB 操作封装为直观的可视化界面，帮助你更高效地完成设备调试、应用管理、日志查看、截图录屏、终端执行、按键模拟等操作。
 
@@ -41,7 +41,7 @@ adb shell screencap
 adb shell input keyevent 3
 ```
 
-那么 QADB-Desktop 可以让这些操作变得更简单。
+那么 QADB 可以让这些操作变得更简单。
 
 ---
 
@@ -71,7 +71,7 @@ adb shell input keyevent 3
 
 ## 🎯 适合人群
 
-QADB-Desktop 适合以下用户：
+QADB 适合以下用户：
 
 - Android 开发者
 - Android 测试人员
@@ -117,7 +117,7 @@ QADB-Desktop 适合以下用户：
 
 ### 1. 安装 ADB
 
-QADB-Desktop 依赖系统中的 `adb` 命令。
+QADB 依赖系统中的 `adb` 命令。
 
 你需要先安装 Android Platform Tools：
 
@@ -153,9 +153,9 @@ adb devices
 
 ---
 
-### 3. 启动 QADB-Desktop
+### 3. 启动 QADB
 
-打开 QADB-Desktop 后：
+打开 QADB 后：
 
 1. 选择当前设备
 2. 查看设备状态
@@ -173,7 +173,7 @@ adb devices
 adb connect 192.168.1.100:5555
 ```
 
-连接成功后，设备会出现在 QADB-Desktop 的设备列表中。
+连接成功后，设备会出现在 QADB 的设备列表中。
 
 > 不同设备开启网络 ADB 的方式可能不同，部分设备需要先通过 USB 或系统设置开启无线调试。
 
@@ -242,14 +242,14 @@ adb version
 
 1. 打开「系统设置」
 2. 进入「隐私与安全性」
-3. 找到 QADB-Desktop 的拦截提示
+3. 找到 QADB 的拦截提示
 4. 点击「仍要打开」
 
 ---
 
 ### 4. 是否内置 ADB？
 
-目前 QADB-Desktop 默认依赖系统已安装的 ADB。
+目前 QADB 默认依赖系统已安装的 ADB。
 
 后续可以考虑支持：
 
@@ -304,7 +304,7 @@ Linux 支持可以作为后续计划。如果你有 Linux 打包或适配经验�
 - 补充使用教程
 - 参与 Linux 打包适配
 
-如果你有常用的 ADB 命令，也欢迎提交建议，让 QADB-Desktop 的命令中心更加完善。
+如果你有常用的 ADB 命令，也欢迎提交建议，让 QADB 的命令中心更加完善。
 
 ---
 
@@ -340,10 +340,10 @@ cd QADB
 
 ## ⭐ Star 支持
 
-如果 QADB-Desktop 对你有帮助，欢迎点一个 Star 支持项目。
+如果 QADB 对你有帮助，欢迎点一个 Star 支持项目。
 
 你的 Star 是项目持续更新的重要动力。
 
 <p align="center">
-  <b>QADB-Desktop：让 Android 调试更简单。</b>
+  <b>QADB：让 Android 调试更简单。</b>
 </p>

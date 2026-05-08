@@ -72,7 +72,7 @@ object GitHubUpdateManager {
     suspend fun downloadAndInstall(asset: GitHubAssetResponse): Result<Path> = withContext(Dispatchers.IO) {
         runCatching {
             val tempDir = Files.createTempDirectory("qadb-update-")
-            val sanitizedName = asset.name.ifBlank { "QADB-Desktop-update.bin" }
+            val sanitizedName = asset.name.ifBlank { "QADB-update.bin" }
             val outputPath = tempDir.resolve(sanitizedName)
             downloadFile(asset.downloadUrl, outputPath)
             openInstaller(outputPath.toFile())
@@ -125,7 +125,7 @@ object GitHubUpdateManager {
         connection.connectTimeout = 10_000
         connection.readTimeout = 20_000
         connection.setRequestProperty("Accept", "application/vnd.github+json")
-        connection.setRequestProperty("User-Agent", "QADB-Desktop-Updater")
+        connection.setRequestProperty("User-Agent", "QADB-Updater")
 
         return try {
             val responseCode = connection.responseCode
@@ -146,7 +146,7 @@ object GitHubUpdateManager {
         connection.requestMethod = "GET"
         connection.connectTimeout = 10_000
         connection.readTimeout = 60_000
-        connection.setRequestProperty("User-Agent", "QADB-Desktop-Updater")
+        connection.setRequestProperty("User-Agent", "QADB-Updater")
 
         try {
             val responseCode = connection.responseCode

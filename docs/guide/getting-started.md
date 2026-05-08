@@ -2,7 +2,7 @@
 
 ## 1. 安装 ADB
 
-QADB-Desktop 依赖系统中的 `adb` 命令。你可以通过 Android Studio 安装 Android SDK Platform Tools，也可以单独安装 Platform Tools。
+QADB 依赖系统中的 `adb` 命令。你可以通过 Android Studio 安装 Android SDK Platform Tools，也可以单独安装 Platform Tools。
 
 安装完成后，在终端执行：
 
@@ -29,7 +29,7 @@ adb devices
 
 如果设备列表中出现目标设备，说明连接成功。
 
-## 3. 启动 QADB-Desktop
+## 3. 启动 QADB
 
 打开应用后：
 
@@ -45,7 +45,7 @@ adb devices
 adb connect 192.168.1.100:5555
 ```
 
-连接成功后，设备会出现在 QADB-Desktop 的设备列表中。不同设备开启网络 ADB 的方式可能不同，部分设备需要先通过 USB 或系统设置开启无线调试。
+连接成功后，设备会出现在 QADB 的设备列表中。不同设备开启网络 ADB 的方式可能不同，部分设备需要先通过 USB 或系统设置开启无线调试。
 
 ## 常见问题
 
