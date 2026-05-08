@@ -1,0 +1,105 @@
+:root {
+  --vp-c-brand-1: #2563eb;
+  --vp-c-brand-2: #1d4ed8;
+  --vp-c-brand-3: #60a5fa;
+  --vp-c-sponsor: #0f766e;
+  --vp-home-hero-name-color: transparent;
+  --vp-home-hero-name-background: linear-gradient(120deg, #2563eb 18%, #0f766e 78%);
+  --vp-home-hero-image-background-image:
+    radial-gradient(circle at 55% 45%, rgba(37, 99, 235, 0.24), transparent 34%),
+    radial-gradient(circle at 42% 58%, rgba(15, 118, 110, 0.18), transparent 34%);
+  --vp-home-hero-image-filter: blur(48px);
+}
+
+.dark {
+  --vp-c-brand-1: #93c5fd;
+  --vp-c-brand-2: #60a5fa;
+  --vp-c-brand-3: #2563eb;
+}
+
+.VPHomeHero .image-src {
+  width: min(540px, 92vw);
+  border: 1px solid rgba(148, 163, 184, 0.26);
+  border-radius: 16px;
+  box-shadow: 0 28px 80px rgba(15, 23, 42, 0.18);
+}
+
+.vp-doc h2 {
+  border-top: 0;
+}
+
+.home-section {
+  max-width: 1152px;
+  margin: 0 auto;
+  padding: 42px 24px 6px;
+}
+
+.home-section h2 {
+  margin: 0 0 12px;
+  font-size: 30px;
+  line-height: 1.25;
+  letter-spacing: 0;
+}
+
+.home-section p {
+  max-width: 720px;
+  color: var(--vp-c-text-2);
+  font-size: 16px;
+  line-height: 1.8;
+}
+
+.scenario-grid,
+.module-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 24px;
+}
+
+.scenario-card,
+.module-card {
+  min-height: 156px;
+  padding: 22px;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 8px;
+  background: var(--vp-c-bg-soft);
+}
+
+.scenario-card h3,
+.module-card h3 {
+  margin: 0 0 10px;
+  font-size: 18px;
+}
+
+.scenario-card p,
+.module-card p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.screenshot-strip {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  margin-top: 26px;
+}
+
+.screenshot-strip img {
+  width: 100%;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 10px;
+  box-shadow: 0 16px 42px rgba(15, 23, 42, 0.12);
+}
+
+@media (max-width: 860px) {
+  .scenario-grid,
+  .module-grid,
+  .screenshot-strip {
+    grid-template-columns: 1fr;
+  }
+
+  .home-section {
+    padding-inline: 20px;
+  }
+}

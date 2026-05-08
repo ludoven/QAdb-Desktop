@@ -9,6 +9,9 @@ local.properties
 .vscode/
 .trae/
 .DS_Store
+node_modules/
+docs/.vitepress/cache/
+docs/.vitepress/dist/
 captures
 .externalNativeBuild
 .cxx
