@@ -1,4 +1,4 @@
-# QAdb-Desktop
+<h1 align="center">QAdb-Desktop</h1>
 
 <p align="center">
   <b>一款开源、跨平台、现代化的 ADB 桌面调试工具</b>

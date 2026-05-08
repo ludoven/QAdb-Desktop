@@ -1,4 +1,4 @@
-# QAdb-Desktop
+<h1 align="center">QAdb-Desktop</h1>
 
 <p align="center">
   <b>An open-source, cross-platform, modern ADB desktop debugging tool</b>
