@@ -1,27 +1,27 @@
 import { defineConfig } from 'vitepress'
 
 export default defineConfig({
-  title: 'QAdb-Desktop',
+  title: 'QADB',
   description: '开源、跨平台、现代化的 ADB 桌面调试工具',
   lang: 'zh-CN',
-  base: '/QAdb-Desktop/',
+  base: '/QADB/',
   cleanUrls: true,
   lastUpdated: true,
   head: [
     ['meta', { name: 'theme-color', content: '#2563eb' }],
-    ['meta', { property: 'og:title', content: 'QAdb-Desktop' }],
+    ['meta', { property: 'og:title', content: 'QADB' }],
     ['meta', { property: 'og:description', content: '让常用 ADB 操作变得更直观、更高效。' }],
     ['meta', { property: 'og:type', content: 'website' }]
   ],
   themeConfig: {
     logo: '/logo.svg',
-    siteTitle: 'QAdb',
+    siteTitle: 'QADB',
     nav: [
       { text: '首页', link: '/' },
       { text: '功能', link: '/features' },
       { text: '快速开始', link: '/guide/getting-started' },
       { text: '下载', link: '/download' },
-      { text: 'GitHub', link: 'https://github.com/ludoven/QAdb-Desktop' }
+      { text: 'GitHub', link: 'https://github.com/ludoven/QADB' }
     ],
     sidebar: {
       '/guide/': [
@@ -34,7 +34,7 @@ export default defineConfig({
       ],
       '/': [
         {
-          text: 'QAdb',
+          text: 'QADB',
           items: [
             { text: '功能亮点', link: '/features' },
             { text: '下载', link: '/download' }
@@ -43,7 +43,7 @@ export default defineConfig({
       ]
     },
     socialLinks: [
-      { icon: 'github', link: 'https://github.com/ludoven/QAdb-Desktop' }
+      { icon: 'github', link: 'https://github.com/ludoven/QADB' }
     ],
     search: {
       provider: 'local'
