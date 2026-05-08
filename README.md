@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="./docs/index.md">官网</a> |
+  <a href="https://ludoven.github.io/QAdb-Desktop/">官网</a> |
   <a href="./README.md">中文</a> |
   <a href="./README_EN.md">English</a>
 </p>

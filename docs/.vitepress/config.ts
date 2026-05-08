@@ -4,6 +4,7 @@ export default defineConfig({
   title: 'QAdb-Desktop',
   description: '开源、跨平台、现代化的 ADB 桌面调试工具',
   lang: 'zh-CN',
+  base: '/QAdb-Desktop/',
   cleanUrls: true,
   lastUpdated: true,
   head: [
