@@ -1,87 +1,347 @@
-# QADB 2.0.1
+# QAdb-Desktop
 
 <p align="center">
-  <img src="composeApp/src/desktopMain/composeResources/drawable/ic_logo.png" width="120" alt="QADB Logo"/>
+  <b>一款开源、跨平台、现代化的 ADB 桌面调试工具</b>
 </p>
 
 <p align="center">
-  基于 <b>Jetpack Compose Multiplatform</b> 的跨平台 ADB 图形化工具，支持 <b>Windows</b> 与 <b>macOS</b>。
+  让常用 ADB 操作变得更直观、更高效，不再反复手敲命令。
 </p>
 
 <p align="center">
-  <a href="README.md">中文</a> | <a href="README_EN.md">English</a>
+  <a href="./README.md">中文</a> |
+  <a href="./README_EN.md">English</a>
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/github/stars/ludoven/QAdb-Desktop?style=flat-square" alt="GitHub Stars" />
+  <img src="https://img.shields.io/github/forks/ludoven/QAdb-Desktop?style=flat-square" alt="GitHub Forks" />
+  <img src="https://img.shields.io/github/v/release/ludoven/QAdb-Desktop?style=flat-square" alt="GitHub Release" />
+  <img src="https://img.shields.io/github/license/ludoven/QAdb-Desktop?style=flat-square" alt="License" />
 </p>
 
 ---
 
-## 项目简介
+## 🚀 项目介绍
 
-QADB 将常见 ADB 操作封装为桌面端图形界面，面向日常调试、设备管理、应用管理、日志排查和命令执行场景。连接 Android 设备后，可以在一个窗口内完成设备信息查看、常用命令执行、应用列表管理、日志过滤和终端操作。
+**QAdb-Desktop** 是一款基于 **Jetpack Compose Multiplatform** 开发的跨平台 ADB 图形化工具，支持 **Windows** 和 **macOS**。
 
-## 功能概览
+它面向 Android 开发者、测试人员、Android TV / 电视盒子调试人员以及经常使用 ADB 命令的高级用户，将常用 ADB 操作封装为直观的可视化界面，帮助你更高效地完成设备调试、应用管理、日志查看、截图录屏、终端执行、按键模拟等操作。
 
-- **设备首页**：识别在线设备，展示设备基础信息、连接状态和运行状态。
-- **常用操作**：提供重启、关机、截屏、录屏、文件推送/拉取等高频 ADB 操作。
-- **应用管理**：查看应用列表，支持安装、卸载、清理数据、导出 APK 和应用详情查看。
-- **按键事件**：快速发送常见按键事件，减少手动输入命令的重复操作。
-- **日志查看**：查看并过滤 Logcat 日志，辅助定位运行问题。
-- **终端命令**：在应用内执行 ADB 命令，保留可视化工具之外的灵活性。
-
-## 界面预览
-
-| 首页 | 常用操作 |
-|------|----------|
-| ![首页](home.png) | ![常用操作](common.png) |
-
-| 应用列表 | 应用详情 |
-|----------|----------|
-| ![应用列表](applist.png) | ![应用详情](appinfo.png) |
-
-| 按键事件 | Logcat |
-|----------|--------|
-| ![按键事件](keyevent.png) | ![Logcat](logcat.png) |
-
-| 终端 |
-|------|
-| ![终端](terminal.png) |
-
-## 快速开始
-
-1. 安装 [ADB](https://developer.android.com/tools/adb)，并确保命令行可以执行 `adb`。
-2. 连接 Android 设备，开启 USB 调试并授权当前电脑。
-3. 启动 QADB，选择设备后执行对应操作。
-
-## 下载发布版
-
-请前往 [GitHub Releases](https://github.com/ludoven/QAdb-Desktop/releases) 获取最新安装包。
-
-- Windows：`QAdb.exe` / `QAdb.msi`
-- macOS：`QAdb.dmg`
-
-## 本地开发
-
-运行桌面应用：
+如果你经常需要输入类似下面的命令：
 
 ```bash
-./gradlew :composeApp:run
+adb devices
+adb install app.apk
+adb shell pm clear package.name
+adb shell am force-stop package.name
+adb logcat
+adb shell screencap
+adb shell input keyevent 3
 ```
 
-运行桌面测试：
+那么 QAdb-Desktop 可以让这些操作变得更简单。
+
+---
+
+## 📸 界面预览
+
+![Home](./screenshots/home.png)
+![Apps](./screenshots/applist.png)
+![Logcat](./screenshots/logcat.png)
+![Terminal](./screenshots/terminal.png)
+
+---
+
+## ✨ 功能亮点
+
+- **设备管理**：检测 USB / 网络 ADB 设备，快速切换当前设备
+- **设备信息**：查看设备型号、Android 版本、屏幕信息、连接状态等
+- **应用管理**：安装 APK、卸载应用、清除数据、强制停止、导出 APK
+- **常用操作**：重启、关机、截图、录屏、打开设置、查看 Activity 等
+- **按键模拟**：支持返回、主页、菜单、音量、方向键等常用 KeyEvent
+- **内置终端**：无需切换系统终端，直接执行 adb / shell 命令
+- **日志查看**：查看 Logcat 日志，辅助定位应用运行问题
+- **命令中心**：将高频 ADB 命令整理为可视化按钮
+- **TV / 盒子调试**：适合 Android TV、机顶盒、系统应用调试等场景
+- **跨平台支持**：基于 Compose Multiplatform，支持 Windows 与 macOS
+
+---
+
+## 🎯 适合人群
+
+QAdb-Desktop 适合以下用户：
+
+- Android 开发者
+- Android 测试人员
+- Android TV / 电视盒子调试人员
+- 系统应用 / 预装应用调试人员
+- 经常使用 ADB 命令的高级用户
+- 需要提升调试效率的开发团队
+
+---
+
+## 🧩 功能模块
+
+| 模块 | 说明 |
+|---|---|
+| 首页 | 展示设备状态、快捷入口、常用操作 |
+| 常用 | 常用 ADB 命令快捷执行 |
+| 终端 | 内置命令行终端，可执行 adb / shell 命令 |
+| 按键 | 模拟 Android 设备按键操作 |
+| 应用 | 应用列表、安装、卸载、清数据、强制停止等 |
+| 日志 | 查看和筛选 Logcat 日志 |
+| 设置 | 配置工具行为、ADB 路径等 |
+| 性能 | 规划中，用于查看 CPU、内存、网络等信息 |
+| 进程 | 规划中，用于查看和管理设备进程 |
+
+---
+
+## 📦 下载
+
+请前往 [GitHub Releases](https://github.com/ludoven/QAdb-Desktop/releases) 下载最新版本。
+
+| 平台 | 推荐安装包 | 说明 |
+|---|---|---|
+| Windows | `.msi` | 推荐普通用户使用 |
+| Windows | `.exe` | 免安装 / 便携版本 |
+| macOS | `.dmg` | 适用于 macOS 用户 |
+
+> macOS 如果提示“无法验证开发者”或“无法打开”，可以在「系统设置」→「隐私与安全性」中允许打开。
+
+---
+
+## ⚡ 快速开始
+
+### 1. 安装 ADB
+
+QAdb-Desktop 依赖系统中的 `adb` 命令。
+
+你需要先安装 Android Platform Tools：
+
+- Android Studio 用户通常已经自带 ADB
+- 也可以单独下载 Android SDK Platform Tools
+
+安装完成后，请确保在终端中可以正常执行：
 
 ```bash
-./gradlew :composeApp:desktopTest
+adb version
 ```
 
-打包当前系统发行版：
+如果能看到 ADB 版本信息，说明环境正常。
+
+---
+
+### 2. 开启设备调试
+
+在 Android 设备上开启：
+
+1. 打开「开发者选项」
+2. 开启「USB 调试」
+3. 使用 USB 连接电脑
+4. 在设备上允许 USB 调试授权
+
+然后执行：
 
 ```bash
-./gradlew :composeApp:packageDistributionForCurrentOS
+adb devices
 ```
 
-## 反馈
+如果能看到设备列表，说明设备连接成功。
 
-问题反馈或功能建议请提交到 [Issues](https://github.com/ludoven/QAdb-Desktop/issues)。
+---
 
-## 声明
+### 3. 启动 QAdb-Desktop
 
-本项目仅提供 ADB 图形化封装能力，不包含或修改 ADB 本体。运行依赖系统环境中的 `adb`。
+打开 QAdb-Desktop 后：
+
+1. 选择当前设备
+2. 查看设备状态
+3. 使用常用操作、应用管理、日志、终端等功能
+
+---
+
+## 🔌 网络 ADB 使用方式
+
+如果你需要连接 Android TV、电视盒子或局域网设备，可以使用网络 ADB。
+
+常见连接命令：
+
+```bash
+adb connect 192.168.1.100:5555
+```
+
+连接成功后，设备会出现在 QAdb-Desktop 的设备列表中。
+
+> 不同设备开启网络 ADB 的方式可能不同，部分设备需要先通过 USB 或系统设置开启无线调试。
+
+---
+
+## 🛠️ 常见使用场景
+
+### Android 应用开发
+
+- 快速安装 APK
+- 清除应用数据
+- 强制停止应用
+- 查看应用日志
+- 查看当前 Activity
+- 截图和录屏
+
+### Android TV / 盒子调试
+
+- 网络 ADB 连接设备
+- 模拟遥控器按键
+- 安装或卸载 APK
+- 查看系统应用信息
+- 调试系统设置或启动页面
+
+### 测试人员
+
+- 快速切换设备
+- 批量执行常用命令
+- 查看日志和截图
+- 复现问题时快速收集信息
+
+---
+
+## ❓ 常见问题
+
+### 1. 为什么检测不到设备？
+
+请确认：
+
+- 已安装 Android Platform Tools
+- `adb devices` 可以在终端正常执行
+- 手机或设备已开启 USB 调试
+- 设备已允许 USB 调试授权
+- USB 数据线支持数据传输
+- Windows 用户已安装对应设备驱动
+
+---
+
+### 2. 为什么提示找不到 adb？
+
+请确认 `adb` 已加入系统环境变量。
+
+你可以在终端执行：
+
+```bash
+adb version
+```
+
+如果提示命令不存在，需要先安装 Android Platform Tools，并将其目录加入环境变量。
+
+---
+
+### 3. macOS 提示无法打开怎么办？
+
+如果 macOS 提示无法验证开发者，可以尝试：
+
+1. 打开「系统设置」
+2. 进入「隐私与安全性」
+3. 找到 QAdb-Desktop 的拦截提示
+4. 点击「仍要打开」
+
+---
+
+### 4. 是否内置 ADB？
+
+目前 QAdb-Desktop 默认依赖系统已安装的 ADB。
+
+后续可以考虑支持：
+
+- 自动检测 ADB 路径
+- 手动配置 ADB 路径
+- 内置 Platform Tools
+- 多版本 ADB 管理
+
+---
+
+### 5. 是否支持 Linux？
+
+当前主要支持 Windows 和 macOS。
+
+Linux 支持可以作为后续计划。如果你有 Linux 打包或适配经验，欢迎参与贡献。
+
+---
+
+## 🗺️ Roadmap
+
+- [x] 设备管理
+- [x] 设备信息展示
+- [x] 常用 ADB 操作
+- [x] 应用管理
+- [x] 按键模拟
+- [x] 截图 / 录屏
+- [x] 内置终端
+- [x] 日志查看
+- [ ] 性能监控
+- [ ] 进程管理
+- [ ] 文件管理
+- [ ] 命令收藏
+- [ ] 命令分组自定义
+- [ ] 多设备批量操作
+- [ ] ADB 路径可视化配置
+- [ ] Linux 支持
+- [ ] 插件化命令扩展
+
+---
+
+## 🤝 参与贡献
+
+欢迎提交 Issue、功能建议或 Pull Request。
+
+你可以参与：
+
+- 反馈 Bug
+- 提交新的 ADB 命令
+- 优化 UI / 交互体验
+- 完善 Windows / macOS 兼容性
+- 改进英文文档
+- 补充使用教程
+- 参与 Linux 打包适配
+
+如果你有常用的 ADB 命令，也欢迎提交建议，让 QAdb-Desktop 的命令中心更加完善。
+
+---
+
+## 🧪 本地开发
+
+### 环境要求
+
+- JDK 17 或更高版本
+- Android Studio / IntelliJ IDEA
+- Gradle
+- Android SDK Platform Tools
+
+### 克隆项目
+
+```bash
+git clone https://github.com/ludoven/QAdb-Desktop.git
+cd QAdb-Desktop
+```
+
+### 运行项目
+
+请使用 Android Studio 或 IntelliJ IDEA 打开项目，并运行对应的 Desktop 配置。
+
+> 具体 Gradle task 可能会根据项目结构变化，请以项目实际配置为准。
+
+---
+
+## 📄 License
+
+本项目基于开源协议发布，具体请查看 [LICENSE](./LICENSE)。
+
+---
+
+## ⭐ Star 支持
+
+如果 QAdb-Desktop 对你有帮助，欢迎点一个 Star 支持项目。
+
+你的 Star 是项目持续更新的重要动力。
+
+<p align="center">
+  <b>QAdb-Desktop：让 Android 调试更简单。</b>
+</p>
