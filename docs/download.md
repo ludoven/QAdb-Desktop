@@ -2,7 +2,7 @@
 
 请前往 GitHub Releases 下载最新版本：
 
-[打开 Releases](https://github.com/ludoven/QAdb-Desktop/releases)
+[打开 Releases](https://github.com/ludoven/QADB/releases)
 
 ## 推荐安装包
 
@@ -10,6 +10,7 @@
 | --- | --- | --- |
 | Windows | `.msi` | 推荐普通用户使用 |
 | Windows | `.exe` | 免安装 / 便携版本 |
+| Windows | `.zip` | 解压即用（便携包） |
 | macOS | `.dmg` | 适用于 macOS 用户 |
 
 ## macOS 打开提示

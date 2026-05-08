@@ -1,6 +1,6 @@
 # 功能亮点
 
-QAdb-Desktop 将高频 ADB 工作流拆成清晰模块，覆盖设备连接、应用管理、日志查看、按键模拟和命令执行。
+QADB-Desktop 将高频 ADB 工作流拆成清晰模块，覆盖设备连接、应用管理、日志查看、按键模拟和命令执行。
 
 <div class="module-grid">
   <div class="module-card">

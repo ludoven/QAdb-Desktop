@@ -17,7 +17,7 @@ import java.nio.file.Path
 
 object GitHubUpdateManager {
     private const val OWNER = "ludoven"
-    private const val REPO = "QAdb-Desktop"
+    private const val REPO = "QADB"
     private const val LATEST_RELEASE_API = "https://api.github.com/repos/$OWNER/$REPO/releases/latest"
     private val json = Json { ignoreUnknownKeys = true }
 
@@ -72,7 +72,7 @@ object GitHubUpdateManager {
     suspend fun downloadAndInstall(asset: GitHubAssetResponse): Result<Path> = withContext(Dispatchers.IO) {
         runCatching {
             val tempDir = Files.createTempDirectory("qadb-update-")
-            val sanitizedName = asset.name.ifBlank { "QAdb-Desktop-update.bin" }
+            val sanitizedName = asset.name.ifBlank { "QADB-Desktop-update.bin" }
             val outputPath = tempDir.resolve(sanitizedName)
             downloadFile(asset.downloadUrl, outputPath)
             openInstaller(outputPath.toFile())
@@ -125,7 +125,7 @@ object GitHubUpdateManager {
         connection.connectTimeout = 10_000
         connection.readTimeout = 20_000
         connection.setRequestProperty("Accept", "application/vnd.github+json")
-        connection.setRequestProperty("User-Agent", "QAdb-Desktop-Updater")
+        connection.setRequestProperty("User-Agent", "QADB-Desktop-Updater")
 
         return try {
             val responseCode = connection.responseCode
@@ -146,7 +146,7 @@ object GitHubUpdateManager {
         connection.requestMethod = "GET"
         connection.connectTimeout = 10_000
         connection.readTimeout = 60_000
-        connection.setRequestProperty("User-Agent", "QAdb-Desktop-Updater")
+        connection.setRequestProperty("User-Agent", "QADB-Desktop-Updater")
 
         try {
             val responseCode = connection.responseCode

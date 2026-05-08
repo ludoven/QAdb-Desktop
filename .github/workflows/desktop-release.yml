@@ -50,8 +50,19 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Build MSI and EXE
-        run: .\gradlew.bat :composeApp:packageReleaseMsi :composeApp:packageReleaseExe
+      - name: Build MSI, EXE and distributable app image
+        run: .\gradlew.bat :composeApp:packageReleaseMsi :composeApp:packageReleaseExe :composeApp:createReleaseDistributable
+
+      - name: Build ZIP portable package
+        shell: pwsh
+        run: |
+          $appRoot = "composeApp/build/compose/binaries/main-release/app"
+          $appDir = Get-ChildItem $appRoot -Directory | Select-Object -First 1
+          if (-not $appDir) { throw "No app image directory found under $appRoot" }
+          New-Item -ItemType Directory -Path "composeApp/build/compose/binaries/main-release/zip" -Force | Out-Null
+          $zipPath = "composeApp/build/compose/binaries/main-release/zip/$($appDir.Name)-windows-portable.zip"
+          if (Test-Path $zipPath) { Remove-Item $zipPath -Force }
+          Compress-Archive -Path "$($appDir.FullName)/*" -DestinationPath $zipPath
 
       - name: Upload Windows artifacts
         uses: actions/upload-artifact@v4
@@ -60,6 +71,7 @@ jobs:
           path: |
             composeApp/build/compose/binaries/main-release/msi/*.msi
             composeApp/build/compose/binaries/main-release/exe/*.exe
+            composeApp/build/compose/binaries/main-release/zip/*.zip
           if-no-files-found: error
 
   publish-release:
@@ -94,3 +106,4 @@ jobs:
             release-assets/macos/*.dmg
             release-assets/windows/msi/*.msi
             release-assets/windows/exe/*.exe
+            release-assets/windows/zip/*.zip

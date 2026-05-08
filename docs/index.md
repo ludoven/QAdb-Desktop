@@ -2,12 +2,12 @@
 layout: home
 
 hero:
-  name: QAdb-Desktop
+  name: QADB-Desktop
   text: 现代化 ADB 桌面调试工具
   tagline: 面向 Android 开发、测试和 TV 盒子调试场景，把高频 ADB 命令整理成直观的跨平台图形界面。
   image:
     src: /screenshots/home.png
-    alt: QAdb-Desktop 首页截图
+    alt: QADB-Desktop 首页截图
   actions:
     - theme: brand
       text: 立即下载
@@ -17,7 +17,7 @@ hero:
       link: /guide/getting-started
     - theme: alt
       text: GitHub
-      link: https://github.com/ludoven/QAdb-Desktop
+      link: https://github.com/ludoven/QADB
 
 features:
   - title: 设备管理
@@ -37,7 +37,7 @@ features:
 <section class="home-section">
   <h2>把常用 ADB 操作变成清晰的工作台</h2>
   <p>
-    QAdb-Desktop 适合经常执行 adb devices、adb install、adb logcat、adb shell input keyevent 等命令的用户。
+    QADB-Desktop 适合经常执行 adb devices、adb install、adb logcat、adb shell input keyevent 等命令的用户。
     它保留命令行的灵活性，同时把设备状态、应用列表、日志、快捷命令和按键操作集中在一个桌面应用里。
   </p>
 

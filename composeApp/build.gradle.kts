@@ -96,10 +96,16 @@ compose.desktop {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Exe)
 
             packageVersion = appVersion
-            packageName = "QAdb"
+            packageName = "QADB"
 
 //            iconFile.set(project.file("src/desktopMain/composeResources/icons/app_icon.icns")) // macOS 图标
             windows.iconFile.set(project.file("src/desktopMain/composeResources/drawable/app_icon.ico")) // Windows 图标
+            windows {
+                // Ensure installers create desktop/start-menu entries by default on Windows.
+                shortcut = true
+                menu = true
+                menuGroup = "QADB"
+            }
 
             macOS {
                 bundleID = "com.ludoven.adbtool"

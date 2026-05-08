@@ -1,4 +1,4 @@
-<h1 align="center">QAdb-Desktop</h1>
+<h1 align="center">QADB-Desktop</h1>
 
 <p align="center">
   <b>An open-source, cross-platform, modern ADB desktop debugging tool</b>
@@ -9,23 +9,23 @@
 </p>
 
 <p align="center">
-  <a href="https://ludoven.github.io/QAdb-Desktop/">Website</a> |
+  <a href="https://ludoven.github.io/QADB/">Website</a> |
   <a href="./README.md">中文</a> |
   <a href="./README_EN.md">English</a>
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/github/stars/ludoven/QAdb-Desktop?style=flat-square" alt="GitHub Stars" />
-  <img src="https://img.shields.io/github/forks/ludoven/QAdb-Desktop?style=flat-square" alt="GitHub Forks" />
-  <img src="https://img.shields.io/github/v/release/ludoven/QAdb-Desktop?style=flat-square" alt="GitHub Release" />
-  <img src="https://img.shields.io/github/license/ludoven/QAdb-Desktop?style=flat-square" alt="License" />
+  <img src="https://img.shields.io/github/stars/ludoven/QADB-Desktop?style=flat-square" alt="GitHub Stars" />
+  <img src="https://img.shields.io/github/forks/ludoven/QADB-Desktop?style=flat-square" alt="GitHub Forks" />
+  <img src="https://img.shields.io/github/v/release/ludoven/QADB-Desktop?style=flat-square" alt="GitHub Release" />
+  <img src="https://img.shields.io/github/license/ludoven/QADB-Desktop?style=flat-square" alt="License" />
 </p>
 
 ---
 
 ## 🚀 Project Overview
 
-**QAdb-Desktop** is a cross-platform ADB GUI tool built with **Jetpack Compose Multiplatform**, supporting **Windows** and **macOS**.
+**QADB-Desktop** is a cross-platform ADB GUI tool built with **Jetpack Compose Multiplatform**, supporting **Windows** and **macOS**.
 
 It is designed for Android developers, testers, Android TV / TV box debugging users, and advanced users who frequently use ADB commands. It turns common ADB workflows into a visual interface so you can debug devices, manage apps, inspect logs, take screenshots and recordings, run terminal commands, and simulate key events more efficiently.
 
@@ -41,7 +41,7 @@ adb shell screencap
 adb shell input keyevent 3
 ```
 
-QAdb-Desktop can make these tasks much easier.
+QADB-Desktop can make these tasks much easier.
 
 ---
 
@@ -71,7 +71,7 @@ QAdb-Desktop can make these tasks much easier.
 
 ## 🎯 Target Users
 
-QAdb-Desktop is suitable for:
+QADB-Desktop is suitable for:
 
 - Android developers
 - Android testers
@@ -100,12 +100,13 @@ QAdb-Desktop is suitable for:
 
 ## 📦 Download
 
-Please go to [GitHub Releases](https://github.com/ludoven/QAdb-Desktop/releases) to download the latest version.
+Please go to [GitHub Releases](https://github.com/ludoven/QADB/releases) to download the latest version.
 
 | Platform | Recommended Package | Notes |
 |---|---|---|
 | Windows | `.msi` | Recommended for regular users |
 | Windows | `.exe` | Portable / no installation |
+| Windows | `.zip` | Extract and run (portable package) |
 | macOS | `.dmg` | For macOS users |
 
 > If macOS shows "cannot verify developer" or "cannot open", allow it in "System Settings" -> "Privacy & Security".
@@ -116,7 +117,7 @@ Please go to [GitHub Releases](https://github.com/ludoven/QAdb-Desktop/releases)
 
 ### 1. Install ADB
 
-QAdb-Desktop depends on the `adb` command available in your system.
+QADB-Desktop depends on the `adb` command available in your system.
 
 Install Android Platform Tools first:
 
@@ -152,9 +153,9 @@ If the device list appears, the connection is successful.
 
 ---
 
-### 3. Launch QAdb-Desktop
+### 3. Launch QADB-Desktop
 
-After opening QAdb-Desktop:
+After opening QADB-Desktop:
 
 1. Select the current device
 2. Check device status
@@ -172,7 +173,7 @@ Common connection command:
 adb connect 192.168.1.100:5555
 ```
 
-After a successful connection, the device will appear in the QAdb-Desktop device list.
+After a successful connection, the device will appear in the QADB-Desktop device list.
 
 > The way to enable network ADB varies by device. Some devices require USB or system settings to enable wireless debugging first.
 
@@ -241,14 +242,14 @@ If macOS cannot verify the developer, try:
 
 1. Open "System Settings"
 2. Go to "Privacy & Security"
-3. Find the blocked prompt for QAdb-Desktop
+3. Find the blocked prompt for QADB-Desktop
 4. Click "Open Anyway"
 
 ---
 
-### 4. Does QAdb-Desktop include ADB?
+### 4. Does QADB-Desktop include ADB?
 
-Currently, QAdb-Desktop relies on ADB installed in your system.
+Currently, QADB-Desktop relies on ADB installed in your system.
 
 Possible future support:
 
@@ -303,7 +304,7 @@ You can contribute by:
 - Adding usage tutorials
 - Helping with Linux packaging and adaptation
 
-If you have frequently used ADB commands, feel free to suggest them and help improve the QAdb-Desktop command center.
+If you have frequently used ADB commands, feel free to suggest them and help improve the QADB-Desktop command center.
 
 ---
 
@@ -319,8 +320,8 @@ If you have frequently used ADB commands, feel free to suggest them and help imp
 ### Clone Project
 
 ```bash
-git clone https://github.com/ludoven/QAdb-Desktop.git
-cd QAdb-Desktop
+git clone https://github.com/ludoven/QADB.git
+cd QADB
 ```
 
 ### Run Project
@@ -339,10 +340,10 @@ This project is released under an open-source license. See [LICENSE](./LICENSE) 
 
 ## ⭐ Star Support
 
-If QAdb-Desktop helps you, please consider giving this project a Star.
+If QADB-Desktop helps you, please consider giving this project a Star.
 
 Your Star is an important motivation for continuous updates.
 
 <p align="center">
-  <b>QAdb-Desktop: Make Android debugging easier.</b>
+  <b>QADB-Desktop: Make Android debugging easier.</b>
 </p>
