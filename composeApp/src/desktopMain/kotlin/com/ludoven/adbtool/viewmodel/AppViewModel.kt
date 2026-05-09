@@ -724,6 +724,13 @@ class AppViewModel : BaseViewModel() {
         }
     }
 
+    fun copyToClipboard(text: String) {
+        try {
+            val clipboard = java.awt.Toolkit.getDefaultToolkit().systemClipboard
+            clipboard.setContents(java.awt.datatransfer.StringSelection(text), null)
+        } catch (_: Exception) {}
+    }
+
     private fun parseInstallTimestamp(raw: String): Long? {
         if (raw.isBlank() || raw == "-") return null
         val normalized = raw.trim()

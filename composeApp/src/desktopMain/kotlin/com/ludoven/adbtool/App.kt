@@ -5,12 +5,14 @@ import com.ludoven.adbtool.ui.mac.*
 import adbtool_desktop.composeapp.generated.resources.Res
 import adbtool_desktop.composeapp.generated.resources.app
 import adbtool_desktop.composeapp.generated.resources.common
+import adbtool_desktop.composeapp.generated.resources.file_browser
 import adbtool_desktop.composeapp.generated.resources.home
 import adbtool_desktop.composeapp.generated.resources.key_event_page
 import adbtool_desktop.composeapp.generated.resources.log
 import adbtool_desktop.composeapp.generated.resources.process
 import adbtool_desktop.composeapp.generated.resources.set
 import adbtool_desktop.composeapp.generated.resources.terminal
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -21,6 +23,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Apps
 import androidx.compose.material.icons.filled.Code
+import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.List
@@ -46,6 +49,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.ludoven.adbtool.pages.AppScreen
 import com.ludoven.adbtool.pages.CommonScreen
+import com.ludoven.adbtool.pages.FileBrowserScreen
 import com.ludoven.adbtool.pages.HomeScreen
 import com.ludoven.adbtool.pages.KeyEventScreen
 import com.ludoven.adbtool.pages.LogScreen
@@ -54,15 +58,21 @@ import com.ludoven.adbtool.pages.SettingScreen
 import com.ludoven.adbtool.pages.TerminalScreen
 import com.ludoven.adbtool.util.AdbPathManager
 import com.ludoven.adbtool.util.LanguageManager
+import com.ludoven.adbtool.util.ThemeManager
 import com.ludoven.adbtool.entity.AdbFunctionType
+import com.ludoven.adbtool.entity.MsgContent
+import com.ludoven.adbtool.util.AdbTool
 import com.ludoven.adbtool.viewmodel.AppViewModel
 import com.ludoven.adbtool.viewmodel.CommonModel
 import com.ludoven.adbtool.viewmodel.DevicesViewModel
+import com.ludoven.adbtool.viewmodel.FileBrowserViewModel
 import com.ludoven.adbtool.viewmodel.KeyEventViewModel
 import com.ludoven.adbtool.viewmodel.LogViewModel
 import com.ludoven.adbtool.viewmodel.TerminalViewModel
 import com.ludoven.adbtool.widget.GlassCard
 import com.ludoven.adbtool.widget.Sidebar
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.jetbrains.compose.resources.stringResource
 import org.jetbrains.compose.ui.tooling.preview.Preview
 
@@ -76,12 +86,14 @@ fun App() {
     val keyEventViewModel: KeyEventViewModel = viewModel()
     val logViewModel: LogViewModel = viewModel()
     val terminalViewModel: TerminalViewModel = viewModel()
+    val fileBrowserViewModel: FileBrowserViewModel = viewModel()
     val devices by devicesViewModel.devices.collectAsState()
     val selectedDevice by devicesViewModel.selectedDevice.collectAsState()
     val deviceDisplayNames by devicesViewModel.deviceDisplayNames.collectAsState()
 
     LaunchedEffect(Unit) {
         LanguageManager.initialize()
+        ThemeManager.initialize()
         AdbPathManager.getAdbPath()
     }
 
@@ -91,6 +103,7 @@ fun App() {
         TabItem(stringResource(Res.string.terminal), Icons.Default.Code, "terminal"),
         TabItem(stringResource(Res.string.key_event_page), Icons.Default.VideogameAsset, "keyevent"),
         TabItem(stringResource(Res.string.app), Icons.Default.Apps, "app"),
+        TabItem(stringResource(Res.string.file_browser), Icons.Default.Folder, "filebrowser"),
         TabItem(stringResource(Res.string.log), Icons.Default.List, "log"),
         TabItem(stringResource(Res.string.process), Icons.Default.Memory, "process"),
         TabItem(stringResource(Res.string.set), Icons.Default.Settings, "setting")
@@ -100,8 +113,55 @@ fun App() {
     val stateHolder = rememberSaveableStateHolder()
     val currentBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = currentBackStackEntry?.destination?.route ?: "home"
+    val currentThemeMode by ThemeManager.currentThemeMode.collectAsState()
+    val resolvedDarkTheme = when (currentThemeMode) {
+        ThemeManager.ThemeMode.SYSTEM -> isSystemInDarkTheme()
+        ThemeManager.ThemeMode.LIGHT -> false
+        ThemeManager.ThemeMode.DARK -> true
+    }
 
-    AdbToolTheme {
+    fun navigateToRoute(route: String) {
+        if (currentRoute == route) return
+        navController.navigate(route) {
+            launchSingleTop = true
+            restoreState = true
+            popUpTo(navController.graph.startDestinationId) {
+                saveState = true
+            }
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        AppMenuCommandBus.commands.collect { command ->
+            when (command) {
+                is AppMenuCommand.Navigate -> navigateToRoute(command.route)
+                is AppMenuCommand.ConnectDevice -> {
+                    val address = command.address.trim()
+                    if (address.isNotEmpty()) {
+                        val output = withContext(Dispatchers.IO) {
+                            AdbTool.executeAdbCommand("connect", address)
+                        }
+                        commonModel.showTipDialog(MsgContent.Text(output), autoDismiss = true)
+                        devicesViewModel.refreshDevices()
+                    }
+                }
+                AppMenuCommand.RefreshDevices -> devicesViewModel.refreshDevices()
+                AppMenuCommand.RebootDevice -> commonModel.executeAdbAction(AdbFunctionType.REBOOT_DEVICE)
+                AppMenuCommand.Screenshot -> commonModel.executeAdbAction(AdbFunctionType.SCREENSHOT)
+                AppMenuCommand.ScreenRecord -> commonModel.executeAdbAction(AdbFunctionType.SCREEN_RECORD)
+                AppMenuCommand.OpenTerminalTool -> navigateToRoute("terminal")
+                AppMenuCommand.InstallApk -> commonModel.executeAdbAction(AdbFunctionType.INSTALL_APK)
+                AppMenuCommand.ViewCurrentActivity -> commonModel.executeAdbAction(AdbFunctionType.VIEW_CURRENT_ACTIVITY)
+                AppMenuCommand.ViewDeviceInfo -> {
+                    navigateToRoute("home")
+                    devicesViewModel.refreshDevices()
+                }
+                AppMenuCommand.ExportLogs -> commonModel.executeAdbAction(AdbFunctionType.CAPTURE_LOGS)
+            }
+        }
+    }
+
+    AdbToolTheme(useDarkTheme = resolvedDarkTheme) {
         Scaffold(
             modifier = Modifier.fillMaxSize(),
             containerColor = MaterialTheme.colorScheme.background
@@ -121,15 +181,7 @@ fun App() {
                     selectedDevice = selectedDevice,
                     deviceDisplayNames = deviceDisplayNames,
                     onItemClick = { route ->
-                        if (currentRoute != route) {
-                            navController.navigate(route) {
-                                launchSingleTop = true
-                                restoreState = true
-                                popUpTo(navController.graph.startDestinationId) {
-                                    saveState = true
-                                }
-                            }
-                        }
+                        navigateToRoute(route)
                     },
                     onDeviceSelected = { deviceId ->
                         devicesViewModel.selectDevice(deviceId)
@@ -193,6 +245,14 @@ fun App() {
                                 composable("app") {
                                     stateHolder.SaveableStateProvider("app") {
                                         AppScreen(appViewModel)
+                                    }
+                                }
+                                composable("filebrowser") {
+                                    stateHolder.SaveableStateProvider("filebrowser") {
+                                        FileBrowserScreen(
+                                            viewModel = fileBrowserViewModel,
+                                            selectedDevice = selectedDevice
+                                        )
                                     }
                                 }
                                 composable("setting") {

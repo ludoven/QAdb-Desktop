@@ -190,6 +190,11 @@
     <string name="adb_path_set_success">ADB path set successfully!</string>
     <string name="language_setting">Language Setting</string>
     <string name="select_language">Select Language</string>
+    <string name="theme_setting">Theme Setting</string>
+    <string name="select_theme">Select Theme</string>
+    <string name="theme_mode_system">Follow System</string>
+    <string name="theme_mode_light">Light</string>
+    <string name="theme_mode_dark">Dark</string>
     <string name="chinese">中文</string>
     <string name="english">English</string>
     <string name="language_changed">Language changed successfully!</string>

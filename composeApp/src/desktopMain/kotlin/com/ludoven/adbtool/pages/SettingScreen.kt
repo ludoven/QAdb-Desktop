@@ -19,6 +19,11 @@ import adbtool_desktop.composeapp.generated.resources.open_release_page
 import adbtool_desktop.composeapp.generated.resources.restart_required
 import adbtool_desktop.composeapp.generated.resources.select_adb_icon_desc
 import adbtool_desktop.composeapp.generated.resources.select_language
+import adbtool_desktop.composeapp.generated.resources.select_theme
+import adbtool_desktop.composeapp.generated.resources.theme_mode_dark
+import adbtool_desktop.composeapp.generated.resources.theme_mode_light
+import adbtool_desktop.composeapp.generated.resources.theme_mode_system
+import adbtool_desktop.composeapp.generated.resources.theme_setting
 import adbtool_desktop.composeapp.generated.resources.update_available_no_asset
 import adbtool_desktop.composeapp.generated.resources.update_available_with_version
 import adbtool_desktop.composeapp.generated.resources.update_check_failed
@@ -29,6 +34,7 @@ import adbtool_desktop.composeapp.generated.resources.update_section_title
 import adbtool_desktop.composeapp.generated.resources.update_up_to_date
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -38,6 +44,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Download
@@ -45,6 +52,7 @@ import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SystemUpdateAlt
 import com.ludoven.adbtool.ui.mac.DropdownMenu
 import com.ludoven.adbtool.ui.mac.DropdownMenuItem
@@ -76,6 +84,7 @@ import com.ludoven.adbtool.util.AdbPathManager
 import com.ludoven.adbtool.util.FileUtils
 import com.ludoven.adbtool.util.GitHubUpdateManager
 import com.ludoven.adbtool.util.LanguageManager
+import com.ludoven.adbtool.util.ThemeManager
 import com.ludoven.adbtool.widget.SectionCard
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
@@ -88,6 +97,7 @@ fun SettingScreen() {
     var showDialog by remember { mutableStateOf(false) }
     var showLanguageDialog by remember { mutableStateOf(false) }
     var showLanguageDropdown by remember { mutableStateOf(false) }
+    var showThemeDropdown by remember { mutableStateOf(false) }
     var updateStatus by remember { mutableStateOf<UpdateStatus>(UpdateStatus.Idle) }
     var latestVersion by remember { mutableStateOf<String?>(null) }
     var releaseUrl by remember { mutableStateOf<String?>(null) }
@@ -97,7 +107,9 @@ fun SettingScreen() {
     val coroutineScope = rememberCoroutineScope()
 
     val currentLanguage by LanguageManager.currentLanguage.collectAsState()
+    val currentThemeMode by ThemeManager.currentThemeMode.collectAsState()
     val supportedLanguages = LanguageManager.getSupportedLanguages()
+    val supportedThemeModes = ThemeManager.ThemeMode.entries
     val currentVersionLabel = AppVersion.CURRENT
     val updateStatusText = when (val status = updateStatus) {
         UpdateStatus.Idle -> null
@@ -117,6 +129,7 @@ fun SettingScreen() {
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .verticalScroll(rememberScrollState())
             .padding(UiTokens.PagePadding),
         verticalArrangement = Arrangement.spacedBy(UiTokens.SectionSpacing)
     ) {
@@ -223,6 +236,71 @@ fun SettingScreen() {
 
         SectionCard(
             modifier = Modifier.fillMaxWidth(),
+            title = stringResource(Res.string.theme_setting),
+            icon = Icons.Default.Settings
+        ) {
+            val currentThemeText = when (currentThemeMode) {
+                ThemeManager.ThemeMode.SYSTEM -> stringResource(Res.string.theme_mode_system)
+                ThemeManager.ThemeMode.LIGHT -> stringResource(Res.string.theme_mode_light)
+                ThemeManager.ThemeMode.DARK -> stringResource(Res.string.theme_mode_dark)
+            }
+
+            ExposedDropdownMenuBox(
+                expanded = showThemeDropdown,
+                onExpandedChange = { showThemeDropdown = !showThemeDropdown }
+            ) {
+                OutlinedTextField(
+                    value = currentThemeText,
+                    onValueChange = {},
+                    readOnly = true,
+                    label = { Text(stringResource(Res.string.select_theme)) },
+                    leadingIcon = {
+                        Icon(Icons.Default.Settings, contentDescription = null)
+                    },
+                    trailingIcon = {
+                        Icon(
+                            Icons.Default.ArrowDropDown,
+                            contentDescription = null,
+                            modifier = Modifier.clickable { showThemeDropdown = !showThemeDropdown }
+                        )
+                    },
+                    modifier = Modifier
+                        .menuAnchor()
+                        .fillMaxWidth(),
+                    shape = RoundedCornerShape(UiTokens.RadiusMedium),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+                        focusedContainerColor = MaterialTheme.colorScheme.surface,
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surface
+                    )
+                )
+
+                DropdownMenu(
+                    expanded = showThemeDropdown,
+                    onDismissRequest = { showThemeDropdown = false },
+                    modifier = Modifier.background(MaterialTheme.colorScheme.surface)
+                ) {
+                    supportedThemeModes.forEach { themeMode ->
+                        val text = when (themeMode) {
+                            ThemeManager.ThemeMode.SYSTEM -> stringResource(Res.string.theme_mode_system)
+                            ThemeManager.ThemeMode.LIGHT -> stringResource(Res.string.theme_mode_light)
+                            ThemeManager.ThemeMode.DARK -> stringResource(Res.string.theme_mode_dark)
+                        }
+                        DropdownMenuItem(
+                            text = { Text(text) },
+                            onClick = {
+                                ThemeManager.setThemeMode(themeMode)
+                                showThemeDropdown = false
+                            }
+                        )
+                    }
+                }
+            }
+        }
+
+        SectionCard(
+            modifier = Modifier.fillMaxWidth(),
             title = stringResource(Res.string.update_section_title),
             icon = Icons.Default.SystemUpdateAlt
         ) {
@@ -245,14 +323,19 @@ fun SettingScreen() {
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     text = updateStatusText,
+                    modifier = Modifier.fillMaxWidth(),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
 
             Spacer(modifier = Modifier.height(12.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
                 Button(
+                    modifier = Modifier.weight(1f),
                     onClick = {
                         coroutineScope.launch {
                             isCheckingUpdate = true
@@ -303,6 +386,7 @@ fun SettingScreen() {
 
                 if (downloadableAsset != null) {
                     Button(
+                        modifier = Modifier.weight(1f),
                         onClick = {
                             val asset = downloadableAsset ?: return@Button
                             coroutineScope.launch {

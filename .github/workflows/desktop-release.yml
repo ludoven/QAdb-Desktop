@@ -11,7 +11,15 @@ permissions:
 
 jobs:
   build-macos:
-    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-13
+            arch: x64
+          - runner: macos-14
+            arch: arm64
+    runs-on: ${{ matrix.runner }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -28,11 +36,20 @@ jobs:
       - name: Build DMG
         run: ./gradlew :composeApp:packageReleaseDmg
 
+      - name: Rename macOS DMG with architecture
+        run: |
+          dmg_dir="composeApp/build/compose/binaries/main-release/dmg"
+          dmg_file="$(ls "$dmg_dir"/*.dmg | head -n 1)"
+          base_name="$(basename "$dmg_file" .dmg)"
+          target_file="$dmg_dir/${base_name}-macos-${{ matrix.arch }}.dmg"
+          rm -f "$target_file"
+          mv "$dmg_file" "$target_file"
+
       - name: Upload macOS artifact
         uses: actions/upload-artifact@v4
         with:
-          name: qadb-macos-dmg
-          path: composeApp/build/compose/binaries/main-release/dmg/*.dmg
+          name: qadb-macos-dmg-${{ matrix.arch }}
+          path: composeApp/build/compose/binaries/main-release/dmg/*-macos-${{ matrix.arch }}.dmg
           if-no-files-found: error
 
   build-windows:
@@ -81,11 +98,12 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     steps:
-      - name: Download macOS artifact
+      - name: Download macOS artifacts
         uses: actions/download-artifact@v4
         with:
-          name: qadb-macos-dmg
+          pattern: qadb-macos-dmg-*
           path: release-assets/macos
+          merge-multiple: true
 
       - name: Download Windows artifacts
         uses: actions/download-artifact@v4
