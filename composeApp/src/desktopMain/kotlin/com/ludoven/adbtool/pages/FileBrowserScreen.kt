@@ -5,6 +5,7 @@ import com.ludoven.adbtool.ui.mac.*
 import com.ludoven.adbtool.entity.FileInfo
 import com.ludoven.adbtool.entity.FileSortBy
 import com.ludoven.adbtool.entity.FileSortOrder
+import com.ludoven.adbtool.entity.MsgContent
 import com.ludoven.adbtool.viewmodel.FileBrowserViewModel
 import androidx.compose.foundation.*
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -18,12 +19,23 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.ExperimentalComposeUiApi
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.pointer.PointerButton
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
+import kotlin.math.max
+import org.jetbrains.compose.resources.stringResource
 
 @Composable
 fun FileBrowserScreen(
@@ -31,6 +43,7 @@ fun FileBrowserScreen(
     selectedDevice: String?
 ) {
     val currentPath by viewModel.currentPath.collectAsState()
+    val files by viewModel.files.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val errorText by viewModel.errorText.collectAsState()
     val sortBy by viewModel.sortBy.collectAsState()
@@ -39,8 +52,14 @@ fun FileBrowserScreen(
     val searchKeyword by viewModel.searchKeyword.collectAsState()
     val clipboardMode by viewModel.clipboardMode.collectAsState()
     val clipboardFiles by viewModel.clipboardFiles.collectAsState()
+    val showDialog by viewModel.showDialog.collectAsState()
+    val dialogMessage by viewModel.dialogMessage.collectAsState()
 
-    val filteredFiles = remember { derivedStateOf { viewModel.getFilteredFiles() } }
+    val filteredFiles = remember(files, showHidden, searchKeyword) {
+        val base = if (showHidden) files else files.filter { !it.name.startsWith(".") }
+        val keyword = searchKeyword.trim()
+        if (keyword.isBlank()) base else base.filter { it.name.contains(keyword, ignoreCase = true) }
+    }
     val listState = rememberLazyListState()
 
     // Dialog states
@@ -55,6 +74,9 @@ fun FileBrowserScreen(
     // Context menu state
     var contextMenuTarget by remember { mutableStateOf<FileInfo?>(null) }
     var contextMenuExpanded by remember { mutableStateOf(false) }
+    var contextMenuOffsetPx by remember { mutableStateOf(Offset.Zero) }
+    var fileListRootPx by remember { mutableStateOf(Offset.Zero) }
+    val density = LocalDensity.current
 
     LaunchedEffect(selectedDevice) {
         viewModel.loadFiles(deviceId = selectedDevice)
@@ -133,6 +155,17 @@ fun FileBrowserScreen(
         )
     }
 
+    if (showDialog) {
+        dialogMessage?.let { message ->
+            TipDialog(
+                dialogText = when (message) {
+                    is MsgContent.Resource -> stringResource(message.stringResource, *message.args.toTypedArray())
+                    is MsgContent.Text -> message.text
+                }
+            ) { viewModel.dismissTipDialog() }
+        }
+    }
+
     Column(
         modifier = Modifier.fillMaxSize().padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -203,7 +236,7 @@ fun FileBrowserScreen(
         ) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
-                    text = "${filteredFiles.value.size} 项",
+                    text = "${filteredFiles.size} 项",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold
                 )
@@ -253,7 +286,7 @@ fun FileBrowserScreen(
                         }
                     }
                 }
-                filteredFiles.value.isEmpty() -> {
+                filteredFiles.isEmpty() -> {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Text(
                             text = "此目录为空",
@@ -263,7 +296,13 @@ fun FileBrowserScreen(
                     }
                 }
                 else -> {
-                    Box(modifier = Modifier.fillMaxSize()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .onGloballyPositioned { coordinates ->
+                                fileListRootPx = coordinates.positionInRoot()
+                            }
+                    ) {
                         // Column header
                         Column(modifier = Modifier.fillMaxSize()) {
                             // Header row
@@ -320,7 +359,7 @@ fun FileBrowserScreen(
                                     state = listState,
                                     verticalArrangement = Arrangement.spacedBy(2.dp)
                                 ) {
-                                    items(filteredFiles.value, key = { it.name }) { file ->
+                                    items(filteredFiles, key = { it.name }) { file ->
                                         FileRow(
                                             file = file,
                                             isHighlighted = clipboardFiles.contains("$currentPath/${file.name}"),
@@ -329,8 +368,13 @@ fun FileBrowserScreen(
                                                     viewModel.navigateTo("$currentPath/${file.name}", selectedDevice)
                                                 }
                                             },
-                                            onRightClick = {
+                                            onRightClick = { clickInRoot ->
                                                 contextMenuTarget = file
+                                                val clickInList = clickInRoot - fileListRootPx
+                                                contextMenuOffsetPx = Offset(
+                                                    x = max(0f, clickInList.x),
+                                                    y = max(0f, clickInList.y)
+                                                )
                                                 contextMenuExpanded = true
                                             }
                                         )
@@ -357,9 +401,12 @@ fun FileBrowserScreen(
                                         interactionSource = remember { MutableInteractionSource() }
                                     ) { contextMenuExpanded = false }
                             )
-                            DropdownMenu(
+                            androidx.compose.material.DropdownMenu(
                                 expanded = contextMenuExpanded,
                                 onDismissRequest = { contextMenuExpanded = false },
+                                offset = with(density) {
+                                    DpOffset(contextMenuOffsetPx.x.toDp(), contextMenuOffsetPx.y.toDp())
+                                },
                                 modifier = Modifier.width(200.dp)
                             ) {
                                 val file = contextMenuTarget!!
@@ -523,7 +570,7 @@ private fun NavigationToolbar(
             OutlinedTextField(
                 value = if (isEditingPath) pathInput else currentPath,
                 onValueChange = { pathInput = it },
-                modifier = Modifier.weight(1f).height(40.dp),
+                modifier = Modifier.weight(1f),
                 singleLine = true,
                 textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
                 placeholder = { Text("输入路径", style = MaterialTheme.typography.bodySmall) },
@@ -572,7 +619,7 @@ private fun NavigationToolbar(
             OutlinedTextField(
                 value = searchKeyword,
                 onValueChange = onSearchChange,
-                modifier = Modifier.fillMaxWidth().height(40.dp),
+                modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 textStyle = MaterialTheme.typography.bodySmall,
                 placeholder = { Text("搜索文件名...", style = MaterialTheme.typography.bodySmall) },
@@ -681,27 +728,43 @@ private fun SortChip(
     }
 }
 
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 private fun FileRow(
     file: FileInfo,
     isHighlighted: Boolean,
     onClick: () -> Unit,
-    onRightClick: () -> Unit
+    onRightClick: (Offset) -> Unit
 ) {
     val bgColor = if (isHighlighted) {
         MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
     } else {
         MaterialTheme.colorScheme.surface.copy(alpha = 0.01f)
     }
+    var rowRootPx by remember(file.name) { mutableStateOf(Offset.Zero) }
 
     Surface(
         shape = RoundedCornerShape(6.dp),
         color = bgColor,
         modifier = Modifier
             .fillMaxWidth()
+            .onGloballyPositioned { coordinates ->
+                rowRootPx = coordinates.positionInRoot()
+            }
+            .pointerInput(file.name) {
+                awaitPointerEventScope {
+                    while (true) {
+                        val event = awaitPointerEvent()
+                        if (event.button == PointerButton.Secondary && event.type == PointerEventType.Press) {
+                            val clickInRoot = rowRootPx + event.changes.first().position
+                            onRightClick(clickInRoot)
+                        }
+                    }
+                }
+            }
             .combinedClickable(
                 onClick = onClick,
-                onLongClick = onRightClick
+                onLongClick = { onRightClick(rowRootPx) }
             )
     ) {
         Row(
