@@ -39,7 +39,7 @@ plugins {
     alias(libs.plugins.composeHotReload)
 }
 
-val appVersion = "2.0.2"
+val appVersion = "2.0.3"
 val generatedVersionSourceDir = layout.buildDirectory.dir("generated/source/appVersion/desktopMain/kotlin")
 val generateDesktopAppVersion = tasks.register<GenerateAppVersionTask>("generateDesktopAppVersion") {
     versionName.set(appVersion)
@@ -91,6 +91,7 @@ kotlin {
 compose.desktop {
     application {
         mainClass = "com.ludoven.adbtool.MainKt"
+        jvmArgs += listOf("-Djna.nosys=true")
 
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Exe)
