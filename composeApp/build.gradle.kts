@@ -94,6 +94,9 @@ compose.desktop {
     application {
         mainClass = "com.ludoven.adbtool.MainKt"
         jvmArgs += listOf("-Djna.nosys=true")
+        buildTypes.release.proguard {
+            configurationFiles.from(project.file("proguard-rules.pro"))
+        }
 
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Exe)
