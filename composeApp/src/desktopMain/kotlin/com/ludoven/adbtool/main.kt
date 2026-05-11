@@ -36,6 +36,7 @@ private const val GITHUB_URL = "https://github.com/ludoven/QADB"
 private const val FEEDBACK_URL = "https://github.com/ludoven/QADB/issues"
 
 fun main() = application {
+    val isWindows = System.getProperty("os.name").contains("windows", ignoreCase = true)
     val windowState = rememberWindowState(
         width = 1200.dp,
         height = 800.dp,
@@ -52,29 +53,31 @@ fun main() = application {
         icon = painterResource(Res.drawable.ic_logo),
         alwaysOnTop = alwaysOnTop
     ) {
-        MenuBar {
-            AppMenuBar(
-                alwaysOnTop = alwaysOnTop,
-                onAlwaysOnTopToggle = { alwaysOnTop = !alwaysOnTop },
-                onClose = ::exitApplication,
-                onMinimize = { windowState.isMinimized = true },
-                onZoomIn = { resizeWindow(windowState, 1.08f) },
-                onZoomOut = { resizeWindow(windowState, 0.92f) },
-                onZoomReset = { windowState.size = DpSize(1200.dp, 800.dp) },
-                onToggleTheme = {
-                    val nextMode = if (currentThemeMode == ThemeManager.ThemeMode.DARK) {
-                        ThemeManager.ThemeMode.LIGHT
-                    } else {
-                        ThemeManager.ThemeMode.DARK
+        if (!isWindows) {
+            MenuBar {
+                AppMenuBar(
+                    alwaysOnTop = alwaysOnTop,
+                    onAlwaysOnTopToggle = { alwaysOnTop = !alwaysOnTop },
+                    onClose = ::exitApplication,
+                    onMinimize = { windowState.isMinimized = true },
+                    onZoomIn = { resizeWindow(windowState, 1.08f) },
+                    onZoomOut = { resizeWindow(windowState, 0.92f) },
+                    onZoomReset = { windowState.size = DpSize(1200.dp, 800.dp) },
+                    onToggleTheme = {
+                        val nextMode = if (currentThemeMode == ThemeManager.ThemeMode.DARK) {
+                            ThemeManager.ThemeMode.LIGHT
+                        } else {
+                            ThemeManager.ThemeMode.DARK
+                        }
+                        ThemeManager.setThemeMode(nextMode)
+                    },
+                    onConnectDevice = { address ->
+                        coroutineScope.launch {
+                            AppMenuCommandBus.dispatch(AppMenuCommand.ConnectDevice(address))
+                        }
                     }
-                    ThemeManager.setThemeMode(nextMode)
-                },
-                onConnectDevice = { address ->
-                    coroutineScope.launch {
-                        AppMenuCommandBus.dispatch(AppMenuCommand.ConnectDevice(address))
-                    }
-                }
-            )
+                )
+            }
         }
         App()
     }
