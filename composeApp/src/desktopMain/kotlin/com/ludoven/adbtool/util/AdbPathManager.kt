@@ -1,8 +1,5 @@
 package com.ludoven.adbtool.util
 
-import io.github.vinceglb.filekit.FileKit
-import io.github.vinceglb.filekit.absolutePath
-import io.github.vinceglb.filekit.dialogs.openFilePicker
 import java.io.File
 import java.io.IOException
 import kotlinx.coroutines.Dispatchers
@@ -60,7 +57,6 @@ object AdbPathManager {
      * 2. 本地配置文件路径（用户之前设置的路径）
      * 3. 系统PATH环境变量中的adb
      * 4. 常见安装路径列表
-     * 5. 用户手动选择文件
      * 
      * @return 有效的ADB路径，如果未找到则返回null
      */
@@ -94,14 +90,6 @@ object AdbPathManager {
                 println("在常见路径中找到ADB: $commonPath")
                 setAdbPath(commonPath)
                 return@withContext commonPath
-            }
-
-            // 5. 用户手动选择
-            val userSelectedPath = showAdbPickerDialog()
-            if (userSelectedPath != null) {
-                println("用户选择的ADB路径: $userSelectedPath")
-                setAdbPath(userSelectedPath)
-                return@withContext userSelectedPath
             }
 
             println("未找到有效的ADB路径")
@@ -241,23 +229,4 @@ object AdbPathManager {
             null
         }
     }
-
-    /**
-     * 显示文件选择对话框让用户手动选择ADB文件
-     * @return 用户选择的ADB路径，如果取消则返回null
-     */
-    private suspend fun showAdbPickerDialog(): String? {
-        return try {
-            withContext(Dispatchers.Main) {
-                val selectedFile = FileKit.openFilePicker()
-                selectedFile?.absolutePath()?.toString()?.takeIf { path ->
-                    isValidAdb(path)
-                }
-            }
-        } catch (e: Exception) {
-            println("文件选择对话框错误: ${e.message}")
-            null
-        }
-    }
 }
-

@@ -69,11 +69,13 @@ kotlin {
             implementation("org.jetbrains.androidx.navigation:navigation-compose:2.9.0-beta03")
 
 
-            val fileKit = "0.10.0-beta04"
+            val fileKit = "0.10.0"
             implementation("io.github.vinceglb:filekit-core:$fileKit")
             implementation("io.github.vinceglb:filekit-dialogs:$fileKit")
             implementation("io.github.vinceglb:filekit-dialogs-compose:$fileKit")
             implementation("io.github.vinceglb:filekit-coil:$fileKit")
+            implementation("net.java.dev.jna:jna:5.18.1")
+            implementation("net.java.dev.jna:jna-platform:5.18.1")
             implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
 
         }
