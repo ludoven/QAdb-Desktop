@@ -83,6 +83,7 @@ kotlin {
             implementation(libs.kotlin.test)
         }
         desktopMain.dependencies {
+            implementation(enforcedPlatform("org.jetbrains.kotlinx:kotlinx-coroutines-bom:1.8.0"))
             implementation(compose.desktop.currentOs)
             implementation(libs.kotlinx.coroutinesSwing)
         }

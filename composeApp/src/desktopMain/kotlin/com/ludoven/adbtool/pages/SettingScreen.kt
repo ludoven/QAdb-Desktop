@@ -153,13 +153,12 @@ fun SettingScreen() {
                 readOnly = true,
                 trailingIcon = {
                     IconButton(onClick = {
-                        coroutineScope.launch {
-                            val newPath = FileUtils.selectFile()
-                            if (newPath != null) {
-                                AdbPathManager.setAdbPath(newPath)
-                                adbPath = newPath
-                                showDialog = true
-                            }
+                        val newPath = runCatching { FileUtils.selectFileBlocking() }
+                            .getOrNull()
+                        if (newPath != null) {
+                            AdbPathManager.setAdbPath(newPath)
+                            adbPath = newPath
+                            showDialog = true
                         }
                     }) {
                         Icon(

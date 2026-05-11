@@ -57,21 +57,25 @@ object FileUtils {
 
     suspend fun selectFile(): String? {
         if (isWindows) {
-            return runOnEdt {
-                val chooser = JFileChooser().apply {
-                    fileSelectionMode = JFileChooser.FILES_ONLY
-                    isMultiSelectionEnabled = false
-                }
-                if (chooser.showOpenDialog(null) == JFileChooser.APPROVE_OPTION) {
-                    chooser.selectedFile?.absolutePath
-                } else {
-                    null
-                }
-            }
+            return selectFileBlocking()
         }
 
         val openFilePicker = FileKit.openFilePicker()
         return openFilePicker?.absolutePath()
+    }
+
+    fun selectFileBlocking(): String? {
+        return runOnEdt {
+            val chooser = JFileChooser().apply {
+                fileSelectionMode = JFileChooser.FILES_ONLY
+                isMultiSelectionEnabled = false
+            }
+            if (chooser.showOpenDialog(null) == JFileChooser.APPROVE_OPTION) {
+                chooser.selectedFile?.absolutePath
+            } else {
+                null
+            }
+        }
     }
 
     private fun <T> runOnEdt(action: () -> T): T {
