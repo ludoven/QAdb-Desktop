@@ -1,49 +1,79 @@
 package com.ludoven.adbtool.util
 
+import java.awt.Desktop
 import java.io.File
 import java.io.IOException
+import java.net.URI
+import java.util.Properties
+import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
 
-
 /**
- * ADB路径管理器
- * 负责自动检测、缓存和管理ADB可执行文件的路径
+ * ADB 路径管理器。
+ *
+ * 默认自动检测系统 ADB；系统不可用时回退到 QADB 内置 ADB。
  */
 object AdbPathManager {
 
+    enum class AdbSource {
+        SYSTEM,
+        BUNDLED,
+        CUSTOM,
+        NONE
+    }
+
+    data class AdbEnvironment(
+        val path: String? = null,
+        val source: AdbSource = AdbSource.NONE,
+        val version: String? = null,
+        val isReady: Boolean = false,
+        val message: String? = null
+    )
+
+    private data class SavedPreference(
+        val source: AdbSource?,
+        val path: String?
+    )
+
+    private data class ValidationResult(
+        val isValid: Boolean,
+        val version: String? = null,
+        val error: String? = null
+    )
+
     private val configFile = File(System.getProperty("user.home"), ".adb_path_config")
+    private const val HELP_URL = "https://ludoven.github.io/QADB/guide/getting-started.html"
+    private const val FRIENDLY_INIT_ERROR = "ADB 初始化失败，请检查 QADB 是否有执行权限，或手动选择 adb 路径。"
 
-    /**
-     * 供外部访问的当前ADB路径，只读
-     */
+    private val _adbEnvironment = MutableStateFlow(
+        AdbEnvironment(message = "正在检测 ADB 环境...")
+    )
+    val adbEnvironment: StateFlow<AdbEnvironment> = _adbEnvironment.asStateFlow()
+
     val currentAdbPath: String?
-        get() = cachedAdbPath
+        get() = _adbEnvironment.value.path
 
-    // 内部缓存路径
-    private var cachedAdbPath: String? = null
-
-    /**
-     * 常见的ADB安装路径列表
-     */
     private val commonAdbPaths: List<String>
         get() {
             val userName = System.getProperty("user.name")
             val osName = System.getProperty("os.name").lowercase()
-            
+
             return when {
                 osName.contains("mac") -> listOf(
                     "/Users/$userName/Library/Android/sdk/platform-tools/adb",
                     "/opt/homebrew/bin/adb",
-                    "/usr/local/bin/adb",
-                    "/Applications/Android Studio.app/Contents/plugins/android/lib/android.jar/../../../bin/adb"
+                    "/usr/local/bin/adb"
                 )
                 osName.contains("windows") -> listOf(
                     "C:\\Users\\$userName\\AppData\\Local\\Android\\sdk\\platform-tools\\adb.exe",
                     "C:\\Program Files (x86)\\Android\\android-sdk\\platform-tools\\adb.exe",
                     "C:\\Android\\sdk\\platform-tools\\adb.exe"
                 )
-                else -> listOf( // Linux
+                else -> listOf(
                     "/home/$userName/Android/Sdk/platform-tools/adb",
                     "/usr/local/bin/adb",
                     "/usr/bin/adb"
@@ -51,182 +81,313 @@ object AdbPathManager {
             }
         }
 
-    /**
-     * 获取有效的ADB路径，按以下优先级顺序：
-     * 1. 缓存路径（内存中已验证的路径）
-     * 2. 本地配置文件路径（用户之前设置的路径）
-     * 3. 系统PATH环境变量中的adb
-     * 4. 常见安装路径列表
-     * 
-     * @return 有效的ADB路径，如果未找到则返回null
-     */
     suspend fun getAdbPath(): String? = withContext(Dispatchers.IO) {
-        try {
-            // 1. 检查缓存路径
-            cachedAdbPath?.takeIf { isValidAdb(it) }?.let { 
-                println("使用缓存的ADB路径: $it")
-                return@withContext it 
-            }
-
-            // 2. 读取配置文件
-            val savedPath = readSavedPath()
-            if (savedPath != null && isValidAdb(savedPath)) {
-                println("使用配置文件中的ADB路径: $savedPath")
-                setAdbPath(savedPath)
-                return@withContext savedPath
-            }
-
-            // 3. 系统PATH中查找
-            val systemPath = getAdbFromSystemPath()
-            if (systemPath != null) {
-                println("在系统PATH中找到ADB: $systemPath")
-                setAdbPath(systemPath)
-                return@withContext systemPath
-            }
-
-            // 4. 常见路径检查
-            val commonPath = findAdbInCommonPaths()
-            if (commonPath != null) {
-                println("在常见路径中找到ADB: $commonPath")
-                setAdbPath(commonPath)
-                return@withContext commonPath
-            }
-
-            println("未找到有效的ADB路径")
-            null
-        } catch (e: Exception) {
-            println("获取ADB路径时发生错误: ${e.message}")
-            null
-        }
+        detectAdbEnvironment(preferSavedPreference = true).path
     }
 
-    /**
-     * 设置ADB路径并保存到配置文件
-     * @param path ADB可执行文件的路径
-     * @return 是否设置成功
-     */
+    suspend fun detectAdbEnvironment(preferSavedPreference: Boolean = true): AdbEnvironment = withContext(Dispatchers.IO) {
+        val environment = resolveEnvironment(preferSavedPreference)
+        _adbEnvironment.value = environment
+        environment
+    }
+
+    suspend fun autoDetect(): AdbEnvironment = withContext(Dispatchers.IO) {
+        deleteSavedPreference()
+        val environment = resolveEnvironment(preferSavedPreference = false)
+        _adbEnvironment.value = environment
+        environment
+    }
+
+    suspend fun useBundledAdb(): AdbEnvironment = withContext(Dispatchers.IO) {
+        val environment = bundledAdbEnvironment()
+        if (environment.isReady) {
+            writeSavedPreference(AdbSource.BUNDLED, environment.path)
+        }
+        _adbEnvironment.value = environment
+        environment
+    }
+
     fun setAdbPath(path: String): Boolean {
-        return try {
-            if (isValidAdb(path)) {
-                cachedAdbPath = path
-                configFile.writeText(path)
-                println("ADB路径已设置: $path")
-                true
-            } else {
-                println("无效的ADB路径: $path")
-                false
-            }
-        } catch (e: IOException) {
-            println("保存ADB路径配置失败: ${e.message}")
+        val validation = validateAdb(path)
+        return if (validation.isValid) {
+            writeSavedPreference(AdbSource.CUSTOM, path)
+            _adbEnvironment.value = AdbEnvironment(
+                path = path,
+                source = AdbSource.CUSTOM,
+                version = validation.version,
+                isReady = true
+            )
+            true
+        } else {
+            _adbEnvironment.value = AdbEnvironment(
+                path = path.takeIf { it.isNotBlank() },
+                source = AdbSource.CUSTOM,
+                isReady = false,
+                message = friendlyInitializationError(validation.error)
+            )
             false
         }
     }
 
-    /**
-     * 重置ADB路径配置
-     */
     fun reset() {
-        try {
-            cachedAdbPath = null
-            if (configFile.exists()) {
-                configFile.delete()
-                println("ADB路径配置已重置")
-            }
-        } catch (e: IOException) {
-            println("重置ADB路径配置失败: ${e.message}")
+        deleteSavedPreference()
+        _adbEnvironment.value = AdbEnvironment(message = "已恢复自动检测 ADB。")
+    }
+
+    fun friendlyInitializationError(rawError: String?): String {
+        return FRIENDLY_INIT_ERROR
+    }
+
+    fun sourceDisplayName(source: AdbSource): String {
+        return when (source) {
+            AdbSource.SYSTEM -> "系统 ADB"
+            AdbSource.BUNDLED -> "QADB 内置 ADB"
+            AdbSource.CUSTOM -> "自定义 ADB"
+            AdbSource.NONE -> "未就绪"
         }
     }
 
-    /**
-     * 从配置文件读取保存的路径
-     */
-    private fun readSavedPath(): String? {
-        return try {
-            if (configFile.exists()) {
-                configFile.readText().trim().takeIf { it.isNotEmpty() }
-            } else {
-                null
+    fun openHelp(): Result<Unit> = runCatching {
+        if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)) {
+            Desktop.getDesktop().browse(URI(HELP_URL))
+        } else {
+            throw IllegalStateException("当前系统不支持打开浏览器。")
+        }
+    }
+
+    fun resolveBundledAdbPath(
+        resourceRoot: File,
+        osName: String = System.getProperty("os.name"),
+        osArch: String = System.getProperty("os.arch")
+    ): File? {
+        val normalizedOs = osName.lowercase()
+        val normalizedArch = osArch.lowercase()
+        val relativePath = when {
+            normalizedOs.contains("mac") -> {
+                val archDir = if (
+                    normalizedArch.contains("aarch64") ||
+                    normalizedArch.contains("arm64")
+                ) {
+                    "arm64"
+                } else {
+                    "x64"
+                }
+                "adb/macos/$archDir/adb"
             }
-        } catch (e: IOException) {
-            println("读取ADB路径配置失败: ${e.message}")
+            normalizedOs.contains("windows") -> "adb/windows/adb.exe"
+            normalizedOs.contains("linux") -> "adb/linux/adb"
+            else -> return null
+        }
+        return File(resourceRoot, relativePath)
+    }
+
+    private fun resolveEnvironment(preferSavedPreference: Boolean): AdbEnvironment {
+        if (preferSavedPreference) {
+            resolveSavedPreference()?.let { return it }
+        }
+
+        systemAdbEnvironment()?.let { return it }
+        return bundledAdbEnvironment()
+    }
+
+    private fun resolveSavedPreference(): AdbEnvironment? {
+        val saved = readSavedPreference() ?: return null
+        return when (saved.source) {
+            AdbSource.CUSTOM -> {
+                val path = saved.path ?: return null
+                val validation = validateAdb(path)
+                if (validation.isValid) {
+                    AdbEnvironment(path, AdbSource.CUSTOM, validation.version, isReady = true)
+                } else {
+                    AdbEnvironment(
+                        path = path,
+                        source = AdbSource.CUSTOM,
+                        isReady = false,
+                        message = friendlyInitializationError(validation.error)
+                    )
+                }
+            }
+            AdbSource.BUNDLED -> bundledAdbEnvironment()
+            else -> null
+        }
+    }
+
+    private fun systemAdbEnvironment(): AdbEnvironment? {
+        val systemPath = getAdbFromSystemPath()
+            ?: findAdbInCommonPaths()
+            ?: return null
+        val validation = validateAdb(systemPath)
+        return if (validation.isValid) {
+            AdbEnvironment(systemPath, AdbSource.SYSTEM, validation.version, isReady = true)
+        } else {
             null
         }
     }
 
-    /**
-     * 在常见路径中查找ADB
-     */
+    private fun bundledAdbEnvironment(): AdbEnvironment {
+        val bundledPath = findBundledResourceRoots()
+            .mapNotNull { resolveBundledAdbPath(it) }
+            .firstOrNull { it.exists() }
+
+        if (bundledPath == null) {
+            return AdbEnvironment(
+                source = AdbSource.NONE,
+                isReady = false,
+                message = friendlyInitializationError("Bundled ADB not found")
+            )
+        }
+
+        ensureExecutableIfPossible(bundledPath)
+        val validation = validateAdb(bundledPath.absolutePath)
+        return if (validation.isValid) {
+            AdbEnvironment(
+                path = bundledPath.absolutePath,
+                source = AdbSource.BUNDLED,
+                version = validation.version,
+                isReady = true
+            )
+        } else {
+            AdbEnvironment(
+                path = bundledPath.absolutePath,
+                source = AdbSource.BUNDLED,
+                isReady = false,
+                message = friendlyInitializationError(validation.error)
+            )
+        }
+    }
+
+    private fun findBundledResourceRoots(): List<File> {
+        val roots = mutableListOf<File>()
+        val resource = Thread.currentThread().contextClassLoader.getResource("adb")
+        if (resource != null && resource.protocol == "file") {
+            runCatching { File(resource.toURI()).parentFile }
+                .getOrNull()
+                ?.let { roots += it }
+        }
+        roots += File(System.getProperty("user.dir"), "composeApp/src/desktopMain/resources")
+        roots += File(System.getProperty("user.dir"), "src/desktopMain/resources")
+        return roots.distinctBy { it.absolutePath }
+    }
+
+    private fun ensureExecutableIfPossible(file: File) {
+        if (isWindows()) return
+        if (file.exists() && !file.canExecute()) {
+            runCatching { file.setExecutable(true, false) }
+        }
+    }
+
     private fun findAdbInCommonPaths(): String? {
         return commonAdbPaths.firstOrNull { path ->
-            try {
-                isValidAdb(path)
-            } catch (e: Exception) {
-                false
-            }
+            validateAdb(path).isValid
         }
     }
 
-    /**
-     * 验证给定路径是否为有效的ADB可执行文件
-     * @param path 要验证的文件路径
-     * @return 是否为有效的ADB文件
-     */
-    private fun isValidAdb(path: String): Boolean {
+    private fun validateAdb(path: String): ValidationResult {
         return try {
-            if (path.isBlank()) return false
-            
+            if (path.isBlank()) return ValidationResult(false, error = "ADB path is blank")
+
             val file = File(path)
-            val isValid = file.exists() && file.canExecute() && 
-                         (file.name == "adb" || file.name == "adb.exe")
-            
-            if (isValid) {
-                // 进一步验证：尝试执行adb version命令
-                val process = ProcessBuilder(path, "version")
-                    .redirectErrorStream(true)
-                    .start()
-                
-                val exitCode = process.waitFor()
-                val output = process.inputStream.bufferedReader().readText()
-                
-                exitCode == 0 && output.contains("Android Debug Bridge")
+            val isExecutableFile = file.exists() &&
+                file.canExecute() &&
+                (file.name == "adb" || file.name == "adb.exe")
+
+            if (!isExecutableFile) {
+                return ValidationResult(false, error = "ADB file is missing or not executable")
+            }
+
+            val process = ProcessBuilder(path, "version")
+                .redirectErrorStream(true)
+                .start()
+            val completed = process.waitFor(5, TimeUnit.SECONDS)
+            val output = process.inputStream.bufferedReader().readText()
+
+            if (!completed) {
+                process.destroyForcibly()
+                return ValidationResult(false, error = "ADB version check timed out")
+            }
+
+            if (process.exitValue() == 0 && output.contains("Android Debug Bridge")) {
+                ValidationResult(true, version = output.lines().firstOrNull { it.isNotBlank() }?.trim())
             } else {
-                false
+                ValidationResult(false, error = output.ifBlank { "ADB version check failed" })
             }
         } catch (e: Exception) {
-            println("验证ADB路径时发生错误: ${e.message}")
-            false
+            ValidationResult(false, error = e.message)
         }
     }
 
-    /**
-     * 从系统PATH环境变量中查找ADB
-     * @return 找到的ADB路径，如果未找到则返回null
-     */
     private fun getAdbFromSystemPath(): String? {
         return try {
-            val osName = System.getProperty("os.name").lowercase()
-            val isWindows = osName.contains("windows")
-            
-            val cmd = if (isWindows) {
-                arrayOf("where", "adb")
-            } else {
-                arrayOf("which", "adb")
-            }
-            
+            val cmd = if (isWindows()) arrayOf("where", "adb") else arrayOf("which", "adb")
             val process = ProcessBuilder(*cmd)
                 .redirectErrorStream(true)
                 .start()
-            
-            val exitCode = process.waitFor()
-            if (exitCode == 0) {
-                val result = process.inputStream.bufferedReader().readLine()?.trim()
-                result?.takeIf { it.isNotEmpty() && isValidAdb(it) }
+            val completed = process.waitFor(5, TimeUnit.SECONDS)
+            if (!completed) {
+                process.destroyForcibly()
+                return null
+            }
+            if (process.exitValue() == 0) {
+                process.inputStream.bufferedReader()
+                    .readLines()
+                    .firstOrNull { it.isNotBlank() }
+                    ?.trim()
+                    ?.takeIf { validateAdb(it).isValid }
             } else {
                 null
             }
         } catch (e: Exception) {
-            println("从系统PATH查找ADB时发生错误: ${e.message}")
             null
         }
+    }
+
+    private fun readSavedPreference(): SavedPreference? {
+        return try {
+            if (!configFile.exists()) return null
+            val raw = configFile.readText().trim()
+            if (raw.isBlank()) return null
+
+            if (!raw.contains("=")) {
+                return SavedPreference(AdbSource.CUSTOM, raw)
+            }
+
+            val properties = Properties()
+            properties.load(raw.byteInputStream())
+            SavedPreference(
+                source = properties.getProperty("source")?.let { runCatching { AdbSource.valueOf(it) }.getOrNull() },
+                path = properties.getProperty("path")?.takeIf { it.isNotBlank() }
+            )
+        } catch (e: IOException) {
+            null
+        }
+    }
+
+    private fun writeSavedPreference(source: AdbSource, path: String?) {
+        try {
+            val properties = Properties()
+            properties.setProperty("source", source.name)
+            if (!path.isNullOrBlank()) {
+                properties.setProperty("path", path)
+            }
+            configFile.writer().use { writer ->
+                properties.store(writer, "QADB ADB environment")
+            }
+        } catch (e: IOException) {
+            println("保存 ADB 配置失败: ${e.message}")
+        }
+    }
+
+    private fun deleteSavedPreference() {
+        try {
+            if (configFile.exists()) {
+                configFile.delete()
+            }
+        } catch (e: IOException) {
+            println("重置 ADB 配置失败: ${e.message}")
+        }
+    }
+
+    private fun isWindows(): Boolean {
+        return System.getProperty("os.name").lowercase().contains("windows")
     }
 }

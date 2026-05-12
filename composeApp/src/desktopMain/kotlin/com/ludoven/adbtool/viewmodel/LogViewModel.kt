@@ -55,7 +55,11 @@ class LogViewModel : ViewModel() {
 
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                val adbPath = AdbPathManager.currentAdbPath ?: throw IllegalStateException("ADB path not set")
+                val adbPath = AdbPathManager.currentAdbPath
+                    ?: throw IllegalStateException(
+                        AdbPathManager.adbEnvironment.value.message
+                            ?: AdbPathManager.friendlyInitializationError("ADB path not set")
+                    )
                 val command = buildList {
                     add(adbPath)
                     add("-s")

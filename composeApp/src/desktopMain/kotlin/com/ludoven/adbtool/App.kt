@@ -238,7 +238,14 @@ fun App() {
                                         TerminalScreen(
                                             viewModel = terminalViewModel,
                                             selectedDevice = selectedDevice,
-                                            deviceDisplayNames = deviceDisplayNames
+                                            devices = devices,
+                                            deviceDisplayNames = deviceDisplayNames,
+                                            onSelectDevice = { deviceId ->
+                                                devicesViewModel.selectDevice(deviceId)
+                                            },
+                                            onRefreshDevices = {
+                                                devicesViewModel.refreshDevices()
+                                            }
                                         )
                                     }
                                 }

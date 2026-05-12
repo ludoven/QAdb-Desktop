@@ -11,6 +11,14 @@ import adbtool_desktop.composeapp.generated.resources.connection_type
 import adbtool_desktop.composeapp.generated.resources.cpu_usage
 import adbtool_desktop.composeapp.generated.resources.device_info
 import adbtool_desktop.composeapp.generated.resources.android_version
+import adbtool_desktop.composeapp.generated.resources.adb_environment_failed
+import adbtool_desktop.composeapp.generated.resources.adb_environment_checking
+import adbtool_desktop.composeapp.generated.resources.adb_environment_ready
+import adbtool_desktop.composeapp.generated.resources.adb_source_bundled
+import adbtool_desktop.composeapp.generated.resources.adb_source_custom
+import adbtool_desktop.composeapp.generated.resources.adb_source_none
+import adbtool_desktop.composeapp.generated.resources.adb_source_system
+import adbtool_desktop.composeapp.generated.resources.adb_using
 import adbtool_desktop.composeapp.generated.resources.build_fingerprint
 import adbtool_desktop.composeapp.generated.resources.device_overview
 import adbtool_desktop.composeapp.generated.resources.device_model
@@ -74,6 +82,7 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DeveloperMode
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Memory
@@ -103,6 +112,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.ludoven.adbtool.entity.DeviceInfoData
+import com.ludoven.adbtool.util.AdbPathManager
 import com.ludoven.adbtool.viewmodel.DevicesViewModel
 import com.ludoven.adbtool.widget.DashboardMetricCard
 import com.ludoven.adbtool.widget.DashboardPanel
@@ -132,6 +142,7 @@ fun HomeScreen(
     val centerInfo by viewModel.centerInfo.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val lastRefreshTime by viewModel.lastRefreshTime.collectAsState()
+    val adbEnvironment by AdbPathManager.adbEnvironment.collectAsState()
 
     var showDropdown by remember { mutableStateOf(false) }
     val scrollState = rememberScrollState()
@@ -221,6 +232,8 @@ fun HomeScreen(
                     onRefresh = { viewModel.refreshDevices() },
                     onDisconnect = { viewModel.disconnectSelectedDevice() }
                 )
+
+                AdbEnvironmentStatusCard(adbEnvironment)
 
                 DeviceSelectorCard(
                     devices = devices,
@@ -313,6 +326,66 @@ fun HomeScreen(
                     .fillMaxHeight()
             )
         }
+    }
+}
+
+@Composable
+private fun AdbEnvironmentStatusCard(environment: AdbPathManager.AdbEnvironment) {
+    val isReady = environment.isReady
+    val isChecking = !isReady &&
+        environment.source == AdbPathManager.AdbSource.NONE &&
+        environment.message?.contains("检测") == true
+    GlassCard(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 18.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Icon(
+                imageVector = if (isReady) Icons.Default.CheckCircle else Icons.Default.Error,
+                contentDescription = null,
+                tint = if (isReady) Color(0xFF2DBE60) else MaterialTheme.colorScheme.error,
+                modifier = Modifier.size(20.dp)
+            )
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
+                Text(
+                    text = when {
+                        isReady -> stringResource(Res.string.adb_environment_ready)
+                        isChecking -> stringResource(Res.string.adb_environment_checking)
+                        else -> stringResource(Res.string.adb_environment_failed)
+                    },
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    text = if (isReady) {
+                        stringResource(Res.string.adb_using, adbSourceText(environment.source))
+                    } else {
+                        environment.message.orEmpty()
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun adbSourceText(source: AdbPathManager.AdbSource): String {
+    return when (source) {
+        AdbPathManager.AdbSource.SYSTEM -> stringResource(Res.string.adb_source_system)
+        AdbPathManager.AdbSource.BUNDLED -> stringResource(Res.string.adb_source_bundled)
+        AdbPathManager.AdbSource.CUSTOM -> stringResource(Res.string.adb_source_custom)
+        AdbPathManager.AdbSource.NONE -> stringResource(Res.string.adb_source_none)
     }
 }
 

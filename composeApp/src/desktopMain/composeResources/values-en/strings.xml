@@ -111,13 +111,17 @@
     <string name="terminal_history">Command History</string>
     <string name="terminal_output">Terminal Output</string>
     <string name="terminal_clear_output">Clear Output</string>
+    <string name="terminal_clear_input">Clear Input</string>
     <string name="terminal_no_output">No output yet. Execute a command to view logs.</string>
     <string name="terminal_copy_output">Copy Output</string>
+    <string name="terminal_prev_command">Previous Command</string>
+    <string name="terminal_next_command">Next Command</string>
     <string name="terminal_quick_commands">Quick Commands</string>
     <string name="terminal_recent_commands">Recent Commands</string>
     <string name="terminal_command_preview">Command Preview</string>
     <string name="terminal_tips">Tips</string>
     <string name="terminal_tip_text">Tip: Commands run on the current connected device. Supports adb subcommands and shell commands.</string>
+    <string name="terminal_shortcuts">Shortcuts: Enter execute, Up/Down history, Esc clear input, Cmd/Ctrl+L clear output, Cmd/Ctrl+Shift+C copy output.</string>
     <string name="terminal_tab_shell">ADB Shell</string>
     <string name="terminal_tab_logcat">Logcat</string>
 
@@ -184,11 +188,26 @@
     <string name="app_info_placeholder">Please select an app to view its information.</string>
 
     <!-- Settings Page -->
-    <string name="adb_path_setting">ADB Path Setting</string>
+    <string name="adb_path_setting">ADB Environment</string>
     <string name="current_adb_path">Current ADB Path</string>
+    <string name="adb_environment_ready">ADB is ready</string>
+    <string name="adb_environment_checking">Checking ADB environment</string>
+    <string name="adb_environment_failed">ADB initialization failed</string>
+    <string name="adb_current_using">Current source</string>
+    <string name="adb_using">Current source: %1$s</string>
+    <string name="adb_version_label">ADB Version</string>
+    <string name="adb_source_system">System ADB</string>
+    <string name="adb_source_bundled">QADB bundled ADB</string>
+    <string name="adb_source_custom">Custom ADB</string>
+    <string name="adb_source_none">Not ready</string>
+    <string name="adb_auto_detect">Auto Detect</string>
+    <string name="adb_select_adb">Select adb</string>
+    <string name="adb_restore_bundled">Restore bundled adb</string>
+    <string name="adb_open_help">Open Guide</string>
     <string name="select_adb_path">Select ADB Path</string>
     <string name="adb_path_set_success">ADB path set successfully!</string>
     <string name="language_setting">Language Setting</string>
+    <string name="preferences_setting">Preferences</string>
     <string name="select_language">Select Language</string>
     <string name="theme_setting">Theme Setting</string>
     <string name="select_theme">Select Theme</string>

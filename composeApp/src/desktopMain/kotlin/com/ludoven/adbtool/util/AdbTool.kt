@@ -50,7 +50,12 @@ object AdbTool {
         return withContext(Dispatchers.IO) {
             try {
                 val adbPath = AdbPathManager.getAdbPath() 
-                    ?: return@withContext AdbResult(false, "", "ADB path not found")
+                    ?: return@withContext AdbResult(
+                        false,
+                        "",
+                        AdbPathManager.adbEnvironment.value.message
+                            ?: AdbPathManager.friendlyInitializationError("ADB path not found")
+                    )
                 
                 val fullCmd = mutableListOf(adbPath).apply { addAll(args) }
                 val process = ProcessBuilder(fullCmd)
@@ -66,7 +71,7 @@ object AdbTool {
                     AdbResult(false, output, "Command failed with exit code: $exitCode")
                 }
             } catch (e: Exception) {
-                AdbResult(false, "", "Execution failed: ${e.message}")
+                AdbResult(false, "", AdbPathManager.friendlyInitializationError(e.message))
             }
         }
     }
@@ -76,14 +81,16 @@ object AdbTool {
      */
     private fun runCommand(vararg args: String): String {
         return try {
-            val adbPath = AdbPathManager.currentAdbPath ?: "adb"
+            val environment = AdbPathManager.adbEnvironment.value
+            val adbPath = environment.path
+                ?: return environment.message ?: AdbPathManager.friendlyInitializationError("ADB path not found")
             val fullCmd = mutableListOf(adbPath).apply { addAll(args) }
             val process = ProcessBuilder(fullCmd).redirectErrorStream(true).start()
             val output = process.inputStream.bufferedReader().readText()
             process.waitFor()
             output.trim()
         } catch (e: Exception) {
-            "Execution failed: ${e.message}"
+            AdbPathManager.friendlyInitializationError(e.message)
         }
     }
 

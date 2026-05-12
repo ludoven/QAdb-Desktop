@@ -112,13 +112,17 @@
     <string name="terminal_history">历史命令</string>
     <string name="terminal_output">终端输出</string>
     <string name="terminal_clear_output">清空输出</string>
+    <string name="terminal_clear_input">清空输入</string>
     <string name="terminal_no_output">暂无输出，执行命令后会显示在这里</string>
     <string name="terminal_copy_output">复制输出</string>
+    <string name="terminal_prev_command">上一条命令</string>
+    <string name="terminal_next_command">下一条命令</string>
     <string name="terminal_quick_commands">快捷命令</string>
     <string name="terminal_recent_commands">最近命令</string>
     <string name="terminal_command_preview">命令预览</string>
     <string name="terminal_tips">使用技巧</string>
     <string name="terminal_tip_text">提示：终端命令会在当前已连接设备上执行。支持输入 adb 子命令或 shell 命令。</string>
+    <string name="terminal_shortcuts">快捷键：Enter 执行，↑/↓ 切换历史，Esc 清空输入，Cmd/Ctrl+L 清空输出，Cmd/Ctrl+Shift+C 复制输出。</string>
     <string name="terminal_tab_shell">ADB Shell</string>
     <string name="terminal_tab_logcat">Logcat</string>
 
@@ -186,11 +190,26 @@
     <string name="app_info_placeholder">请选择一个应用以查看其信息。</string>
 
     <!-- 设置页面 -->
-    <string name="adb_path_setting">ADB路径设置</string>
+    <string name="adb_path_setting">ADB 环境</string>
     <string name="current_adb_path">当前ADB路径</string>
+    <string name="adb_environment_ready">ADB 已就绪</string>
+    <string name="adb_environment_checking">正在检测 ADB 环境</string>
+    <string name="adb_environment_failed">ADB 初始化失败</string>
+    <string name="adb_current_using">当前使用</string>
+    <string name="adb_using">当前使用：%1$s</string>
+    <string name="adb_version_label">ADB 版本</string>
+    <string name="adb_source_system">系统 ADB</string>
+    <string name="adb_source_bundled">QADB 内置 ADB</string>
+    <string name="adb_source_custom">自定义 ADB</string>
+    <string name="adb_source_none">未就绪</string>
+    <string name="adb_auto_detect">自动检测</string>
+    <string name="adb_select_adb">选择 adb</string>
+    <string name="adb_restore_bundled">恢复内置 adb</string>
+    <string name="adb_open_help">打开说明</string>
     <string name="select_adb_path">选择ADB路径</string>
     <string name="adb_path_set_success">ADB路径设置成功！</string>
     <string name="language_setting">语言设置</string>
+    <string name="preferences_setting">偏好设置</string>
     <string name="select_language">选择语言</string>
     <string name="theme_setting">主题设置</string>
     <string name="select_theme">选择主题</string>

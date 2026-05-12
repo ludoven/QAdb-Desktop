@@ -113,24 +113,34 @@ QADB 适合以下用户：
 
 ---
 
+## 📝 更新日志
+
+### v2.0.5 - 2026-05-12
+
+- 新增内置 ADB，默认开箱即用，减少手动安装和配置环境变量的步骤
+- 重构终端页面，优化命令输入、执行和结果展示体验
+- 优化命令中心布局，让常用命令入口更清晰、更易查找
+
+---
+
 ## ⚡ 快速开始
 
-### 1. 安装 ADB
+### 1. 准备 ADB
 
-QADB 依赖系统中的 `adb` 命令。
+QADB v2.0.5 起已内置 ADB，默认可直接使用。
 
-你需要先安装 Android Platform Tools：
+如果你需要使用自己安装的 ADB，也可以在设置中配置自定义 ADB 路径。常见来源包括：
 
 - Android Studio 用户通常已经自带 ADB
-- 也可以单独下载 Android SDK Platform Tools
+- 单独下载 Android SDK Platform Tools
 
-安装完成后，请确保在终端中可以正常执行：
+如需验证自定义 ADB 环境，可以在终端中执行：
 
 ```bash
 adb version
 ```
 
-如果能看到 ADB 版本信息，说明环境正常。
+如果能看到 ADB 版本信息，说明自定义环境正常。
 
 ---
 
@@ -213,8 +223,8 @@ adb connect 192.168.1.100:5555
 
 请确认：
 
-- 已安装 Android Platform Tools
-- `adb devices` 可以在终端正常执行
+- 已使用内置 ADB，或自定义 ADB 路径配置正确
+- `adb devices` 可以在终端正常执行（使用自定义 ADB 时）
 - 手机或设备已开启 USB 调试
 - 设备已允许 USB 调试授权
 - USB 数据线支持数据传输
@@ -224,15 +234,15 @@ adb connect 192.168.1.100:5555
 
 ### 2. 为什么提示找不到 adb？
 
-请确认 `adb` 已加入系统环境变量。
+请先在设置中确认当前 ADB 来源和路径状态。QADB 会优先使用可用的内置 ADB；如果你切换为自定义 ADB，请确认路径配置正确。
 
-你可以在终端执行：
+使用自定义 ADB 时，可以在终端执行：
 
 ```bash
 adb version
 ```
 
-如果提示命令不存在，需要先安装 Android Platform Tools，并将其目录加入环境变量。
+如果提示命令不存在，需要安装 Android Platform Tools，或改回使用 QADB 内置 ADB。
 
 ---
 
@@ -249,14 +259,7 @@ adb version
 
 ### 4. 是否内置 ADB？
 
-目前 QADB 默认依赖系统已安装的 ADB。
-
-后续可以考虑支持：
-
-- 自动检测 ADB 路径
-- 手动配置 ADB 路径
-- 内置 Platform Tools
-- 多版本 ADB 管理
+QADB v2.0.5 起已内置 ADB，默认开箱即用，同时保留自定义 ADB 路径配置，方便使用系统已安装的 Platform Tools。
 
 ---
 

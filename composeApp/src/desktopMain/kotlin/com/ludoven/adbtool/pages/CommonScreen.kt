@@ -388,7 +388,7 @@ fun CommonScreen(viewModel: CommonModel) {
                     executionResult = executionResult,
                     onCopyCommand = ::copyCommand,
                     onExecuteCommand = ::executeCommand,
-                    modifier = Modifier.widthIn(min = 360.dp, max = 400.dp)
+                    modifier = Modifier.weight(2f)
                 )
             }
         }
