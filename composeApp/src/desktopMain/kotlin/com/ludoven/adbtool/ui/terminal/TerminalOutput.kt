@@ -20,7 +20,10 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -35,6 +38,7 @@ import androidx.compose.ui.input.key.isMetaPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import com.ludoven.adbtool.domain.terminal.TerminalLine
@@ -57,12 +61,10 @@ fun TerminalOutput(
     modifier: Modifier = Modifier
 ) {
     val focusRequester = remember { FocusRequester() }
-    LaunchedEffect(Unit) {
-        focusRequester.requestFocus()
-    }
+    var pendingFocusRequest by remember { mutableStateOf(true) }
     LaunchedEffect(isRunning) {
         if (!isRunning) {
-            focusRequester.requestFocus()
+            pendingFocusRequest = true
         }
     }
 
@@ -72,86 +74,86 @@ fun TerminalOutput(
                 color = Color(0xFF0B0F14),
                 shape = RoundedCornerShape(12.dp)
             )
+            .clickable { focusRequester.requestFocus() }
             .padding(12.dp)
     ) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
+        Box(modifier = Modifier.fillMaxSize()) {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                state = listState
             ) {
-                SelectionContainer {
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
-                        state = listState
-                    ) {
-                        items(lines, key = { it.id }) { line ->
-                            Text(
-                                text = line.text,
-                                style = MaterialTheme.typography.bodySmall,
-                                fontFamily = FontFamily.Monospace,
-                                color = lineColor(line.type)
-                            )
-                        }
+                items(lines, key = { it.id }) { line ->
+                    SelectionContainer {
+                        Text(
+                            text = line.text,
+                            style = MaterialTheme.typography.bodySmall,
+                            fontFamily = FontFamily.Monospace,
+                            color = lineColor(line.type)
+                        )
                     }
                 }
-                VerticalScrollbar(
-                    adapter = rememberScrollbarAdapter(listState),
-                    modifier = Modifier
-                        .align(Alignment.CenterEnd)
-                        .fillMaxHeight()
-                        .padding(vertical = 2.dp)
-                )
-            }
-
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { focusRequester.requestFocus() },
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Text(
-                    text = prompt,
-                    style = MaterialTheme.typography.bodySmall,
-                    fontFamily = FontFamily.Monospace,
-                    color = Color(0xFF58A6FF)
-                )
-                BasicTextField(
-                    value = input,
-                    onValueChange = onInputChange,
-                    singleLine = true,
-                    cursorBrush = SolidColor(Color(0xFFE6EDF3)),
-                    textStyle = MaterialTheme.typography.bodySmall.copy(
-                        color = Color(0xFFE6EDF3),
-                        fontFamily = FontFamily.Monospace
-                    ),
-                    modifier = Modifier
-                        .weight(1f)
-                        .focusRequester(focusRequester)
-                        .onPreviewKeyEvent { event ->
-                            handleTerminalInlineKeyEvent(
-                                event = event,
-                                isRunning = isRunning,
-                                onSubmit = onSubmit,
-                                onHistoryPrev = onHistoryPrev,
-                                onHistoryNext = onHistoryNext,
-                                onClearOutput = onClearOutput,
-                                onInterrupt = onInterrupt
-                            )
-                        },
-                    decorationBox = { innerTextField ->
-                        if (input.isEmpty()) {
-                            Text(
-                                text = "输入 ADB 命令",
-                                style = MaterialTheme.typography.bodySmall,
-                                fontFamily = FontFamily.Monospace,
-                                color = Color(0xFF8B949E)
-                            )
-                        }
-                        innerTextField()
+                item(key = "terminal_input_row") {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = prompt,
+                            style = MaterialTheme.typography.bodySmall,
+                            fontFamily = FontFamily.Monospace,
+                            color = Color(0xFF58A6FF)
+                        )
+                        BasicTextField(
+                            value = input,
+                            onValueChange = onInputChange,
+                            singleLine = true,
+                            cursorBrush = SolidColor(Color(0xFFE6EDF3)),
+                            textStyle = MaterialTheme.typography.bodySmall.copy(
+                                color = Color(0xFFE6EDF3),
+                                fontFamily = FontFamily.Monospace
+                            ),
+                            modifier = Modifier
+                                .weight(1f)
+                                .focusRequester(focusRequester)
+                                .onGloballyPositioned {
+                                    if (pendingFocusRequest) {
+                                        focusRequester.requestFocus()
+                                        pendingFocusRequest = false
+                                    }
+                                }
+                                .onPreviewKeyEvent { event ->
+                                    handleTerminalInlineKeyEvent(
+                                        event = event,
+                                        isRunning = isRunning,
+                                        onSubmit = onSubmit,
+                                        onHistoryPrev = onHistoryPrev,
+                                        onHistoryNext = onHistoryNext,
+                                        onClearOutput = onClearOutput,
+                                        onInterrupt = onInterrupt
+                                    )
+                                },
+                            decorationBox = { innerTextField ->
+                                if (input.isEmpty()) {
+                                    Text(
+                                        text = "输入 ADB 命令",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        fontFamily = FontFamily.Monospace,
+                                        color = Color(0xFF8B949E)
+                                    )
+                                }
+                                innerTextField()
+                            }
+                        )
                     }
-                )
+                }
             }
+            VerticalScrollbar(
+                adapter = rememberScrollbarAdapter(listState),
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .fillMaxHeight()
+                    .padding(vertical = 2.dp)
+            )
         }
     }
 }

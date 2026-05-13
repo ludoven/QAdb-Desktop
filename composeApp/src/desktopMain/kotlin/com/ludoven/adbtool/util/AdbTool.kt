@@ -101,6 +101,20 @@ object AdbTool {
         val args = buildDeviceArgs(deviceId) + listOf("shell", command)
         return runCommand(*args.toTypedArray())
     }
+
+    /**
+     * 对 shell 参数做安全转义，防止命令注入。
+     */
+    internal fun shellQuote(argument: String): String {
+        return "'${argument.replace("'", "'\\''")}'"
+    }
+
+    /**
+     * 基于参数安全拼装 shell 命令。
+     */
+    internal fun buildShellCommand(vararg arguments: String): String {
+        return arguments.joinToString(" ") { shellQuote(it) }
+    }
     
     /**
      * 执行Shell命令的异步版本

@@ -91,10 +91,8 @@ fun TerminalScreen(
                 containerColor = MaterialTheme.colorScheme.secondaryContainer,
                 contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
                 onClick = {
-                    if (session.lines.isNotEmpty()) {
-                        coroutineScope.launch {
-                            listState.animateScrollToItem(session.lines.lastIndex)
-                        }
+                    coroutineScope.launch {
+                        listState.animateScrollToItem(session.lines.size)
                     }
                 }
             )

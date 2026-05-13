@@ -10,7 +10,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -18,6 +17,17 @@ import java.text.SimpleDateFormat
 import java.util.*
 
 class LogViewModel : ViewModel() {
+    companion object {
+        internal const val MAX_LOG_ENTRIES = 10_000
+        private const val LOG_UI_BATCH_SIZE = 40
+
+        internal fun appendWithLimit(buffer: ArrayDeque<LogEntry>, entry: LogEntry, maxEntries: Int = MAX_LOG_ENTRIES) {
+            if (buffer.size >= maxEntries) {
+                buffer.removeFirst()
+            }
+            buffer.addLast(entry)
+        }
+    }
 
     private val _logs = MutableStateFlow<List<LogEntry>>(emptyList())
     val logs: StateFlow<List<LogEntry>> = _logs.asStateFlow()
@@ -38,6 +48,9 @@ class LogViewModel : ViewModel() {
     val selectedDevice: StateFlow<String?> = _selectedDevice.asStateFlow()
 
     private var logProcess: Process? = null
+    private val logBuffer = ArrayDeque<LogEntry>(MAX_LOG_ENTRIES)
+    private val logBufferLock = Any()
+    private var pendingLogUpdates = 0
 
     fun setSelectedDevice(device: String?) {
         _selectedDevice.value = device
@@ -51,6 +64,7 @@ class LogViewModel : ViewModel() {
         if (_isCapturing.value) return
 
         _isCapturing.value = true
+        clearLogBuffer()
         _logs.value = emptyList()
 
         viewModelScope.launch(Dispatchers.IO) {
@@ -107,13 +121,15 @@ class LogViewModel : ViewModel() {
                                 pid = pidStr.trim().toIntOrNull() ?: 0
                             )
 
+                            val shouldPublish = bufferLogEntry(entry)
                             withContext(Dispatchers.Main) {
-                                _logs.update { current ->
-                                    (current + entry).takeLast(10000)
-                                }
+                                publishBufferedLogs(force = false, shouldPublish = shouldPublish)
                             }
                         }
                     }
+                }
+                withContext(Dispatchers.Main) {
+                    publishBufferedLogs(force = true, shouldPublish = true)
                 }
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
@@ -185,6 +201,7 @@ class LogViewModel : ViewModel() {
     }
 
     fun clearLogs() {
+        clearLogBuffer()
         _logs.value = emptyList()
     }
 
@@ -195,5 +212,31 @@ class LogViewModel : ViewModel() {
     override fun onCleared() {
         super.onCleared()
         stopCapture()
+    }
+
+    private fun bufferLogEntry(entry: LogEntry): Boolean = synchronized(logBufferLock) {
+        appendWithLimit(logBuffer, entry)
+        pendingLogUpdates += 1
+        pendingLogUpdates >= LOG_UI_BATCH_SIZE
+    }
+
+    private fun publishBufferedLogs(force: Boolean, shouldPublish: Boolean) {
+        if (!force && !shouldPublish) return
+        val snapshot = synchronized(logBufferLock) {
+            if (!force && pendingLogUpdates < LOG_UI_BATCH_SIZE) {
+                null
+            } else {
+                pendingLogUpdates = 0
+                logBuffer.toList()
+            }
+        }
+        if (snapshot != null) {
+            _logs.value = snapshot
+        }
+    }
+
+    private fun clearLogBuffer() = synchronized(logBufferLock) {
+        logBuffer.clear()
+        pendingLogUpdates = 0
     }
 }
