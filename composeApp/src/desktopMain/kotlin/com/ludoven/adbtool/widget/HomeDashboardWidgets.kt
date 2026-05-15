@@ -120,41 +120,45 @@ fun DashboardMetricCard(
     supportingText: String? = null,
     progress: Float = 0f
 ) {
-    GlassCard(modifier = modifier) {
+    GlassCard(
+        modifier = modifier,
+        shape = RoundedCornerShape(12.dp),
+        borderStroke = BorderStroke(1.dp, Color(0xFFE8EAEE))
+    ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .defaultMinSize(minHeight = 112.dp)
-                .padding(horizontal = 14.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+                .defaultMinSize(minHeight = 98.dp)
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 Box(
                     modifier = Modifier
-                        .size(26.dp)
-                        .background(accentColor.copy(alpha = 0.14f), RoundedCornerShape(8.dp)),
+                        .size(22.dp)
+                        .background(accentColor.copy(alpha = 0.12f), RoundedCornerShape(7.dp)),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = icon,
                         contentDescription = title,
                         tint = accentColor,
-                        modifier = Modifier.size(14.dp)
+                        modifier = Modifier.size(13.dp)
                     )
                 }
                 Text(
                     text = title,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    style = MaterialTheme.typography.bodyMedium
+                    style = MaterialTheme.typography.bodySmall
                 )
             }
             Text(
                 text = value,
                 color = MaterialTheme.colorScheme.onSurface,
-                style = MaterialTheme.typography.titleLarge,
+                style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis
@@ -186,16 +190,16 @@ private fun MetricLinearBar(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(8.dp)
+            .height(5.dp)
             .background(
-                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
+                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.9f),
                 RoundedCornerShape(999.dp)
             )
     ) {
         Box(
             modifier = Modifier
                 .fillMaxWidth(safeProgress)
-                .height(8.dp)
+                .height(5.dp)
                 .background(accentColor, RoundedCornerShape(999.dp))
         )
     }
@@ -209,7 +213,11 @@ fun DashboardPanel(
     contentPadding: PaddingValues = PaddingValues(16.dp),
     content: @Composable ColumnScope.() -> Unit
 ) {
-    GlassCard(modifier = modifier) {
+    GlassCard(
+        modifier = modifier,
+        shape = RoundedCornerShape(12.dp),
+        borderStroke = BorderStroke(1.dp, Color(0xFFE5E7EB))
+    ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -217,14 +225,14 @@ fun DashboardPanel(
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Box(
                     modifier = Modifier
-                        .size(30.dp)
+                        .size(26.dp)
                         .background(
-                            MaterialTheme.colorScheme.primaryContainer,
-                            RoundedCornerShape(UiTokens.RadiusSmall)
+                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.9f),
+                            RoundedCornerShape(8.dp)
                         ),
                     contentAlignment = Alignment.Center
                 ) {
@@ -232,19 +240,19 @@ fun DashboardPanel(
                         imageVector = icon,
                         contentDescription = title,
                         tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(15.dp)
                     )
                 }
 
                 Text(
                     text = title,
-                    style = MaterialTheme.typography.titleSmall,
+                    style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
             }
 
-            Spacer(modifier = Modifier.height(14.dp))
+            Spacer(modifier = Modifier.height(12.dp))
             content()
         }
     }
@@ -351,11 +359,11 @@ fun QuickActionCard(
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
     val scale by animateFloatAsState(
-        targetValue = if (isHovered) 1.02f else 1f,
+        targetValue = if (isHovered) 1.01f else 1f,
         animationSpec = tween(160)
     )
     val backgroundColor by animateColorAsState(
-        targetValue = if (isHovered) accentColor.copy(alpha = 0.14f) else accentColor.copy(alpha = 0.08f),
+        targetValue = if (isHovered) accentColor.copy(alpha = 0.08f) else MaterialTheme.colorScheme.surface,
         animationSpec = tween(180)
     )
     Card(
@@ -365,25 +373,28 @@ fun QuickActionCard(
             .then(
                 if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier
             ),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(10.dp),
         colors = CardDefaults.cardColors(containerColor = backgroundColor),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-        border = BorderStroke(0.dp, Color.Transparent)
+        border = BorderStroke(
+            width = 1.dp,
+            color = if (isHovered) accentColor.copy(alpha = 0.32f) else Color(0xFFE5E7EB)
+        )
     ) {
-        Column(
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .defaultMinSize(minHeight = 80.dp)
+                .defaultMinSize(minHeight = 44.dp)
                 .padding(vertical = 10.dp, horizontal = 12.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(6.dp)
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Box(
                 modifier = Modifier
-                    .size(34.dp)
+                    .size(22.dp)
                     .background(
-                        MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
-                        RoundedCornerShape(10.dp)
+                        accentColor.copy(alpha = 0.12f),
+                        RoundedCornerShape(6.dp)
                     ),
                 contentAlignment = Alignment.Center
             ) {
@@ -391,17 +402,18 @@ fun QuickActionCard(
                     imageVector = icon,
                     contentDescription = title,
                     tint = accentColor,
-                    modifier = Modifier.size(18.dp)
+                    modifier = Modifier.size(14.dp)
                 )
             }
 
             Text(
                 text = title,
+                modifier = Modifier.weight(1f),
                 color = MaterialTheme.colorScheme.onSurface,
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+                maxLines = 2,
+                overflow = TextOverflow.Clip
             )
         }
     }

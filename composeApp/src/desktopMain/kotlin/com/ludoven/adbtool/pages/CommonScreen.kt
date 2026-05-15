@@ -3,6 +3,7 @@ package com.ludoven.adbtool.pages
 import com.ludoven.adbtool.ui.mac.*
 
 import adbtool_desktop.composeapp.generated.resources.Res
+import adbtool_desktop.composeapp.generated.resources.apk_not_selected
 import adbtool_desktop.composeapp.generated.resources.confirm
 import adbtool_desktop.composeapp.generated.resources.tip_title
 import androidx.compose.foundation.BorderStroke
@@ -34,6 +35,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
@@ -59,7 +61,6 @@ import com.ludoven.adbtool.ui.mac.AlertDialog
 import com.ludoven.adbtool.ui.mac.Card
 import com.ludoven.adbtool.ui.mac.CardDefaults
 import com.ludoven.adbtool.ui.mac.Icon
-import com.ludoven.adbtool.ui.mac.IconButton
 import com.ludoven.adbtool.ui.mac.MaterialTheme
 import com.ludoven.adbtool.ui.mac.OutlinedTextField
 import com.ludoven.adbtool.ui.mac.OutlinedTextFieldDefaults
@@ -88,6 +89,7 @@ import androidx.compose.ui.unit.dp
 import com.ludoven.adbtool.entity.AdbFunctionType
 import com.ludoven.adbtool.entity.MsgContent
 import com.ludoven.adbtool.util.AdbTool
+import com.ludoven.adbtool.util.l10n
 import com.ludoven.adbtool.viewmodel.CommonModel
 import com.ludoven.adbtool.widget.GlassCard
 import java.io.InputStreamReader
@@ -146,15 +148,15 @@ fun CommonScreen(viewModel: CommonModel) {
 
     val categories = remember {
         listOf(
-            CommandCategoryUi("all", "全部", Icons.Default.Tune),
-            CommandCategoryUi("device", "设备", Icons.Default.Home),
-            CommandCategoryUi("app", "应用管理", Icons.Default.InstallMobile),
-            CommandCategoryUi("file", "文件操作", Icons.Default.Folder),
-            CommandCategoryUi("input", "输入控制", Icons.Default.Edit),
-            CommandCategoryUi("screen", "截图录屏", Icons.Default.PhotoCamera),
-            CommandCategoryUi("network", "网络调试", Icons.Default.Wifi),
-            CommandCategoryUi("log", "日志", Icons.Default.Memory),
-            CommandCategoryUi("tv", "TV盒子", Icons.Default.ScreenSearchDesktop)
+            CommandCategoryUi("all", l10n("全部", "All"), Icons.Default.Tune),
+            CommandCategoryUi("device", l10n("设备", "Device"), Icons.Default.Home),
+            CommandCategoryUi("app", l10n("应用管理", "Apps"), Icons.Default.InstallMobile),
+            CommandCategoryUi("file", l10n("文件操作", "Files"), Icons.Default.Folder),
+            CommandCategoryUi("input", l10n("输入控制", "Input"), Icons.Default.Edit),
+            CommandCategoryUi("screen", l10n("截图录屏", "Screen"), Icons.Default.PhotoCamera),
+            CommandCategoryUi("network", l10n("网络调试", "Network"), Icons.Default.Wifi),
+            CommandCategoryUi("log", l10n("日志", "Logs"), Icons.Default.Memory),
+            CommandCategoryUi("tv", l10n("TV盒子", "TV"), Icons.Default.ScreenSearchDesktop)
         )
     }
 
@@ -166,7 +168,7 @@ fun CommonScreen(viewModel: CommonModel) {
     var packageNameInput by remember { mutableStateOf("com.example.app") }
     var shellCommandInput by remember { mutableStateOf("getprop") }
     var textInput by remember { mutableStateOf("hello") }
-    var executionResult by remember { mutableStateOf("等待执行") }
+    var executionResult by remember { mutableStateOf(l10n("等待执行", "Ready")) }
 
     val filteredCommands by remember(allCommands, selectedCategory, searchKeyword) {
         derivedStateOf {
@@ -234,10 +236,10 @@ fun CommonScreen(viewModel: CommonModel) {
 
     fun executeCommand(command: CommandItemUi) {
         if (AdbTool.selectDeviceId.isNullOrBlank()) {
-            executionResult = "执行失败：未选择设备"
+            executionResult = l10n("执行失败：未选择设备", "Failed: no device selected")
             return
         }
-        executionResult = "执行中..."
+        executionResult = l10n("执行中...", "Running...")
 
         coroutineScope.launch {
             runCatching {
@@ -245,7 +247,7 @@ fun CommonScreen(viewModel: CommonModel) {
                     CommandTrigger.PACKAGE_INPUT -> {
                         val pkg = packageNameInput.trim()
                         if (pkg.isBlank()) {
-                            executionResult = "执行失败：包名不能为空"
+                            executionResult = l10n("执行失败：包名不能为空", "Failed: package name cannot be empty")
                             return@launch
                         }
                         val success = withContext(Dispatchers.IO) {
@@ -260,22 +262,22 @@ fun CommonScreen(viewModel: CommonModel) {
                             }
                         }
                         executionResult = if (success) {
-                            "执行成功：$resolvedCommandPreview"
+                            "${l10n("执行成功", "Success")}：$resolvedCommandPreview"
                         } else {
-                            "执行失败：$resolvedCommandPreview"
+                            "${l10n("执行失败", "Failed")}：$resolvedCommandPreview"
                         }
                     }
 
                     CommandTrigger.SHELL_INPUT -> {
                         val shell = shellCommandInput.trim()
                         if (shell.isBlank()) {
-                            executionResult = "执行失败：Shell 命令不能为空"
+                            executionResult = l10n("执行失败：Shell 命令不能为空", "Failed: shell command cannot be empty")
                             return@launch
                         }
                         val output = withContext(Dispatchers.IO) {
                             AdbTool.execShell(shell)
                         }
-                        executionResult = output.ifBlank { "执行完成，无输出" }
+                        executionResult = output.ifBlank { l10n("执行完成，无输出", "Done, no output") }
                     }
 
                     CommandTrigger.DIRECT -> {
@@ -283,7 +285,7 @@ fun CommonScreen(viewModel: CommonModel) {
                             val output = withContext(Dispatchers.IO) {
                                 AdbTool.execShell(command.shellCommand)
                             }
-                            executionResult = output.ifBlank { "执行完成，无输出" }
+                            executionResult = output.ifBlank { l10n("执行完成，无输出", "Done, no output") }
                             return@launch
                         }
 
@@ -291,58 +293,65 @@ fun CommonScreen(viewModel: CommonModel) {
                             AdbFunctionType.INPUT_TEXT -> {
                                 val input = textInput
                                 if (input.isBlank()) {
-                                    executionResult = "执行失败：输入文本不能为空"
+                                    executionResult = l10n("执行失败：输入文本不能为空", "Failed: input text cannot be empty")
                                     return@launch
                                 }
                                 val success = withContext(Dispatchers.IO) {
                                     AdbTool.inputText(input)
                                 }
-                                executionResult = if (success) "执行成功：$resolvedCommandPreview" else "执行失败：$resolvedCommandPreview"
+                                executionResult = if (success) {
+                                    "${l10n("执行成功", "Success")}：$resolvedCommandPreview"
+                                } else {
+                                    "${l10n("执行失败", "Failed")}：$resolvedCommandPreview"
+                                }
                             }
 
                             AdbFunctionType.VIEW_CURRENT_ACTIVITY -> {
                                 val output = withContext(Dispatchers.IO) {
                                     AdbTool.execShell("dumpsys window | grep mCurrentFocus")
                                 }
-                                executionResult = output.ifBlank { "执行完成，无输出" }
+                                executionResult = output.ifBlank { l10n("执行完成，无输出", "Done, no output") }
                             }
 
                             AdbFunctionType.KEY_BACK -> {
                                 withContext(Dispatchers.IO) { AdbTool.execShell("input keyevent 4") }
-                                executionResult = "执行成功：$resolvedCommandPreview"
+                                executionResult = "${l10n("执行成功", "Success")}：$resolvedCommandPreview"
                             }
 
                             AdbFunctionType.KEY_HOME -> {
                                 withContext(Dispatchers.IO) { AdbTool.execShell("input keyevent 3") }
-                                executionResult = "执行成功：$resolvedCommandPreview"
+                                executionResult = "${l10n("执行成功", "Success")}：$resolvedCommandPreview"
                             }
 
                             AdbFunctionType.NETWORK_STATUS -> {
                                 val output = withContext(Dispatchers.IO) { AdbTool.execShell("dumpsys connectivity") }
-                                executionResult = output.ifBlank { "执行完成，无输出" }
+                                executionResult = output.ifBlank { l10n("执行完成，无输出", "Done, no output") }
                             }
 
                             AdbFunctionType.REBOOT_DEVICE -> {
                                 withContext(Dispatchers.IO) { AdbTool.execShell("reboot") }
-                                executionResult = "重启指令已发送"
+                                executionResult = l10n("重启指令已发送", "Reboot command sent")
                             }
 
                             AdbFunctionType.DEVELOPER_OPTIONS -> {
                                 withContext(Dispatchers.IO) {
                                     AdbTool.execShell("am start -a android.settings.APPLICATION_DEVELOPMENT_SETTINGS")
                                 }
-                                executionResult = "执行成功：$resolvedCommandPreview"
+                                executionResult = "${l10n("执行成功", "Success")}：$resolvedCommandPreview"
                             }
 
                             else -> {
                                 command.actionType?.let(viewModel::executeAdbAction)
-                                executionResult = "已触发执行：$resolvedCommandPreview\n具体结果请查看提示弹窗"
+                                executionResult = l10n(
+                                    "已触发执行：$resolvedCommandPreview\n具体结果请查看提示弹窗",
+                                    "Triggered: $resolvedCommandPreview\nSee toast/tip for details"
+                                )
                             }
                         }
                     }
                 }
             }.onFailure { error ->
-                executionResult = "执行异常：${error.message ?: "未知错误"}"
+                executionResult = l10n("执行异常", "Error") + "：${error.message ?: l10n("未知错误", "Unknown error")}"
             }
         }
     }
@@ -408,13 +417,36 @@ fun CommonScreen(viewModel: CommonModel) {
 
     if (showDialog) {
         dialogMsg?.let {
-            TipDialog(
-                dialogText = when (it) {
-                    is MsgContent.Resource -> stringResource(it.stringResource, *it.args.toTypedArray())
-                    is MsgContent.Text -> it.text
+            val dialogText = when (it) {
+                is MsgContent.Resource -> stringResource(it.stringResource, *it.args.toTypedArray())
+                is MsgContent.Text -> it.text
+            }
+            val showAsToast = it is MsgContent.Resource && it.stringResource == Res.string.apk_not_selected
+
+            if (showAsToast) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.BottomCenter
+                ) {
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.inverseSurface,
+                        shadowElevation = 6.dp,
+                        modifier = Modifier.padding(bottom = 24.dp)
+                    ) {
+                        Text(
+                            text = dialogText,
+                            modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
+                            color = MaterialTheme.colorScheme.inverseOnSurface,
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
                 }
-            ) {
-                viewModel.dismissTipDialog()
+            } else {
+                TipDialog(dialogText = dialogText) {
+                    viewModel.dismissTipDialog()
+                }
             }
         }
     }
@@ -429,7 +461,8 @@ private fun rememberCommandLibrary(): List<CommandItemUi> {
 }
 
 private fun loadCommandLibraryFromConfig(): List<CommandItemUi> {
-    val stream = Thread.currentThread().contextClassLoader.getResourceAsStream("adb_commands.json")
+    val fileName = if (l10n("zh", "en") == "en") "adb_commands_en.json" else "adb_commands.json"
+    val stream = Thread.currentThread().contextClassLoader.getResourceAsStream(fileName)
         ?: return emptyList()
 
     val jsonText = InputStreamReader(stream).use { it.readText() }
@@ -528,8 +561,8 @@ private fun commandItemAccentColor(index: Int): Color {
 private fun fallbackCommands(): List<CommandItemUi> = listOf(
     CommandItemUi(
         id = "fallback_shell",
-        title = "执行 Shell 命令",
-        description = "配置文件读取失败时的回退命令",
+        title = l10n("执行 Shell 命令", "Run Shell Command"),
+        description = l10n("配置文件读取失败时的回退命令", "Fallback command when config loading fails"),
         commandPreview = "adb shell getprop",
         categoryKey = "device",
         icon = Icons.Default.Code,
@@ -577,12 +610,12 @@ private fun CommandCenterHeader(
 
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(
-                    text = "命令中心",
+                    text = l10n("命令中心", "Command Center"),
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = "浏览常用 ADB 命令，快速复制并执行",
+                    text = l10n("浏览常用 ADB 命令，快速复制并执行", "Browse common ADB commands and run quickly"),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -600,7 +633,7 @@ private fun CommandCenterHeader(
                 )
             },
             singleLine = true,
-            placeholder = { Text("搜索命令") },
+            placeholder = { Text(l10n("搜索命令", "Search commands")) },
             textStyle = MaterialTheme.typography.bodySmall,
             shape = RoundedCornerShape(10.dp),
             colors = OutlinedTextFieldDefaults.colors(
@@ -702,7 +735,7 @@ private fun CommandLibraryPanel(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "命令库（共 ${commands.size} 条）",
+                    text = l10n("命令库（共 ${commands.size} 条）", "Command library (${commands.size})"),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
@@ -716,7 +749,7 @@ private fun CommandLibraryPanel(
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = "未找到匹配命令",
+                            text = l10n("未找到匹配命令", "No matching commands"),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -849,7 +882,7 @@ private fun CommandDetailPanel(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text(
-                text = "当前命令",
+                text = l10n("当前命令", "Current command"),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold
             )
@@ -919,33 +952,22 @@ private fun CommandDetailPanel(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text(
-                            text = "命令预览",
+                            text = l10n("命令预览", "Command preview"),
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.SemiBold
                         )
-                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                            IconButton(
-                                onClick = { onCopyCommand(resolvedCommandPreview) },
-                                modifier = Modifier.size(24.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.ContentCopy,
-                                    contentDescription = "复制预览命令",
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                            }
-                            IconButton(
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            CommandActionButton(
+                                text = l10n("复制", "Copy"),
+                                icon = Icons.Default.ContentCopy,
+                                onClick = { onCopyCommand(resolvedCommandPreview) }
+                            )
+                            CommandActionButton(
+                                text = l10n("运行", "Run"),
+                                icon = Icons.Default.PlayArrow,
                                 onClick = { onExecuteCommand(selectedCommand) },
-                                modifier = Modifier.size(24.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.PlayArrow,
-                                    contentDescription = "执行到设备",
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                            }
+                                primary = true
+                            )
                         }
                     }
                     Box(
@@ -977,7 +999,7 @@ private fun CommandDetailPanel(
                         value = packageNameInput,
                         onValueChange = onPackageNameInputChange,
                         singleLine = true,
-                        label = { Text("应用包名") },
+                        label = { Text(l10n("应用包名", "Package name")) },
                         placeholder = { Text("com.example.app") },
                         shape = RoundedCornerShape(10.dp),
                         modifier = Modifier.fillMaxWidth()
@@ -989,7 +1011,7 @@ private fun CommandDetailPanel(
                         value = shellCommandInput,
                         onValueChange = onShellCommandInputChange,
                         singleLine = true,
-                        label = { Text("Shell 命令") },
+                        label = { Text(l10n("Shell 命令", "Shell command")) },
                         placeholder = { Text("getprop") },
                         shape = RoundedCornerShape(10.dp),
                         modifier = Modifier.fillMaxWidth()
@@ -1002,7 +1024,7 @@ private fun CommandDetailPanel(
                             value = textInput,
                             onValueChange = onTextInputChange,
                             singleLine = true,
-                            label = { Text("输入文本") },
+                            label = { Text(l10n("输入文本", "Input text")) },
                             placeholder = { Text("hello") },
                             shape = RoundedCornerShape(10.dp),
                             modifier = Modifier.fillMaxWidth()
@@ -1034,13 +1056,15 @@ private fun CommandDetailPanel(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text(
-                            text = "执行结果",
+                            text = l10n("执行结果", "Execution result"),
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.SemiBold
                         )
-                        TextButton(onClick = { onCopyCommand(executionResult) }) {
-                            Text("复制结果")
-                        }
+                        CommandActionButton(
+                            text = l10n("复制结果", "Copy result"),
+                            icon = Icons.Default.ContentCopy,
+                            onClick = { onCopyCommand(executionResult) }
+                        )
                     }
                     val resultScroll = rememberScrollState()
                     Box(
@@ -1054,14 +1078,68 @@ private fun CommandDetailPanel(
                             .padding(horizontal = 10.dp, vertical = 8.dp)
                             .verticalScroll(resultScroll)
                     ) {
-                        Text(
-                            text = executionResult,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        SelectionContainer {
+                            Text(
+                                text = executionResult,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun CommandActionButton(
+    text: String,
+    icon: ImageVector,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    primary: Boolean = false
+) {
+    val contentColor = if (primary) {
+        MaterialTheme.colorScheme.onPrimary
+    } else {
+        MaterialTheme.colorScheme.onSurface
+    }
+    val backgroundColor = if (primary) {
+        MaterialTheme.colorScheme.primary
+    } else {
+        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.68f)
+    }
+    val borderColor = if (primary) {
+        MaterialTheme.colorScheme.primary
+    } else {
+        MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.8f)
+    }
+
+    TextButton(
+        onClick = onClick,
+        modifier = modifier
+            .height(32.dp)
+            .background(backgroundColor, RoundedCornerShape(10.dp))
+            .border(BorderStroke(1.dp, borderColor), RoundedCornerShape(10.dp))
+            .padding(horizontal = 10.dp, vertical = 0.dp)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = text,
+                tint = contentColor,
+                modifier = Modifier.size(14.dp)
+            )
+            Text(
+                text = text,
+                color = contentColor,
+                style = MaterialTheme.typography.bodySmall,
+                fontWeight = FontWeight.SemiBold
+            )
         }
     }
 }

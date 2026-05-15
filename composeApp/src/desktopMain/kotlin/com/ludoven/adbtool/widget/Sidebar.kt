@@ -12,6 +12,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -41,7 +42,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.ludoven.adbtool.TabItem
@@ -52,7 +52,6 @@ import org.jetbrains.compose.resources.stringResource
 @Composable
 fun Sidebar(
     items: List<TabItem>,
-    toolItems: List<TabItem>,
     selectedRoute: String,
     connectedDeviceCount: Int,
     devices: List<String>,
@@ -62,28 +61,22 @@ fun Sidebar(
     onDeviceSelected: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var manuallyExpanded by remember { mutableStateOf(false) }
-    val expanded = SidebarNavigation.shouldExpandTools(
-        selectedRoute = selectedRoute,
-        manuallyExpanded = manuallyExpanded
-    )
-    val resolvedPrimaryRoute = SidebarNavigation.resolvedPrimaryRoute(selectedRoute)
-
     GlassCard(
         modifier = modifier
             .fillMaxHeight()
             .width(UiTokens.SidebarWidth),
-        shape = RoundedCornerShape(20.dp)
+        shape = RoundedCornerShape(14.dp),
+        borderStroke = BorderStroke(1.dp, Color(0xFFE5E7EB))
     ) {
         Column(
             modifier = Modifier
                 .fillMaxHeight()
-                .padding(horizontal = 12.dp, vertical = 14.dp),
+                .padding(horizontal = 10.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.padding(bottom = 12.dp, start = 6.dp, top = 2.dp)
+            modifier = Modifier.padding(bottom = 10.dp, start = 6.dp, top = 2.dp)
             ) {
                 Image(
                     painter = painterResource(Res.drawable.ic_logo),
@@ -104,33 +97,11 @@ fun Sidebar(
             }
 
             items.forEach { item ->
-                if (item.route == SidebarNavigation.ToolsRoute) {
-                    SidebarGroupItem(
-                        item = item,
-                        isSelected = resolvedPrimaryRoute == item.route,
-                        isExpanded = expanded,
-                        onClick = { manuallyExpanded = !expanded }
-                    )
-
-                    if (expanded) {
-                        toolItems.forEach { toolItem ->
-                            SidebarSubItem(
-                                item = toolItem,
-                                isSelected = selectedRoute == toolItem.route,
-                                onClick = { onItemClick(toolItem.route) }
-                            )
-                        }
-                    }
-                } else {
-                    SidebarItem(
-                        item = item,
-                        isSelected = resolvedPrimaryRoute == item.route,
-                        onClick = {
-                            manuallyExpanded = false
-                            onItemClick(item.route)
-                        }
-                    )
-                }
+                SidebarItem(
+                    item = item,
+                    isSelected = selectedRoute == item.route,
+                    onClick = { onItemClick(item.route) }
+                )
             }
 
             Spacer(modifier = Modifier.weight(1f))
@@ -174,7 +145,7 @@ private fun SidebarItem(
         modifier = Modifier
             .fillMaxWidth()
             .height(46.dp)
-            .clip(RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(10.dp))
             .background(backgroundColor)
             .clickable(onClick = onClick)
             .padding(horizontal = 10.dp),
@@ -212,153 +183,6 @@ private fun SidebarItem(
 }
 
 @Composable
-private fun SidebarGroupItem(
-    item: TabItem,
-    isSelected: Boolean,
-    isExpanded: Boolean,
-    onClick: () -> Unit
-) {
-    val backgroundColor by animateColorAsState(
-        targetValue = when {
-            isSelected -> MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
-            isExpanded -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.28f)
-            else -> Color.Transparent
-        },
-        animationSpec = tween(220)
-    )
-
-    val contentColor by animateColorAsState(
-        targetValue = if (isSelected || isExpanded) {
-            MaterialTheme.colorScheme.onSurface
-        } else {
-            MaterialTheme.colorScheme.onSurfaceVariant
-        },
-        animationSpec = tween(220)
-    )
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(46.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .background(backgroundColor)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 10.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        if (isSelected) {
-            Box(
-                modifier = Modifier
-                    .width(UiTokens.IndicatorWidth - 1.dp)
-                    .height(24.dp)
-                    .clip(RoundedCornerShape(999.dp))
-                    .background(MaterialTheme.colorScheme.primary)
-            )
-            Spacer(modifier = Modifier.width(10.dp))
-        } else {
-            Spacer(modifier = Modifier.width(13.dp))
-        }
-
-        Icon(
-            imageVector = item.icon,
-            contentDescription = item.title,
-            tint = contentColor,
-            modifier = Modifier.size(20.dp)
-        )
-
-        Spacer(modifier = Modifier.width(10.dp))
-
-        Text(
-            text = item.title,
-            color = contentColor,
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
-            modifier = Modifier.weight(1f)
-        )
-
-        Icon(
-            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier
-                .size(18.dp)
-                .graphicsLayer {
-                    rotationZ = if (isExpanded) 90f else 0f
-                }
-        )
-    }
-}
-
-@Composable
-private fun SidebarSubItem(
-    item: TabItem,
-    isSelected: Boolean,
-    onClick: () -> Unit
-) {
-    val backgroundColor by animateColorAsState(
-        targetValue = if (isSelected) {
-            MaterialTheme.colorScheme.primary.copy(alpha = 0.05f)
-        } else {
-            Color.Transparent
-        },
-        animationSpec = tween(220)
-    )
-
-    val contentColor by animateColorAsState(
-        targetValue = if (isSelected) {
-            MaterialTheme.colorScheme.primary
-        } else {
-            MaterialTheme.colorScheme.onSurfaceVariant
-        },
-        animationSpec = tween(220)
-    )
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(40.dp)
-            .padding(start = 16.dp)
-            .clip(RoundedCornerShape(10.dp))
-            .background(backgroundColor)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 10.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Box(
-            modifier = Modifier
-                .width(2.dp)
-                .height(22.dp)
-                .clip(RoundedCornerShape(999.dp))
-                .background(
-                    if (isSelected) {
-                        MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)
-                    } else {
-                        MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)
-                    }
-                )
-        )
-
-        Spacer(modifier = Modifier.width(8.dp))
-
-        Icon(
-            imageVector = item.icon,
-            contentDescription = item.title,
-            tint = contentColor,
-            modifier = Modifier.size(18.dp)
-        )
-
-        Spacer(modifier = Modifier.width(10.dp))
-
-        Text(
-            text = item.title,
-            color = contentColor,
-            style = MaterialTheme.typography.labelLarge,
-            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
-        )
-    }
-}
-
-@Composable
 private fun ConnectedStatusCard(
     connectedDeviceCount: Int,
     devices: List<String>,
@@ -376,7 +200,7 @@ private fun ConnectedStatusCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(12.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
+                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.85f))
                 .clickable(enabled = devices.isNotEmpty()) { expanded = !expanded }
                 .padding(horizontal = 10.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically

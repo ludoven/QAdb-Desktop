@@ -131,6 +131,7 @@ import com.ludoven.adbtool.UiTokens
 import com.ludoven.adbtool.viewmodel.KeyEventRecord
 import com.ludoven.adbtool.viewmodel.KeyEventViewModel
 import com.ludoven.adbtool.widget.GlassCard
+import com.ludoven.adbtool.util.l10n
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 import java.awt.Toolkit
@@ -298,7 +299,7 @@ fun KeyEventScreen(
             title = { Text(stringResource(Res.string.key_long_press_title)) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("按键: $lpName")
+                    Text(l10n("按键: $lpName", "Key: $lpName"))
                     OutlinedTextField(
                         value = duration,
                         onValueChange = { duration = it.filter(Char::isDigit) },
@@ -691,7 +692,7 @@ private fun RecentSentPanel(records: List<KeyEventRecord>, onClear: () -> Unit) 
             ) {
                 if (records.isEmpty()) {
                     Text(
-                        text = "暂无发送记录",
+                        text = l10n("暂无发送记录", "No send history"),
                         modifier = Modifier.padding(horizontal = 14.dp, vertical = 16.dp),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant

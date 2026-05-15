@@ -12,7 +12,6 @@ import adbtool_desktop.composeapp.generated.resources.log
 import adbtool_desktop.composeapp.generated.resources.process
 import adbtool_desktop.composeapp.generated.resources.set
 import adbtool_desktop.composeapp.generated.resources.terminal
-import adbtool_desktop.composeapp.generated.resources.tools
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -23,7 +22,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Apps
-import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Home
@@ -44,6 +42,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.BorderStroke
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -73,7 +73,6 @@ import com.ludoven.adbtool.viewmodel.LogViewModel
 import com.ludoven.adbtool.viewmodel.TerminalViewModel
 import com.ludoven.adbtool.widget.GlassCard
 import com.ludoven.adbtool.widget.Sidebar
-import com.ludoven.adbtool.widget.SidebarNavigation
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.jetbrains.compose.resources.stringResource
@@ -100,20 +99,16 @@ fun App() {
         AdbPathManager.getAdbPath()
     }
 
-    val primaryTabs = listOf(
+    val tabs = listOf(
         TabItem(stringResource(Res.string.home), Icons.Default.Home, "home"),
         TabItem(stringResource(Res.string.common), Icons.Default.Info, "common"),
-        TabItem(stringResource(Res.string.app), Icons.Default.Apps, "app"),
-        TabItem(stringResource(Res.string.key_event_page), Icons.Default.VideogameAsset, "keyevent"),
-        TabItem(stringResource(Res.string.file_browser), Icons.Default.Folder, "filebrowser"),
-        TabItem(stringResource(Res.string.tools), Icons.Default.Build, SidebarNavigation.ToolsRoute),
-        TabItem(stringResource(Res.string.set), Icons.Default.Settings, "setting")
-    )
-
-    val toolTabs = listOf(
         TabItem(stringResource(Res.string.terminal), Icons.Default.Code, "terminal"),
+        TabItem(stringResource(Res.string.key_event_page), Icons.Default.VideogameAsset, "keyevent"),
+        TabItem(stringResource(Res.string.app), Icons.Default.Apps, "app"),
+        TabItem(stringResource(Res.string.file_browser), Icons.Default.Folder, "filebrowser"),
         TabItem(stringResource(Res.string.log), Icons.Default.List, "log"),
-        TabItem(stringResource(Res.string.process), Icons.Default.Memory, "process")
+        TabItem(stringResource(Res.string.process), Icons.Default.Memory, "process"),
+        TabItem(stringResource(Res.string.set), Icons.Default.Settings, "setting")
     )
 
     val navController = rememberNavController()
@@ -177,12 +172,11 @@ fun App() {
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(paddingValues)
-                    .padding(10.dp),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    .padding(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Sidebar(
-                    items = primaryTabs,
-                    toolItems = toolTabs,
+                    items = tabs,
                     selectedRoute = currentRoute,
                     connectedDeviceCount = devices.size,
                     devices = devices,
@@ -203,7 +197,8 @@ fun App() {
                 ) {
                     GlassCard(
                         modifier = Modifier.fillMaxSize(),
-                        shape = RoundedCornerShape(30.dp)
+                        shape = RoundedCornerShape(14.dp),
+                        borderStroke = BorderStroke(1.dp, Color(0xFFE5E7EB))
                     ) {
                         Box(
                             modifier = Modifier
@@ -219,10 +214,7 @@ fun App() {
                                             onScreenshot = { commonModel.executeAdbAction(AdbFunctionType.SCREENSHOT) },
                                             onInstallApk = { commonModel.executeAdbAction(AdbFunctionType.INSTALL_APK) },
                                             onOpenShell = {
-                                                navController.navigate("terminal") {
-                                                    launchSingleTop = true
-                                                    restoreState = true
-                                                }
+                                                navigateToRoute("terminal")
                                             }
                                         )
                                     }

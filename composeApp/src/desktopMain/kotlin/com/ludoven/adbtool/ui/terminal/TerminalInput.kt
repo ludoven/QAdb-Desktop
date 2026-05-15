@@ -24,6 +24,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import com.ludoven.adbtool.ui.mac.*
+import com.ludoven.adbtool.util.l10n
 
 @Composable
 fun TerminalInput(
@@ -72,7 +73,7 @@ fun TerminalInput(
                 },
             placeholder = {
                 Text(
-                    text = "输入 ADB 命令",
+                    text = l10n("输入 ADB 命令", "Enter ADB command"),
                     style = MaterialTheme.typography.bodySmall
                 )
             },
@@ -91,7 +92,7 @@ fun TerminalInput(
                 contentColor = Color.White
             )
         ) {
-            Text("运行")
+            Text(l10n("运行", "Run"))
         }
         Button(
             onClick = onInterrupt,
@@ -101,7 +102,7 @@ fun TerminalInput(
                 contentColor = Color.White
             )
         ) {
-            Text("停止")
+            Text(l10n("停止", "Stop"))
         }
         Spacer(modifier = Modifier.width(2.dp))
     }

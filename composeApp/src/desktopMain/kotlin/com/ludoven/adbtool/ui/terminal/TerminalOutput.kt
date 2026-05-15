@@ -44,6 +44,7 @@ import androidx.compose.ui.unit.dp
 import com.ludoven.adbtool.domain.terminal.TerminalLine
 import com.ludoven.adbtool.domain.terminal.TerminalLineType
 import com.ludoven.adbtool.ui.mac.*
+import com.ludoven.adbtool.util.l10n
 
 @Composable
 fun TerminalOutput(
@@ -135,7 +136,7 @@ fun TerminalOutput(
                             decorationBox = { innerTextField ->
                                 if (input.isEmpty()) {
                                     Text(
-                                        text = "输入 ADB 命令",
+                                        text = l10n("输入 ADB 命令", "Enter ADB command"),
                                         style = MaterialTheme.typography.bodySmall,
                                         fontFamily = FontFamily.Monospace,
                                         color = Color(0xFF8B949E)

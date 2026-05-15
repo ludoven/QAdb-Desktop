@@ -24,6 +24,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import com.ludoven.adbtool.domain.terminal.TerminalMode
 import com.ludoven.adbtool.ui.mac.*
+import com.ludoven.adbtool.util.l10n
 import com.ludoven.adbtool.viewmodel.TerminalViewModel
 import kotlinx.coroutines.launch
 
@@ -71,14 +72,14 @@ fun TerminalScreen(
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             ToolbarActionButton(
-                text = "清屏",
+                text = l10n("清屏", "Clear"),
                 icon = Icons.Default.DeleteSweep,
                 containerColor = MaterialTheme.colorScheme.surfaceVariant,
                 contentColor = MaterialTheme.colorScheme.onSurface,
                 onClick = viewModel::clearLogs
             )
             ToolbarActionButton(
-                text = "终止输出",
+                text = l10n("终止输出", "Interrupt"),
                 icon = Icons.Default.StopCircle,
                 enabled = session.isRunning,
                 containerColor = MaterialTheme.colorScheme.errorContainer,
@@ -86,7 +87,7 @@ fun TerminalScreen(
                 onClick = viewModel::interruptCommand
             )
             ToolbarActionButton(
-                text = "到底部",
+                text = l10n("到底部", "Bottom"),
                 icon = Icons.Default.ArrowDownward,
                 containerColor = MaterialTheme.colorScheme.secondaryContainer,
                 contentColor = MaterialTheme.colorScheme.onSecondaryContainer,

@@ -20,17 +20,17 @@ val LightColorScheme: ColorScheme = lightColorScheme(
     tertiaryContainer = androidx.compose.ui.graphics.Color(0xFFE7F8FF),
     onTertiaryContainer = androidx.compose.ui.graphics.Color(0xFF084B63),
 
-    background = androidx.compose.ui.graphics.Color(0xFFF5F5F7),
+    background = androidx.compose.ui.graphics.Color(0xFFF8F9FB),
     onBackground = androidx.compose.ui.graphics.Color(0xFF1D1D1F),
 
     surface = androidx.compose.ui.graphics.Color.White,
     onSurface = androidx.compose.ui.graphics.Color(0xFF1D1D1F),
-    surfaceVariant = androidx.compose.ui.graphics.Color(0xFFF2F2F7),
+    surfaceVariant = androidx.compose.ui.graphics.Color(0xFFF7F8FA),
     onSurfaceVariant = androidx.compose.ui.graphics.Color(0xFF636366),
 
     error = androidx.compose.ui.graphics.Color(0xFFFF3B30),
     onError = androidx.compose.ui.graphics.Color.White,
 
-    outline = androidx.compose.ui.graphics.Color(0xFFD1D1D6),
-    outlineVariant = androidx.compose.ui.graphics.Color(0xFFE5E5EA)
+    outline = androidx.compose.ui.graphics.Color(0xFFE1E4EA),
+    outlineVariant = androidx.compose.ui.graphics.Color(0xFFE5E7EB)
 )

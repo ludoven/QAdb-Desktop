@@ -401,6 +401,10 @@ class AppViewModel : BaseViewModel() {
         val versionName = Regex("versionName=([^\\s]+)").find(dumpsys)?.groupValues?.get(1) ?: app.versionName
         val firstInstallTime = Regex("firstInstallTime=([^\n]+)").find(dumpsys)?.groupValues?.get(1)?.trim() ?: app.installTime
         val installTimestamp = parseInstallTimestamp(firstInstallTime)
+        val pkgFlags = Regex("pkgFlags=\\[([^\\]]+)]").find(dumpsys)?.groupValues?.get(1).orEmpty()
+        val isDebuggable = pkgFlags.contains("DEBUGGABLE", ignoreCase = true) || app.isDebuggable
+        val enabledToken = Regex("enabled=(\\S+)").find(dumpsys)?.groupValues?.get(1)?.lowercase()
+        val isDisabled = enabledToken == "0" || enabledToken == "false" || app.isDisabled
         val packagePath = app.apkPath.takeIf { it.isNotBlank() }
             ?: AdbTool.exec("pm path $packageName").lineSequence()
                 .firstOrNull { it.startsWith("package:") }
@@ -418,7 +422,10 @@ class AppViewModel : BaseViewModel() {
                     installTime = firstInstallTime,
                     size = sizeText,
                     sizeBytes = sizeBytes,
-                    installTimestamp = installTimestamp
+                    installTimestamp = installTimestamp,
+                    lastUsedTimestamp = installTimestamp ?: current.lastUsedTimestamp,
+                    isDebuggable = isDebuggable,
+                    isDisabled = isDisabled
                 )
             } else {
                 current
@@ -436,6 +443,10 @@ class AppViewModel : BaseViewModel() {
 
     fun executeAdbAction(type: AdbFunctionType, packageName: String) {
         val appName = _appList.value.find { it.packageName == packageName }?.appName ?: packageName
+        if (type == AdbFunctionType.APP_INFO) {
+            openAppInfoFast(packageName)
+            return
+        }
         viewModelScope.launch {
             try {
                 withContext(Dispatchers.IO) {
@@ -464,90 +475,6 @@ class AppViewModel : BaseViewModel() {
                             }
                         }
                         AdbFunctionType.CLEAR_DATA -> AdbTool.exec("pm clear $packageName")
-                        AdbFunctionType.APP_INFO -> {
-                            val app = _appList.value.firstOrNull { it.packageName == packageName }
-                            val dumpsys = AdbTool.exec("dumpsys package $packageName")
-                            val versionName = Regex("versionName=([^\\s]+)").find(dumpsys)?.groupValues?.get(1) ?: "-"
-                            val versionCode = Regex("versionCode=([^\\s]+)").find(dumpsys)?.groupValues?.get(1) ?: "-"
-                            val minSdk = Regex("minSdk=([^\\s]+)").find(dumpsys)?.groupValues?.get(1) ?: "-"
-                            val targetSdk = Regex("targetSdk=([^\\s]+)").find(dumpsys)?.groupValues?.get(1) ?: "-"
-                            val uid = Regex("userId=([^\\s]+)").find(dumpsys)?.groupValues?.get(1) ?: "-"
-                            val firstInstallTime = Regex("firstInstallTime=([^\n]+)").find(dumpsys)?.groupValues?.get(1)?.trim() ?: "-"
-                            val lastUpdateTime = Regex("lastUpdateTime=([^\n]+)").find(dumpsys)?.groupValues?.get(1)?.trim() ?: "-"
-                            val supportedAbi = Regex("primaryCpuAbi=([^\n]+)").find(dumpsys)?.groupValues?.get(1)?.trim() ?: "-"
-                            val isSystemApp = dumpsys.contains("pkgFlags=[") && dumpsys.substringAfter("pkgFlags=[").substringBefore("]").contains("SYSTEM")
-                            val packagePath = app?.apkPath?.takeIf { it.isNotBlank() }
-                                ?: AdbTool.exec("pm path $packageName").lineSequence()
-                                    .firstOrNull { it.startsWith("package:") }
-                                    ?.removePrefix("package:")
-                                    ?.trim()
-                                    .orEmpty()
-                            val sizeBytes = queryPackageSizeBytes(packagePath, packageName) ?: app?.sizeBytes
-                            val sizeText = app?.size?.takeIf { it != "-" } ?: sizeBytes?.let { formatSize(it) } ?: "-"
-                            val processId = if (app?.isRunning == true) {
-                                AdbTool.exec("pidof $packageName").trim().takeIf { it.isNotEmpty() } ?: "-"
-                            } else {
-                                "-"
-                            }
-                            val permissionStats = parsePermissionStats(dumpsys)
-                            val permissionDetails = parsePermissionDetails(dumpsys)
-                            val activityDetails = parseActivityDetails(dumpsys, packageName)
-                            val serviceDetails = parseServiceDetails(dumpsys, packageName)
-                            val receiverDetails = parseReceiverDetails(dumpsys, packageName)
-                            val providerDetails = parseProviderDetails(dumpsys, packageName)
-                            val signatureDetails = parseSignatureDetails(dumpsys)
-
-                            val info = AppInfoData(
-                                appName = app?.appName ?: packageName,
-                                packageName = packageName,
-                                versionName = versionName,
-                                versionCode = versionCode,
-                                minSdk = minSdk,
-                                targetSdk = targetSdk,
-                                uid = uid,
-                                firstInstallTime = firstInstallTime,
-                                lastUpdateTime = lastUpdateTime,
-                                supportedAbi = supportedAbi,
-                                isSystemApp = isSystemApp,
-                                isRunning = app?.isRunning == true,
-                                apkPath = packagePath,
-                                dataDir = "/data/user/0/$packageName",
-                                installLocation = if (isSystemApp) "系统分区" else "内部存储",
-                                appSize = sizeText,
-                                totalSize = sizeText,
-                                processId = processId,
-                                memoryUsage = if (app?.isRunning == true) "运行中" else "-",
-                                startTime = if (app?.isRunning == true) "已启动" else "-",
-                                dangerousPermissionCount = permissionStats.dangerous,
-                                privacyPermissionCount = permissionStats.privacy,
-                                normalPermissionCount = permissionStats.normal,
-                                totalPermissionCount = permissionStats.total,
-                                permissionDetails = permissionDetails,
-                                activityDetails = activityDetails,
-                                serviceDetails = serviceDetails,
-                                receiverDetails = receiverDetails,
-                                providerDetails = providerDetails,
-                                signatureDetails = signatureDetails
-                            )
-                            withContext(Dispatchers.Main) {
-                                if (app != null) {
-                                    _appList.value = _appList.value.map { current ->
-                                        if (current.packageName == packageName) {
-                                            current.copy(
-                                                versionName = versionName,
-                                                installTime = firstInstallTime,
-                                                size = sizeText,
-                                                sizeBytes = sizeBytes,
-                                                installTimestamp = parseInstallTimestamp(firstInstallTime)
-                                            )
-                                        } else {
-                                            current
-                                        }
-                                    }
-                                }
-                                _appInfo.value = info
-                            }
-                        }
                         AdbFunctionType.EXPORT_APK -> {
                             val path = AdbTool.exec("pm path $packageName").split(":").getOrNull(1)?.trim()
                             if (path != null) {
@@ -568,6 +495,113 @@ class AppViewModel : BaseViewModel() {
                 }
             } catch (e: Exception) {
                 showTipDialog(MsgContent.Resource(Res.string.dialog_operation_failed))
+            }
+        }
+    }
+
+    private fun openAppInfoFast(packageName: String) {
+        val app = _appList.value.firstOrNull { it.packageName == packageName }
+        _appInfo.value = AppInfoData(
+            appName = app?.appName ?: packageName,
+            packageName = packageName,
+            versionName = app?.versionName.orEmpty(),
+            isSystemApp = app?.isSystemApp == true,
+            isRunning = app?.isRunning == true,
+            apkPath = app?.apkPath.orEmpty(),
+            appSize = app?.size ?: "-",
+            totalSize = app?.size ?: "-"
+        )
+
+        viewModelScope.launch(Dispatchers.IO) {
+            runCatching {
+                val dumpsys = AdbTool.exec("dumpsys package $packageName")
+                val versionName = Regex("versionName=([^\\s]+)").find(dumpsys)?.groupValues?.get(1) ?: "-"
+                val versionCode = Regex("versionCode=([^\\s]+)").find(dumpsys)?.groupValues?.get(1) ?: "-"
+                val minSdk = Regex("minSdk=([^\\s]+)").find(dumpsys)?.groupValues?.get(1) ?: "-"
+                val targetSdk = Regex("targetSdk=([^\\s]+)").find(dumpsys)?.groupValues?.get(1) ?: "-"
+                val uid = Regex("userId=([^\\s]+)").find(dumpsys)?.groupValues?.get(1) ?: "-"
+                val firstInstallTime = Regex("firstInstallTime=([^\n]+)").find(dumpsys)?.groupValues?.get(1)?.trim() ?: "-"
+                val lastUpdateTime = Regex("lastUpdateTime=([^\n]+)").find(dumpsys)?.groupValues?.get(1)?.trim() ?: "-"
+                val supportedAbi = Regex("primaryCpuAbi=([^\n]+)").find(dumpsys)?.groupValues?.get(1)?.trim() ?: "-"
+                val isSystemApp = dumpsys.contains("pkgFlags=[") && dumpsys.substringAfter("pkgFlags=[").substringBefore("]").contains("SYSTEM")
+                val packagePath = app?.apkPath?.takeIf { it.isNotBlank() }
+                    ?: AdbTool.exec("pm path $packageName").lineSequence()
+                        .firstOrNull { it.startsWith("package:") }
+                        ?.removePrefix("package:")
+                        ?.trim()
+                        .orEmpty()
+                val sizeBytes = queryPackageSizeBytes(packagePath, packageName) ?: app?.sizeBytes
+                val sizeText = app?.size?.takeIf { it != "-" } ?: sizeBytes?.let { formatSize(it) } ?: "-"
+                val processId = if (app?.isRunning == true) {
+                    AdbTool.exec("pidof $packageName").trim().takeIf { it.isNotEmpty() } ?: "-"
+                } else {
+                    "-"
+                }
+                val permissionStats = parsePermissionStats(dumpsys)
+                val permissionDetails = parsePermissionDetails(dumpsys)
+                val activityDetails = parseActivityDetails(dumpsys, packageName)
+                val serviceDetails = parseServiceDetails(dumpsys, packageName)
+                val receiverDetails = parseReceiverDetails(dumpsys, packageName)
+                val providerDetails = parseProviderDetails(dumpsys, packageName)
+                val signatureDetails = parseSignatureDetails(dumpsys)
+
+                val info = AppInfoData(
+                    appName = app?.appName ?: packageName,
+                    packageName = packageName,
+                    versionName = versionName,
+                    versionCode = versionCode,
+                    minSdk = minSdk,
+                    targetSdk = targetSdk,
+                    uid = uid,
+                    firstInstallTime = firstInstallTime,
+                    lastUpdateTime = lastUpdateTime,
+                    supportedAbi = supportedAbi,
+                    isSystemApp = isSystemApp,
+                    isRunning = app?.isRunning == true,
+                    apkPath = packagePath,
+                    dataDir = "/data/user/0/$packageName",
+                    installLocation = if (isSystemApp) "系统分区" else "内部存储",
+                    appSize = sizeText,
+                    totalSize = sizeText,
+                    processId = processId,
+                    memoryUsage = if (app?.isRunning == true) "运行中" else "-",
+                    startTime = if (app?.isRunning == true) "已启动" else "-",
+                    dangerousPermissionCount = permissionStats.dangerous,
+                    privacyPermissionCount = permissionStats.privacy,
+                    normalPermissionCount = permissionStats.normal,
+                    totalPermissionCount = permissionStats.total,
+                    permissionDetails = permissionDetails,
+                    activityDetails = activityDetails,
+                    serviceDetails = serviceDetails,
+                    receiverDetails = receiverDetails,
+                    providerDetails = providerDetails,
+                    signatureDetails = signatureDetails
+                )
+
+                withContext(Dispatchers.Main) {
+                    if (app != null) {
+                        _appList.value = _appList.value.map { current ->
+                            if (current.packageName == packageName) {
+                                current.copy(
+                                    versionName = versionName,
+                                    installTime = firstInstallTime,
+                                    size = sizeText,
+                                    sizeBytes = sizeBytes,
+                                    installTimestamp = parseInstallTimestamp(firstInstallTime),
+                                    lastUsedTimestamp = parseInstallTimestamp(lastUpdateTime)
+                                        ?: parseInstallTimestamp(firstInstallTime),
+                                    isDebuggable = pkgFlagsContainsDebuggable(dumpsys) || current.isDebuggable,
+                                    isDisabled = parseDisabledState(dumpsys) || current.isDisabled
+                                )
+                            } else {
+                                current
+                            }
+                        }
+                    }
+                    _appInfo.value = info
+                }
+            }.onFailure {
+                // Keep initial detail page visible even if deep dumpsys parsing fails.
             }
         }
     }
@@ -608,6 +642,16 @@ class AppViewModel : BaseViewModel() {
             normal = normal,
             total = permissions.size
         )
+    }
+
+    private fun pkgFlagsContainsDebuggable(dumpsys: String): Boolean {
+        val flags = Regex("pkgFlags=\\[([^\\]]+)]").find(dumpsys)?.groupValues?.get(1).orEmpty()
+        return flags.contains("DEBUGGABLE", ignoreCase = true)
+    }
+
+    private fun parseDisabledState(dumpsys: String): Boolean {
+        val enabledToken = Regex("enabled=(\\S+)").find(dumpsys)?.groupValues?.get(1)?.lowercase()
+        return enabledToken == "0" || enabledToken == "false"
     }
 
     private fun parsePermissionDetails(dumpsys: String): List<String> {

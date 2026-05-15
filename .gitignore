@@ -22,5 +22,4 @@ captures
 !*.xcworkspace/contents.xcworkspacedata
 **/xcshareddata/WorkspaceSettings.xcsettings
 /docs/dev/
-docs/superpowers/
 .worktrees/

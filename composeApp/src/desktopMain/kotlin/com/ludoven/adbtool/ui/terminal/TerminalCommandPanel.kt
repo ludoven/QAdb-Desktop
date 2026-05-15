@@ -11,6 +11,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.ludoven.adbtool.ui.mac.*
+import com.ludoven.adbtool.util.l10n
 import com.ludoven.adbtool.widget.GlassCard
 
 @Composable
@@ -28,9 +29,9 @@ fun TerminalCommandPanel(
             modifier = Modifier.padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Section("常用", common, onInsert, onRun)
-            Section("应用", app, onInsert, onRun)
-            Section("系统", system, onInsert, onRun)
+            Section(l10n("常用", "Common"), common, onInsert, onRun)
+            Section(l10n("应用", "Apps"), app, onInsert, onRun)
+            Section(l10n("系统", "System"), system, onInsert, onRun)
         }
     }
 }
@@ -64,7 +65,7 @@ private fun Section(
                     onClick = { onRun(cmd) },
                     shape = RoundedCornerShape(8.dp)
                 ) {
-                    Text("运行")
+                    Text(l10n("运行", "Run"))
                 }
             }
         }
