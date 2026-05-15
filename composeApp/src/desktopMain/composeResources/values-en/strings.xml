@@ -2,6 +2,7 @@
 <resources>
     <string name="home">Home</string>
     <string name="common">Common</string>
+    <string name="tools">Tools</string>
     <string name="terminal">Terminal</string>
     <string name="process">Process</string>
     <string name="app">Apps</string>

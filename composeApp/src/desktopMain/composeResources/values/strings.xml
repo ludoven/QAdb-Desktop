@@ -2,6 +2,7 @@
 <resources>
     <string name="home">首页</string>
     <string name="common">常用</string>
+    <string name="tools">工具</string>
     <string name="terminal">终端</string>
     <string name="process">进程</string>
     <string name="app">应用</string>
