@@ -1,5 +1,6 @@
 package com.ludoven.adbtool.util
 
+import java.io.IOException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -114,6 +115,42 @@ object AdbTool {
      */
     internal fun buildShellCommand(vararg arguments: String): String {
         return arguments.joinToString(" ") { shellQuote(it) }
+    }
+
+    internal fun buildScrcpyCommand(
+        scrcpyPath: String,
+        deviceId: String,
+        windowTitle: String
+    ): List<String> {
+        return listOf(scrcpyPath, "--serial", deviceId, "--window-title", windowTitle)
+    }
+
+    suspend fun startDeviceMirrorAsync(
+        deviceId: String? = selectDeviceId,
+        windowTitle: String = "QADB Device Mirror"
+    ): AdbResult {
+        if (deviceId.isNullOrBlank()) {
+            return AdbResult(false, "", "Device ID is required")
+        }
+
+        val adbPath = AdbPathManager.getAdbPath()
+            ?: return AdbResult(false, "", AdbPathManager.friendlyInitializationError("ADB path not found"))
+        val scrcpyPath = ScrcpyPathManager.getScrcpyPath()
+            ?: return AdbResult(false, "", ScrcpyPathManager.ERROR_BUNDLED_SCRCPY_NOT_FOUND)
+
+        return withContext(Dispatchers.IO) {
+            try {
+                ProcessBuilder(buildScrcpyCommand(scrcpyPath, deviceId, windowTitle))
+                    .apply {
+                        redirectErrorStream(true)
+                        environment()["ADB"] = adbPath
+                    }
+                    .start()
+                AdbResult(true, "Device mirror started")
+            } catch (e: IOException) {
+                AdbResult(false, "", e.message ?: "Failed to start scrcpy")
+            }
+        }
     }
     
     /**

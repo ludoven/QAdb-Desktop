@@ -1,0 +1,7 @@
+scrcpy
+
+Bundled version: v3.3.4
+Source: https://github.com/Genymobile/scrcpy/releases/tag/v3.3.4
+
+This application bundles official portable release artifacts for macOS arm64,
+macOS x64, and Windows x64. See scrcpy-LICENSE for license terms.

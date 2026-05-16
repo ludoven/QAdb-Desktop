@@ -49,6 +49,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.compose.ui.Alignment
 import com.ludoven.adbtool.pages.AppScreen
 import com.ludoven.adbtool.pages.CommonScreen
 import com.ludoven.adbtool.pages.FileBrowserScreen
@@ -209,14 +210,24 @@ fun App() {
                             NavHost(navController, startDestination = "home") {
                                 composable("home") {
                                     stateHolder.SaveableStateProvider("home") {
-                                        HomeScreen(
-                                            viewModel = devicesViewModel,
-                                            onScreenshot = { commonModel.executeAdbAction(AdbFunctionType.SCREENSHOT) },
-                                            onInstallApk = { commonModel.executeAdbAction(AdbFunctionType.INSTALL_APK) },
-                                            onOpenShell = {
-                                                navigateToRoute("terminal")
-                                            }
-                                        )
+                                        val commonDialogMessage by commonModel.dialogMessage.collectAsState()
+                                        val commonShowDialog by commonModel.showDialog.collectAsState()
+
+                                        Box(modifier = Modifier.fillMaxSize()) {
+                                            HomeScreen(
+                                                viewModel = devicesViewModel,
+                                                onScreenshot = { commonModel.executeAdbAction(AdbFunctionType.SCREENSHOT) },
+                                                onInstallApk = { commonModel.executeAdbAction(AdbFunctionType.INSTALL_APK) },
+                                                onMirrorDevice = { commonModel.executeAdbAction(AdbFunctionType.DEVICE_MIRROR) },
+                                                onOpenShell = {
+                                                    navigateToRoute("terminal")
+                                                }
+                                            )
+                                            HomeActionToast(
+                                                visible = commonShowDialog,
+                                                message = commonDialogMessage
+                                            )
+                                        }
                                     }
                                 }
                                 composable("common") {
@@ -287,6 +298,38 @@ fun App() {
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun HomeActionToast(
+    visible: Boolean,
+    message: MsgContent?
+) {
+    if (!visible || message == null) return
+
+    val text = when (message) {
+        is MsgContent.Resource -> stringResource(message.stringResource, *message.args.toTypedArray())
+        is MsgContent.Text -> message.text
+    }
+
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.BottomCenter
+    ) {
+        Surface(
+            shape = RoundedCornerShape(12.dp),
+            color = MaterialTheme.colorScheme.inverseSurface,
+            shadowElevation = 6.dp,
+            modifier = Modifier.padding(bottom = 24.dp)
+        ) {
+            Text(
+                text = text,
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
+                color = MaterialTheme.colorScheme.inverseOnSurface,
+                style = MaterialTheme.typography.bodyMedium
+            )
         }
     }
 }

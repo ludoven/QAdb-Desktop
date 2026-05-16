@@ -33,6 +33,10 @@
     <string name="usb_connection">USB</string>
     <string name="connected_devices_count">%1$d devices online</string>
     <string name="open_shell">Open Shell</string>
+    <string name="device_mirror">Device Mirror</string>
+    <string name="device_mirror_started">Device mirror window started</string>
+    <string name="device_mirror_scrcpy_missing">Bundled scrcpy is unavailable. Please check that the app package is complete.</string>
+    <string name="device_mirror_failed">Failed to start device mirror: %1$s</string>
     <string name="file_manager">File Manager</string>
     <string name="file_manager_desc">Browse and manage files</string>
     <string name="file_browser">Files</string>

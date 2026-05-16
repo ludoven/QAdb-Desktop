@@ -14,6 +14,7 @@ import adbtool_desktop.composeapp.generated.resources.android_version
 import adbtool_desktop.composeapp.generated.resources.build_fingerprint
 import adbtool_desktop.composeapp.generated.resources.device_overview
 import adbtool_desktop.composeapp.generated.resources.device_model
+import adbtool_desktop.composeapp.generated.resources.device_mirror
 import adbtool_desktop.composeapp.generated.resources.device_status
 import adbtool_desktop.composeapp.generated.resources.disconnected
 import adbtool_desktop.composeapp.generated.resources.disconnect
@@ -68,6 +69,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ScreenShare
 import androidx.compose.material.icons.filled.Apps
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.BatteryFull
@@ -125,6 +127,7 @@ fun HomeScreen(
     viewModel: DevicesViewModel,
     onScreenshot: () -> Unit = {},
     onInstallApk: () -> Unit = {},
+    onMirrorDevice: () -> Unit = {},
     onOpenShell: () -> Unit = {}
 ) {
     val devices by viewModel.devices.collectAsState()
@@ -256,6 +259,7 @@ fun HomeScreen(
                         QuickActionsPanel(
                             onScreenshot = onScreenshot,
                             onInstallApk = onInstallApk,
+                            onMirrorDevice = onMirrorDevice,
                             onOpenShell = onOpenShell
                         )
                     }
@@ -287,6 +291,7 @@ fun HomeScreen(
                             QuickActionsPanel(
                                 onScreenshot = onScreenshot,
                                 onInstallApk = onInstallApk,
+                                onMirrorDevice = onMirrorDevice,
                                 onOpenShell = onOpenShell
                             )
                         }
@@ -794,6 +799,7 @@ private fun ConnectionInfoPanel(
 private fun QuickActionsPanel(
     onScreenshot: () -> Unit = {},
     onInstallApk: () -> Unit = {},
+    onMirrorDevice: () -> Unit = {},
     onOpenShell: () -> Unit = {}
 ) {
     DashboardPanel(
@@ -817,6 +823,13 @@ private fun QuickActionsPanel(
                 icon = Icons.Default.Download,
                 accentColor = Color(0xFF4E74C9),
                 onClick = onInstallApk
+            )
+            QuickActionCard(
+                modifier = Modifier.fillMaxWidth(),
+                title = stringResource(Res.string.device_mirror),
+                icon = Icons.AutoMirrored.Filled.ScreenShare,
+                accentColor = Color(0xFF6E7B8B),
+                onClick = onMirrorDevice
             )
             QuickActionCard(
                 modifier = Modifier.fillMaxWidth(),

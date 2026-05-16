@@ -5,6 +5,9 @@ import adbtool_desktop.composeapp.generated.resources.activity_not_found
 import adbtool_desktop.composeapp.generated.resources.apk_not_selected
 import adbtool_desktop.composeapp.generated.resources.capture_logs
 import adbtool_desktop.composeapp.generated.resources.current_activity
+import adbtool_desktop.composeapp.generated.resources.device_mirror_failed
+import adbtool_desktop.composeapp.generated.resources.device_mirror_scrcpy_missing
+import adbtool_desktop.composeapp.generated.resources.device_mirror_started
 import adbtool_desktop.composeapp.generated.resources.dialog_operation_failed
 import adbtool_desktop.composeapp.generated.resources.folder_not_selected
 import adbtool_desktop.composeapp.generated.resources.install_failed
@@ -24,6 +27,7 @@ import com.ludoven.adbtool.entity.AdbFunctionType
 import com.ludoven.adbtool.entity.MsgContent
 import com.ludoven.adbtool.util.AdbTool
 import com.ludoven.adbtool.util.FileUtils
+import com.ludoven.adbtool.util.ScrcpyPathManager
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -40,6 +44,11 @@ class CommonModel : BaseViewModel() {
     fun executeAdbAction(
         type: AdbFunctionType
     ) {
+        if (type == AdbFunctionType.DEVICE_MIRROR) {
+            startDeviceMirror()
+            return
+        }
+
         if (!ensureDeviceSelected()) {
             return
         }
@@ -49,6 +58,7 @@ class CommonModel : BaseViewModel() {
                 when (type) {
                     AdbFunctionType.INSTALL_APK -> installApp()
                     AdbFunctionType.INPUT_TEXT -> showInputDialog(true)
+                    AdbFunctionType.DEVICE_MIRROR -> Unit
                     AdbFunctionType.SCREENSHOT -> screenShoot()
                     AdbFunctionType.SCREEN_RECORD -> screenRecord()
                     AdbFunctionType.CAPTURE_LOGS -> captureLogs()
@@ -287,9 +297,30 @@ class CommonModel : BaseViewModel() {
         showTipDialog(localizedText)
     }
 
-    private fun ensureDeviceSelected(): Boolean {
+    private fun startDeviceMirror() {
+        if (!ensureDeviceSelected(autoDismiss = true)) return
+
+        viewModelScope.launch {
+            val result = withContext(Dispatchers.IO) {
+                AdbTool.startDeviceMirrorAsync()
+            }
+            val message = when {
+                result.success -> MsgContent.Resource(Res.string.device_mirror_started)
+                result.errorMessage == ScrcpyPathManager.ERROR_BUNDLED_SCRCPY_NOT_FOUND -> {
+                    MsgContent.Resource(Res.string.device_mirror_scrcpy_missing)
+                }
+                else -> MsgContent.Resource(
+                    Res.string.device_mirror_failed,
+                    listOf(result.errorMessage ?: result.output)
+                )
+            }
+            showTipDialog(message, autoDismiss = true)
+        }
+    }
+
+    private fun ensureDeviceSelected(autoDismiss: Boolean = false): Boolean {
         if (AdbTool.selectDeviceId != null) return true
-        showTipDialog(MsgContent.Resource(Res.string.no_device_available))
+        showTipDialog(MsgContent.Resource(Res.string.no_device_available), autoDismiss = autoDismiss)
         return false
     }
 }

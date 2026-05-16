@@ -33,6 +33,10 @@
     <string name="usb_connection">USB</string>
     <string name="connected_devices_count">%1$d 个设备在线</string>
     <string name="open_shell">打开 Shell</string>
+    <string name="device_mirror">设备镜像</string>
+    <string name="device_mirror_started">已启动设备镜像窗口</string>
+    <string name="device_mirror_scrcpy_missing">内置 scrcpy 不可用，请检查应用包是否完整。</string>
+    <string name="device_mirror_failed">设备镜像启动失败：%1$s</string>
     <string name="file_manager">文件管理</string>
     <string name="file_manager_desc">浏览和管理文件</string>
     <string name="install_apk_short">安装 APK</string>

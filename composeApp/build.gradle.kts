@@ -100,6 +100,7 @@ compose.desktop {
 
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Exe)
+            appResourcesRootDir.set(project.layout.projectDirectory.dir("src/desktopMain/appResources"))
 
             packageVersion = appVersion
             packageName = "QADB"
