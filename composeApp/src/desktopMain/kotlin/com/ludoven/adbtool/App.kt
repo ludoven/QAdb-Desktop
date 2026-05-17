@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ScreenShare
 import androidx.compose.material.icons.filled.Apps
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.Folder
@@ -56,6 +57,7 @@ import com.ludoven.adbtool.pages.FileBrowserScreen
 import com.ludoven.adbtool.pages.HomeScreen
 import com.ludoven.adbtool.pages.KeyEventScreen
 import com.ludoven.adbtool.pages.LogScreen
+import com.ludoven.adbtool.pages.DeviceMirrorScreen
 import com.ludoven.adbtool.pages.ProcessScreen
 import com.ludoven.adbtool.pages.SettingScreen
 import com.ludoven.adbtool.pages.TerminalScreen
@@ -65,8 +67,10 @@ import com.ludoven.adbtool.util.ThemeManager
 import com.ludoven.adbtool.entity.AdbFunctionType
 import com.ludoven.adbtool.entity.MsgContent
 import com.ludoven.adbtool.util.AdbTool
+import com.ludoven.adbtool.util.l10n
 import com.ludoven.adbtool.viewmodel.AppViewModel
 import com.ludoven.adbtool.viewmodel.CommonModel
+import com.ludoven.adbtool.viewmodel.DeviceMirrorViewModel
 import com.ludoven.adbtool.viewmodel.DevicesViewModel
 import com.ludoven.adbtool.viewmodel.FileBrowserViewModel
 import com.ludoven.adbtool.viewmodel.KeyEventViewModel
@@ -86,6 +90,7 @@ fun App() {
     val devicesViewModel: DevicesViewModel = viewModel()
     val appViewModel: AppViewModel = viewModel()
     val commonModel: CommonModel = viewModel()
+    val deviceMirrorViewModel: DeviceMirrorViewModel = viewModel()
     val keyEventViewModel: KeyEventViewModel = viewModel()
     val logViewModel: LogViewModel = viewModel()
     val terminalViewModel: TerminalViewModel = viewModel()
@@ -103,6 +108,7 @@ fun App() {
     val tabs = listOf(
         TabItem(stringResource(Res.string.home), Icons.Default.Home, "home"),
         TabItem(stringResource(Res.string.common), Icons.Default.Info, "common"),
+        TabItem(l10n("镜像", "Mirror"), Icons.AutoMirrored.Filled.ScreenShare, "mirror"),
         TabItem(stringResource(Res.string.terminal), Icons.Default.Code, "terminal"),
         TabItem(stringResource(Res.string.key_event_page), Icons.Default.VideogameAsset, "keyevent"),
         TabItem(stringResource(Res.string.app), Icons.Default.Apps, "app"),
@@ -212,13 +218,12 @@ fun App() {
                                     stateHolder.SaveableStateProvider("home") {
                                         val commonDialogMessage by commonModel.dialogMessage.collectAsState()
                                         val commonShowDialog by commonModel.showDialog.collectAsState()
-
                                         Box(modifier = Modifier.fillMaxSize()) {
                                             HomeScreen(
                                                 viewModel = devicesViewModel,
                                                 onScreenshot = { commonModel.executeAdbAction(AdbFunctionType.SCREENSHOT) },
                                                 onInstallApk = { commonModel.executeAdbAction(AdbFunctionType.INSTALL_APK) },
-                                                onMirrorDevice = { commonModel.executeAdbAction(AdbFunctionType.DEVICE_MIRROR) },
+                                                onMirrorDevice = { navigateToRoute("mirror") },
                                                 onOpenShell = {
                                                     navigateToRoute("terminal")
                                                 }
@@ -228,6 +233,14 @@ fun App() {
                                                 message = commonDialogMessage
                                             )
                                         }
+                                    }
+                                }
+                                composable("mirror") {
+                                    stateHolder.SaveableStateProvider("mirror") {
+                                        DeviceMirrorScreen(
+                                            viewModel = deviceMirrorViewModel,
+                                            selectedDevice = selectedDevice
+                                        )
                                     }
                                 }
                                 composable("common") {

@@ -1,5 +1,6 @@
 package com.ludoven.adbtool
 
+import com.ludoven.adbtool.entity.DeviceMirrorSettings
 import com.ludoven.adbtool.util.AdbTool
 import com.ludoven.adbtool.util.ScrcpyPathManager
 import java.io.File
@@ -22,7 +23,53 @@ class DeviceMirrorTest {
                 "--serial",
                 "emulator-5554",
                 "--window-title",
-                "QADB Device Mirror"
+                "QADB Device Mirror",
+                "--always-on-top",
+                "--video-bit-rate",
+                "8M",
+                "--stay-awake"
+            ),
+            command
+        )
+    }
+
+    @Test
+    fun `build scrcpy command includes runtime mirror settings`() {
+        val command = AdbTool.buildScrcpyCommand(
+            scrcpyPath = "/opt/homebrew/bin/scrcpy",
+            deviceId = "emulator-5554",
+            windowTitle = "QADB Device Mirror",
+            settings = DeviceMirrorSettings(
+                alwaysOnTop = true,
+                fullscreen = true,
+                borderless = true,
+                maxSize = 1280,
+                maxFps = 60,
+                videoBitRate = "12M",
+                audioEnabled = false,
+                showTouches = true,
+                stayAwake = true,
+                turnScreenOffOnStart = true,
+                powerOffOnClose = true
+            )
+        )
+
+        assertEquals(
+            listOf(
+                "/opt/homebrew/bin/scrcpy",
+                "--serial", "emulator-5554",
+                "--window-title", "QADB Device Mirror",
+                "--always-on-top",
+                "--fullscreen",
+                "--window-borderless",
+                "--max-size", "1280",
+                "--max-fps", "60",
+                "--video-bit-rate", "12M",
+                "--no-audio",
+                "--show-touches",
+                "--stay-awake",
+                "--turn-screen-off",
+                "--power-off-on-close"
             ),
             command
         )
