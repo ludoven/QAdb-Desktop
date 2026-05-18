@@ -19,6 +19,7 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Assignment
+import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.automirrored.filled.ViewList
 import androidx.compose.material.icons.filled.*
 import com.ludoven.adbtool.ui.mac.*
@@ -48,6 +49,7 @@ import com.ludoven.adbtool.entity.MsgContent
 import com.ludoven.adbtool.util.AdbTool
 import com.ludoven.adbtool.util.l10n
 import com.ludoven.adbtool.viewmodel.AppViewModel
+import kotlinx.coroutines.flow.distinctUntilChanged
 import org.jetbrains.compose.resources.stringResource
 
 data class AppInfo(
@@ -66,10 +68,39 @@ data class AppInfo(
     val isRunning: Boolean = false
 )
 
-private data class AppFilterTab(
-    val key: String,
-    val label: String
-)
+internal enum class AppFilter(val key: String) {
+    ALL("all"),
+    USER("user"),
+    SYSTEM("system"),
+    DEBUGGABLE("debug"),
+    RECENT("recent"),
+    RUNNING("running");
+
+    fun matches(app: AppInfo): Boolean {
+        return when (this) {
+            ALL -> true
+            USER -> !app.isSystemApp
+            SYSTEM -> app.isSystemApp
+            DEBUGGABLE -> app.isDebuggable
+            RECENT -> (app.lastUsedTimestamp ?: app.installTimestamp ?: 0L) > 0L
+            RUNNING -> app.isRunning
+        }
+    }
+
+    companion object {
+        fun fromKey(value: String): AppFilter {
+            return entries.firstOrNull { it.key == value } ?: when (value) {
+                "全部应用" -> ALL
+                "用户应用" -> USER
+                "系统应用" -> SYSTEM
+                "可调试应用" -> DEBUGGABLE
+                "最近使用" -> RECENT
+                "运行中" -> RUNNING
+                else -> ALL
+            }
+        }
+    }
+}
 
 private enum class AppSortMode {
     Name,
@@ -103,6 +134,26 @@ fun getInstalledApps(): List<AppInfo> {
             isDisabled = disabledPackages.contains(packageName)
         )
     }.sortedBy { it.packageName }
+}
+
+internal fun filterApps(
+    apps: List<AppInfo>,
+    selectedFilter: AppFilter,
+    searchText: String
+): List<AppInfo> {
+    val query = searchText.trim()
+    return apps.filter { app ->
+        val matchesSearch = query.isBlank() ||
+            app.appName.contains(query, ignoreCase = true) ||
+            app.packageName.contains(query, ignoreCase = true)
+        matchesSearch && selectedFilter.matches(app)
+    }
+}
+
+internal fun appFilterCounts(apps: List<AppInfo>): Map<AppFilter, Int> {
+    return AppFilter.entries.associateWith { filter ->
+        apps.count { app -> filter.matches(app) }
+    }
 }
 
 @Composable
@@ -159,27 +210,10 @@ fun AppScreen(viewModel: AppViewModel) {
 
     LaunchedEffect(Unit) { viewModel.getAppList() }
 
-    val tabs = listOf(
-        AppFilterTab("all", "全部应用"),
-        AppFilterTab("user", "用户应用"),
-        AppFilterTab("system", "系统应用"),
-        AppFilterTab("debug", "可调试应用"),
-        AppFilterTab("recent", "最近使用"),
-        AppFilterTab("running", "运行中")
-    )
-
-    val filteredList = appList.filter { app ->
-        val matchesSearch = app.appName.contains(searchText, ignoreCase = true) ||
-            app.packageName.contains(searchText, ignoreCase = true)
-        val matchesTab = when (selectedTab) {
-            "用户应用" -> !app.isSystemApp
-            "系统应用" -> app.isSystemApp
-            "可调试应用" -> app.isDebuggable
-            "最近使用" -> (app.lastUsedTimestamp ?: app.installTimestamp ?: 0L) > 0L
-            "运行中" -> app.isRunning
-            else -> true
-        }
-        matchesSearch && matchesTab
+    val tabs = remember { AppFilter.entries.toList() }
+    val selectedFilter = remember(selectedTab) { AppFilter.fromKey(selectedTab) }
+    val filteredList = remember(appList, selectedFilter, searchText) {
+        filterApps(appList, selectedFilter, searchText)
     }
     val displayedList = remember(filteredList, sortMode) {
         when (sortMode) {
@@ -191,14 +225,7 @@ fun AppScreen(viewModel: AppViewModel) {
         }
     }
     val tabCountMap = remember(appList) {
-        mapOf(
-            "全部应用" to appList.size,
-            "用户应用" to appList.count { !it.isSystemApp },
-            "系统应用" to appList.count { it.isSystemApp },
-            "可调试应用" to appList.count { it.isDebuggable },
-            "最近使用" to appList.count { (it.lastUsedTimestamp ?: it.installTimestamp ?: 0L) > 0L },
-            "运行中" to appList.count { it.isRunning }
-        )
+        appFilterCounts(appList)
     }
 
     Scaffold(containerColor = Color.Transparent) { paddingValues ->
@@ -255,7 +282,7 @@ fun AppScreen(viewModel: AppViewModel) {
                         Text(l10n("刷新", "Refresh"))
                     }
                     Text(
-                        text = l10n("最近刷新", "Last refresh") + "：${formatRelativeRefresh(lastRefreshMillis)}",
+                        text = l10n("最近刷新：", "Last refresh: ") + formatRelativeRefresh(lastRefreshMillis),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -280,7 +307,7 @@ fun AppScreen(viewModel: AppViewModel) {
             ) {
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(tabs, key = { it.key }) { tab ->
-                        val selected = selectedTab == tab.label
+                        val selected = selectedFilter == tab
                         Surface(
                             shape = RoundedCornerShape(10.dp),
                             color = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surface,
@@ -289,10 +316,10 @@ fun AppScreen(viewModel: AppViewModel) {
                                 if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.28f)
                                 else Color(0xFFE5E7EB)
                             ),
-                            modifier = Modifier.clickable { viewModel.setSelectedTab(tab.label) }
+                            modifier = Modifier.clickable { viewModel.setSelectedTab(tab.key) }
                         ) {
                             Text(
-                                text = "${appTabLabel(tab.label)} ${tabCountMap[tab.label] ?: 0}",
+                                text = "${appTabLabel(tab)} ${tabCountMap[tab] ?: 0}",
                                 modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
@@ -312,7 +339,7 @@ fun AppScreen(viewModel: AppViewModel) {
                             shape = RoundedCornerShape(10.dp),
                             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
                         ) {
-                            Icon(Icons.Default.Sort, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Icon(Icons.AutoMirrored.Filled.Sort, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(Modifier.width(6.dp))
                             Text(appSortModeLabel(sortMode))
                             Spacer(Modifier.width(2.dp))
@@ -405,7 +432,7 @@ fun AppScreen(viewModel: AppViewModel) {
                         snapshotFlow {
                             gridState.layoutInfo.visibleItemsInfo
                                 .mapNotNull { item -> displayedList.getOrNull(item.index)?.packageName }
-                        }.collect { visiblePackages ->
+                        }.distinctUntilChanged().collect { visiblePackages ->
                             viewModel.ensureAppAssetsVisible(visiblePackages)
                             viewModel.ensureAppDetailsVisible(visiblePackages)
                         }
@@ -440,7 +467,7 @@ fun AppScreen(viewModel: AppViewModel) {
                         snapshotFlow {
                             listState.layoutInfo.visibleItemsInfo
                                 .mapNotNull { item -> displayedList.getOrNull(item.index)?.packageName }
-                        }.collect { visiblePackages ->
+                        }.distinctUntilChanged().collect { visiblePackages ->
                             viewModel.ensureAppAssetsVisible(visiblePackages)
                             viewModel.ensureAppDetailsVisible(visiblePackages)
                         }
@@ -529,15 +556,14 @@ private fun appSortModeLabel(mode: AppSortMode): String {
     }
 }
 
-private fun appTabLabel(label: String): String {
-    return when (label) {
-        "全部应用" -> l10n("全部应用", "All apps")
-        "用户应用" -> l10n("用户应用", "User apps")
-        "系统应用" -> l10n("系统应用", "System apps")
-        "可调试应用" -> l10n("可调试应用", "Debuggable")
-        "最近使用" -> l10n("最近使用", "Recent")
-        "运行中" -> l10n("运行中", "Running")
-        else -> label
+private fun appTabLabel(filter: AppFilter): String {
+    return when (filter) {
+        AppFilter.ALL -> l10n("全部应用", "All apps")
+        AppFilter.USER -> l10n("用户应用", "User apps")
+        AppFilter.SYSTEM -> l10n("系统应用", "System apps")
+        AppFilter.DEBUGGABLE -> l10n("可调试应用", "Debuggable")
+        AppFilter.RECENT -> l10n("最近使用", "Recent")
+        AppFilter.RUNNING -> l10n("运行中", "Running")
     }
 }
 

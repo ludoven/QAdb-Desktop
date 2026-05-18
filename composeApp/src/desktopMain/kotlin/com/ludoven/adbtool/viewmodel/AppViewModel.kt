@@ -47,7 +47,7 @@ class AppViewModel : BaseViewModel() {
     private val _searchText = MutableStateFlow("")
     val searchText = _searchText.asStateFlow()
 
-    private val _selectedTab = MutableStateFlow("全部应用")
+    private val _selectedTab = MutableStateFlow("all")
     val selectedTab = _selectedTab.asStateFlow()
 
     private val _isLoading = MutableStateFlow(false)
