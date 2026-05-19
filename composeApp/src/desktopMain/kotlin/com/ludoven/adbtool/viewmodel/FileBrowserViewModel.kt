@@ -169,8 +169,8 @@ class FileBrowserViewModel : BaseViewModel() {
             for (src in sources) {
                 val destPath = "$dest/${src.substringAfterLast("/")}"
                 val command = when (mode) {
-                    ClipboardMode.COPY -> "cp -r \"$src\" \"$destPath\""
-                    ClipboardMode.CUT -> "mv \"$src\" \"$destPath\""
+                    ClipboardMode.COPY -> AdbTool.buildShellCommand("cp", "-r", src, destPath)
+                    ClipboardMode.CUT -> AdbTool.buildShellCommand("mv", src, destPath)
                     else -> continue
                 }
                 val result = withContext(Dispatchers.IO) {
@@ -193,8 +193,9 @@ class FileBrowserViewModel : BaseViewModel() {
     fun deleteFile(path: String, deviceId: String?) {
         if (deviceId.isNullOrBlank()) return
         viewModelScope.launch {
+            val command = AdbTool.buildShellCommand("rm", "-rf", "--", path)
             val result = withContext(Dispatchers.IO) {
-                AdbTool.execShellAsync("rm -rf \"$path\"", deviceId)
+                AdbTool.execShellAsync(command, deviceId)
             }
             if (result.success || result.output.isBlank()) {
                 showTipDialog(MsgContent.Text("已删除: ${path.substringAfterLast("/")}"), autoDismiss = true)
@@ -209,8 +210,9 @@ class FileBrowserViewModel : BaseViewModel() {
         if (deviceId.isNullOrBlank() || newName.isBlank()) return
         val newPath = "${oldPath.substringBeforeLast("/")}/$newName"
         viewModelScope.launch {
+            val command = AdbTool.buildShellCommand("mv", oldPath, newPath)
             val result = withContext(Dispatchers.IO) {
-                AdbTool.execShellAsync("mv \"$oldPath\" \"$newPath\"", deviceId)
+                AdbTool.execShellAsync(command, deviceId)
             }
             if (result.success || result.output.isBlank()) {
                 showTipDialog(MsgContent.Text("重命名成功"), autoDismiss = true)
@@ -225,8 +227,9 @@ class FileBrowserViewModel : BaseViewModel() {
         if (deviceId.isNullOrBlank() || dirName.isBlank()) return
         val path = "${_currentPath.value}/$dirName"
         viewModelScope.launch {
+            val command = AdbTool.buildShellCommand("mkdir", "--", path)
             val result = withContext(Dispatchers.IO) {
-                AdbTool.execShellAsync("mkdir \"$path\"", deviceId)
+                AdbTool.execShellAsync(command, deviceId)
             }
             if (result.success || result.output.isBlank()) {
                 showTipDialog(MsgContent.Text("已创建目录: $dirName"), autoDismiss = true)
@@ -288,8 +291,9 @@ class FileBrowserViewModel : BaseViewModel() {
     fun getFilePermission(path: String, deviceId: String?) {
         if (deviceId.isNullOrBlank()) return
         viewModelScope.launch {
+            val command = AdbTool.buildShellCommand("stat", path)
             val result = withContext(Dispatchers.IO) {
-                AdbTool.execShellAsync("stat \"$path\"", deviceId)
+                AdbTool.execShellAsync(command, deviceId)
             }
             if (result.success) {
                 showTipDialog(MsgContent.Text(result.output))
@@ -302,8 +306,16 @@ class FileBrowserViewModel : BaseViewModel() {
     fun openFile(devicePath: String, deviceId: String?) {
         if (deviceId.isNullOrBlank()) return
         viewModelScope.launch {
+            val command = AdbTool.buildShellCommand(
+                "am",
+                "start",
+                "-a",
+                "android.intent.action.VIEW",
+                "-d",
+                "file://$devicePath"
+            )
             val result = withContext(Dispatchers.IO) {
-                AdbTool.execShellAsync("am start -a android.intent.action.VIEW -d \"file://$devicePath\"", deviceId)
+                AdbTool.execShellAsync(command, deviceId)
             }
             if (!result.success) {
                 showTipDialog(MsgContent.Text("无法打开文件: ${result.errorMessage ?: result.output}"))

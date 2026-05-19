@@ -1,5 +1,7 @@
 package com.ludoven.adbtool.util
 
+import com.ludoven.adbtool.entity.DeviceMirrorSettings
+import java.io.IOException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -10,7 +12,14 @@ import kotlinx.coroutines.withContext
  * 优化了错误处理、代码复用和性能
  */
 object AdbTool {
-    
+
+    const val DEVICE_MIRROR_STARTED_MESSAGE = "Device mirror started"
+    const val DEVICE_MIRROR_ALREADY_RUNNING_MESSAGE = "Device mirror already running"
+
+    private val mirrorProcessLock = Any()
+    @Volatile
+    private var deviceMirrorProcess: Process? = null
+
     var selectDeviceId: String? = null
     
     /**
@@ -100,6 +109,101 @@ object AdbTool {
     fun execShell(command: String, deviceId: String? = selectDeviceId): String {
         val args = buildDeviceArgs(deviceId) + listOf("shell", command)
         return runCommand(*args.toTypedArray())
+    }
+
+    /**
+     * 对 shell 参数做安全转义，防止命令注入。
+     */
+    internal fun shellQuote(argument: String): String {
+        return "'${argument.replace("'", "'\\''")}'"
+    }
+
+    /**
+     * 基于参数安全拼装 shell 命令。
+     */
+    internal fun buildShellCommand(vararg arguments: String): String {
+        return arguments.joinToString(" ") { shellQuote(it) }
+    }
+
+    internal fun buildScrcpyCommand(
+        scrcpyPath: String,
+        deviceId: String,
+        windowTitle: String,
+        settings: DeviceMirrorSettings = DeviceMirrorSettings()
+    ): List<String> {
+        return listOf(scrcpyPath, "--serial", deviceId, "--window-title", windowTitle) + settings.toScrcpyArgs()
+    }
+
+    suspend fun startDeviceMirrorAsync(
+        deviceId: String? = selectDeviceId,
+        windowTitle: String = "QADB Device Mirror",
+        settings: DeviceMirrorSettings = DeviceMirrorSettings(),
+        forceRestart: Boolean = false
+    ): AdbResult {
+        if (deviceId.isNullOrBlank()) {
+            return AdbResult(false, "", "Device ID is required")
+        }
+
+        val adbPath = AdbPathManager.getAdbPath()
+            ?: return AdbResult(false, "", AdbPathManager.friendlyInitializationError("ADB path not found"))
+        val scrcpyPath = ScrcpyPathManager.getScrcpyPath()
+            ?: return AdbResult(false, "", ScrcpyPathManager.ERROR_BUNDLED_SCRCPY_NOT_FOUND)
+
+        return withContext(Dispatchers.IO) {
+            synchronized(mirrorProcessLock) {
+                val currentProcess = deviceMirrorProcess
+                if (currentProcess != null && !currentProcess.isAlive) {
+                    deviceMirrorProcess = null
+                }
+                if (forceRestart) {
+                    deviceMirrorProcess?.takeIf { it.isAlive }?.destroy()
+                    deviceMirrorProcess = null
+                } else if (deviceMirrorProcess?.isAlive == true) {
+                    return@synchronized AdbResult(true, DEVICE_MIRROR_ALREADY_RUNNING_MESSAGE)
+                }
+
+                try {
+                    val process = ProcessBuilder(buildScrcpyCommand(scrcpyPath, deviceId, windowTitle, settings))
+                        .apply {
+                            redirectErrorStream(true)
+                            environment()["ADB"] = adbPath
+                        }
+                        .start()
+                    deviceMirrorProcess = process
+                    AdbResult(true, DEVICE_MIRROR_STARTED_MESSAGE)
+                } catch (e: IOException) {
+                    AdbResult(false, "", e.message ?: "Failed to start scrcpy")
+                }
+            }
+        }
+    }
+
+    suspend fun stopDeviceMirrorAsync(): AdbResult {
+        return withContext(Dispatchers.IO) {
+            synchronized(mirrorProcessLock) {
+                val process = deviceMirrorProcess
+                if (process == null || !process.isAlive) {
+                    deviceMirrorProcess = null
+                    return@synchronized AdbResult(true, "Device mirror stopped")
+                }
+
+                process.destroy()
+                deviceMirrorProcess = null
+                AdbResult(true, "Device mirror stopped")
+            }
+        }
+    }
+
+    fun isDeviceMirrorRunning(): Boolean {
+        synchronized(mirrorProcessLock) {
+            val process = deviceMirrorProcess
+            return if (process?.isAlive == true) {
+                true
+            } else {
+                deviceMirrorProcess = null
+                false
+            }
+        }
     }
     
     /**

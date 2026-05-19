@@ -4,6 +4,56 @@ package com.ludoven.adbtool
 
 import adbtool_desktop.composeapp.generated.resources.Res
 import adbtool_desktop.composeapp.generated.resources.ic_logo
+import adbtool_desktop.composeapp.generated.resources.menu_about_qadb
+import adbtool_desktop.composeapp.generated.resources.menu_about_qadb_message
+import adbtool_desktop.composeapp.generated.resources.menu_always_on_top
+import adbtool_desktop.composeapp.generated.resources.menu_check_update
+import adbtool_desktop.composeapp.generated.resources.menu_close
+import adbtool_desktop.composeapp.generated.resources.menu_connect_device
+import adbtool_desktop.composeapp.generated.resources.menu_connect_device_prompt
+import adbtool_desktop.composeapp.generated.resources.menu_connect_device_title
+import adbtool_desktop.composeapp.generated.resources.menu_device
+import adbtool_desktop.composeapp.generated.resources.menu_device_info
+import adbtool_desktop.composeapp.generated.resources.menu_docs
+import adbtool_desktop.composeapp.generated.resources.menu_exit
+import adbtool_desktop.composeapp.generated.resources.menu_export_logs
+import adbtool_desktop.composeapp.generated.resources.menu_feedback
+import adbtool_desktop.composeapp.generated.resources.menu_file
+import adbtool_desktop.composeapp.generated.resources.menu_github
+import adbtool_desktop.composeapp.generated.resources.menu_go_app
+import adbtool_desktop.composeapp.generated.resources.menu_go_common
+import adbtool_desktop.composeapp.generated.resources.menu_go_file
+import adbtool_desktop.composeapp.generated.resources.menu_go_home
+import adbtool_desktop.composeapp.generated.resources.menu_go_keyevent
+import adbtool_desktop.composeapp.generated.resources.menu_go_log
+import adbtool_desktop.composeapp.generated.resources.menu_go_process
+import adbtool_desktop.composeapp.generated.resources.menu_go_setting
+import adbtool_desktop.composeapp.generated.resources.menu_go_terminal
+import adbtool_desktop.composeapp.generated.resources.menu_help
+import adbtool_desktop.composeapp.generated.resources.menu_import_apk
+import adbtool_desktop.composeapp.generated.resources.menu_install_apk
+import adbtool_desktop.composeapp.generated.resources.menu_minimize
+import adbtool_desktop.composeapp.generated.resources.menu_off
+import adbtool_desktop.composeapp.generated.resources.menu_on
+import adbtool_desktop.composeapp.generated.resources.menu_open_directory
+import adbtool_desktop.composeapp.generated.resources.menu_page_navigation
+import adbtool_desktop.composeapp.generated.resources.menu_qadb
+import adbtool_desktop.composeapp.generated.resources.menu_reboot_device
+import adbtool_desktop.composeapp.generated.resources.menu_refresh_devices
+import adbtool_desktop.composeapp.generated.resources.menu_screen_record
+import adbtool_desktop.composeapp.generated.resources.menu_screenshot
+import adbtool_desktop.composeapp.generated.resources.menu_settings
+import adbtool_desktop.composeapp.generated.resources.menu_shortcuts
+import adbtool_desktop.composeapp.generated.resources.menu_shortcuts_message
+import adbtool_desktop.composeapp.generated.resources.menu_terminal
+import adbtool_desktop.composeapp.generated.resources.menu_toggle_dark_theme
+import adbtool_desktop.composeapp.generated.resources.menu_tools
+import adbtool_desktop.composeapp.generated.resources.menu_view
+import adbtool_desktop.composeapp.generated.resources.menu_view_activity
+import adbtool_desktop.composeapp.generated.resources.menu_window
+import adbtool_desktop.composeapp.generated.resources.menu_zoom_in
+import adbtool_desktop.composeapp.generated.resources.menu_zoom_out
+import adbtool_desktop.composeapp.generated.resources.menu_zoom_reset
 import com.ludoven.adbtool.ui.mac.*
 import com.ludoven.adbtool.ui.mac.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
@@ -30,6 +80,7 @@ import javax.swing.JOptionPane
 import kotlinx.coroutines.launch
 import com.ludoven.adbtool.util.ThemeManager
 import org.jetbrains.compose.resources.painterResource
+import org.jetbrains.compose.resources.stringResource
 
 private const val DOCS_URL = "https://ludoven.github.io/QADB/"
 private const val GITHUB_URL = "https://github.com/ludoven/QADB"
@@ -95,93 +146,109 @@ private fun MenuBarScope.AppMenuBar(
     onToggleTheme: () -> Unit,
     onConnectDevice: (String) -> Unit
 ) {
-    Menu("QADB") {
-        Item("关于 QADB") {
+    val menuQadb = stringResource(Res.string.menu_qadb)
+    val menuFile = stringResource(Res.string.menu_file)
+    val menuDevice = stringResource(Res.string.menu_device)
+    val menuTools = stringResource(Res.string.menu_tools)
+    val menuView = stringResource(Res.string.menu_view)
+    val menuWindow = stringResource(Res.string.menu_window)
+    val menuHelp = stringResource(Res.string.menu_help)
+    val menuOn = stringResource(Res.string.menu_on)
+    val menuOff = stringResource(Res.string.menu_off)
+    val menuAboutQadb = stringResource(Res.string.menu_about_qadb)
+    val menuAboutQadbMessage = stringResource(Res.string.menu_about_qadb_message)
+    val menuConnectDevicePrompt = stringResource(Res.string.menu_connect_device_prompt)
+    val menuConnectDeviceTitle = stringResource(Res.string.menu_connect_device_title)
+    val menuShortcuts = stringResource(Res.string.menu_shortcuts)
+    val menuShortcutsMessage = stringResource(Res.string.menu_shortcuts_message)
+
+    Menu(menuQadb) {
+        Item(menuAboutQadb) {
             showInfoDialog(
-                title = "关于 QADB",
-                message = "QADB\n开源、跨平台、现代化的 ADB 桌面调试工具。"
+                title = menuAboutQadb,
+                message = menuAboutQadbMessage
             )
         }
-        Item("设置") { AppMenuCommandBus.dispatch(AppMenuCommand.Navigate("setting")) }
-        Item("检查更新") { AppMenuCommandBus.dispatch(AppMenuCommand.Navigate("setting")) }
+        Item(stringResource(Res.string.menu_settings)) { AppMenuCommandBus.dispatch(AppMenuCommand.Navigate("setting")) }
+        Item(stringResource(Res.string.menu_check_update)) { AppMenuCommandBus.dispatch(AppMenuCommand.Navigate("setting")) }
         Separator()
-        Item("退出", onClick = onClose)
+        Item(stringResource(Res.string.menu_exit), onClick = onClose)
     }
 
-    Menu("文件") {
-        Item("导入 APK") { AppMenuCommandBus.dispatch(AppMenuCommand.InstallApk) }
-        Item("导出日志") { AppMenuCommandBus.dispatch(AppMenuCommand.ExportLogs) }
+    Menu(menuFile) {
+        Item(stringResource(Res.string.menu_import_apk)) { AppMenuCommandBus.dispatch(AppMenuCommand.InstallApk) }
+        Item(stringResource(Res.string.menu_export_logs)) { AppMenuCommandBus.dispatch(AppMenuCommand.ExportLogs) }
         Separator()
-        Item("打开目录") { openDirectory(File(System.getProperty("user.home"))) }
+        Item(stringResource(Res.string.menu_open_directory)) { openDirectory(File(System.getProperty("user.home"))) }
     }
 
-    Menu("设备") {
-        Item("连接设备...") {
+    Menu(menuDevice) {
+        Item(stringResource(Res.string.menu_connect_device)) {
             val input = JOptionPane.showInputDialog(
                 null,
-                "请输入设备地址（例如 192.168.1.100:5555）",
-                "连接设备",
+                menuConnectDevicePrompt,
+                menuConnectDeviceTitle,
                 JOptionPane.PLAIN_MESSAGE
             )
             val address = input?.trim().orEmpty()
             if (address.isNotBlank()) onConnectDevice(address)
         }
-        Item("刷新设备") { AppMenuCommandBus.dispatch(AppMenuCommand.RefreshDevices) }
-        Item("重启设备") { AppMenuCommandBus.dispatch(AppMenuCommand.RebootDevice) }
+        Item(stringResource(Res.string.menu_refresh_devices)) { AppMenuCommandBus.dispatch(AppMenuCommand.RefreshDevices) }
+        Item(stringResource(Res.string.menu_reboot_device)) { AppMenuCommandBus.dispatch(AppMenuCommand.RebootDevice) }
         Separator()
-        Item("截图") { AppMenuCommandBus.dispatch(AppMenuCommand.Screenshot) }
-        Item("录屏") { AppMenuCommandBus.dispatch(AppMenuCommand.ScreenRecord) }
+        Item(stringResource(Res.string.menu_screenshot)) { AppMenuCommandBus.dispatch(AppMenuCommand.Screenshot) }
+        Item(stringResource(Res.string.menu_screen_record)) { AppMenuCommandBus.dispatch(AppMenuCommand.ScreenRecord) }
     }
 
-    Menu("工具") {
-        Item("终端") { AppMenuCommandBus.dispatch(AppMenuCommand.OpenTerminalTool) }
-        Item("安装 APK") { AppMenuCommandBus.dispatch(AppMenuCommand.InstallApk) }
-        Item("查看 Activity") { AppMenuCommandBus.dispatch(AppMenuCommand.ViewCurrentActivity) }
-        Item("设备信息") { AppMenuCommandBus.dispatch(AppMenuCommand.ViewDeviceInfo) }
+    Menu(menuTools) {
+        Item(stringResource(Res.string.menu_terminal)) { AppMenuCommandBus.dispatch(AppMenuCommand.OpenTerminalTool) }
+        Item(stringResource(Res.string.menu_install_apk)) { AppMenuCommandBus.dispatch(AppMenuCommand.InstallApk) }
+        Item(stringResource(Res.string.menu_view_activity)) { AppMenuCommandBus.dispatch(AppMenuCommand.ViewCurrentActivity) }
+        Item(stringResource(Res.string.menu_device_info)) { AppMenuCommandBus.dispatch(AppMenuCommand.ViewDeviceInfo) }
     }
 
-    Menu("视图") {
-        Menu("页面跳转") {
-            Item("首页") { AppMenuCommandBus.dispatch(AppMenuCommand.Navigate("home")) }
-            Item("常用") { AppMenuCommandBus.dispatch(AppMenuCommand.Navigate("common")) }
-            Item("终端") { AppMenuCommandBus.dispatch(AppMenuCommand.Navigate("terminal")) }
-            Item("按键") { AppMenuCommandBus.dispatch(AppMenuCommand.Navigate("keyevent")) }
-            Item("应用") { AppMenuCommandBus.dispatch(AppMenuCommand.Navigate("app")) }
-            Item("文件") { AppMenuCommandBus.dispatch(AppMenuCommand.Navigate("filebrowser")) }
-            Item("日志") { AppMenuCommandBus.dispatch(AppMenuCommand.Navigate("log")) }
-            Item("进程") { AppMenuCommandBus.dispatch(AppMenuCommand.Navigate("process")) }
-            Item("设置") { AppMenuCommandBus.dispatch(AppMenuCommand.Navigate("setting")) }
+    Menu(menuView) {
+        Menu(stringResource(Res.string.menu_page_navigation)) {
+            Item(stringResource(Res.string.menu_go_home)) { AppMenuCommandBus.dispatch(AppMenuCommand.Navigate("home")) }
+            Item(stringResource(Res.string.menu_go_common)) { AppMenuCommandBus.dispatch(AppMenuCommand.Navigate("common")) }
+            Item(stringResource(Res.string.menu_go_terminal)) { AppMenuCommandBus.dispatch(AppMenuCommand.Navigate("terminal")) }
+            Item(stringResource(Res.string.menu_go_keyevent)) { AppMenuCommandBus.dispatch(AppMenuCommand.Navigate("keyevent")) }
+            Item(stringResource(Res.string.menu_go_app)) { AppMenuCommandBus.dispatch(AppMenuCommand.Navigate("app")) }
+            Item(stringResource(Res.string.menu_go_file)) { AppMenuCommandBus.dispatch(AppMenuCommand.Navigate("filebrowser")) }
+            Item(stringResource(Res.string.menu_go_log)) { AppMenuCommandBus.dispatch(AppMenuCommand.Navigate("log")) }
+            Item(stringResource(Res.string.menu_go_process)) { AppMenuCommandBus.dispatch(AppMenuCommand.Navigate("process")) }
+            Item(stringResource(Res.string.menu_go_setting)) { AppMenuCommandBus.dispatch(AppMenuCommand.Navigate("setting")) }
         }
         Separator()
-        Item("切换深色主题") { onToggleTheme() }
+        Item(stringResource(Res.string.menu_toggle_dark_theme)) { onToggleTheme() }
         Separator()
-        Item("放大") { onZoomIn() }
-        Item("缩小") { onZoomOut() }
-        Item("重置缩放") { onZoomReset() }
+        Item(stringResource(Res.string.menu_zoom_in)) { onZoomIn() }
+        Item(stringResource(Res.string.menu_zoom_out)) { onZoomOut() }
+        Item(stringResource(Res.string.menu_zoom_reset)) { onZoomReset() }
     }
 
-    Menu("窗口") {
-        Item("最小化", onClick = onMinimize)
-        Item("关闭", onClick = onClose)
+    Menu(menuWindow) {
+        Item(stringResource(Res.string.menu_minimize), onClick = onMinimize)
+        Item(stringResource(Res.string.menu_close), onClick = onClose)
         Separator()
-        Item("置顶: ${if (alwaysOnTop) "开" else "关"}", onClick = onAlwaysOnTopToggle)
+        Item(
+            stringResource(
+                Res.string.menu_always_on_top,
+                if (alwaysOnTop) menuOn else menuOff
+            ),
+            onClick = onAlwaysOnTopToggle
+        )
     }
 
-    Menu("帮助") {
-        Item("文档") { openUrl(DOCS_URL) }
-        Item("GitHub") { openUrl(GITHUB_URL) }
-        Item("反馈") { openUrl(FEEDBACK_URL) }
+    Menu(menuHelp) {
+        Item(stringResource(Res.string.menu_docs)) { openUrl(DOCS_URL) }
+        Item(stringResource(Res.string.menu_github)) { openUrl(GITHUB_URL) }
+        Item(stringResource(Res.string.menu_feedback)) { openUrl(FEEDBACK_URL) }
         Separator()
-        Item("快捷键") {
+        Item(menuShortcuts) {
             showInfoDialog(
-                title = "快捷键",
-                message = """
-                常用快捷方式建议：
-                - 刷新设备：菜单「设备 > 刷新设备」
-                - 终端：菜单「工具 > 终端」
-                - 截图/录屏：菜单「设备 > 截图/录屏」
-                - 页面跳转：菜单「视图 > 页面跳转」
-                """.trimIndent()
+                title = menuShortcuts,
+                message = menuShortcutsMessage
             )
         }
     }

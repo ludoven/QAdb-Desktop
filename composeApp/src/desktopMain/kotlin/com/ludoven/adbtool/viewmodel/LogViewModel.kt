@@ -10,7 +10,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -18,6 +17,17 @@ import java.text.SimpleDateFormat
 import java.util.*
 
 class LogViewModel : ViewModel() {
+    companion object {
+        internal const val MAX_LOG_ENTRIES = 10_000
+        private const val LOG_UI_BATCH_SIZE = 40
+
+        internal fun appendWithLimit(buffer: ArrayDeque<LogEntry>, entry: LogEntry, maxEntries: Int = MAX_LOG_ENTRIES) {
+            if (buffer.size >= maxEntries) {
+                buffer.removeFirst()
+            }
+            buffer.addLast(entry)
+        }
+    }
 
     private val _logs = MutableStateFlow<List<LogEntry>>(emptyList())
     val logs: StateFlow<List<LogEntry>> = _logs.asStateFlow()
@@ -38,6 +48,9 @@ class LogViewModel : ViewModel() {
     val selectedDevice: StateFlow<String?> = _selectedDevice.asStateFlow()
 
     private var logProcess: Process? = null
+    private val logBuffer = ArrayDeque<LogEntry>(MAX_LOG_ENTRIES)
+    private val logBufferLock = Any()
+    private var pendingLogUpdates = 0
 
     fun setSelectedDevice(device: String?) {
         _selectedDevice.value = device
@@ -51,6 +64,7 @@ class LogViewModel : ViewModel() {
         if (_isCapturing.value) return
 
         _isCapturing.value = true
+        clearLogBuffer()
         _logs.value = emptyList()
 
         viewModelScope.launch(Dispatchers.IO) {
@@ -75,45 +89,59 @@ class LogViewModel : ViewModel() {
 
                 logProcess?.inputStream?.bufferedReader()?.use { reader ->
                     val dateFormat = SimpleDateFormat("MM-dd HH:mm:ss.SSS", Locale.getDefault())
-                    val logRegex = Regex("""^(\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}\.\d{3})\s+([VDIWEF])\/([^\(]+)\(\s*(\d+)\):\s(.*)$""")
+                    val structuredRegex = Regex("""^(\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}\.\d{3})\s+(\d+)\s+(\d+)\s+([VDIWEF])\s+(.+?):\s?(.*)$""")
+                    val legacyRegex = Regex("""^(\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}\.\d{3})\s+([VDIWEF])\/([^\(]+)\(\s*(\d+)\):\s(.*)$""")
 
                     while (_isCapturing.value) {
                         val line = reader.readLine() ?: break
-                        val matchResult = logRegex.find(line.trim())
+                        val trimmed = line.trim()
 
-                        if (matchResult != null) {
-                            val (time, levelChar, tag, pidStr, message) = matchResult.destructured
-                            val level = when (levelChar) {
-                                "V" -> LogLevel.VERBOSE
-                                "D" -> LogLevel.DEBUG
-                                "I" -> LogLevel.INFO
-                                "W" -> LogLevel.WARN
-                                "E" -> LogLevel.ERROR
-                                "F" -> LogLevel.FATAL
-                                else -> LogLevel.INFO
+                        val entry = when {
+                            structuredRegex.matches(trimmed) -> {
+                                val (time, pidStr, tidStr, levelChar, tag, message) = structuredRegex.find(trimmed)!!.destructured
+                                createLogEntry(
+                                    time = time,
+                                    levelChar = levelChar,
+                                    tag = tag.trim(),
+                                    message = message.trim(),
+                                    pid = pidStr.trim().toIntOrNull() ?: 0,
+                                    tid = tidStr.trim().toIntOrNull() ?: 0,
+                                    dateFormat = dateFormat
+                                )
                             }
-
-                            val timestamp = try {
-                                dateFormat.parse(time)?.time ?: System.currentTimeMillis()
-                            } catch (e: Exception) {
-                                System.currentTimeMillis()
+                            legacyRegex.matches(trimmed) -> {
+                                val (time, levelChar, tag, pidStr, message) = legacyRegex.find(trimmed)!!.destructured
+                                createLogEntry(
+                                    time = time,
+                                    levelChar = levelChar,
+                                    tag = tag.trim(),
+                                    message = message.trim(),
+                                    pid = pidStr.trim().toIntOrNull() ?: 0,
+                                    tid = 0,
+                                    dateFormat = dateFormat
+                                )
                             }
-
-                            val entry = LogEntry(
-                                timestamp = timestamp,
-                                level = level,
-                                tag = tag.trim(),
-                                message = message.trim(),
-                                pid = pidStr.trim().toIntOrNull() ?: 0
-                            )
-
-                            withContext(Dispatchers.Main) {
-                                _logs.update { current ->
-                                    (current + entry).takeLast(10000)
-                                }
+                            else -> {
+                                createLogEntry(
+                                    time = "",
+                                    levelChar = "I",
+                                    tag = "logcat",
+                                    message = trimmed,
+                                    pid = 0,
+                                    tid = 0,
+                                    dateFormat = dateFormat
+                                )
                             }
                         }
+
+                        val shouldPublish = bufferLogEntry(entry)
+                        withContext(Dispatchers.Main) {
+                            publishBufferedLogs(force = false, shouldPublish = shouldPublish)
+                        }
                     }
+                }
+                withContext(Dispatchers.Main) {
+                    publishBufferedLogs(force = true, shouldPublish = true)
                 }
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
@@ -140,12 +168,23 @@ class LogViewModel : ViewModel() {
 
     fun getFilteredLogs(): List<LogEntry> {
         val currentFilter = _filter.value
+        val keywordRegex = if (currentFilter.keyword.isNotBlank() && currentFilter.isRegex) {
+            runCatching { Regex(currentFilter.keyword, RegexOption.IGNORE_CASE) }.getOrNull()
+        } else {
+            null
+        }
+        val keywordLower = if (!currentFilter.isRegex) currentFilter.keyword.trim().lowercase() else ""
+        val pidFilter = currentFilter.pid.trim()
+
         return _logs.value.filter { entry ->
             (currentFilter.level == null || entry.level == currentFilter.level) &&
+            (!currentFilter.onlyErrors || entry.level == LogLevel.ERROR || entry.level == LogLevel.FATAL) &&
             (currentFilter.packageName.isEmpty() ||
                 entry.tag.contains(currentFilter.packageName, ignoreCase = true) ||
                 entry.message.contains(currentFilter.packageName, ignoreCase = true)) &&
             (currentFilter.tag.isEmpty() || entry.tag.contains(currentFilter.tag, ignoreCase = true)) &&
+            (pidFilter.isEmpty() || entry.pid.toString().contains(pidFilter)) &&
+            matchesKeywordFilter(entry, currentFilter.keyword, keywordLower, currentFilter.isRegex, keywordRegex) &&
             (currentFilter.startTime == null || entry.timestamp >= currentFilter.startTime) &&
             (currentFilter.endTime == null || entry.timestamp <= currentFilter.endTime)
         }
@@ -185,6 +224,7 @@ class LogViewModel : ViewModel() {
     }
 
     fun clearLogs() {
+        clearLogBuffer()
         _logs.value = emptyList()
     }
 
@@ -195,5 +235,86 @@ class LogViewModel : ViewModel() {
     override fun onCleared() {
         super.onCleared()
         stopCapture()
+    }
+
+    private fun bufferLogEntry(entry: LogEntry): Boolean = synchronized(logBufferLock) {
+        appendWithLimit(logBuffer, entry)
+        pendingLogUpdates += 1
+        pendingLogUpdates >= LOG_UI_BATCH_SIZE
+    }
+
+    private fun publishBufferedLogs(force: Boolean, shouldPublish: Boolean) {
+        if (!force && !shouldPublish) return
+        val snapshot = synchronized(logBufferLock) {
+            if (!force && pendingLogUpdates < LOG_UI_BATCH_SIZE) {
+                null
+            } else {
+                pendingLogUpdates = 0
+                logBuffer.toList()
+            }
+        }
+        if (snapshot != null) {
+            _logs.value = snapshot
+        }
+    }
+
+    private fun clearLogBuffer() = synchronized(logBufferLock) {
+        logBuffer.clear()
+        pendingLogUpdates = 0
+    }
+
+    private fun createLogEntry(
+        time: String,
+        levelChar: String,
+        tag: String,
+        message: String,
+        pid: Int,
+        tid: Int,
+        dateFormat: SimpleDateFormat
+    ): LogEntry {
+        val level = when (levelChar) {
+            "V" -> LogLevel.VERBOSE
+            "D" -> LogLevel.DEBUG
+            "I" -> LogLevel.INFO
+            "W" -> LogLevel.WARN
+            "E" -> LogLevel.ERROR
+            "F" -> LogLevel.FATAL
+            else -> LogLevel.INFO
+        }
+
+        val timestamp = if (time.isBlank()) {
+            System.currentTimeMillis()
+        } else {
+            try {
+                dateFormat.parse(time)?.time ?: System.currentTimeMillis()
+            } catch (_: Exception) {
+                System.currentTimeMillis()
+            }
+        }
+
+        return LogEntry(
+            timestamp = timestamp,
+            level = level,
+            tag = tag,
+            message = message,
+            pid = pid,
+            tid = tid
+        )
+    }
+
+    private fun matchesKeywordFilter(
+        entry: LogEntry,
+        keywordRaw: String,
+        keywordLower: String,
+        isRegex: Boolean,
+        keywordRegex: Regex?
+    ): Boolean {
+        if (keywordRaw.isBlank()) return true
+        val target = "${entry.tag} ${entry.message}"
+        return if (isRegex) {
+            keywordRegex?.containsMatchIn(target) ?: false
+        } else {
+            target.lowercase().contains(keywordLower)
+        }
     }
 }

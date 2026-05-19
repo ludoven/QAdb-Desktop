@@ -11,17 +11,10 @@ import adbtool_desktop.composeapp.generated.resources.connection_type
 import adbtool_desktop.composeapp.generated.resources.cpu_usage
 import adbtool_desktop.composeapp.generated.resources.device_info
 import adbtool_desktop.composeapp.generated.resources.android_version
-import adbtool_desktop.composeapp.generated.resources.adb_environment_failed
-import adbtool_desktop.composeapp.generated.resources.adb_environment_checking
-import adbtool_desktop.composeapp.generated.resources.adb_environment_ready
-import adbtool_desktop.composeapp.generated.resources.adb_source_bundled
-import adbtool_desktop.composeapp.generated.resources.adb_source_custom
-import adbtool_desktop.composeapp.generated.resources.adb_source_none
-import adbtool_desktop.composeapp.generated.resources.adb_source_system
-import adbtool_desktop.composeapp.generated.resources.adb_using
 import adbtool_desktop.composeapp.generated.resources.build_fingerprint
 import adbtool_desktop.composeapp.generated.resources.device_overview
 import adbtool_desktop.composeapp.generated.resources.device_model
+import adbtool_desktop.composeapp.generated.resources.device_mirror
 import adbtool_desktop.composeapp.generated.resources.device_status
 import adbtool_desktop.composeapp.generated.resources.disconnected
 import adbtool_desktop.composeapp.generated.resources.disconnect
@@ -56,6 +49,7 @@ import adbtool_desktop.composeapp.generated.resources.wireless_connection
 import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Box
@@ -75,6 +69,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ScreenShare
 import androidx.compose.material.icons.filled.Apps
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.BatteryFull
@@ -82,7 +77,6 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DeveloperMode
 import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Memory
@@ -113,6 +107,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.ludoven.adbtool.entity.DeviceInfoData
 import com.ludoven.adbtool.util.AdbPathManager
+import com.ludoven.adbtool.util.isWirelessAdbConnection
 import com.ludoven.adbtool.viewmodel.DevicesViewModel
 import com.ludoven.adbtool.widget.DashboardMetricCard
 import com.ludoven.adbtool.widget.DashboardPanel
@@ -133,6 +128,7 @@ fun HomeScreen(
     viewModel: DevicesViewModel,
     onScreenshot: () -> Unit = {},
     onInstallApk: () -> Unit = {},
+    onMirrorDevice: () -> Unit = {},
     onOpenShell: () -> Unit = {}
 ) {
     val devices by viewModel.devices.collectAsState()
@@ -142,7 +138,6 @@ fun HomeScreen(
     val centerInfo by viewModel.centerInfo.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val lastRefreshTime by viewModel.lastRefreshTime.collectAsState()
-    val adbEnvironment by AdbPathManager.adbEnvironment.collectAsState()
 
     var showDropdown by remember { mutableStateOf(false) }
     val scrollState = rememberScrollState()
@@ -157,7 +152,7 @@ fun HomeScreen(
     val connectedSince = remember(selectedDevice) {
         if (selectedDevice == null) null else LocalDateTime.now()
     }
-    val wirelessConnection = isWirelessConnection(selectedDevice, deviceInfo?.ipAddress)
+    val wirelessConnection = isWirelessAdbConnection(selectedDevice, deviceInfo?.ipAddress)
     val connectionType = stringResource(
         if (wirelessConnection) Res.string.wireless_connection else Res.string.usb_connection
     )
@@ -183,7 +178,7 @@ fun HomeScreen(
             titleKey = Res.string.cpu_usage,
             value = centerInfo?.cpuUsage.orDash(),
             icon = Icons.Default.Memory,
-            accentColor = Color(0xFFFF5A5F),
+            accentColor = Color(0xFF5F7FA8),
             progress = parsePercentProgress(centerInfo?.cpuUsage)
         ),
         HomeMetricModel(
@@ -197,14 +192,14 @@ fun HomeScreen(
             titleKey = Res.string.storage_usage,
             value = centerInfo?.storageUsage.orDash("-- / --"),
             icon = Icons.Default.SdStorage,
-            accentColor = Color(0xFF2DBE60),
+            accentColor = Color(0xFF4F8E78),
             progress = parseStorageProgress(centerInfo?.storageUsage)
         ),
         HomeMetricModel(
             titleKey = Res.string.battery_level,
             value = batteryValue,
             icon = Icons.Default.BatteryFull,
-            accentColor = Color(0xFFF59E0B),
+            accentColor = Color(0xFFAD8A4A),
             progress = parsePercentProgress(centerInfo?.batteryLevel)
         )
     )
@@ -217,11 +212,11 @@ fun HomeScreen(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(start = 12.dp, top = 12.dp, bottom = 12.dp, end = 24.dp)
+                    .padding(horizontal = 24.dp, vertical = 24.dp)
                     .verticalScroll(scrollState),
                 verticalArrangement = Arrangement.spacedBy(spacing)
             ) {
-                HomeHeader(
+                DeviceControlPanel(
                     compactLayout = compactLayout,
                     deviceName = selectedDeviceLabel,
                     androidVersion = androidHeadline,
@@ -229,23 +224,17 @@ fun HomeScreen(
                     batteryInfo = batteryValue,
                     isConnected = isConnected,
                     isLoading = isLoading,
-                    onRefresh = { viewModel.refreshDevices() },
-                    onDisconnect = { viewModel.disconnectSelectedDevice() }
-                )
-
-                AdbEnvironmentStatusCard(adbEnvironment)
-
-                DeviceSelectorCard(
                     devices = devices,
                     deviceDisplayNames = deviceDisplayNames,
                     selectedDevice = selectedDevice,
                     selectedDeviceLabel = selectedDeviceLabel,
                     selectedDeviceAddress = selectedDevice.orDash(),
                     selectedDeviceStatus = if (isConnected) connectionHeadline else stringResource(Res.string.no_device),
-                    isConnected = isConnected,
-                    expanded = showDropdown,
-                    onExpandedChange = { showDropdown = it },
-                    onDeviceSelected = { viewModel.selectDevice(it) }
+                    selectorExpanded = showDropdown,
+                    onSelectorExpandedChange = { showDropdown = it },
+                    onDeviceSelected = { viewModel.selectDevice(it) },
+                    onRefresh = { viewModel.refreshDevices() },
+                    onDisconnect = { viewModel.disconnectSelectedDevice() }
                 )
 
                 MetricsSection(
@@ -271,6 +260,7 @@ fun HomeScreen(
                         QuickActionsPanel(
                             onScreenshot = onScreenshot,
                             onInstallApk = onInstallApk,
+                            onMirrorDevice = onMirrorDevice,
                             onOpenShell = onOpenShell
                         )
                     }
@@ -302,6 +292,7 @@ fun HomeScreen(
                             QuickActionsPanel(
                                 onScreenshot = onScreenshot,
                                 onInstallApk = onInstallApk,
+                                onMirrorDevice = onMirrorDevice,
                                 onOpenShell = onOpenShell
                             )
                         }
@@ -330,67 +321,7 @@ fun HomeScreen(
 }
 
 @Composable
-private fun AdbEnvironmentStatusCard(environment: AdbPathManager.AdbEnvironment) {
-    val isReady = environment.isReady
-    val isChecking = !isReady &&
-        environment.source == AdbPathManager.AdbSource.NONE &&
-        environment.message?.contains("检测") == true
-    GlassCard(modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 18.dp, vertical = 14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Icon(
-                imageVector = if (isReady) Icons.Default.CheckCircle else Icons.Default.Error,
-                contentDescription = null,
-                tint = if (isReady) Color(0xFF2DBE60) else MaterialTheme.colorScheme.error,
-                modifier = Modifier.size(20.dp)
-            )
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(2.dp)
-            ) {
-                Text(
-                    text = when {
-                        isReady -> stringResource(Res.string.adb_environment_ready)
-                        isChecking -> stringResource(Res.string.adb_environment_checking)
-                        else -> stringResource(Res.string.adb_environment_failed)
-                    },
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    fontWeight = FontWeight.SemiBold
-                )
-                Text(
-                    text = if (isReady) {
-                        stringResource(Res.string.adb_using, adbSourceText(environment.source))
-                    } else {
-                        environment.message.orEmpty()
-                    },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun adbSourceText(source: AdbPathManager.AdbSource): String {
-    return when (source) {
-        AdbPathManager.AdbSource.SYSTEM -> stringResource(Res.string.adb_source_system)
-        AdbPathManager.AdbSource.BUNDLED -> stringResource(Res.string.adb_source_bundled)
-        AdbPathManager.AdbSource.CUSTOM -> stringResource(Res.string.adb_source_custom)
-        AdbPathManager.AdbSource.NONE -> stringResource(Res.string.adb_source_none)
-    }
-}
-
-@Composable
-private fun HomeHeader(
+private fun DeviceControlPanel(
     compactLayout: Boolean,
     deviceName: String,
     androidVersion: String,
@@ -398,78 +329,111 @@ private fun HomeHeader(
     batteryInfo: String,
     isConnected: Boolean,
     isLoading: Boolean,
+    devices: List<String>,
+    deviceDisplayNames: Map<String, String>,
+    selectedDevice: String?,
+    selectedDeviceLabel: String,
+    selectedDeviceAddress: String,
+    selectedDeviceStatus: String,
+    selectorExpanded: Boolean,
+    onSelectorExpandedChange: (Boolean) -> Unit,
+    onDeviceSelected: (String) -> Unit,
     onRefresh: () -> Unit,
     onDisconnect: () -> Unit
 ) {
-    GlassCard(modifier = Modifier.fillMaxWidth()) {
-        if (compactLayout) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 18.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
-            ) {
-                DeviceHeadline(
-                    deviceName = deviceName,
-                    androidVersion = androidVersion,
-                    connectionInfo = connectionInfo,
-                    batteryInfo = batteryInfo,
-                    isConnected = isConnected
-                )
+    GlassCard(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        borderStroke = BorderStroke(1.dp, Color(0xFFE5E7EB))
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            if (compactLayout) {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    DeviceHeadline(
+                        deviceName = deviceName,
+                        androidVersion = androidVersion,
+                        connectionInfo = connectionInfo,
+                        batteryInfo = batteryInfo,
+                        isConnected = isConnected
+                    )
+                    DeviceControlActions(
+                        compactLayout = true,
+                        isLoading = isLoading,
+                        isConnected = isConnected,
+                        onRefresh = onRefresh,
+                        onDisconnect = onDisconnect
+                    )
+                }
+            } else {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(20.dp)
+                ) {
+                    DeviceHeadline(
+                        modifier = Modifier.weight(1f),
+                        deviceName = deviceName,
+                        androidVersion = androidVersion,
+                        connectionInfo = connectionInfo,
+                        batteryInfo = batteryInfo,
+                        isConnected = isConnected
+                    )
+                    DeviceControlActions(
+                        compactLayout = false,
+                        isLoading = isLoading,
+                        isConnected = isConnected,
+                        onRefresh = onRefresh,
+                        onDisconnect = onDisconnect
+                    )
+                }
+            }
 
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    OutlineActionButton(
-                        modifier = Modifier.weight(1f),
-                        text = stringResource(Res.string.refresh),
-                        icon = Icons.Default.Refresh,
-                        tint = MaterialTheme.colorScheme.primary,
-                        enabled = !isLoading,
-                        onClick = onRefresh
-                    )
-                    OutlineActionButton(
-                        modifier = Modifier.weight(1f),
-                        text = stringResource(Res.string.disconnect),
-                        icon = Icons.Default.Close,
-                        tint = MaterialTheme.colorScheme.error,
-                        enabled = isConnected && !isLoading,
-                        onClick = onDisconnect
-                    )
-                }
-            }
-        } else {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 18.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(24.dp)
-            ) {
-                DeviceHeadline(
-                    modifier = Modifier.weight(1f),
-                    deviceName = deviceName,
-                    androidVersion = androidVersion,
-                    connectionInfo = connectionInfo,
-                    batteryInfo = batteryInfo,
-                    isConnected = isConnected
-                )
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    OutlineActionButton(
-                        text = stringResource(Res.string.refresh),
-                        icon = Icons.Default.Refresh,
-                        tint = MaterialTheme.colorScheme.primary,
-                        enabled = !isLoading,
-                        onClick = onRefresh
-                    )
-                    OutlineActionButton(
-                        text = stringResource(Res.string.disconnect),
-                        icon = Icons.Default.Close,
-                        tint = MaterialTheme.colorScheme.error,
-                        enabled = isConnected && !isLoading,
-                        onClick = onDisconnect
-                    )
-                }
-            }
+            DeviceSelectorCard(
+                devices = devices,
+                deviceDisplayNames = deviceDisplayNames,
+                selectedDevice = selectedDevice,
+                selectedDeviceLabel = selectedDeviceLabel,
+                selectedDeviceAddress = selectedDeviceAddress,
+                selectedDeviceStatus = selectedDeviceStatus,
+                isConnected = isConnected,
+                expanded = selectorExpanded,
+                onExpandedChange = onSelectorExpandedChange,
+                onDeviceSelected = onDeviceSelected
+            )
         }
+    }
+}
+
+@Composable
+private fun DeviceControlActions(
+    compactLayout: Boolean,
+    isLoading: Boolean,
+    isConnected: Boolean,
+    onRefresh: () -> Unit,
+    onDisconnect: () -> Unit
+) {
+    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        OutlineActionButton(
+            modifier = if (compactLayout) Modifier.weight(1f) else Modifier,
+            text = stringResource(Res.string.refresh),
+            icon = Icons.Default.Refresh,
+            tint = MaterialTheme.colorScheme.primary,
+            enabled = !isLoading,
+            onClick = onRefresh
+        )
+        OutlineActionButton(
+            modifier = if (compactLayout) Modifier.weight(1f) else Modifier,
+            text = stringResource(Res.string.disconnect),
+            icon = Icons.Default.Close,
+            tint = MaterialTheme.colorScheme.error,
+            enabled = isConnected && !isLoading,
+            onClick = onDisconnect
+        )
     }
 }
 
@@ -494,11 +458,11 @@ private fun DeviceHeadline(
                 imageVector = Icons.Default.Smartphone,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(22.dp)
+                modifier = Modifier.size(20.dp)
             )
             Text(
                 text = deviceName,
-                style = MaterialTheme.typography.headlineSmall,
+                style = MaterialTheme.typography.headlineMedium,
                 color = MaterialTheme.colorScheme.onSurface,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
@@ -538,129 +502,125 @@ private fun DeviceSelectorCard(
     onExpandedChange: (Boolean) -> Unit,
     onDeviceSelected: (String) -> Unit
 ) {
-    GlassCard(modifier = Modifier.fillMaxWidth()) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            Text(
-                text = stringResource(Res.string.select_device),
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                fontWeight = FontWeight.SemiBold
-            )
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Text(
+            text = stringResource(Res.string.select_device),
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontWeight = FontWeight.SemiBold
+        )
 
-            Box {
-                Row(
+        Box {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(
+                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f),
+                        RoundedCornerShape(10.dp)
+                    )
+                    .clickable(
+                        enabled = devices.isNotEmpty(),
+                        onClick = { onExpandedChange(!expanded) }
+                    )
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Box(
                     modifier = Modifier
-                        .fillMaxWidth()
+                        .size(28.dp)
                         .background(
-                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.28f),
-                            RoundedCornerShape(14.dp)
-                        )
-                        .clickable(
-                            enabled = devices.isNotEmpty(),
-                            onClick = { onExpandedChange(!expanded) }
-                        )
-                        .padding(horizontal = 14.dp, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+                            RoundedCornerShape(8.dp)
+                        ),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(34.dp)
-                            .background(
-                                MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
-                                RoundedCornerShape(10.dp)
-                            ),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Smartphone,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-
-                    Column(
-                        modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(2.dp)
-                    ) {
-                        Text(
-                            text = selectedDeviceLabel,
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            fontWeight = FontWeight.SemiBold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        Text(
-                            text = selectedDeviceAddress,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        Text(
-                            text = selectedDeviceStatus,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.ArrowDropDown,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Box(
-                            modifier = Modifier
-                                .size(8.dp)
-                                .background(
-                                    if (isConnected) Color(0xFF2DBE60) else MaterialTheme.colorScheme.outlineVariant,
-                                    RoundedCornerShape(999.dp)
-                                )
-                        )
-                    }
+                    Icon(
+                        imageVector = Icons.Default.Smartphone,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(16.dp)
+                    )
                 }
 
-                DropdownMenu(
-                    expanded = expanded,
-                    onDismissRequest = { onExpandedChange(false) },
-                    modifier = Modifier.background(MaterialTheme.colorScheme.surface)
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
-                    if (devices.isEmpty()) {
-                        DropdownMenuItem(
-                            text = { Text(stringResource(Res.string.no_device_available)) },
-                            onClick = { onExpandedChange(false) },
-                            enabled = false
-                        )
-                    } else {
-                        devices.forEach { deviceId ->
-                            val displayName = formatDeviceDisplay(deviceId, deviceDisplayNames[deviceId])
-                            DropdownMenuItem(
-                                text = {
-                                    Text(
-                                        text = displayName,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                },
-                                onClick = {
-                                    onDeviceSelected(deviceId)
-                                    onExpandedChange(false)
-                                }
+                    Text(
+                        text = selectedDeviceLabel,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = selectedDeviceAddress,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = selectedDeviceStatus,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.ArrowDropDown,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Box(
+                        modifier = Modifier
+                            .size(7.dp)
+                            .background(
+                                if (isConnected) Color(0xFF2DBE60) else MaterialTheme.colorScheme.outlineVariant,
+                                RoundedCornerShape(999.dp)
                             )
-                        }
+                    )
+                }
+            }
+
+            DropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { onExpandedChange(false) },
+                modifier = Modifier.background(MaterialTheme.colorScheme.surface)
+            ) {
+                if (devices.isEmpty()) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(Res.string.no_device_available)) },
+                        onClick = { onExpandedChange(false) },
+                        enabled = false
+                    )
+                } else {
+                    devices.forEach { deviceId ->
+                        val displayName = formatDeviceDisplay(deviceId, deviceDisplayNames[deviceId])
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    text = displayName,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            },
+                            onClick = {
+                                onDeviceSelected(deviceId)
+                                onExpandedChange(false)
+                            }
+                        )
                     }
                 }
             }
@@ -840,35 +800,43 @@ private fun ConnectionInfoPanel(
 private fun QuickActionsPanel(
     onScreenshot: () -> Unit = {},
     onInstallApk: () -> Unit = {},
+    onMirrorDevice: () -> Unit = {},
     onOpenShell: () -> Unit = {}
 ) {
     DashboardPanel(
         title = stringResource(Res.string.quick_actions),
         icon = Icons.Default.CheckCircle
     ) {
-        Row(
+        Column(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             QuickActionCard(
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.fillMaxWidth(),
                 title = stringResource(Res.string.key_screenshot_short),
                 icon = Icons.Default.PhotoCamera,
                 accentColor = Color(0xFF3B82F6),
                 onClick = onScreenshot
             )
             QuickActionCard(
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.fillMaxWidth(),
                 title = stringResource(Res.string.install_apk_short),
                 icon = Icons.Default.Download,
-                accentColor = Color(0xFF4F7CFF),
+                accentColor = Color(0xFF4E74C9),
                 onClick = onInstallApk
             )
             QuickActionCard(
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.fillMaxWidth(),
+                title = stringResource(Res.string.device_mirror),
+                icon = Icons.AutoMirrored.Filled.ScreenShare,
+                accentColor = Color(0xFF6E7B8B),
+                onClick = onMirrorDevice
+            )
+            QuickActionCard(
+                modifier = Modifier.fillMaxWidth(),
                 title = stringResource(Res.string.open_shell),
                 icon = Icons.Default.DeveloperMode,
-                accentColor = Color(0xFF22C55E),
+                accentColor = Color(0xFF3E7C8F),
                 onClick = onOpenShell
             )
         }
@@ -1022,12 +990,6 @@ private fun formatRelativeRefresh(rawTime: String): String {
         seconds < 3600 -> "${seconds / 60}m"
         else -> "${seconds / 3600}h"
     }
-}
-
-private fun isWirelessConnection(deviceId: String?, ipAddress: String?): Boolean {
-    if (!ipAddress.isNullOrBlank()) return true
-    if (deviceId.isNullOrBlank()) return false
-    return deviceId.contains(':') || deviceId.contains("tls-connect", ignoreCase = true)
 }
 
 private fun extractPort(deviceId: String?, ipAddress: String?): String {

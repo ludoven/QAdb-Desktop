@@ -1,7 +1,5 @@
 package com.ludoven.adbtool.pages
 
-import com.ludoven.adbtool.ui.mac.*
-
 import adbtool_desktop.composeapp.generated.resources.Res
 import adbtool_desktop.composeapp.generated.resources.adb_auto_detect
 import adbtool_desktop.composeapp.generated.resources.adb_current_using
@@ -23,7 +21,6 @@ import adbtool_desktop.composeapp.generated.resources.current_version
 import adbtool_desktop.composeapp.generated.resources.download_and_install
 import adbtool_desktop.composeapp.generated.resources.downloading_update
 import adbtool_desktop.composeapp.generated.resources.language_changed
-import adbtool_desktop.composeapp.generated.resources.latest_version
 import adbtool_desktop.composeapp.generated.resources.not_set
 import adbtool_desktop.composeapp.generated.resources.open_release_page
 import adbtool_desktop.composeapp.generated.resources.preferences_setting
@@ -31,6 +28,22 @@ import adbtool_desktop.composeapp.generated.resources.restart_required
 import adbtool_desktop.composeapp.generated.resources.select_adb_icon_desc
 import adbtool_desktop.composeapp.generated.resources.select_language
 import adbtool_desktop.composeapp.generated.resources.select_theme
+import adbtool_desktop.composeapp.generated.resources.settings_adb_path_desc
+import adbtool_desktop.composeapp.generated.resources.settings_adb_source_desc
+import adbtool_desktop.composeapp.generated.resources.settings_adb_version_desc
+import adbtool_desktop.composeapp.generated.resources.settings_pref_auto_detect_desc
+import adbtool_desktop.composeapp.generated.resources.settings_pref_auto_detect_title
+import adbtool_desktop.composeapp.generated.resources.settings_pref_language_desc
+import adbtool_desktop.composeapp.generated.resources.settings_pref_remember_device_desc
+import adbtool_desktop.composeapp.generated.resources.settings_pref_remember_device_title
+import adbtool_desktop.composeapp.generated.resources.settings_pref_theme_desc
+import adbtool_desktop.composeapp.generated.resources.settings_status_label
+import adbtool_desktop.composeapp.generated.resources.settings_subtitle
+import adbtool_desktop.composeapp.generated.resources.settings_update_current_version_desc
+import adbtool_desktop.composeapp.generated.resources.settings_update_status
+import adbtool_desktop.composeapp.generated.resources.settings_update_status_desc
+import adbtool_desktop.composeapp.generated.resources.settings_update_status_latest
+import adbtool_desktop.composeapp.generated.resources.set
 import adbtool_desktop.composeapp.generated.resources.theme_mode_dark
 import adbtool_desktop.composeapp.generated.resources.theme_mode_light
 import adbtool_desktop.composeapp.generated.resources.theme_mode_system
@@ -44,7 +57,7 @@ import adbtool_desktop.composeapp.generated.resources.update_section_title
 import adbtool_desktop.composeapp.generated.resources.update_up_to_date
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -57,25 +70,19 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SystemUpdateAlt
-import com.ludoven.adbtool.ui.mac.DropdownMenu
-import com.ludoven.adbtool.ui.mac.DropdownMenuItem
-import com.ludoven.adbtool.ui.mac.ExperimentalMaterial3Api
-import com.ludoven.adbtool.ui.mac.Button
-import com.ludoven.adbtool.ui.mac.CircularProgressIndicator
-import com.ludoven.adbtool.ui.mac.Icon
-import com.ludoven.adbtool.ui.mac.MaterialTheme
-import com.ludoven.adbtool.ui.mac.Text
-import com.ludoven.adbtool.ui.mac.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -83,9 +90,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -93,6 +99,24 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.ludoven.adbtool.AppVersion
 import com.ludoven.adbtool.UiTokens
+import com.ludoven.adbtool.ui.mac.Button
+import com.ludoven.adbtool.ui.mac.ButtonDefaults
+import com.ludoven.adbtool.ui.mac.CircularProgressIndicator
+import com.ludoven.adbtool.ui.mac.DropdownMenu
+import com.ludoven.adbtool.ui.mac.DropdownMenuItem
+import com.ludoven.adbtool.ui.mac.HorizontalDivider
+import com.ludoven.adbtool.ui.mac.Icon
+import com.ludoven.adbtool.ui.mac.MaterialTheme
+import com.ludoven.adbtool.ui.mac.OutlinedButton
+import com.ludoven.adbtool.ui.mac.Surface
+import com.ludoven.adbtool.ui.mac.Switch
+import com.ludoven.adbtool.ui.mac.Text
+import com.ludoven.adbtool.ui.mac.TextButton
+import com.ludoven.adbtool.ui.mac.bodyLarge
+import com.ludoven.adbtool.ui.mac.bodyMedium
+import com.ludoven.adbtool.ui.mac.bodySmall
+import com.ludoven.adbtool.ui.mac.headlineSmall
+import com.ludoven.adbtool.ui.mac.titleMedium
 import com.ludoven.adbtool.util.AdbPathManager
 import com.ludoven.adbtool.util.FileUtils
 import com.ludoven.adbtool.util.GitHubUpdateManager
@@ -100,14 +124,14 @@ import com.ludoven.adbtool.util.LanguageManager
 import com.ludoven.adbtool.util.ThemeManager
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
+import java.awt.Desktop
+import java.io.File
+import java.util.prefs.Preferences
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingScreen() {
     val notSetText = stringResource(Res.string.not_set)
-    val adbReadyText = stringResource(Res.string.adb_environment_ready)
     val adbEnvironment by AdbPathManager.adbEnvironment.collectAsState()
-    var adbDialogMessage by remember { mutableStateOf<String?>(null) }
     var showLanguageDialog by remember { mutableStateOf(false) }
     var showLanguageDropdown by remember { mutableStateOf(false) }
     var showThemeDropdown by remember { mutableStateOf(false) }
@@ -124,8 +148,17 @@ fun SettingScreen() {
     val supportedLanguages = LanguageManager.getSupportedLanguages()
     val supportedThemeModes = ThemeManager.ThemeMode.entries
     val currentVersionLabel = AppVersion.CURRENT
+
+    val userPrefs = remember { Preferences.userNodeForPackage(AdbPathManager::class.java) }
+    var autoDetectDeviceOnLaunch by remember {
+        mutableStateOf(userPrefs.getBoolean("setting.auto_detect_device_on_launch", true))
+    }
+    var rememberLastDevice by remember {
+        mutableStateOf(userPrefs.getBoolean("setting.remember_last_device", true))
+    }
+
     val updateStatusText = when (val status = updateStatus) {
-        UpdateStatus.Idle -> null
+        UpdateStatus.Idle -> stringResource(Res.string.settings_update_status_latest)
         UpdateStatus.Checking -> stringResource(Res.string.update_checking)
         UpdateStatus.Downloading -> stringResource(Res.string.downloading_update)
         is UpdateStatus.UpToDate -> stringResource(Res.string.update_up_to_date, status.latestVersion)
@@ -144,10 +177,22 @@ fun SettingScreen() {
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
             .padding(UiTokens.PagePadding),
-        verticalArrangement = Arrangement.spacedBy(UiTokens.SectionSpacing)
+        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(
+                text = stringResource(Res.string.set),
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Medium
+            )
+            Text(
+                text = stringResource(Res.string.settings_subtitle),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+
         SettingsSection(
-            modifier = Modifier.fillMaxWidth(),
             title = stringResource(Res.string.adb_path_setting),
             icon = Icons.Default.FolderOpen
         ) {
@@ -163,115 +208,104 @@ fun SettingScreen() {
                 adbEnvironment.message ?: stringResource(Res.string.adb_environment_failed)
             }
 
-            StatusPill(
-                text = statusText,
-                color = if (adbEnvironment.isReady) {
-                    MaterialTheme.colorScheme.primary
-                } else if (isCheckingAdb) {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                } else {
-                    MaterialTheme.colorScheme.error
+            SettingStatusRow(
+                label = stringResource(Res.string.settings_status_label),
+                statusText = statusText,
+                tone = when {
+                    adbEnvironment.isReady -> StatusTone.Positive
+                    isCheckingAdb -> StatusTone.Neutral
+                    else -> StatusTone.Danger
                 }
+            )
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.58f))
+            SettingValueRow(
+                title = stringResource(Res.string.adb_current_using),
+                description = stringResource(Res.string.settings_adb_source_desc),
+                value = sourceText
+            )
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.58f))
+            SettingValueRow(
+                title = stringResource(Res.string.adb_path_label),
+                description = stringResource(Res.string.settings_adb_path_desc),
+                value = adbEnvironment.path ?: notSetText,
+                trailingIcon = Icons.Default.Folder,
+                trailingIconDescription = stringResource(Res.string.adb_path_label),
+                onTrailingAction = {
+                    openPathLocation(adbEnvironment.path)
+                }
+            )
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.58f))
+            SettingValueRow(
+                title = stringResource(Res.string.adb_version_label),
+                description = stringResource(Res.string.settings_adb_version_desc),
+                value = adbEnvironment.version ?: notSetText
             )
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            InfoGroup {
-                AdbInfoRow(
-                    label = stringResource(Res.string.adb_current_using),
-                    value = sourceText
-                )
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f))
-                AdbInfoRow(
-                    label = stringResource(Res.string.adb_path_label),
-                    value = adbEnvironment.path ?: notSetText
-                )
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f))
-                AdbInfoRow(
-                    label = stringResource(Res.string.adb_version_label),
-                    value = adbEnvironment.version ?: notSetText
-                )
-            }
-
-            Spacer(modifier = Modifier.height(14.dp))
-
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 Button(
-                    modifier = Modifier.weight(1f),
                     onClick = {
                         coroutineScope.launch {
-                            val environment = AdbPathManager.autoDetect()
-                            adbDialogMessage = environment.message
-                                ?: "$adbReadyText\n${environment.path.orEmpty()}"
+                            AdbPathManager.autoDetect()
                         }
-                    }
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = Color.White
+                    )
                 ) {
-                    Icon(Icons.Default.Refresh, contentDescription = null)
-                    Spacer(modifier = Modifier.size(8.dp))
-                    Text(stringResource(Res.string.adb_auto_detect))
+                    Icon(Icons.Default.Refresh, contentDescription = null, tint = Color.White)
+                    Spacer(modifier = Modifier.size(6.dp))
+                    Text(stringResource(Res.string.adb_auto_detect), color = Color.White)
                 }
-                Button(
-                    modifier = Modifier.weight(1f),
+
+                OutlinedButton(
                     onClick = {
                         coroutineScope.launch {
                             val newPath = FileUtils.selectFile()
                             if (newPath != null) {
-                                val success = AdbPathManager.setAdbPath(newPath)
-                                adbDialogMessage = if (success) {
-                                    "$adbReadyText\n$newPath"
-                                } else {
-                                    AdbPathManager.adbEnvironment.value.message
-                                }
+                                AdbPathManager.setAdbPath(newPath)
                             }
                         }
                     }
                 ) {
                     Icon(Icons.Default.FolderOpen, contentDescription = stringResource(Res.string.select_adb_icon_desc))
-                    Spacer(modifier = Modifier.size(8.dp))
+                    Spacer(modifier = Modifier.size(6.dp))
                     Text(stringResource(Res.string.adb_select_adb))
                 }
-            }
 
-            Spacer(modifier = Modifier.height(10.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                Button(
-                    modifier = Modifier.weight(1f),
+                OutlinedButton(
                     onClick = {
                         coroutineScope.launch {
-                            val environment = AdbPathManager.useBundledAdb()
-                            adbDialogMessage = environment.message
-                                ?: "$adbReadyText\n${environment.path.orEmpty()}"
+                            AdbPathManager.useBundledAdb()
                         }
                     }
                 ) {
                     Icon(Icons.Default.Settings, contentDescription = null)
-                    Spacer(modifier = Modifier.size(8.dp))
+                    Spacer(modifier = Modifier.size(6.dp))
                     Text(stringResource(Res.string.adb_restore_bundled))
                 }
-                TextButton(
-                    modifier = Modifier.weight(1f),
+
+                OutlinedButton(
                     onClick = {
-                        AdbPathManager.openHelp().onFailure { error ->
-                            adbDialogMessage = error.message ?: "无法打开说明"
-                        }
+                        AdbPathManager.openHelp().onFailure { _ -> }
                     }
                 ) {
                     Icon(Icons.Default.OpenInNew, contentDescription = null)
-                    Spacer(modifier = Modifier.size(8.dp))
+                    Spacer(modifier = Modifier.size(6.dp))
                     Text(stringResource(Res.string.adb_open_help))
                 }
             }
         }
 
         SettingsSection(
-            modifier = Modifier.fillMaxWidth(),
             title = stringResource(Res.string.preferences_setting),
             icon = Icons.Default.Settings
         ) {
@@ -282,7 +316,8 @@ fun SettingScreen() {
             }
 
             SettingsDropdownRow(
-                label = stringResource(Res.string.select_language),
+                title = stringResource(Res.string.select_language),
+                description = stringResource(Res.string.settings_pref_language_desc),
                 value = currentLanguage.displayName,
                 icon = Icons.Default.Language,
                 expanded = showLanguageDropdown,
@@ -300,13 +335,11 @@ fun SettingScreen() {
                 }
             }
 
-            HorizontalDivider(
-                modifier = Modifier.padding(vertical = 6.dp),
-                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)
-            )
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.58f))
 
             SettingsDropdownRow(
-                label = stringResource(Res.string.select_theme),
+                title = stringResource(Res.string.select_theme),
+                description = stringResource(Res.string.settings_pref_theme_desc),
                 value = currentThemeText,
                 icon = Icons.Default.Settings,
                 expanded = showThemeDropdown,
@@ -327,100 +360,103 @@ fun SettingScreen() {
                     )
                 }
             }
+
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.58f))
+
+            SettingSwitchRow(
+                title = stringResource(Res.string.settings_pref_auto_detect_title),
+                description = stringResource(Res.string.settings_pref_auto_detect_desc),
+                checked = autoDetectDeviceOnLaunch,
+                onCheckedChange = {
+                    autoDetectDeviceOnLaunch = it
+                    userPrefs.putBoolean("setting.auto_detect_device_on_launch", it)
+                }
+            )
+
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.58f))
+
+            SettingSwitchRow(
+                title = stringResource(Res.string.settings_pref_remember_device_title),
+                description = stringResource(Res.string.settings_pref_remember_device_desc),
+                checked = rememberLastDevice,
+                onCheckedChange = {
+                    rememberLastDevice = it
+                    userPrefs.putBoolean("setting.remember_last_device", it)
+                }
+            )
         }
 
         SettingsSection(
-            modifier = Modifier.fillMaxWidth(),
             title = stringResource(Res.string.update_section_title),
             icon = Icons.Default.SystemUpdateAlt
         ) {
-            val currentVersionTitle = stringResource(Res.string.current_version, "").trim().trimEnd(':', '：')
-            val latestVersionTitle = stringResource(Res.string.latest_version, "").trim().trimEnd(':', '：')
+            SettingValueRow(
+                title = stringResource(Res.string.current_version, "").trim().trimEnd(':', '：'),
+                description = stringResource(Res.string.settings_update_current_version_desc),
+                value = currentVersionLabel
+            )
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.58f))
+            SettingValueRow(
+                title = stringResource(Res.string.settings_update_status),
+                description = stringResource(Res.string.settings_update_status_desc),
+                value = updateStatusText,
+                valueColor = updateStatusColor(updateStatus)
+            )
 
-            InfoGroup {
-                VersionActionRow(
-                    label = currentVersionTitle,
-                    value = currentVersionLabel
-                ) {
-                    Button(
-                        onClick = {
-                            coroutineScope.launch {
-                                isCheckingUpdate = true
-                                updateStatus = UpdateStatus.Checking
-                                val result = GitHubUpdateManager.checkForUpdate(currentVersionLabel)
-                                when (result) {
-                                    is GitHubUpdateManager.CheckResult.UpToDate -> {
-                                        latestVersion = result.latestVersion
-                                        releaseUrl = null
-                                        downloadableAsset = null
-                                        updateStatus = UpdateStatus.UpToDate(result.latestVersion)
-                                    }
-                                    is GitHubUpdateManager.CheckResult.UpdateAvailable -> {
-                                        latestVersion = result.latestVersion
-                                        releaseUrl = result.htmlUrl
-                                        downloadableAsset = result.asset
-                                        updateStatus = UpdateStatus.UpdateAvailable(
-                                            latestVersion = result.latestVersion,
-                                            hasAutoInstall = true
-                                        )
-                                    }
-                                    is GitHubUpdateManager.CheckResult.UpdateAvailableNoAsset -> {
-                                        latestVersion = result.latestVersion
-                                        releaseUrl = result.htmlUrl
-                                        downloadableAsset = null
-                                        updateStatus = UpdateStatus.UpdateAvailable(
-                                            latestVersion = result.latestVersion,
-                                            hasAutoInstall = false
-                                        )
-                                    }
-                                    is GitHubUpdateManager.CheckResult.Error -> {
-                                        updateStatus = UpdateStatus.CheckFailed(result.message)
-                                    }
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Button(
+                    onClick = {
+                        coroutineScope.launch {
+                            isCheckingUpdate = true
+                            updateStatus = UpdateStatus.Checking
+                            val result = GitHubUpdateManager.checkForUpdate(currentVersionLabel)
+                            when (result) {
+                                is GitHubUpdateManager.CheckResult.UpToDate -> {
+                                    latestVersion = result.latestVersion
+                                    releaseUrl = null
+                                    downloadableAsset = null
+                                    updateStatus = UpdateStatus.UpToDate(result.latestVersion)
                                 }
-                                isCheckingUpdate = false
+                                is GitHubUpdateManager.CheckResult.UpdateAvailable -> {
+                                    latestVersion = result.latestVersion
+                                    releaseUrl = result.htmlUrl
+                                    downloadableAsset = result.asset
+                                    updateStatus = UpdateStatus.UpdateAvailable(result.latestVersion, hasAutoInstall = true)
+                                }
+                                is GitHubUpdateManager.CheckResult.UpdateAvailableNoAsset -> {
+                                    latestVersion = result.latestVersion
+                                    releaseUrl = result.htmlUrl
+                                    downloadableAsset = null
+                                    updateStatus = UpdateStatus.UpdateAvailable(result.latestVersion, hasAutoInstall = false)
+                                }
+                                is GitHubUpdateManager.CheckResult.Error -> {
+                                    updateStatus = UpdateStatus.CheckFailed(result.message)
+                                }
                             }
-                        },
-                        enabled = !isCheckingUpdate && !isDownloadingUpdate
-                    ) {
-                        if (isCheckingUpdate) {
-                            CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp)
-                        } else {
-                            Icon(Icons.Default.Refresh, contentDescription = null)
+                            isCheckingUpdate = false
                         }
-                        Spacer(modifier = Modifier.size(8.dp))
-                        Text(stringResource(Res.string.check_update))
-                    }
-                }
-                latestVersion?.let { latest ->
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f))
-                    AdbInfoRow(
-                        label = latestVersionTitle,
-                        value = latest
+                    },
+                    enabled = !isCheckingUpdate && !isDownloadingUpdate,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = Color.White
                     )
+                ) {
+                    if (isCheckingUpdate) {
+                        CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp, color = Color.White)
+                    } else {
+                        Icon(Icons.Default.Refresh, contentDescription = null, tint = Color.White)
+                    }
+                    Spacer(modifier = Modifier.size(6.dp))
+                    Text(stringResource(Res.string.check_update), color = Color.White)
                 }
-            }
 
-            if (!updateStatusText.isNullOrBlank()) {
-                Spacer(modifier = Modifier.height(12.dp))
-                StatusPill(
-                    text = updateStatusText,
-                    color = updateStatusColor(updateStatus)
-                )
-            }
-
-            if (downloadableAsset != null || (!releaseUrl.isNullOrBlank() && latestVersion != null)) {
-                Spacer(modifier = Modifier.height(12.dp))
-            }
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
                 if (downloadableAsset != null) {
-                    Button(
-                        modifier = Modifier.weight(1f),
+                    OutlinedButton(
                         onClick = {
-                            val asset = downloadableAsset ?: return@Button
+                            val asset = downloadableAsset ?: return@OutlinedButton
                             coroutineScope.launch {
                                 isDownloadingUpdate = true
                                 updateStatus = UpdateStatus.Downloading
@@ -440,15 +476,16 @@ fun SettingScreen() {
                         } else {
                             Icon(Icons.Default.Download, contentDescription = null)
                         }
-                        Spacer(modifier = Modifier.size(8.dp))
+                        Spacer(modifier = Modifier.size(6.dp))
                         Text(stringResource(Res.string.download_and_install))
                     }
-                } else if (!releaseUrl.isNullOrBlank() && latestVersion != null) {
-                    TextButton(
+                }
+
+                if (!releaseUrl.isNullOrBlank() && latestVersion != null) {
+                    OutlinedButton(
                         onClick = {
-                            val url = releaseUrl ?: return@TextButton
-                            val openResult = GitHubUpdateManager.openReleasePage(url)
-                            openResult.onFailure { error ->
+                            val url = releaseUrl ?: return@OutlinedButton
+                            GitHubUpdateManager.openReleasePage(url).onFailure { error ->
                                 updateStatus = UpdateStatus.CheckFailed(error.message ?: "Unknown error")
                             }
                         }
@@ -462,12 +499,6 @@ fun SettingScreen() {
         }
     }
 
-    adbDialogMessage?.let { message ->
-        TipDialog(message) {
-            adbDialogMessage = null
-        }
-    }
-
     if (showLanguageDialog) {
         TipDialog(stringResource(Res.string.language_changed) + "\n" + stringResource(Res.string.restart_required)) {
             showLanguageDialog = false
@@ -478,93 +509,142 @@ fun SettingScreen() {
 @Composable
 private fun SettingsSection(
     title: String,
+    icon: ImageVector,
     modifier: Modifier = Modifier,
-    icon: ImageVector? = null,
     content: @Composable ColumnScope.() -> Unit
 ) {
     Surface(
-        modifier = modifier,
-        shape = RoundedCornerShape(UiTokens.RadiusMedium),
-        color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.72f)),
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        color = Color.White,
+        border = BorderStroke(1.dp, Color(0xFFE5E7EB)),
         tonalElevation = 0.dp,
         shadowElevation = 0.dp
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp)
+                .padding(horizontal = 18.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                if (icon != null) {
-                    Icon(
-                        imageVector = icon,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                }
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(17.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = title,
                     style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    fontWeight = FontWeight.SemiBold
+                    fontWeight = FontWeight.Medium
                 )
             }
-            Spacer(modifier = Modifier.height(14.dp))
             content()
         }
     }
 }
 
 @Composable
-private fun StatusPill(
-    text: String,
-    color: Color,
-    modifier: Modifier = Modifier
-) {
-    Surface(
-        modifier = modifier,
-        shape = RoundedCornerShape(999.dp),
-        color = color.copy(alpha = 0.12f),
-        contentColor = color
+private fun SettingStatusRow(label: String, statusText: String, tone: StatusTone) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
-            text = text,
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-            style = MaterialTheme.typography.labelMedium,
-            color = color,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-            fontWeight = FontWeight.SemiBold
+            text = label,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface
         )
+        val color = when (tone) {
+            StatusTone.Positive -> Color(0xFF2563EB)
+            StatusTone.Neutral -> MaterialTheme.colorScheme.onSurfaceVariant
+            StatusTone.Danger -> Color(0xFFDC2626)
+        }
+        Surface(
+            shape = RoundedCornerShape(999.dp),
+            color = color.copy(alpha = 0.1f),
+            border = BorderStroke(1.dp, color.copy(alpha = 0.22f))
+        ) {
+            Text(
+                text = statusText,
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                style = MaterialTheme.typography.bodySmall,
+                color = color,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
     }
 }
 
 @Composable
-private fun InfoGroup(
-    modifier: Modifier = Modifier,
-    content: @Composable ColumnScope.() -> Unit
+private fun SettingValueRow(
+    title: String,
+    description: String,
+    value: String,
+    valueColor: Color = MaterialTheme.colorScheme.onSurface,
+    trailingIcon: ImageVector? = null,
+    trailingIconDescription: String? = null,
+    onTrailingAction: (() -> Unit)? = null
 ) {
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(UiTokens.RadiusSmall),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 7.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
+        Column(modifier = Modifier.weight(0.62f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Medium
+            )
+            Text(
+                text = description,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp),
-            content = content
-        )
+            modifier = Modifier.weight(0.38f),
+            horizontalAlignment = Alignment.End,
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Text(
+                text = value,
+                style = MaterialTheme.typography.bodyMedium,
+                color = valueColor,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+            if (trailingIcon != null && onTrailingAction != null) {
+                OutlinedButton(
+                    onClick = onTrailingAction,
+                    modifier = Modifier.height(30.dp),
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+                ) {
+                    Icon(
+                        imageVector = trailingIcon,
+                        contentDescription = trailingIconDescription,
+                        modifier = Modifier.size(14.dp)
+                    )
+                }
+            }
+        }
     }
 }
 
 @Composable
 private fun SettingsDropdownRow(
-    label: String,
+    title: String,
+    description: String,
     value: String,
     icon: ImageVector,
     expanded: Boolean,
@@ -574,39 +654,48 @@ private fun SettingsDropdownRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 5.dp),
+            .padding(vertical = 7.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp)
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(18.dp)
-        )
-        Text(
-            text = label,
-            modifier = Modifier.weight(1f),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurface
-        )
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(16.dp)
+                )
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+            Text(
+                text = description,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+
         Box {
             Surface(
                 onClick = { onExpandedChange(!expanded) },
-                modifier = Modifier.menuAnchor(),
-                shape = RoundedCornerShape(UiTokens.RadiusSmall),
-                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.38f),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.28f))
+                shape = RoundedCornerShape(9.dp),
+                color = Color(0xFFF8F9FB),
+                border = BorderStroke(1.dp, Color(0xFFE5E7EB)),
+                tonalElevation = 0.dp,
+                shadowElevation = 0.dp
             ) {
                 Row(
                     modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
                         text = value,
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = MaterialTheme.colorScheme.onSurface,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -614,15 +703,14 @@ private fun SettingsDropdownRow(
                         imageVector = Icons.Default.ArrowDropDown,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(16.dp)
                     )
                 }
             }
-
             DropdownMenu(
                 expanded = expanded,
                 onDismissRequest = { onExpandedChange(false) },
-                modifier = Modifier.background(MaterialTheme.colorScheme.surface),
+                modifier = Modifier.background(Color.White),
                 content = menuContent
             )
         }
@@ -630,72 +718,38 @@ private fun SettingsDropdownRow(
 }
 
 @Composable
-private fun VersionActionRow(
-    label: String,
-    value: String,
-    action: @Composable () -> Unit
+private fun SettingSwitchRow(
+    title: String,
+    description: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 7.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp)
+            .padding(vertical = 8.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(
-            text = label,
-            modifier = Modifier.weight(1f),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Text(
-            text = value,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurface,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
-        action()
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(text = title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+            Text(text = description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Switch(checked = checked, onCheckedChange = onCheckedChange)
     }
 }
 
 @Composable
 private fun updateStatusColor(status: UpdateStatus): Color {
     return when (status) {
-        UpdateStatus.Idle -> MaterialTheme.colorScheme.onSurfaceVariant
+        UpdateStatus.Idle -> MaterialTheme.colorScheme.onSurface
         UpdateStatus.Checking,
         UpdateStatus.Downloading -> MaterialTheme.colorScheme.primary
         is UpdateStatus.UpToDate,
-        is UpdateStatus.UpdateAvailable,
-        is UpdateStatus.DownloadSuccess -> Color(0xFF34C759)
+        is UpdateStatus.DownloadSuccess -> Color(0xFF15803D)
+        is UpdateStatus.UpdateAvailable -> Color(0xFF2563EB)
         is UpdateStatus.CheckFailed,
-        is UpdateStatus.DownloadFailed -> MaterialTheme.colorScheme.error
-    }
-}
-
-@Composable
-private fun AdbInfoRow(label: String, value: String) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 9.dp),
-        verticalAlignment = Alignment.Top,
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        Text(
-            text = label,
-            modifier = Modifier.weight(0.32f),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Text(
-            text = value,
-            modifier = Modifier.weight(0.68f),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurface,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis
-        )
+        is UpdateStatus.DownloadFailed -> Color(0xFFDC2626)
     }
 }
 
@@ -707,6 +761,26 @@ private fun settingAdbSourceText(source: AdbPathManager.AdbSource): String {
         AdbPathManager.AdbSource.CUSTOM -> stringResource(Res.string.adb_source_custom)
         AdbPathManager.AdbSource.NONE -> stringResource(Res.string.adb_source_none)
     }
+}
+
+private fun openPathLocation(path: String?) {
+    if (path.isNullOrBlank()) return
+    runCatching {
+        if (!Desktop.isDesktopSupported()) return
+        val desktop = Desktop.getDesktop()
+        if (!desktop.isSupported(Desktop.Action.OPEN)) return
+        val file = File(path)
+        val target = if (file.isDirectory) file else file.parentFile
+        if (target != null && target.exists()) {
+            desktop.open(target)
+        }
+    }
+}
+
+private enum class StatusTone {
+    Positive,
+    Neutral,
+    Danger
 }
 
 private sealed interface UpdateStatus {

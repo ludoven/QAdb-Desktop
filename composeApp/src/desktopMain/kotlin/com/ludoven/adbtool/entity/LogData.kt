@@ -22,6 +22,10 @@ data class LogFilter(
     val level: LogLevel? = null,
     val packageName: String = "",
     val tag: String = "",
+    val pid: String = "",
+    val keyword: String = "",
+    val isRegex: Boolean = false,
+    val onlyErrors: Boolean = false,
     val startTime: Long? = null,
     val endTime: Long? = null
 )

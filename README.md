@@ -23,6 +23,20 @@
 
 ---
 
+## 📝 更新日志
+
+### v2.0.6 - 2026-05-19
+
+- 新增镜像功能，支持在独立窗口中查看并控制 Android 设备
+
+### v2.0.5 - 2026-05-12
+
+- 新增内置 ADB，默认开箱即用，减少手动安装和配置环境变量的步骤
+- 重构终端页面，优化命令输入、执行和结果展示体验
+- 优化命令中心布局，让常用命令入口更清晰、更易查找
+
+---
+
 ## 🚀 项目介绍
 
 **QADB** 是一款基于 **Jetpack Compose Multiplatform** 开发的跨平台 ADB 图形化工具，支持 **Windows** 和 **macOS**。
@@ -42,15 +56,6 @@ adb shell input keyevent 3
 ```
 
 那么 QADB 可以让这些操作变得更简单。
-
----
-
-## 📸 界面预览
-
-![Home](./screenshots/home.png)
-![Apps](./screenshots/applist.png)
-![Logcat](./screenshots/logcat.png)
-![Terminal](./screenshots/terminal.png)
 
 ---
 
@@ -113,13 +118,12 @@ QADB 适合以下用户：
 
 ---
 
-## 📝 更新日志
+## 📸 界面预览
 
-### v2.0.5 - 2026-05-12
-
-- 新增内置 ADB，默认开箱即用，减少手动安装和配置环境变量的步骤
-- 重构终端页面，优化命令输入、执行和结果展示体验
-- 优化命令中心布局，让常用命令入口更清晰、更易查找
+![Home](./screenshots/home.png)
+![Apps](./screenshots/applist.png)
+![Logcat](./screenshots/logcat.png)
+![Terminal](./screenshots/terminal.png)
 
 ---
 

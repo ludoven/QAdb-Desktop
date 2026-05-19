@@ -16,6 +16,7 @@ enum class AdbFunctionType() {
     INPUT_TEXT, // 输入文本需要弹窗
     OPEN_SHELL, // 执行 shell 命令
     OPEN_FILE_MANAGER, // 打开文件管理
+    DEVICE_MIRROR, // 设备镜像显示
     SCREENSHOT, // 截图需要文件选择器
     SCREEN_RECORD, // 录屏
     CAPTURE_LOGS, // 抓日志

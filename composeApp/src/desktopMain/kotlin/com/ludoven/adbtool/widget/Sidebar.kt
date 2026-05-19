@@ -12,6 +12,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -64,17 +65,18 @@ fun Sidebar(
         modifier = modifier
             .fillMaxHeight()
             .width(UiTokens.SidebarWidth),
-        shape = RoundedCornerShape(20.dp)
+        shape = RoundedCornerShape(14.dp),
+        borderStroke = BorderStroke(1.dp, Color(0xFFE5E7EB))
     ) {
         Column(
             modifier = Modifier
                 .fillMaxHeight()
-                .padding(horizontal = 12.dp, vertical = 14.dp),
+                .padding(horizontal = 10.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.padding(bottom = 12.dp, start = 6.dp, top = 2.dp)
+            modifier = Modifier.padding(bottom = 10.dp, start = 6.dp, top = 2.dp)
             ) {
                 Image(
                     painter = painterResource(Res.drawable.ic_logo),
@@ -143,7 +145,7 @@ private fun SidebarItem(
         modifier = Modifier
             .fillMaxWidth()
             .height(46.dp)
-            .clip(RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(10.dp))
             .background(backgroundColor)
             .clickable(onClick = onClick)
             .padding(horizontal = 10.dp),
@@ -198,7 +200,7 @@ private fun ConnectedStatusCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(12.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
+                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.85f))
                 .clickable(enabled = devices.isNotEmpty()) { expanded = !expanded }
                 .padding(horizontal = 10.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically

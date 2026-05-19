@@ -36,6 +36,7 @@ import androidx.compose.material.Scaffold as M2Scaffold
 import androidx.compose.material.Snackbar as M2Snackbar
 import androidx.compose.material.Surface as M2Surface
 import androidx.compose.material.Switch as M2Switch
+import androidx.compose.material.SwitchDefaults as M2SwitchDefaults
 import androidx.compose.material.Text as M2Text
 import androidx.compose.material.TextButton as M2TextButton
 import androidx.compose.material.TextFieldColors
@@ -781,5 +782,15 @@ fun Switch(
     onCheckedChange: ((Boolean) -> Unit)?,
     modifier: Modifier = Modifier
 ) {
-    M2Switch(checked = checked, onCheckedChange = onCheckedChange, modifier = modifier)
+    M2Switch(
+        checked = checked,
+        onCheckedChange = onCheckedChange,
+        modifier = modifier,
+        colors = M2SwitchDefaults.colors(
+            checkedThumbColor = Color.White,
+            checkedTrackColor = MaterialTheme.colorScheme.primary,
+            uncheckedThumbColor = Color.White,
+            uncheckedTrackColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.9f)
+        )
+    )
 }
