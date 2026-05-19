@@ -23,6 +23,20 @@
 
 ---
 
+## 📝 Changelog
+
+### v2.0.6 - 2026-05-19
+
+- Added device mirroring support to view and control Android devices in a standalone window.
+
+### v2.0.5 - 2026-05-12
+
+- Added built-in ADB for out-of-the-box usage with less manual setup.
+- Refactored the terminal page for improved command input, execution, and output viewing.
+- Optimized the command center layout to make frequent commands easier to find.
+
+---
+
 ## 🚀 Project Overview
 
 **QADB** is a cross-platform ADB GUI tool built with **Jetpack Compose Multiplatform**, supporting **Windows** and **macOS**.
@@ -42,15 +56,6 @@ adb shell input keyevent 3
 ```
 
 QADB can make these tasks much easier.
-
----
-
-## 📸 Interface Preview
-
-![Home](./screenshots/home.png)
-![Apps](./screenshots/applist.png)
-![Logcat](./screenshots/logcat.png)
-![Terminal](./screenshots/terminal.png)
 
 ---
 
@@ -110,6 +115,15 @@ Please go to [GitHub Releases](https://github.com/ludoven/QADB/releases) to down
 | macOS | `.dmg` | For macOS users |
 
 > If macOS shows "cannot verify developer" or "cannot open", allow it in "System Settings" -> "Privacy & Security".
+
+---
+
+## 📸 Interface Preview
+
+![Home](./screenshots/home.png)
+![Apps](./screenshots/applist.png)
+![Logcat](./screenshots/logcat.png)
+![Terminal](./screenshots/terminal.png)
 
 ---
 

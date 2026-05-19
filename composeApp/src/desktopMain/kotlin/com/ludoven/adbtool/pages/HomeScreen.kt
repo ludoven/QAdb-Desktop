@@ -107,6 +107,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.ludoven.adbtool.entity.DeviceInfoData
 import com.ludoven.adbtool.util.AdbPathManager
+import com.ludoven.adbtool.util.isWirelessAdbConnection
 import com.ludoven.adbtool.viewmodel.DevicesViewModel
 import com.ludoven.adbtool.widget.DashboardMetricCard
 import com.ludoven.adbtool.widget.DashboardPanel
@@ -151,7 +152,7 @@ fun HomeScreen(
     val connectedSince = remember(selectedDevice) {
         if (selectedDevice == null) null else LocalDateTime.now()
     }
-    val wirelessConnection = isWirelessConnection(selectedDevice, deviceInfo?.ipAddress)
+    val wirelessConnection = isWirelessAdbConnection(selectedDevice, deviceInfo?.ipAddress)
     val connectionType = stringResource(
         if (wirelessConnection) Res.string.wireless_connection else Res.string.usb_connection
     )
@@ -989,12 +990,6 @@ private fun formatRelativeRefresh(rawTime: String): String {
         seconds < 3600 -> "${seconds / 60}m"
         else -> "${seconds / 3600}h"
     }
-}
-
-private fun isWirelessConnection(deviceId: String?, ipAddress: String?): Boolean {
-    if (!ipAddress.isNullOrBlank()) return true
-    if (deviceId.isNullOrBlank()) return false
-    return deviceId.contains(':') || deviceId.contains("tls-connect", ignoreCase = true)
 }
 
 private fun extractPort(deviceId: String?, ipAddress: String?): String {

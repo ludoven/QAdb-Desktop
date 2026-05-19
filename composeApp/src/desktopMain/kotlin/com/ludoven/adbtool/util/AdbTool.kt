@@ -193,6 +193,18 @@ object AdbTool {
             }
         }
     }
+
+    fun isDeviceMirrorRunning(): Boolean {
+        synchronized(mirrorProcessLock) {
+            val process = deviceMirrorProcess
+            return if (process?.isAlive == true) {
+                true
+            } else {
+                deviceMirrorProcess = null
+                false
+            }
+        }
+    }
     
     /**
      * 执行Shell命令的异步版本

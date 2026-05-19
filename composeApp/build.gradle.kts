@@ -39,7 +39,7 @@ plugins {
     alias(libs.plugins.composeHotReload)
 }
 
-val appVersion = "2.0.5"
+val appVersion = "2.0.6"
 val generatedVersionSourceDir = layout.buildDirectory.dir("generated/source/appVersion/desktopMain/kotlin")
 val generateDesktopAppVersion = tasks.register<GenerateAppVersionTask>("generateDesktopAppVersion") {
     versionName.set(appVersion)

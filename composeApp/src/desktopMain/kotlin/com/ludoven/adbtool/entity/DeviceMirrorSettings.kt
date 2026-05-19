@@ -5,8 +5,8 @@ data class DeviceMirrorSettings(
     val alwaysOnTop: Boolean = true,
     val fullscreen: Boolean = false,
     val borderless: Boolean = false,
-    val maxSize: Int? = null,
-    val maxFps: Int? = null,
+    val maxSize: Int? = 1280,
+    val maxFps: Int? = 60,
     val videoBitRate: String = "8M",
     val audioEnabled: Boolean = true,
     val showTouches: Boolean = false,
@@ -33,9 +33,9 @@ data class DeviceMirrorSettings(
             MirrorLaunchProfile.LOW_LATENCY -> copy(
                 launchProfile = profile,
                 maxSize = 1280,
-                maxFps = 90,
-                videoBitRate = "6M",
-                audioEnabled = false
+                maxFps = 60,
+                videoBitRate = "4M",
+                audioEnabled = true
             )
             MirrorLaunchProfile.CUSTOM -> copy(launchProfile = profile)
         }
