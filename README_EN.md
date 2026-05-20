@@ -11,7 +11,7 @@
 <p align="center">
   <a href="https://ludoven.github.io/QADB/">Website</a> |
   <a href="./README_CN.md">中文</a> |
-  <a href="./README.md">English</a>
+  <a href="./README_EN.md">English</a>
 </p>
 
 <p align="center">

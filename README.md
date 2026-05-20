@@ -1,17 +1,17 @@
 <h1 align="center">QADB</h1>
 
 <p align="center">
-  <b>An open-source, cross-platform, modern ADB desktop debugging tool</b>
+  <b>一款开源、跨平台、现代化的 ADB 桌面调试工具</b>
 </p>
 
 <p align="center">
-  Make common ADB operations more intuitive and efficient, without repeatedly typing commands.
+  让常用 ADB 操作变得更直观、更高效，不再反复手敲命令。
 </p>
 
 <p align="center">
-  <a href="https://ludoven.github.io/QADB/">Website</a> |
+  <a href="https://ludoven.github.io/QADB/">官网</a> |
   <a href="./README_CN.md">中文</a> |
-  <a href="./README.md">English</a>
+  <a href="./README_EN.md">English</a>
 </p>
 
 <p align="center">
@@ -23,27 +23,27 @@
 
 ---
 
-## 📝 Changelog
+## 📝 更新日志
 
 ### v2.0.6 - 2026-05-19
 
-- Added device mirroring support to view and control Android devices in a standalone window.
+- 新增镜像功能，支持在独立窗口中查看并控制 Android 设备
 
 ### v2.0.5 - 2026-05-12
 
-- Added built-in ADB for out-of-the-box usage with less manual setup.
-- Refactored the terminal page for improved command input, execution, and output viewing.
-- Optimized the command center layout to make frequent commands easier to find.
+- 新增内置 ADB，默认开箱即用，减少手动安装和配置环境变量的步骤
+- 重构终端页面，优化命令输入、执行和结果展示体验
+- 优化命令中心布局，让常用命令入口更清晰、更易查找
 
 ---
 
-## 🚀 Project Overview
+## 🚀 项目介绍
 
-**QADB** is a cross-platform ADB GUI tool built with **Jetpack Compose Multiplatform**, supporting **Windows** and **macOS**.
+**QADB** 是一款基于 **Jetpack Compose Multiplatform** 开发的跨平台 ADB 图形化工具，支持 **Windows** 和 **macOS**。
 
-It is designed for Android developers, testers, Android TV / TV box debugging users, and advanced users who frequently use ADB commands. It turns common ADB workflows into a visual interface so you can debug devices, manage apps, inspect logs, take screenshots and recordings, run terminal commands, and simulate key events more efficiently.
+它面向 Android 开发者、测试人员、Android TV / 电视盒子调试人员以及经常使用 ADB 命令的高级用户，将常用 ADB 操作封装为直观的可视化界面，帮助你更高效地完成设备调试、应用管理、日志查看、截图录屏、终端执行、按键模拟等操作。
 
-If you often run commands like:
+如果你经常需要输入类似下面的命令：
 
 ```bash
 adb devices
@@ -55,70 +55,70 @@ adb shell screencap
 adb shell input keyevent 3
 ```
 
-QADB can make these tasks much easier.
+那么 QADB 可以让这些操作变得更简单。
 
 ---
 
-## ✨ Key Features
+## ✨ 功能亮点
 
-- **Device Management**: Detect USB / network ADB devices and quickly switch the current target device
-- **Device Info**: View model, Android version, screen information, connection status, and more
-- **App Management**: Install APKs, uninstall apps, clear data, force stop apps, and export APKs
-- **Common Operations**: Reboot, shutdown, screenshot, screen recording, open settings, inspect current Activity, etc.
-- **Key Event Simulation**: Quickly trigger common key events such as Back, Home, Menu, Volume, and D-pad keys
-- **Built-in Terminal**: Run adb / shell commands directly inside the app
-- **Log Viewer**: View and filter Logcat logs to troubleshoot runtime issues
-- **Command Center**: Organize frequently used ADB commands into visual actions
-- **TV / Box Debugging**: Suitable for Android TV, set-top boxes, and system app debugging scenarios
-- **Cross-Platform**: Built on Compose Multiplatform, supports Windows and macOS
-
----
-
-## 🎯 Target Users
-
-QADB is suitable for:
-
-- Android developers
-- Android testers
-- Android TV / TV box debugging engineers
-- System app / preinstalled app debugging engineers
-- Advanced users who frequently use ADB commands
-- Development teams that want to improve debugging efficiency
+- **设备管理**：检测 USB / 网络 ADB 设备，快速切换当前设备
+- **设备信息**：查看设备型号、Android 版本、屏幕信息、连接状态等
+- **应用管理**：安装 APK、卸载应用、清除数据、强制停止、导出 APK
+- **常用操作**：重启、关机、截图、录屏、打开设置、查看 Activity 等
+- **按键模拟**：支持返回、主页、菜单、音量、方向键等常用 KeyEvent
+- **内置终端**：无需切换系统终端，直接执行 adb / shell 命令
+- **日志查看**：查看 Logcat 日志，辅助定位应用运行问题
+- **命令中心**：将高频 ADB 命令整理为可视化按钮
+- **TV / 盒子调试**：适合 Android TV、机顶盒、系统应用调试等场景
+- **跨平台支持**：基于 Compose Multiplatform，支持 Windows 与 macOS
 
 ---
 
-## 🧩 Functional Modules
+## 🎯 适合人群
 
-| Module | Description |
+QADB 适合以下用户：
+
+- Android 开发者
+- Android 测试人员
+- Android TV / 电视盒子调试人员
+- 系统应用 / 预装应用调试人员
+- 经常使用 ADB 命令的高级用户
+- 需要提升调试效率的开发团队
+
+---
+
+## 🧩 功能模块
+
+| 模块 | 说明 |
 |---|---|
-| Home | Device status, quick entries, and common actions |
-| Common | Quick execution for frequently used ADB commands |
-| Terminal | Built-in command terminal for adb / shell commands |
-| Key Events | Simulate Android device key operations |
-| Apps | App list, install, uninstall, clear data, force stop, etc. |
-| Logs | View and filter Logcat logs |
-| Settings | Configure tool behavior, ADB path, and related options |
-| Performance | Planned: CPU, memory, network, and related metrics |
-| Processes | Planned: View and manage device processes |
+| 首页 | 展示设备状态、快捷入口、常用操作 |
+| 常用 | 常用 ADB 命令快捷执行 |
+| 终端 | 内置命令行终端，可执行 adb / shell 命令 |
+| 按键 | 模拟 Android 设备按键操作 |
+| 应用 | 应用列表、安装、卸载、清数据、强制停止等 |
+| 日志 | 查看和筛选 Logcat 日志 |
+| 设置 | 配置工具行为、ADB 路径等 |
+| 性能 | 规划中，用于查看 CPU、内存、网络等信息 |
+| 进程 | 规划中，用于查看和管理设备进程 |
 
 ---
 
-## 📦 Download
+## 📦 下载
 
-Please go to [GitHub Releases](https://github.com/ludoven/QADB/releases) to download the latest version.
+请前往 [GitHub Releases](https://github.com/ludoven/QADB/releases) 下载最新版本。
 
-| Platform | Recommended Package | Notes |
+| 平台 | 推荐安装包 | 说明 |
 |---|---|---|
-| Windows | `.msi` | Recommended for regular users |
-| Windows | `.exe` | Portable / no installation |
-| Windows | `.zip` | Extract and run (portable package) |
-| macOS | `.dmg` | For macOS users |
+| Windows | `.msi` | 推荐普通用户使用 |
+| Windows | `.exe` | 免安装 / 便携版本 |
+| Windows | `.zip` | 解压即用（便携包） |
+| macOS | `.dmg` | 适用于 macOS 用户 |
 
-> If macOS shows "cannot verify developer" or "cannot open", allow it in "System Settings" -> "Privacy & Security".
+> macOS 如果提示“无法验证开发者”或“无法打开”，可以在「系统设置」→「隐私与安全性」中允许打开。
 
 ---
 
-## 📸 Interface Preview
+## 📸 界面预览
 
 ![Home](./screenshots/home.png)
 ![Apps](./screenshots/applist.png)
@@ -127,237 +127,239 @@ Please go to [GitHub Releases](https://github.com/ludoven/QADB/releases) to down
 
 ---
 
-## ⚡ Quick Start
+## ⚡ 快速开始
 
-### 1. Install ADB
+### 1. 准备 ADB
 
-QADB depends on the `adb` command available in your system.
+QADB v2.0.5 起已内置 ADB，默认可直接使用。
 
-Install Android Platform Tools first:
+如果你需要使用自己安装的 ADB，也可以在设置中配置自定义 ADB 路径。常见来源包括：
 
-- Android Studio users usually already have ADB
-- You can also download Android SDK Platform Tools separately
+- Android Studio 用户通常已经自带 ADB
+- 单独下载 Android SDK Platform Tools
 
-After installation, make sure this command works:
+如需验证自定义 ADB 环境，可以在终端中执行：
 
 ```bash
 adb version
 ```
 
-If you can see the ADB version output, your environment is ready.
+如果能看到 ADB 版本信息，说明自定义环境正常。
 
 ---
 
-### 2. Enable Device Debugging
+### 2. 开启设备调试
 
-On your Android device:
+在 Android 设备上开启：
 
-1. Open "Developer options"
-2. Enable "USB debugging"
-3. Connect the device via USB
-4. Allow USB debugging authorization on the device
+1. 打开「开发者选项」
+2. 开启「USB 调试」
+3. 使用 USB 连接电脑
+4. 在设备上允许 USB 调试授权
 
-Then run:
+然后执行：
 
 ```bash
 adb devices
 ```
 
-If the device list appears, the connection is successful.
+如果能看到设备列表，说明设备连接成功。
 
 ---
 
-### 3. Launch QADB
+### 3. 启动 QADB
 
-After opening QADB:
+打开 QADB 后：
 
-1. Select the current device
-2. Check device status
-3. Use common actions, app management, logs, terminal, and other features
+1. 选择当前设备
+2. 查看设备状态
+3. 使用常用操作、应用管理、日志、终端等功能
 
 ---
 
-## 🔌 Network ADB
+## 🔌 网络 ADB 使用方式
 
-If you need to connect Android TV, TV boxes, or LAN devices, you can use network ADB.
+如果你需要连接 Android TV、电视盒子或局域网设备，可以使用网络 ADB。
 
-Common connection command:
+常见连接命令：
 
 ```bash
 adb connect 192.168.1.100:5555
 ```
 
-After a successful connection, the device will appear in the QADB device list.
+连接成功后，设备会出现在 QADB 的设备列表中。
 
-> The way to enable network ADB varies by device. Some devices require USB or system settings to enable wireless debugging first.
-
----
-
-## 🛠️ Common Scenarios
-
-### Android App Development
-
-- Quickly install APKs
-- Clear app data
-- Force stop apps
-- Inspect app logs
-- View current Activity
-- Take screenshots and recordings
-
-### Android TV / TV Box Debugging
-
-- Connect via network ADB
-- Simulate remote control key events
-- Install or uninstall APKs
-- View system app information
-- Debug settings pages or launcher/startup pages
-
-### QA / Testing
-
-- Quickly switch devices
-- Execute common commands in batches
-- View logs and screenshots
-- Collect information quickly during issue reproduction
+> 不同设备开启网络 ADB 的方式可能不同，部分设备需要先通过 USB 或系统设置开启无线调试。
 
 ---
 
-## ❓ FAQ
+## 🛠️ 常见使用场景
 
-### 1. Why is my device not detected?
+### Android 应用开发
 
-Please confirm:
+- 快速安装 APK
+- 清除应用数据
+- 强制停止应用
+- 查看应用日志
+- 查看当前 Activity
+- 截图和录屏
 
-- Android Platform Tools are installed
-- `adb devices` works in your terminal
-- USB debugging is enabled on the device
-- USB debugging authorization is accepted on the device
-- Your USB cable supports data transfer
-- Windows users have installed the correct device drivers
+### Android TV / 盒子调试
+
+- 网络 ADB 连接设备
+- 模拟遥控器按键
+- 安装或卸载 APK
+- 查看系统应用信息
+- 调试系统设置或启动页面
+
+### 测试人员
+
+- 快速切换设备
+- 批量执行常用命令
+- 查看日志和截图
+- 复现问题时快速收集信息
 
 ---
 
-### 2. Why does it say adb is not found?
+## ❓ 常见问题
 
-Please ensure `adb` is added to your system `PATH`.
+### 1. 为什么检测不到设备？
 
-You can run:
+请确认：
+
+- 已使用内置 ADB，或自定义 ADB 路径配置正确
+- `adb devices` 可以在终端正常执行（使用自定义 ADB 时）
+- 手机或设备已开启 USB 调试
+- 设备已允许 USB 调试授权
+- USB 数据线支持数据传输
+- Windows 用户已安装对应设备驱动
+
+---
+
+### 2. 为什么提示找不到 adb？
+
+请先在设置中确认当前 ADB 来源和路径状态。QADB 会优先使用可用的内置 ADB；如果你切换为自定义 ADB，请确认路径配置正确。
+
+使用自定义 ADB 时，可以在终端执行：
 
 ```bash
 adb version
 ```
 
-If the command is not found, install Android Platform Tools first and add its directory to your environment variables.
+如果提示命令不存在，需要安装 Android Platform Tools，或改回使用 QADB 内置 ADB。
 
 ---
 
-### 3. What should I do if macOS says the app cannot be opened?
+### 3. macOS 提示无法打开怎么办？
 
-If macOS cannot verify the developer, try:
+如果 macOS 提示无法验证开发者，可以尝试：
 
-1. Open "System Settings"
-2. Go to "Privacy & Security"
-3. Find the blocked prompt for QADB
-4. Click "Open Anyway"
-
----
-
-### 4. Does QADB include ADB?
-
-Currently, QADB relies on ADB installed in your system.
-
-Possible future support:
-
-- Auto-detect ADB path
-- Manually configure ADB path
-- Built-in Platform Tools
-- Multi-version ADB management
+1. 打开「系统设置」
+2. 进入「隐私与安全性」
+3. 找到 QADB 的拦截提示
+4. 点击「仍要打开」
 
 ---
 
-### 5. Is Linux supported?
+### 4. 是否内置 ADB？
 
-Currently the main supported platforms are Windows and macOS.
+QADB v2.0.5 起已内置 ADB，默认开箱即用，同时保留自定义 ADB 路径配置，方便使用系统已安装的 Platform Tools。
 
-Linux support can be a future plan. If you have experience with Linux packaging or adaptation, contributions are welcome.
+---
+
+### 5. 是否支持 Linux？
+
+当前主要支持 Windows 和 macOS。
+
+Linux 支持可以作为后续计划。如果你有 Linux 打包或适配经验，欢迎参与贡献。
 
 ---
 
 ## 🗺️ Roadmap
 
-- [x] Device management
-- [x] Device information display
-- [x] Common ADB operations
-- [x] App management
-- [x] Key event simulation
-- [x] Screenshot / screen recording
-- [x] Built-in terminal
-- [x] Log viewer
-- [ ] Performance monitoring
-- [ ] Process management
-- [ ] File management
-- [ ] Command favorites
-- [ ] Custom command grouping
-- [ ] Multi-device batch operations
-- [ ] Visual ADB path configuration
-- [ ] Linux support
-- [ ] Plugin-based command extensions
+- [x] 设备管理
+- [x] 设备信息展示
+- [x] 常用 ADB 操作
+- [x] 应用管理
+- [x] 按键模拟
+- [x] 截图 / 录屏
+- [x] 内置终端
+- [x] 日志查看
+- [ ] 性能监控
+- [ ] 进程管理
+- [ ] 文件管理
+- [ ] 命令收藏
+- [ ] 命令分组自定义
+- [ ] 多设备批量操作
+- [ ] ADB 路径可视化配置
+- [ ] Linux 支持
+- [ ] 插件化命令扩展
 
 ---
 
-## 🤝 Contributing
+## 🤝 参与贡献
 
-Issues, feature suggestions, and Pull Requests are welcome.
+欢迎提交 Issue、功能建议或 Pull Request。
 
-You can contribute by:
+你可以参与：
 
-- Reporting bugs
-- Submitting useful ADB commands
-- Improving UI / interaction design
-- Enhancing Windows / macOS compatibility
-- Improving English documentation
-- Adding usage tutorials
-- Helping with Linux packaging and adaptation
+- 反馈 Bug
+- 提交新的 ADB 命令
+- 优化 UI / 交互体验
+- 完善 Windows / macOS 兼容性
+- 改进英文文档
+- 补充使用教程
+- 参与 Linux 打包适配
 
-If you have frequently used ADB commands, feel free to suggest them and help improve the QADB command center.
+如果你有常用的 ADB 命令，也欢迎提交建议，让 QADB 的命令中心更加完善。
 
 ---
 
-## 🧪 Local Development
+## 🧪 本地开发
 
-### Requirements
+### 环境要求
 
-- JDK 17 or above
+- JDK 17 或更高版本
 - Android Studio / IntelliJ IDEA
 - Gradle
 - Android SDK Platform Tools
 
-### Clone Project
+### 克隆项目
 
 ```bash
 git clone https://github.com/ludoven/QADB.git
 cd QADB
 ```
 
-### Run Project
+### 运行项目
 
-Open the project with Android Studio or IntelliJ IDEA and run the Desktop configuration.
+请使用 Android Studio 或 IntelliJ IDEA 打开项目，并运行对应的 Desktop 配置。
 
-> Specific Gradle tasks may change with project structure updates. Please refer to the actual project configuration.
+> 具体 Gradle task 可能会根据项目结构变化，请以项目实际配置为准。
 
 ---
 
 ## 📄 License
 
-This project is released under an open-source license. See [LICENSE](./LICENSE) for details.
+本项目基于开源协议发布，具体请查看 [LICENSE](./LICENSE)。
 
 ---
 
-## ⭐ Star Support
+## 📮 联系方式
 
-If QADB helps you, please consider giving this project a Star.
+- 微信二维码：
 
-Your Star is an important motivation for continuous updates.
+  ![微信二维码](docs/wechat.png)
+- 邮箱：ludoven2019@gmail.com
+
+---
+
+## ⭐ Star 支持
+
+如果 QADB 对你有帮助，欢迎点一个 Star 支持项目。
+
+你的 Star 是项目持续更新的重要动力。
 
 <p align="center">
-  <b>QADB: Make Android debugging easier.</b>
+  <b>QADB：让 Android 调试更简单。</b>
 </p>
