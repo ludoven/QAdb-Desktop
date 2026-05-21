@@ -23,6 +23,12 @@
 
 ---
 
+## 🏠 首页预览
+
+![Home](./screenshots/home.png)
+
+---
+
 ## 📝 更新日志
 
 ### v2.0.6 - 2026-05-19
@@ -120,7 +126,6 @@ QADB 适合以下用户：
 
 ## 📸 界面预览
 
-![Home](./screenshots/home.png)
 ![Apps](./screenshots/applist.png)
 ![Logcat](./screenshots/logcat.png)
 ![Terminal](./screenshots/terminal.png)
