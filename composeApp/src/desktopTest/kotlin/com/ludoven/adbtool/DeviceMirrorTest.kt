@@ -25,6 +25,10 @@ class DeviceMirrorTest {
                 "--window-title",
                 "QADB Device Mirror",
                 "--always-on-top",
+                "--max-size",
+                "1280",
+                "--max-fps",
+                "60",
                 "--video-bit-rate",
                 "8M",
                 "--stay-awake"
