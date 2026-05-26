@@ -1,7 +1,7 @@
 package com.ludoven.adbtool.util
 
 import com.ludoven.adbtool.entity.DeviceMirrorSettings
-import java.io.IOException
+import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -15,6 +15,8 @@ object AdbTool {
 
     const val DEVICE_MIRROR_STARTED_MESSAGE = "Device mirror started"
     const val DEVICE_MIRROR_ALREADY_RUNNING_MESSAGE = "Device mirror already running"
+    private const val SCRCPY_STARTUP_CHECK_TIMEOUT_MS = 500L
+    private const val MIRROR_STOP_TIMEOUT_MS = 1500L
 
     private val mirrorProcessLock = Any()
     @Volatile
@@ -156,7 +158,10 @@ object AdbTool {
                     deviceMirrorProcess = null
                 }
                 if (forceRestart) {
-                    deviceMirrorProcess?.takeIf { it.isAlive }?.destroy()
+                    val runningProcess = deviceMirrorProcess?.takeIf { it.isAlive }
+                    if (runningProcess != null && !stopMirrorProcess(runningProcess, MIRROR_STOP_TIMEOUT_MS)) {
+                        return@synchronized AdbResult(false, "", "Failed to stop existing mirror process")
+                    }
                     deviceMirrorProcess = null
                 } else if (deviceMirrorProcess?.isAlive == true) {
                     return@synchronized AdbResult(true, DEVICE_MIRROR_ALREADY_RUNNING_MESSAGE)
@@ -169,9 +174,14 @@ object AdbTool {
                             environment()["ADB"] = adbPath
                         }
                         .start()
+                    val startupFailure = detectEarlyProcessExit(process, SCRCPY_STARTUP_CHECK_TIMEOUT_MS)
+                    if (startupFailure != null) {
+                        deviceMirrorProcess = null
+                        return@synchronized startupFailure
+                    }
                     deviceMirrorProcess = process
                     AdbResult(true, DEVICE_MIRROR_STARTED_MESSAGE)
-                } catch (e: IOException) {
+                } catch (e: Exception) {
                     AdbResult(false, "", e.message ?: "Failed to start scrcpy")
                 }
             }
@@ -187,9 +197,13 @@ object AdbTool {
                     return@synchronized AdbResult(true, "Device mirror stopped")
                 }
 
-                process.destroy()
-                deviceMirrorProcess = null
-                AdbResult(true, "Device mirror stopped")
+                val stopped = stopMirrorProcess(process, MIRROR_STOP_TIMEOUT_MS)
+                if (stopped) {
+                    deviceMirrorProcess = null
+                    AdbResult(true, "Device mirror stopped")
+                } else {
+                    AdbResult(false, "", "Failed to stop mirror process")
+                }
             }
         }
     }
@@ -204,6 +218,47 @@ object AdbTool {
                 false
             }
         }
+    }
+
+    internal fun detectEarlyProcessExit(
+        process: Process,
+        startupCheckTimeoutMillis: Long = SCRCPY_STARTUP_CHECK_TIMEOUT_MS
+    ): AdbResult? {
+        val exited = runCatching {
+            process.waitFor(startupCheckTimeoutMillis, TimeUnit.MILLISECONDS)
+        }.getOrDefault(false)
+        if (!exited) {
+            return null
+        }
+
+        val exitCode = runCatching { process.exitValue() }.getOrDefault(-1)
+        val output = runCatching {
+            process.inputStream.bufferedReader().readText().trim()
+        }.getOrDefault("")
+        val message = output.ifBlank { "scrcpy exited immediately with exit code: $exitCode" }
+        return AdbResult(false, output, message)
+    }
+
+    internal fun stopMirrorProcess(
+        process: Process,
+        timeoutMillis: Long = MIRROR_STOP_TIMEOUT_MS
+    ): Boolean {
+        if (!process.isAlive) {
+            return true
+        }
+        process.destroy()
+        val stoppedGracefully = runCatching {
+            process.waitFor(timeoutMillis, TimeUnit.MILLISECONDS)
+        }.getOrDefault(false)
+        if (stoppedGracefully || !process.isAlive) {
+            return true
+        }
+
+        process.destroyForcibly()
+        val stoppedForcibly = runCatching {
+            process.waitFor(timeoutMillis, TimeUnit.MILLISECONDS)
+        }.getOrDefault(false)
+        return stoppedForcibly || !process.isAlive
     }
     
     /**

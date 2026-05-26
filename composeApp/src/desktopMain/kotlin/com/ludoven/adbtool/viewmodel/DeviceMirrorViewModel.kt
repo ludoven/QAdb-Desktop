@@ -111,11 +111,11 @@ class DeviceMirrorViewModel : BaseViewModel() {
             val result = withContext(Dispatchers.IO) {
                 AdbTool.stopDeviceMirrorAsync()
             }
-            _mirrorRunning.value = false
-            _activeDeviceId.value = null
-            _mirrorStartedAt.value = null
-            stopMirrorStateWatcher()
             val message = if (result.success) {
+                _mirrorRunning.value = false
+                _activeDeviceId.value = null
+                _mirrorStartedAt.value = null
+                stopMirrorStateWatcher()
                 _mirrorErrorMessage.value = null
                 MsgContent.Text("已停止设备镜像窗口")
             } else {

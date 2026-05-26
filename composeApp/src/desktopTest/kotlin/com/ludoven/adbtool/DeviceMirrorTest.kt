@@ -6,6 +6,10 @@ import com.ludoven.adbtool.util.ScrcpyPathManager
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class DeviceMirrorTest {
 
@@ -107,5 +111,63 @@ class DeviceMirrorTest {
             File(root, "windows-x64/scrcpy/scrcpy.exe").absolutePath,
             ScrcpyPathManager.resolveBundledScrcpyPath(root, "Windows 11", "amd64")?.absolutePath
         )
+    }
+
+    @Test
+    fun `early process exit should be reported as startup failure`() {
+        val process = startFailingProcess()
+
+        val result = AdbTool.detectEarlyProcessExit(process, startupCheckTimeoutMillis = 1000)
+
+        assertNotNull(result)
+        assertFalse(result.success)
+        assertTrue(result.errorMessage?.isNotBlank() == true)
+    }
+
+    @Test
+    fun `running process should not be treated as startup failure`() {
+        val process = startLongRunningProcess()
+        try {
+            val result = AdbTool.detectEarlyProcessExit(process, startupCheckTimeoutMillis = 100)
+            assertNull(result)
+        } finally {
+            AdbTool.stopMirrorProcess(process, timeoutMillis = 500)
+        }
+    }
+
+    @Test
+    fun `stop mirror process should terminate alive process`() {
+        val process = startLongRunningProcess()
+
+        val stopped = AdbTool.stopMirrorProcess(process, timeoutMillis = 500)
+
+        assertTrue(stopped)
+        assertFalse(process.isAlive)
+    }
+
+    private fun startFailingProcess(): Process {
+        val command = if (isWindows()) {
+            listOf("cmd", "/c", "(echo fail) & exit /b 1")
+        } else {
+            listOf("sh", "-c", "echo fail && exit 1")
+        }
+        return ProcessBuilder(command)
+            .redirectErrorStream(true)
+            .start()
+    }
+
+    private fun startLongRunningProcess(): Process {
+        val command = if (isWindows()) {
+            listOf("cmd", "/c", "ping -n 6 127.0.0.1 >NUL")
+        } else {
+            listOf("sh", "-c", "sleep 5")
+        }
+        return ProcessBuilder(command)
+            .redirectErrorStream(true)
+            .start()
+    }
+
+    private fun isWindows(): Boolean {
+        return System.getProperty("os.name").lowercase().contains("windows")
     }
 }
