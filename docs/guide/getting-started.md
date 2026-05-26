@@ -1,16 +1,21 @@
 # 快速开始
 
-## 1. 安装 ADB
+## 1. 准备 ADB
 
-QADB 依赖系统中的 `adb` 命令。你可以通过 Android Studio 安装 Android SDK Platform Tools，也可以单独安装 Platform Tools。
+QADB v2.0.5 起已内置 ADB，默认可直接使用。
 
-安装完成后，在终端执行：
+如果你需要使用自己安装的 ADB，也可以在设置中配置自定义 ADB 路径。常见来源包括：
+
+- Android Studio 用户通常已经自带 ADB
+- 单独下载 Android SDK Platform Tools
+
+如需验证自定义 ADB 环境，在终端执行：
 
 ```bash
 adb version
 ```
 
-如果能看到 ADB 版本信息，说明本机环境正常。
+如果能看到 ADB 版本信息，说明自定义环境正常。
 
 ## 2. 开启设备调试
 
@@ -53,8 +58,8 @@ adb connect 192.168.1.100:5555
 
 请确认：
 
-- 已安装 Android Platform Tools。
-- `adb devices` 可以在终端正常执行。
+- 已使用内置 ADB，或自定义 ADB 路径配置正确。
+- `adb devices` 可以在终端正常执行（使用自定义 ADB 时）。
 - 手机或设备已开启 USB 调试。
 - 设备已允许 USB 调试授权。
 - USB 数据线支持数据传输。

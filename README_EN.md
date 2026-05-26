@@ -129,22 +129,22 @@ Please go to [GitHub Releases](https://github.com/ludoven/QADB/releases) to down
 
 ## ⚡ Quick Start
 
-### 1. Install ADB
+### 1. Prepare ADB
 
-QADB depends on the `adb` command available in your system.
+QADB includes built-in ADB since v2.0.5 and works out of the box.
 
-Install Android Platform Tools first:
+If you prefer your own ADB installation, you can configure a custom ADB path in Settings. Common sources include:
 
-- Android Studio users usually already have ADB
-- You can also download Android SDK Platform Tools separately
+- Android Studio (usually includes ADB)
+- Android SDK Platform Tools (standalone download)
 
-After installation, make sure this command works:
+To verify a custom ADB environment, run:
 
 ```bash
 adb version
 ```
 
-If you can see the ADB version output, your environment is ready.
+If you can see the ADB version output, your custom environment is ready.
 
 ---
 
@@ -227,8 +227,8 @@ After a successful connection, the device will appear in the QADB device list.
 
 Please confirm:
 
-- Android Platform Tools are installed
-- `adb devices` works in your terminal
+- Built-in ADB is enabled, or your custom ADB path is configured correctly
+- `adb devices` works in your terminal (when using custom ADB)
 - USB debugging is enabled on the device
 - USB debugging authorization is accepted on the device
 - Your USB cable supports data transfer
@@ -238,7 +238,7 @@ Please confirm:
 
 ### 2. Why does it say adb is not found?
 
-Please ensure `adb` is added to your system `PATH`.
+Please check the current ADB source and path status in Settings. QADB prefers available built-in ADB. If you switch to custom ADB, make sure the configured path is valid.
 
 You can run:
 
@@ -246,7 +246,7 @@ You can run:
 adb version
 ```
 
-If the command is not found, install Android Platform Tools first and add its directory to your environment variables.
+If the command is not found, install Android Platform Tools first, or switch back to QADB built-in ADB.
 
 ---
 
@@ -263,14 +263,9 @@ If macOS cannot verify the developer, try:
 
 ### 4. Does QADB include ADB?
 
-Currently, QADB relies on ADB installed in your system.
+QADB includes built-in ADB since v2.0.5 for out-of-the-box usage.
 
-Possible future support:
-
-- Auto-detect ADB path
-- Manually configure ADB path
-- Built-in Platform Tools
-- Multi-version ADB management
+You can still switch to a custom ADB path in Settings when you need to use your system-installed tools.
 
 ---
 
