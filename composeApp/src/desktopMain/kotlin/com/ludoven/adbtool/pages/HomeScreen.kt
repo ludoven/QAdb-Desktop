@@ -296,6 +296,8 @@ fun HomeScreen(
                             connectionStatus = connectionStatus,
                             ipAddress = deviceInfo?.ipAddress.orDash(),
                             port = extractPort(selectedDevice, deviceInfo?.ipAddress),
+                            latency = deviceInfo?.latency.orDash(),
+                            connectionSpeed = deviceInfo?.connectionSpeed.orDash(),
                             relativeUpdated = relativeUpdated,
                             connectedDuration = connectedDuration,
                             isConnected = isConnected
@@ -327,6 +329,8 @@ fun HomeScreen(
                                 connectionStatus = connectionStatus,
                                 ipAddress = deviceInfo?.ipAddress.orDash(),
                                 port = extractPort(selectedDevice, deviceInfo?.ipAddress),
+                                latency = deviceInfo?.latency.orDash(),
+                                connectionSpeed = deviceInfo?.connectionSpeed.orDash(),
                                 relativeUpdated = relativeUpdated,
                                 connectedDuration = connectedDuration,
                                 isConnected = isConnected
@@ -789,6 +793,8 @@ private fun ConnectionInfoPanel(
     connectionStatus: String,
     ipAddress: String,
     port: String,
+    latency: String,
+    connectionSpeed: String,
     relativeUpdated: String,
     connectedDuration: String,
     isConnected: Boolean
@@ -812,11 +818,11 @@ private fun ConnectionInfoPanel(
             LabeledValueRow(label = stringResource(Res.string.port), value = port)
             LabeledValueRow(
                 label = stringResource(Res.string.latency),
-                value = "--"
+                value = latency
             )
             LabeledValueRow(
                 label = stringResource(Res.string.transfer_speed),
-                value = "--"
+                value = connectionSpeed
             )
             LabeledValueRow(
                 label = stringResource(Res.string.connected_for),

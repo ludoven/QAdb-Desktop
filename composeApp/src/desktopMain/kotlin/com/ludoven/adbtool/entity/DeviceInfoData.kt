@@ -63,7 +63,9 @@ data class DeviceInfoData(
     val fontScale: String = "",
     val buildFingerprint: String = "",
     val ipAddress: String = "",
-    val macAddress: String = ""
+    val macAddress: String = "",
+    val latency: String = "",
+    val connectionSpeed: String = ""
 ) {
     /**
      * 转换为显示用的Map，key为DeviceInfoField，value为对应的值

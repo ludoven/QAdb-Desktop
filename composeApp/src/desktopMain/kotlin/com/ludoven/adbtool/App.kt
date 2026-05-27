@@ -11,6 +11,7 @@ import adbtool_desktop.composeapp.generated.resources.key_event_page
 import adbtool_desktop.composeapp.generated.resources.log
 import adbtool_desktop.composeapp.generated.resources.process
 import adbtool_desktop.composeapp.generated.resources.set
+import adbtool_desktop.composeapp.generated.resources.system_page
 import adbtool_desktop.composeapp.generated.resources.terminal
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
@@ -29,6 +30,7 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Memory
+import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.VideogameAsset
 import com.ludoven.adbtool.ui.mac.ExperimentalMaterial3Api
@@ -63,6 +65,7 @@ import com.ludoven.adbtool.pages.LogScreen
 import com.ludoven.adbtool.pages.DeviceMirrorScreen
 import com.ludoven.adbtool.pages.ProcessScreen
 import com.ludoven.adbtool.pages.SettingScreen
+import com.ludoven.adbtool.pages.SystemScreen
 import com.ludoven.adbtool.pages.TerminalScreen
 import com.ludoven.adbtool.util.AdbPathManager
 import com.ludoven.adbtool.util.LanguageManager
@@ -78,6 +81,7 @@ import com.ludoven.adbtool.viewmodel.DevicesViewModel
 import com.ludoven.adbtool.viewmodel.FileBrowserViewModel
 import com.ludoven.adbtool.viewmodel.KeyEventViewModel
 import com.ludoven.adbtool.viewmodel.LogViewModel
+import com.ludoven.adbtool.viewmodel.SystemViewModel
 import com.ludoven.adbtool.viewmodel.TerminalViewModel
 import com.ludoven.adbtool.widget.GlassCard
 import com.ludoven.adbtool.widget.Sidebar
@@ -98,6 +102,7 @@ fun App() {
     val logViewModel: LogViewModel = viewModel()
     val terminalViewModel: TerminalViewModel = viewModel()
     val fileBrowserViewModel: FileBrowserViewModel = viewModel()
+    val systemViewModel: SystemViewModel = viewModel()
     val devices by devicesViewModel.devices.collectAsState()
     val selectedDevice by devicesViewModel.selectedDevice.collectAsState()
     val deviceDisplayNames by devicesViewModel.deviceDisplayNames.collectAsState()
@@ -118,6 +123,7 @@ fun App() {
         TabItem(stringResource(Res.string.file_browser), Icons.Default.Folder, "filebrowser"),
         TabItem(stringResource(Res.string.log), Icons.Default.List, "log"),
         TabItem(stringResource(Res.string.process), Icons.Default.Memory, "process"),
+        TabItem(stringResource(Res.string.system_page), Icons.Default.PhoneAndroid, "system"),
         TabItem(stringResource(Res.string.set), Icons.Default.Settings, "setting")
     )
 
@@ -306,6 +312,14 @@ fun App() {
                                 composable("process") {
                                     stateHolder.SaveableStateProvider("process") {
                                         ProcessScreen(
+                                            selectedDevice = selectedDevice
+                                        )
+                                    }
+                                }
+                                composable("system") {
+                                    stateHolder.SaveableStateProvider("system") {
+                                        SystemScreen(
+                                            viewModel = systemViewModel,
                                             selectedDevice = selectedDevice
                                         )
                                     }

@@ -172,6 +172,24 @@ class DevicesViewModel : BaseViewModel() {
                 val batteryStatus = BatteryStatus.fromStatusCode(status)
                 val batteryLevel = if (level != null) "$level%" else ""
 
+                // Latency measurement: time a simple adb shell echo command
+                val latencyMs = try {
+                    val start = System.currentTimeMillis()
+                    AdbTool.executeAdbCommand("-s", deviceId, "shell", "echo", "ping")
+                    System.currentTimeMillis() - start
+                } catch (_: Exception) { -1L }
+                val latencyStr = if (latencyMs >= 0) "${latencyMs}ms" else "--"
+
+                // Connection speed: detect USB vs WiFi
+                val connectionSpeedStr = try {
+                    val transportType = AdbTool.executeAdbCommand("-s", deviceId, "shell", "getprop", "sys.usb.state").trim()
+                    if (deviceId.contains(":") || deviceId.matches(Regex(".*\\.\\d+\\.\\d+.*"))) {
+                        "Wi-Fi"
+                    } else {
+                        "USB"
+                    }
+                } catch (_: Exception) { "--" }
+
                 // 创建数据对象
                 val deviceInfo = DeviceInfoData(
                     androidVersion = androidVersion,
@@ -184,7 +202,9 @@ class DevicesViewModel : BaseViewModel() {
                     fontScale = fontScale,
                     buildFingerprint = buildFingerprint,
                     ipAddress = ipAddress,
-                    macAddress = macAddress
+                    macAddress = macAddress,
+                    latency = latencyStr,
+                    connectionSpeed = connectionSpeedStr
                 )
 
                 val centerInfo = DeviceCenterInfoData(
