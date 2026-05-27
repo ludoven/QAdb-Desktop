@@ -1,6 +1,7 @@
 package com.ludoven.adbtool.pages
 
 import com.ludoven.adbtool.ui.mac.*
+import com.ludoven.adbtool.entity.MsgContent
 
 import adbtool_desktop.composeapp.generated.resources.Res
 import adbtool_desktop.composeapp.generated.resources.battery_level
@@ -138,9 +139,22 @@ fun HomeScreen(
     val centerInfo by viewModel.centerInfo.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val lastRefreshTime by viewModel.lastRefreshTime.collectAsState()
+    val showDialog by viewModel.showDialog.collectAsState()
+    val dialogMessage by viewModel.dialogMessage.collectAsState()
 
     var showDropdown by remember { mutableStateOf(false) }
     val scrollState = rememberScrollState()
+
+    if (showDialog) {
+        dialogMessage?.let { message ->
+            TipDialog(
+                dialogText = when (message) {
+                    is MsgContent.Resource -> stringResource(message.stringResource, *message.args.toTypedArray())
+                    is MsgContent.Text -> message.text
+                }
+            ) { viewModel.dismissTipDialog() }
+        }
+    }
 
     LaunchedEffect(Unit) {
         if (devices.isEmpty()) {
@@ -149,8 +163,14 @@ fun HomeScreen(
     }
 
     val isConnected = selectedDevice != null
-    val connectedSince = remember(selectedDevice) {
-        if (selectedDevice == null) null else LocalDateTime.now()
+    var connectedSinceDeviceId by remember { mutableStateOf<String?>(null) }
+    var connectedSince by remember { mutableStateOf<LocalDateTime?>(null) }
+    LaunchedEffect(selectedDevice) {
+        val deviceId = selectedDevice
+        if (deviceId != connectedSinceDeviceId) {
+            connectedSinceDeviceId = deviceId
+            connectedSince = if (deviceId == null) null else LocalDateTime.now()
+        }
     }
     val wirelessConnection = isWirelessAdbConnection(selectedDevice, deviceInfo?.ipAddress)
     val connectionType = stringResource(
@@ -242,7 +262,30 @@ fun HomeScreen(
                     compactLayout = compactLayout
                 )
 
-                if (compactLayout) {
+                if (!isConnected) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 48.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Smartphone,
+                            contentDescription = null,
+                            modifier = Modifier.size(64.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+                        )
+                        Text(
+                            text = stringResource(Res.string.no_device_available),
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = stringResource(Res.string.select_device_hint),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                        )
+                    }
+                } else if (compactLayout) {
                     Column(verticalArrangement = Arrangement.spacedBy(spacing)) {
                         DeviceInfoPanel(
                             modifier = Modifier.fillMaxWidth(),
@@ -297,15 +340,6 @@ fun HomeScreen(
                             )
                         }
                     }
-                }
-
-                if (!isConnected) {
-                    Text(
-                        text = stringResource(Res.string.select_device_hint),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        style = MaterialTheme.typography.bodyLarge,
-                        modifier = Modifier.padding(horizontal = 4.dp)
-                    )
                 }
             }
 

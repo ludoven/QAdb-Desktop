@@ -516,8 +516,8 @@ private fun SettingsSection(
     Surface(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
-        color = Color.White,
-        border = BorderStroke(1.dp, Color(0xFFE5E7EB)),
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         tonalElevation = 0.dp,
         shadowElevation = 0.dp
     ) {
@@ -683,8 +683,8 @@ private fun SettingsDropdownRow(
             Surface(
                 onClick = { onExpandedChange(!expanded) },
                 shape = RoundedCornerShape(9.dp),
-                color = Color(0xFFF8F9FB),
-                border = BorderStroke(1.dp, Color(0xFFE5E7EB)),
+                color = MaterialTheme.colorScheme.surfaceVariant,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                 tonalElevation = 0.dp,
                 shadowElevation = 0.dp
             ) {
@@ -710,7 +710,7 @@ private fun SettingsDropdownRow(
             DropdownMenu(
                 expanded = expanded,
                 onDismissRequest = { onExpandedChange(false) },
-                modifier = Modifier.background(Color.White),
+                modifier = Modifier.background(MaterialTheme.colorScheme.surface),
                 content = menuContent
             )
         }

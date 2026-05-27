@@ -59,10 +59,12 @@ fun FileBrowserScreen(
     val showDialog by viewModel.showDialog.collectAsState()
     val dialogMessage by viewModel.dialogMessage.collectAsState()
 
-    val filteredFiles = remember(files, showHidden, searchKeyword) {
-        val base = if (showHidden) files else files.filter { !it.name.startsWith(".") }
-        val keyword = searchKeyword.trim()
-        if (keyword.isBlank()) base else base.filter { it.name.contains(keyword, ignoreCase = true) }
+    val filteredFiles by remember {
+        derivedStateOf {
+            val base = if (showHidden) files else files.filter { !it.name.startsWith(".") }
+            val keyword = searchKeyword.trim()
+            if (keyword.isBlank()) base else base.filter { it.name.contains(keyword, ignoreCase = true) }
+        }
     }
     val listState = rememberLazyListState()
 
@@ -73,7 +75,7 @@ fun FileBrowserScreen(
     var showNewDirDialog by remember { mutableStateOf(false) }
     var newDirName by remember { mutableStateOf("") }
     var showDeleteConfirm by remember { mutableStateOf(false) }
-    var deleteTarget by remember { mutableStateOf<FileInfo?>(null) }
+    var deleteTargets by remember { mutableStateOf<List<String>>(emptyList()) }
 
     // Context menu state
     var contextMenuTarget by remember { mutableStateOf<FileInfo?>(null) }
@@ -160,14 +162,22 @@ fun FileBrowserScreen(
         )
     }
 
-    if (showDeleteConfirm && deleteTarget != null) {
+    if (showDeleteConfirm && deleteTargets.isNotEmpty()) {
+        val count = deleteTargets.size
         AlertDialog(
             onDismissRequest = { showDeleteConfirm = false },
             title = { Text(l10n("确认删除", "Confirm delete")) },
-            text = { Text(l10n("确定要删除 \"${deleteTarget!!.name}\" 吗？此操作不可撤销。", "Delete \"${deleteTarget!!.name}\"? This action cannot be undone.")) },
+            text = {
+                if (count == 1) {
+                    val name = deleteTargets.first().substringAfterLast('/')
+                    Text(l10n("确定要删除 \"$name\" 吗？此操作不可撤销。", "Delete \"$name\"? This action cannot be undone."))
+                } else {
+                    Text(l10n("确定要删除选中的 $count 个项目吗？此操作不可撤销。", "Delete $count selected items? This action cannot be undone."))
+                }
+            },
             confirmButton = {
                 Button(onClick = {
-                    viewModel.deleteFile("${currentPath}/${deleteTarget!!.name}", selectedDevice)
+                    deleteTargets.forEach { path -> viewModel.deleteFile(path, selectedDevice) }
                     showDeleteConfirm = false
                 }) { Text(l10n("删除", "Delete"), color = MaterialTheme.colorScheme.error) }
             },
@@ -573,7 +583,7 @@ fun FileBrowserScreen(
                                 DropdownMenuItem(
                                     text = { Text(l10n("删除", "Delete"), color = MaterialTheme.colorScheme.error) },
                                     onClick = {
-                                        deleteTarget = file
+                                        deleteTargets = listOf("${currentPath}/${file.name}")
                                         showDeleteConfirm = true
                                         contextMenuExpanded = false
                                     },
@@ -625,9 +635,9 @@ fun FileBrowserScreen(
                 ) { Text(l10n("复制路径", "Copy path")) }
                 OutlinedButton(
                     onClick = {
-                        selectedPaths.firstOrNull()?.let { path ->
-                            deleteTarget = filteredFiles.firstOrNull { "$currentPath/${it.name}" == path }
-                            if (deleteTarget != null) showDeleteConfirm = true
+                        if (selectedPaths.isNotEmpty()) {
+                            deleteTargets = selectedPaths.toList()
+                            showDeleteConfirm = true
                         }
                     },
                     shape = RoundedCornerShape(10.dp)
@@ -678,12 +688,10 @@ private fun NavigationToolbar(
     val crumbs = remember(currentPath) {
         currentPath.trim('/').split("/")
             .filter { it.isNotBlank() }
-            .dropWhile { it == "sdcard" }
     }
     val crumbPaths = remember(currentPath, crumbs) {
-        val base = "/sdcard"
         crumbs.mapIndexed { index, _ ->
-            base + "/" + crumbs.take(index + 1).joinToString("/")
+            "/" + crumbs.take(index + 1).joinToString("/")
         }
     }
 

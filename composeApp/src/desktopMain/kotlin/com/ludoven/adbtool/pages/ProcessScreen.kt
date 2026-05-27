@@ -26,14 +26,18 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollbarAdapter
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.ArrowDropUp
 import androidx.compose.material.icons.filled.Refresh
 import com.ludoven.adbtool.ui.mac.CircularProgressIndicator
 import com.ludoven.adbtool.ui.mac.Icon
@@ -53,6 +57,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.ludoven.adbtool.util.AdbTool
 import kotlinx.coroutines.launch
@@ -67,12 +72,16 @@ private data class ProcessItem(
     val user: String
 )
 
+private enum class SortColumn { NAME, CPU, CPU_TIME, MEMORY, PID, USER }
+
 @Composable
 fun ProcessScreen(selectedDevice: String?) {
     var keyword by remember { mutableStateOf("") }
     var processes by remember { mutableStateOf(emptyList<ProcessItem>()) }
     var isLoading by remember { mutableStateOf(false) }
     var errorText by remember { mutableStateOf<String?>(null) }
+    var sortBy by remember { mutableStateOf(SortColumn.CPU) }
+    var sortDesc by remember { mutableStateOf(true) }
     val scope = rememberCoroutineScope()
     val listState = rememberLazyListState()
 
@@ -96,9 +105,9 @@ fun ProcessScreen(selectedDevice: String?) {
         refresh()
     }
 
-    val filteredList = remember(processes, keyword) {
-        if (keyword.isBlank()) return@remember processes
-        processes.filter {
+    val filteredList = remember(processes, keyword, sortBy, sortDesc) {
+        val base = if (keyword.isBlank()) processes
+        else processes.filter {
             it.name.contains(keyword, ignoreCase = true) ||
                 it.user.contains(keyword, ignoreCase = true) ||
                 it.pid.contains(keyword) ||
@@ -106,6 +115,15 @@ fun ProcessScreen(selectedDevice: String?) {
                 it.cpuTime.contains(keyword) ||
                 it.memory.contains(keyword)
         }
+        val comparator: Comparator<ProcessItem> = when (sortBy) {
+            SortColumn.NAME -> compareBy { it.name.lowercase() }
+            SortColumn.CPU -> compareBy { parseCpuForSort(it.cpuPercent) }
+            SortColumn.CPU_TIME -> compareBy { it.cpuTime }
+            SortColumn.MEMORY -> compareBy { parseMemoryForSort(it.memory) }
+            SortColumn.PID -> compareBy { it.pid.toIntOrNull() ?: Int.MAX_VALUE }
+            SortColumn.USER -> compareBy { it.user }
+        }
+        if (sortDesc) base.sortedWith(comparator.reversed()) else base.sortedWith(comparator)
     }
 
     Column(
@@ -221,40 +239,71 @@ fun ProcessScreen(selectedDevice: String?) {
                                         .fillMaxWidth()
                                         .padding(horizontal = 8.dp, vertical = 4.dp)
                                 ) {
-                                    Text(
+                                    SortableColumnHeader(
                                         text = stringResource(Res.string.process_name),
-                                        modifier = Modifier.width(240.dp),
-                                        style = MaterialTheme.typography.labelMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        width = 240.dp,
+                                        column = SortColumn.NAME,
+                                        currentSort = sortBy,
+                                        descending = sortDesc,
+                                        onClick = {
+                                            if (sortBy == SortColumn.NAME) sortDesc = !sortDesc
+                                            else { sortBy = SortColumn.NAME; sortDesc = true }
+                                        }
                                     )
-                                    Text(
+                                    SortableColumnHeader(
                                         text = stringResource(Res.string.process_cpu),
-                                        modifier = Modifier.width(70.dp),
-                                        style = MaterialTheme.typography.labelMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        width = 70.dp,
+                                        column = SortColumn.CPU,
+                                        currentSort = sortBy,
+                                        descending = sortDesc,
+                                        onClick = {
+                                            if (sortBy == SortColumn.CPU) sortDesc = !sortDesc
+                                            else { sortBy = SortColumn.CPU; sortDesc = true }
+                                        }
                                     )
-                                    Text(
+                                    SortableColumnHeader(
                                         text = stringResource(Res.string.process_cpu_time),
-                                        modifier = Modifier.width(100.dp),
-                                        style = MaterialTheme.typography.labelMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        width = 100.dp,
+                                        column = SortColumn.CPU_TIME,
+                                        currentSort = sortBy,
+                                        descending = sortDesc,
+                                        onClick = {
+                                            if (sortBy == SortColumn.CPU_TIME) sortDesc = !sortDesc
+                                            else { sortBy = SortColumn.CPU_TIME; sortDesc = true }
+                                        }
                                     )
-                                    Text(
+                                    SortableColumnHeader(
                                         text = stringResource(Res.string.process_memory),
-                                        modifier = Modifier.width(82.dp),
-                                        style = MaterialTheme.typography.labelMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        width = 82.dp,
+                                        column = SortColumn.MEMORY,
+                                        currentSort = sortBy,
+                                        descending = sortDesc,
+                                        onClick = {
+                                            if (sortBy == SortColumn.MEMORY) sortDesc = !sortDesc
+                                            else { sortBy = SortColumn.MEMORY; sortDesc = true }
+                                        }
                                     )
-                                    Text(
+                                    SortableColumnHeader(
                                         text = stringResource(Res.string.process_pid),
-                                        modifier = Modifier.width(70.dp),
-                                        style = MaterialTheme.typography.labelMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        width = 70.dp,
+                                        column = SortColumn.PID,
+                                        currentSort = sortBy,
+                                        descending = sortDesc,
+                                        onClick = {
+                                            if (sortBy == SortColumn.PID) sortDesc = !sortDesc
+                                            else { sortBy = SortColumn.PID; sortDesc = false }
+                                        }
                                     )
-                                    Text(
+                                    SortableColumnHeader(
                                         text = stringResource(Res.string.process_user),
-                                        style = MaterialTheme.typography.labelMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        width = null,
+                                        column = SortColumn.USER,
+                                        currentSort = sortBy,
+                                        descending = sortDesc,
+                                        onClick = {
+                                            if (sortBy == SortColumn.USER) sortDesc = !sortDesc
+                                            else { sortBy = SortColumn.USER; sortDesc = true }
+                                        }
                                     )
                                 }
                             }
@@ -301,7 +350,7 @@ fun ProcessScreen(selectedDevice: String?) {
                                         overflow = TextOverflow.Ellipsis
                                     )
                                     Text(
-                                        text = item.name,
+                                        text = item.user,
                                         style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
@@ -430,4 +479,41 @@ private fun normalizeCpuValue(raw: String): String {
 
 private fun parseCpuForSort(raw: String): Double {
     return raw.removeSuffix("%").toDoubleOrNull() ?: -1.0
+}
+
+private fun parseMemoryForSort(raw: String): Double {
+    val cleaned = raw.trim().removeSuffix("K").removeSuffix("M").removeSuffix("G").removeSuffix("k").removeSuffix("m").removeSuffix("g")
+    return cleaned.toDoubleOrNull() ?: -1.0
+}
+
+@Composable
+private fun SortableColumnHeader(
+    text: String,
+    width: Dp?,
+    column: SortColumn,
+    currentSort: SortColumn,
+    descending: Boolean,
+    onClick: () -> Unit
+) {
+    val isActive = column == currentSort
+    val modifier = if (width != null) Modifier.width(width) else Modifier
+    Row(
+        modifier = modifier.clickable(onClick = onClick),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal,
+            color = if (isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        if (isActive) {
+            Icon(
+                imageVector = if (descending) Icons.Default.ArrowDropDown else Icons.Default.ArrowDropUp,
+                contentDescription = null,
+                modifier = Modifier.size(16.dp),
+                tint = MaterialTheme.colorScheme.primary
+            )
+        }
+    }
 }

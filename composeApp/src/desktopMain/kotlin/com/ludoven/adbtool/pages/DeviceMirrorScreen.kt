@@ -80,16 +80,28 @@ private object MirrorKeyCode {
     const val VOLUME_DOWN = 25
 }
 
-private object MirrorColors {
-    val PageBackground = Color(0xFFFFFFFF)
-    val ContentBackground = Color(0xFFFFFFFF)
-    val PrimaryText = Color(0xFF111827)
-    val SecondaryText = Color(0xFF4B5563)
-    val Divider = Color(0xFFCBD5E1)
-    val Primary = Color(0xFF2563EB)
-    val Danger = Color(0xFFDC2626)
-    val Success = Color(0xFF16A34A)
-}
+private data class MirrorColorsData(
+    val PageBackground: Color,
+    val ContentBackground: Color,
+    val PrimaryText: Color,
+    val SecondaryText: Color,
+    val Divider: Color,
+    val Primary: Color,
+    val Danger: Color,
+    val Success: Color
+)
+
+@Composable
+private fun mirrorColors() = MirrorColorsData(
+    PageBackground = MaterialTheme.colorScheme.surface,
+    ContentBackground = MaterialTheme.colorScheme.surface,
+    PrimaryText = MaterialTheme.colorScheme.onSurface,
+    SecondaryText = MaterialTheme.colorScheme.onSurfaceVariant,
+    Divider = MaterialTheme.colorScheme.outlineVariant,
+    Primary = MaterialTheme.colorScheme.primary,
+    Danger = MaterialTheme.colorScheme.error,
+    Success = Color(0xFF16A34A)
+)
 
 private data class IntOption(
     val label: String,
@@ -116,6 +128,8 @@ fun DeviceMirrorScreen(
     val mirrorErrorMessage by viewModel.mirrorErrorMessage.collectAsState()
     val deviceConnectionState by viewModel.deviceConnectionState.collectAsState()
     val inputInjectionBlocked by viewModel.inputInjectionBlocked.collectAsState()
+
+    var MirrorColors = mirrorColors()
 
     val scrollState = rememberScrollState()
     val statusDeviceId = selectedDevice?.takeIf { it.isNotBlank() }
@@ -371,6 +385,7 @@ private fun HeaderSection(
     connected: Boolean,
     connectionType: String
 ) {
+    var MirrorColors = mirrorColors()
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -421,6 +436,7 @@ private fun MirrorStatusPanel(
     runtimeText: String,
     onPrimaryAction: () -> Unit
 ) {
+    var MirrorColors = mirrorColors()
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -505,10 +521,12 @@ private fun MirrorStatusPanel(
 private fun StatusLine(
     label: String,
     value: String,
-    statusColor: Color = MirrorColors.PrimaryText,
+    statusColor: Color = Color.Unspecified,
     withStatusDot: Boolean = false,
     ellipsize: Boolean = false
 ) {
+    var MirrorColors = mirrorColors()
+    val resolvedStatusColor = if (statusColor == Color.Unspecified) MirrorColors.PrimaryText else statusColor
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -528,16 +546,16 @@ private fun StatusLine(
                 Box(
                     modifier = Modifier
                         .size(8.dp)
-                        .background(statusColor, RoundedCornerShape(999.dp))
+                        .background(resolvedStatusColor, RoundedCornerShape(999.dp))
                 )
             }
             if (ellipsize) {
-                DeviceValueText(value = value, color = statusColor)
+                DeviceValueText(value = value, color = resolvedStatusColor)
             } else {
                 Text(
                     text = value,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = statusColor,
+                    color = resolvedStatusColor,
                     fontWeight = FontWeight.Medium,
                     fontSize = 13.sp
                 )
@@ -551,6 +569,7 @@ private fun Section(
     title: String,
     content: @Composable ColumnScope.() -> Unit
 ) {
+    var MirrorColors = mirrorColors()
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         Text(
             text = title,
@@ -569,12 +588,13 @@ private fun MirrorModeSegment(
     selected: Boolean,
     onClick: () -> Unit
 ) {
+    var MirrorColors = mirrorColors()
     OutlinedButton(
         modifier = modifier.heightIn(min = 36.dp),
         onClick = onClick,
         shape = RoundedCornerShape(9.dp),
         colors = ButtonDefaults.outlinedButtonColors(
-            containerColor = if (selected) Color(0xFFEAF2FF) else Color.White,
+            containerColor = if (selected) Color(0xFFEAF2FF) else MirrorColors.ContentBackground,
             contentColor = if (selected) MirrorColors.Primary else MirrorColors.PrimaryText
         )
     ) {
@@ -599,6 +619,7 @@ private fun CustomAdvancedParameters(
     onMaxFpsSelected: (Int?) -> Unit,
     onBitRateSelected: (String) -> Unit
 ) {
+    var MirrorColors = mirrorColors()
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text(
             text = l10n("高级参数", "Advanced Parameters"),
@@ -653,6 +674,7 @@ private fun RuntimeControls(
     enabled: Boolean,
     viewModel: DeviceMirrorViewModel
 ) {
+    var MirrorColors = mirrorColors()
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -700,10 +722,11 @@ private fun MirrorControlButton(
     enabled: Boolean,
     onClick: () -> Unit
 ) {
+    var MirrorColors = mirrorColors()
     TooltipArea(
         tooltip = {
             Surface(
-                color = Color.White,
+                color = MirrorColors.ContentBackground,
                 shape = RoundedCornerShape(8.dp),
                 border = androidx.compose.foundation.BorderStroke(1.dp, MirrorColors.Divider)
             ) {
@@ -724,7 +747,7 @@ private fun MirrorControlButton(
                 .heightIn(min = 36.dp)
                 .border(1.dp, MirrorColors.Divider, RoundedCornerShape(8.dp))
                 .background(
-                    color = if (enabled) Color.White else Color(0xFFF4F4F5),
+                    color = if (enabled) MirrorColors.ContentBackground else MaterialTheme.colorScheme.surfaceVariant,
                     shape = RoundedCornerShape(8.dp)
                 )
         ) {
@@ -791,6 +814,7 @@ private fun MirrorSwitchCell(
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit
 ) {
+    var MirrorColors = mirrorColors()
     Row(
         modifier = modifier,
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -828,6 +852,7 @@ private fun IntSelectField(
     modifier: Modifier = Modifier,
     onSelected: (Int?) -> Unit
 ) {
+    var MirrorColors = mirrorColors()
     var expanded by remember { mutableStateOf(false) }
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         FieldLabel(label)
@@ -837,7 +862,7 @@ private fun IntSelectField(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(9.dp),
                 colors = ButtonDefaults.outlinedButtonColors(
-                    containerColor = Color.White,
+                    containerColor = MirrorColors.ContentBackground,
                     contentColor = MirrorColors.PrimaryText
                 )
             ) {
@@ -878,6 +903,7 @@ private fun StringSelectField(
     modifier: Modifier = Modifier,
     onSelected: (String) -> Unit
 ) {
+    var MirrorColors = mirrorColors()
     var expanded by remember { mutableStateOf(false) }
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         FieldLabel(label)
@@ -887,7 +913,7 @@ private fun StringSelectField(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(9.dp),
                 colors = ButtonDefaults.outlinedButtonColors(
-                    containerColor = Color.White,
+                    containerColor = MirrorColors.ContentBackground,
                     contentColor = MirrorColors.PrimaryText
                 )
             ) {
@@ -922,6 +948,7 @@ private fun StringSelectField(
 
 @Composable
 private fun FieldLabel(text: String) {
+    var MirrorColors = mirrorColors()
     Text(
         text = text,
         style = MaterialTheme.typography.bodyMedium,
@@ -937,10 +964,11 @@ private fun DeviceValueText(
     color: Color,
     style: TextStyle = MaterialTheme.typography.bodyMedium
 ) {
+    var MirrorColors = mirrorColors()
     TooltipArea(
         tooltip = {
             Surface(
-                color = Color.White,
+                color = MirrorColors.ContentBackground,
                 shape = RoundedCornerShape(8.dp),
                 border = androidx.compose.foundation.BorderStroke(1.dp, MirrorColors.Divider)
             ) {
@@ -1028,6 +1056,7 @@ private fun MirrorToast(
     visible: Boolean,
     message: MsgContent?
 ) {
+    var MirrorColors = mirrorColors()
     if (!visible || message == null) return
     val text = resolveMessageText(message) ?: return
 

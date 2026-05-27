@@ -49,6 +49,8 @@ import com.ludoven.adbtool.entity.MsgContent
 import com.ludoven.adbtool.util.AdbTool
 import com.ludoven.adbtool.util.l10n
 import com.ludoven.adbtool.viewmodel.AppViewModel
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.distinctUntilChanged
 import org.jetbrains.compose.resources.stringResource
 
@@ -66,6 +68,14 @@ data class AppInfo(
     val installTimestamp: Long? = null,
     val lastUsedTimestamp: Long? = null,
     val isRunning: Boolean = false
+)
+
+private fun AppInfoData.toAppInfo(): AppInfo = AppInfo(
+    appName = appName,
+    packageName = packageName,
+    apkPath = apkPath,
+    isSystemApp = isSystemApp,
+    isRunning = isRunning
 )
 
 internal enum class AppFilter(val key: String) {
@@ -110,19 +120,24 @@ private enum class AppSortMode {
     Recent
 }
 
-fun getInstalledApps(): List<AppInfo> {
-    val allApps = AdbTool.exec("pm list packages -f") ?: return emptyList()
-    val sysApps = AdbTool.exec("pm list packages -s") ?: ""
-    val disabledApps = AdbTool.exec("pm list packages -d") ?: ""
+private val packageLineRegex = Regex("""package:(.+)=([A-Za-z0-9._]+)""")
+
+suspend fun getInstalledApps(): List<AppInfo> = coroutineScope {
+    val allAppsDef = async { AdbTool.exec("pm list packages -f") }
+    val sysAppsDef = async { AdbTool.exec("pm list packages -s") }
+    val disabledAppsDef = async { AdbTool.exec("pm list packages -d") }
+
+    val allApps = allAppsDef.await() ?: return@coroutineScope emptyList()
+    val sysApps = sysAppsDef.await() ?: ""
+    val disabledApps = disabledAppsDef.await() ?: ""
     val sysPackages = sysApps.lines()
         .mapNotNull { it.substringAfter("package:", "").takeIf { p -> p.isNotEmpty() } }
         .toSet()
     val disabledPackages = disabledApps.lines()
         .mapNotNull { it.substringAfter("package:", "").takeIf { p -> p.isNotEmpty() } }
         .toSet()
-    return allApps.lines().mapNotNull { line ->
-        val regex = Regex("""package:(.+)=([A-Za-z0-9._]+)""")
-        val match = regex.find(line)
+    allApps.lines().mapNotNull { line ->
+        val match = packageLineRegex.find(line)
         val (apkPath, packageName) = match?.destructured ?: return@mapNotNull null
         val debugHint = packageName.contains("debug", ignoreCase = true) || packageName.endsWith(".dev")
         AppInfo(
@@ -235,6 +250,11 @@ fun AppScreen(viewModel: AppViewModel) {
                 icon = appIcons[appInfo!!.packageName],
                 onBack = { viewModel.clearAppInfo() },
                 onAction = { type -> viewModel.executeAdbAction(type, appInfo!!.packageName) },
+                onRequestDangerAction = { type, label, message ->
+                    pendingDangerAction = type to (appInfo!!.toAppInfo())
+                    confirmActionLabel = label
+                    confirmActionMessage = message
+                },
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(paddingValues)
@@ -1394,18 +1414,19 @@ private fun AppDetailPage(
     icon: ImageBitmap?,
     onBack: () -> Unit,
     onAction: (AdbFunctionType) -> Unit,
+    onRequestDangerAction: (AdbFunctionType, String, String) -> Unit = { type, _, _ -> onAction(type) },
     modifier: Modifier = Modifier
 ) {
-    var selectedTab by remember { mutableStateOf("概览") }
     val detailTabs = listOf(
-        DetailTab("概览"),
-        DetailTab("权限"),
-        DetailTab("Activity"),
-        DetailTab("Service"),
-        DetailTab("Receiver"),
-        DetailTab("Provider"),
-        DetailTab("签名")
+        DetailTab(l10n("概览", "Overview")),
+        DetailTab(l10n("权限", "Permissions")),
+        DetailTab(l10n("Activity", "Activity")),
+        DetailTab(l10n("Service", "Service")),
+        DetailTab(l10n("Receiver", "Receiver")),
+        DetailTab(l10n("Provider", "Provider")),
+        DetailTab(l10n("签名", "Signature"))
     )
+    var selectedTab by remember { mutableStateOf(detailTabs.first().title) }
 
     val scrollState = rememberScrollState()
 
@@ -1435,7 +1456,8 @@ private fun AppDetailPage(
             DetailHeaderCard(
                 appInfo = appInfo,
                 icon = icon,
-                onAction = onAction
+                onAction = onAction,
+                onRequestDangerAction = onRequestDangerAction
             )
 
             val tabListState = rememberLazyListState()
@@ -1461,13 +1483,13 @@ private fun AppDetailPage(
             }
 
             when (selectedTab) {
-                "概览" -> AppInfoDetailContent(appInfo)
-                "权限" -> PermissionDetailContent(appInfo)
-                "Activity" -> ActivityDetailContent(appInfo)
-                "Service" -> ServiceDetailContent(appInfo)
-                "Receiver" -> ReceiverDetailContent(appInfo)
-                "Provider" -> ProviderDetailContent(appInfo)
-                "签名" -> SignatureDetailContent(appInfo)
+                l10n("概览", "Overview") -> AppInfoDetailContent(appInfo)
+                l10n("权限", "Permissions") -> PermissionDetailContent(appInfo)
+                l10n("Activity", "Activity") -> ActivityDetailContent(appInfo)
+                l10n("Service", "Service") -> ServiceDetailContent(appInfo)
+                l10n("Receiver", "Receiver") -> ReceiverDetailContent(appInfo)
+                l10n("Provider", "Provider") -> ProviderDetailContent(appInfo)
+                l10n("签名", "Signature") -> SignatureDetailContent(appInfo)
                 else -> DetailPlaceholder(selectedTab)
             }
         }
@@ -1490,7 +1512,8 @@ private data class DetailTab(
 private fun DetailHeaderCard(
     appInfo: AppInfoData,
     icon: ImageBitmap?,
-    onAction: (AdbFunctionType) -> Unit
+    onAction: (AdbFunctionType) -> Unit,
+    onRequestDangerAction: (AdbFunctionType, String, String) -> Unit = { type, _, _ -> onAction(type) }
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -1551,7 +1574,8 @@ private fun DetailHeaderCard(
 
             DetailActionsPanel(
                 appInfo = appInfo,
-                onAction = onAction
+                onAction = onAction,
+                onRequestDangerAction = onRequestDangerAction
             )
         }
     }
@@ -1645,7 +1669,8 @@ private fun HeaderStorageUsageCard(
 @Composable
 private fun DetailActionsPanel(
     appInfo: AppInfoData,
-    onAction: (AdbFunctionType) -> Unit
+    onAction: (AdbFunctionType) -> Unit,
+    onRequestDangerAction: (AdbFunctionType, String, String) -> Unit = { type, _, _ -> onAction(type) }
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -1667,7 +1692,7 @@ private fun DetailActionsPanel(
             bgColor = MaterialTheme.colorScheme.surface,
             modifier = Modifier.width(110.dp)
         ) { onAction(AdbFunctionType.APP_INFO) }
-        DetailMoreActionMenu(onAction = onAction)
+        DetailMoreActionMenu(onAction = onAction, onRequestDangerAction = onRequestDangerAction)
     }
 }
 
@@ -1733,7 +1758,10 @@ private fun DetailActionButton(
 }
 
 @Composable
-private fun DetailMoreActionMenu(onAction: (AdbFunctionType) -> Unit) {
+private fun DetailMoreActionMenu(
+    onAction: (AdbFunctionType) -> Unit,
+    onRequestDangerAction: (AdbFunctionType, String, String) -> Unit = { type, _, _ -> onAction(type) }
+) {
     var expanded by remember { mutableStateOf(false) }
     Box {
         DetailActionButton(
@@ -1756,7 +1784,14 @@ private fun DetailMoreActionMenu(onAction: (AdbFunctionType) -> Unit) {
                 icon = Icons.Default.DeleteSweep,
                 text = l10n("清除数据", "Clear data"),
                 iconTint = MaterialTheme.colorScheme.onSurfaceVariant
-            ) { expanded = false; onAction(AdbFunctionType.CLEAR_DATA) }
+            ) {
+                expanded = false
+                onRequestDangerAction(
+                    AdbFunctionType.CLEAR_DATA,
+                    l10n("确认清除数据", "Confirm Clear Data"),
+                    l10n("将清除该应用的全部数据，此操作不可撤销。是否继续？", "This will clear all app data. This cannot be undone. Continue?")
+                )
+            }
             AppActionMenuItem(
                 icon = Icons.Default.Download,
                 text = l10n("导出 APK", "Export APK"),
@@ -1771,7 +1806,14 @@ private fun DetailMoreActionMenu(onAction: (AdbFunctionType) -> Unit) {
                 text = l10n("卸载应用", "Uninstall app"),
                 iconTint = Color(0xFFD93025),
                 textColor = Color(0xFFD93025)
-            ) { expanded = false; onAction(AdbFunctionType.UNINSTALL) }
+            ) {
+                expanded = false
+                onRequestDangerAction(
+                    AdbFunctionType.UNINSTALL,
+                    l10n("确认卸载", "Confirm Uninstall"),
+                    l10n("将卸载此应用，应用数据将被清除。是否继续？", "This app will be uninstalled and its data will be erased. Continue?")
+                )
+            }
         }
     }
 }
@@ -2058,16 +2100,6 @@ private fun PermissionSummaryCard(appInfo: AppInfoData, modifier: Modifier = Mod
             PermissionTile(l10n("普通权限", "Normal"), appInfo.normalPermissionCount, Icons.Default.Info, MaterialTheme.colorScheme.onSurfaceVariant, Modifier.weight(1f))
             PermissionTile(l10n("全部权限", "All"), appInfo.totalPermissionCount, Icons.Default.Apps, MaterialTheme.colorScheme.onSurfaceVariant, Modifier.weight(1f))
         }
-        OutlinedButton(
-            onClick = {},
-            enabled = false,
-            shape = RoundedCornerShape(10.dp),
-            modifier = Modifier.fillMaxWidth().height(42.dp)
-        ) {
-            Text(l10n("查看权限详情", "View permission details"))
-            Spacer(Modifier.weight(1f))
-            Icon(Icons.Default.ChevronRight, contentDescription = null, modifier = Modifier.size(18.dp))
-        }
     }
 }
 
@@ -2112,16 +2144,6 @@ private fun OperationLogCard(appInfo: AppInfoData, modifier: Modifier = Modifier
         OperationRow(l10n("更新应用", "Update app"), appInfo.lastUpdateTime)
         OperationRow(l10n("读取详情", "Read details"), l10n("当前会话", "Current session"))
         OperationRow(l10n("运行状态", "Run status"), if (appInfo.isRunning) l10n("运行中", "Running") else l10n("未运行", "Stopped"))
-        OutlinedButton(
-            onClick = {},
-            enabled = false,
-            shape = RoundedCornerShape(10.dp),
-            modifier = Modifier.fillMaxWidth().height(42.dp)
-        ) {
-            Text(l10n("查看更多记录", "View more logs"))
-            Spacer(Modifier.weight(1f))
-            Icon(Icons.Default.ChevronRight, contentDescription = null, modifier = Modifier.size(18.dp))
-        }
     }
 }
 
@@ -2246,7 +2268,7 @@ private fun PermissionDetailContent(appInfo: AppInfoData) {
 private fun ActivityDetailContent(appInfo: AppInfoData) {
     DetailSectionCard(title = l10n("活动（Activity）", "Activities"), modifier = Modifier.fillMaxWidth()) {
         DetailItemList(
-            title = "Activity 列表",
+            title = l10n("Activity 列表", "Activity List"),
             items = appInfo.activityDetails,
             emptyText = l10n("当前未解析到 Activity 信息", "No Activity information parsed")
         )
@@ -2257,7 +2279,7 @@ private fun ActivityDetailContent(appInfo: AppInfoData) {
 private fun ServiceDetailContent(appInfo: AppInfoData) {
     DetailSectionCard(title = l10n("服务（Service）", "Services"), modifier = Modifier.fillMaxWidth()) {
         DetailItemList(
-            title = "Service 列表",
+            title = l10n("Service 列表", "Service List"),
             items = appInfo.serviceDetails,
             emptyText = l10n("当前未解析到 Service 信息", "No Service information parsed")
         )
@@ -2268,7 +2290,7 @@ private fun ServiceDetailContent(appInfo: AppInfoData) {
 private fun ReceiverDetailContent(appInfo: AppInfoData) {
     DetailSectionCard(title = l10n("广播接收器", "Receivers"), modifier = Modifier.fillMaxWidth()) {
         DetailItemList(
-            title = "Receiver 列表",
+            title = l10n("Receiver 列表", "Receiver List"),
             items = appInfo.receiverDetails,
             emptyText = l10n("当前未解析到 Receiver 信息", "No Receiver information parsed")
         )
@@ -2279,7 +2301,7 @@ private fun ReceiverDetailContent(appInfo: AppInfoData) {
 private fun ProviderDetailContent(appInfo: AppInfoData) {
     DetailSectionCard(title = l10n("内容提供者", "Providers"), modifier = Modifier.fillMaxWidth()) {
         DetailItemList(
-            title = "Provider 列表",
+            title = l10n("Provider 列表", "Provider List"),
             items = appInfo.providerDetails,
             emptyText = l10n("当前未解析到 Provider 信息", "No Provider information parsed")
         )

@@ -169,6 +169,8 @@ fun CommonScreen(viewModel: CommonModel) {
     var shellCommandInput by remember { mutableStateOf("getprop") }
     var textInput by remember { mutableStateOf("hello") }
     var executionResult by remember { mutableStateOf(l10n("等待执行", "Ready")) }
+    var showRebootConfirm by remember { mutableStateOf(false) }
+    var pendingRebootCommand by remember { mutableStateOf<CommandItemUi?>(null) }
 
     val filteredCommands by remember(allCommands, selectedCategory, searchKeyword) {
         derivedStateOf {
@@ -329,8 +331,10 @@ fun CommonScreen(viewModel: CommonModel) {
                             }
 
                             AdbFunctionType.REBOOT_DEVICE -> {
-                                withContext(Dispatchers.IO) { AdbTool.execShell("reboot") }
-                                executionResult = l10n("重启指令已发送", "Reboot command sent")
+                                showRebootConfirm = true
+                                pendingRebootCommand = command
+                                executionResult = l10n("等待确认...", "Awaiting confirmation...")
+                                return@launch
                             }
 
                             AdbFunctionType.DEVELOPER_OPTIONS -> {
@@ -401,6 +405,52 @@ fun CommonScreen(viewModel: CommonModel) {
                 )
             }
         }
+    }
+
+    if (showRebootConfirm) {
+        AlertDialog(
+            onDismissRequest = {
+                showRebootConfirm = false
+                pendingRebootCommand = null
+            },
+            title = { Text(l10n("确认重启设备", "Confirm Device Reboot")) },
+            text = {
+                Text(
+                    l10n(
+                        "即将重启连接的设备，设备上的未保存数据可能丢失。是否继续？",
+                        "The connected device will reboot. Unsaved data may be lost. Continue?"
+                    )
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val rebootShell = pendingRebootCommand?.shellCommand ?: "reboot"
+                    val rebootPreview = pendingRebootCommand?.commandPreview ?: "adb shell reboot"
+                    showRebootConfirm = false
+                    executionResult = l10n("执行中...", "Running...")
+                    coroutineScope.launch {
+                        runCatching {
+                            withContext(Dispatchers.IO) { AdbTool.execShell(rebootShell) }
+                        }.onSuccess {
+                            executionResult = "${l10n("执行成功", "Success")}：$rebootPreview"
+                        }.onFailure {
+                            executionResult = "${l10n("执行失败", "Failed")}：${it.message}"
+                        }
+                        pendingRebootCommand = null
+                    }
+                }) { Text(l10n("确认重启", "Reboot")) }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    showRebootConfirm = false
+                    pendingRebootCommand = null
+                    executionResult = l10n("已取消", "Cancelled")
+                }) {
+                    Text(l10n("取消", "Cancel"))
+                }
+            },
+            containerColor = MaterialTheme.colorScheme.surface
+        )
     }
 
     val latestDialogText = dialogMsg?.let {
@@ -1070,7 +1120,7 @@ private fun CommandDetailPanel(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(160.dp)
+                            .heightIn(min = 80.dp, max = 300.dp)
                             .background(
                                 MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
                                 RoundedCornerShape(8.dp)

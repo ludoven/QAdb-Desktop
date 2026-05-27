@@ -38,6 +38,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -122,6 +125,7 @@ fun App() {
     val stateHolder = rememberSaveableStateHolder()
     val currentBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = currentBackStackEntry?.destination?.route ?: "home"
+    var showRebootConfirm by remember { mutableStateOf(false) }
     val currentThemeMode by ThemeManager.currentThemeMode.collectAsState()
     val resolvedDarkTheme = when (currentThemeMode) {
         ThemeManager.ThemeMode.SYSTEM -> isSystemInDarkTheme()
@@ -155,7 +159,7 @@ fun App() {
                     }
                 }
                 AppMenuCommand.RefreshDevices -> devicesViewModel.refreshDevices()
-                AppMenuCommand.RebootDevice -> commonModel.executeAdbAction(AdbFunctionType.REBOOT_DEVICE)
+                AppMenuCommand.RebootDevice -> showRebootConfirm = true
                 AppMenuCommand.Screenshot -> commonModel.executeAdbAction(AdbFunctionType.SCREENSHOT)
                 AppMenuCommand.ScreenRecord -> commonModel.executeAdbAction(AdbFunctionType.SCREEN_RECORD)
                 AppMenuCommand.OpenTerminalTool -> navigateToRoute("terminal")
@@ -312,6 +316,26 @@ fun App() {
                 }
             }
         }
+    }
+
+    if (showRebootConfirm) {
+        AlertDialog(
+            onDismissRequest = { showRebootConfirm = false },
+            title = { Text(l10n("确认重启设备", "Confirm Device Reboot")) },
+            text = { Text(l10n("即将重启连接的设备，设备上的未保存数据可能丢失。是否继续？", "The connected device will reboot. Unsaved data may be lost. Continue?")) },
+            confirmButton = {
+                TextButton(onClick = {
+                    showRebootConfirm = false
+                    commonModel.executeAdbAction(AdbFunctionType.REBOOT_DEVICE)
+                }) { Text(l10n("确认重启", "Reboot")) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showRebootConfirm = false }) {
+                    Text(l10n("取消", "Cancel"))
+                }
+            },
+            containerColor = MaterialTheme.colorScheme.surface
+        )
     }
 }
 

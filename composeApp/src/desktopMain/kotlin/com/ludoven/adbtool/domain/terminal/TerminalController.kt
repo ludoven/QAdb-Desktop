@@ -9,6 +9,7 @@ import com.ludoven.adbtool.domain.adb.DeviceRepository
 import com.ludoven.adbtool.domain.adb.ParsedCommand
 import com.ludoven.adbtool.domain.adb.RunningProcess
 import java.util.UUID
+import java.util.concurrent.atomic.AtomicLong
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -28,6 +29,7 @@ class TerminalController(
 ) {
     private val maxLines = 5000
     private val maxHistory = 200
+    private val lineCounter = AtomicLong(0)
 
     private var historyCursor = -1
     private var historyDraft = ""
@@ -363,13 +365,23 @@ class TerminalController(
     private fun appendLine(type: TerminalLineType, text: String) {
         if (text.isBlank()) return
         val line = TerminalLine(
-            id = UUID.randomUUID().toString(),
+            id = lineCounter.incrementAndGet().toString(),
             type = type,
             text = text
         )
         _session.update { current ->
-            val merged = (current.lines + line).takeLast(maxLines)
-            current.copy(lines = merged)
+            val newLines = if (current.lines.size >= maxLines) {
+                ArrayList<TerminalLine>(maxLines).apply {
+                    addAll(current.lines.subList(1, current.lines.size))
+                    add(line)
+                }
+            } else {
+                ArrayList<TerminalLine>(current.lines.size + 1).apply {
+                    addAll(current.lines)
+                    add(line)
+                }
+            }
+            current.copy(lines = newLines)
         }
     }
 

@@ -1,11 +1,11 @@
 package com.ludoven.adbtool.viewmodel
 
-import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.ludoven.adbtool.util.AdbTool
 import com.ludoven.adbtool.entity.DeviceInfoData
 import com.ludoven.adbtool.entity.DeviceCenterInfoData
 import com.ludoven.adbtool.entity.BatteryStatus
+import com.ludoven.adbtool.entity.MsgContent
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -14,8 +14,9 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-class DevicesViewModel : ViewModel() {
+class DevicesViewModel : BaseViewModel() {
     private val refreshTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
+    private val propRegex = Regex("\\[(.*?)]\\s*:\\s*\\[(.*?)]")
 
     private val _devices = MutableStateFlow<List<String>>(emptyList())
     val devices: StateFlow<List<String>> = _devices.asStateFlow()
@@ -76,7 +77,7 @@ class DevicesViewModel : ViewModel() {
         viewModelScope.launch {
             _isLoading.value = true
             val result = withContext(Dispatchers.IO) { AdbTool.disconnectDevice(deviceId) }
-            println("断开设备 $deviceId 的结果: $result")
+            showTipDialog(MsgContent.Text(if (result.success) result.output else (result.errorMessage ?: result.output)), autoDismiss = true)
             refreshDevices()
             _isLoading.value = false
         }
@@ -91,7 +92,7 @@ class DevicesViewModel : ViewModel() {
                 val propMap = mutableMapOf<String, String>()
 
                 propsOutput.lines().forEach { line ->
-                    Regex("\\[(.*?)]\\s*:\\s*\\[(.*?)]")
+                    propRegex
                         .find(line)?.let { match ->
                         propMap[match.groupValues[1]] = match.groupValues[2]
                     }

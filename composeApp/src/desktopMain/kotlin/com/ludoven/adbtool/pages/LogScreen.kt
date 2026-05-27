@@ -142,7 +142,7 @@ fun LogScreen(
     var autoScroll by remember { mutableStateOf(true) }
     var selectedQuickChip by remember { mutableStateOf<QuickKeywordChip?>(null) }
 
-    val filteredLogs = remember(logs, filter) { viewModel.getFilteredLogs() }
+    val filteredLogs by viewModel.filteredLogs.collectAsState()
     val likelyCurrentPackage = remember(logs) { detectLikelyPackage(logs) }
 
     LaunchedEffect(selectedDevice) {
@@ -497,7 +497,7 @@ private fun CaptureStatusBadge(isCapturing: Boolean) {
         modifier = Modifier
             .clip(androidx.compose.foundation.shape.RoundedCornerShape(999.dp))
             .background(background)
-            .border(1.dp, Color(0xFFE5E7EB), androidx.compose.foundation.shape.RoundedCornerShape(999.dp))
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, androidx.compose.foundation.shape.RoundedCornerShape(999.dp))
             .padding(horizontal = 10.dp, vertical = 5.dp)
     ) {
         Text(
@@ -538,8 +538,8 @@ private fun FilterSelect(text: String, onClick: () -> Unit, modifier: Modifier =
         modifier = modifier
             .height(36.dp)
             .clip(androidx.compose.foundation.shape.RoundedCornerShape(10.dp))
-            .background(Color.White)
-            .border(1.dp, Color(0xFFE5E7EB), androidx.compose.foundation.shape.RoundedCornerShape(10.dp))
+            .background(MaterialTheme.colorScheme.surface)
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, androidx.compose.foundation.shape.RoundedCornerShape(10.dp))
             .clickable { onClick() }
             .padding(horizontal = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -568,8 +568,8 @@ private fun FilterInput(
         modifier = modifier
             .height(36.dp)
             .clip(androidx.compose.foundation.shape.RoundedCornerShape(10.dp))
-            .background(Color.White)
-            .border(1.dp, Color(0xFFE5E7EB), androidx.compose.foundation.shape.RoundedCornerShape(10.dp))
+            .background(MaterialTheme.colorScheme.surface)
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, androidx.compose.foundation.shape.RoundedCornerShape(10.dp))
             .padding(horizontal = 10.dp),
         contentAlignment = Alignment.CenterStart
     ) {
@@ -617,10 +617,10 @@ private fun QuickFilterChip(
     Box(
         modifier = Modifier
             .clip(androidx.compose.foundation.shape.RoundedCornerShape(999.dp))
-            .background(if (active) Color(0xFFEAF2FF) else Color(0xFFF8F9FB))
+            .background(if (active) Color(0xFFEAF2FF) else MaterialTheme.colorScheme.surfaceVariant)
             .border(
                 1.dp,
-                if (active) Color(0xFFC8DBFF) else Color(0xFFE5E7EB),
+                if (active) Color(0xFFC8DBFF) else MaterialTheme.colorScheme.outlineVariant,
                 androidx.compose.foundation.shape.RoundedCornerShape(999.dp)
             )
             .clickable(enabled = enabled) { onClick() }
@@ -643,7 +643,7 @@ private fun LogTableHeader() {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(Color(0xFFF8F9FB))
+            .background(MaterialTheme.colorScheme.surfaceVariant)
             .padding(horizontal = 10.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {

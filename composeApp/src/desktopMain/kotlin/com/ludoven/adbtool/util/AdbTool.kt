@@ -97,9 +97,15 @@ object AdbTool {
                 ?: return environment.message ?: AdbPathManager.friendlyInitializationError("ADB path not found")
             val fullCmd = mutableListOf(adbPath).apply { addAll(args) }
             val process = ProcessBuilder(fullCmd).redirectErrorStream(true).start()
-            val output = process.inputStream.bufferedReader().readText()
-            process.waitFor()
-            output.trim()
+            try {
+                val output = process.inputStream.bufferedReader().readText()
+                process.waitFor()
+                output.trim()
+            } finally {
+                runCatching { process.inputStream.close() }
+                runCatching { process.outputStream.close() }
+                runCatching { process.destroyForcibly() }
+            }
         } catch (e: Exception) {
             AdbPathManager.friendlyInitializationError(e.message)
         }

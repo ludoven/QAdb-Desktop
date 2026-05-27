@@ -1,5 +1,7 @@
 package com.ludoven.adbtool.domain.adb
 
+import java.util.concurrent.ConcurrentHashMap
+
 class PackageNameCache(
     private val ttlMs: Long = 60_000L
 ) {
@@ -8,7 +10,7 @@ class PackageNameCache(
         val timestamp: Long
     )
 
-    private val cache = mutableMapOf<String, Entry>()
+    private val cache = ConcurrentHashMap<String, Entry>()
 
     fun get(deviceId: String): List<String>? {
         val entry = cache[deviceId] ?: return null
