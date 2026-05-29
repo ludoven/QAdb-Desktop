@@ -25,6 +25,13 @@
 
 ## 📝 Changelog
 
+### v2.0.7 - 2026-05-29
+
+- Performance-focused release across terminal output, Logcat filtering, app list loading, and device info parsing.
+- UX improvements for risky actions, empty-state guidance, file management, and process-page interactions.
+- Dark theme and i18n fixes with broader semantic color usage and localization coverage.
+- Full notes: [CHANGELOG-v2.0.7.md](./CHANGELOG-v2.0.7.md)
+
 ### v2.0.6 - 2026-05-19
 
 - Added device mirroring support to view and control Android devices in a standalone window.

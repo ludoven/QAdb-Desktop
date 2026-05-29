@@ -9,7 +9,6 @@ import adbtool_desktop.composeapp.generated.resources.file_browser
 import adbtool_desktop.composeapp.generated.resources.home
 import adbtool_desktop.composeapp.generated.resources.key_event_page
 import adbtool_desktop.composeapp.generated.resources.log
-import adbtool_desktop.composeapp.generated.resources.process
 import adbtool_desktop.composeapp.generated.resources.set
 import adbtool_desktop.composeapp.generated.resources.system_page
 import adbtool_desktop.composeapp.generated.resources.terminal
@@ -22,16 +21,17 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.automirrored.filled.ScreenShare
 import androidx.compose.material.icons.filled.Apps
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.List
-import androidx.compose.material.icons.filled.Memory
 import androidx.compose.material.icons.filled.PhoneAndroid
+import androidx.compose.material.icons.filled.QueryStats
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.VideogameAsset
 import com.ludoven.adbtool.ui.mac.ExperimentalMaterial3Api
 import com.ludoven.adbtool.ui.mac.MaterialTheme
@@ -63,7 +63,9 @@ import com.ludoven.adbtool.pages.HomeScreen
 import com.ludoven.adbtool.pages.KeyEventScreen
 import com.ludoven.adbtool.pages.LogScreen
 import com.ludoven.adbtool.pages.DeviceMirrorScreen
+import com.ludoven.adbtool.pages.PerformanceScreen
 import com.ludoven.adbtool.pages.ProcessScreen
+import com.ludoven.adbtool.widget.SidebarGroup
 import com.ludoven.adbtool.pages.SettingScreen
 import com.ludoven.adbtool.pages.SystemScreen
 import com.ludoven.adbtool.pages.TerminalScreen
@@ -81,6 +83,7 @@ import com.ludoven.adbtool.viewmodel.DevicesViewModel
 import com.ludoven.adbtool.viewmodel.FileBrowserViewModel
 import com.ludoven.adbtool.viewmodel.KeyEventViewModel
 import com.ludoven.adbtool.viewmodel.LogViewModel
+import com.ludoven.adbtool.viewmodel.ResourceViewModel
 import com.ludoven.adbtool.viewmodel.SystemViewModel
 import com.ludoven.adbtool.viewmodel.TerminalViewModel
 import com.ludoven.adbtool.widget.GlassCard
@@ -103,6 +106,7 @@ fun App() {
     val terminalViewModel: TerminalViewModel = viewModel()
     val fileBrowserViewModel: FileBrowserViewModel = viewModel()
     val systemViewModel: SystemViewModel = viewModel()
+    val resourceViewModel: ResourceViewModel = viewModel()
     val devices by devicesViewModel.devices.collectAsState()
     val selectedDevice by devicesViewModel.selectedDevice.collectAsState()
     val deviceDisplayNames by devicesViewModel.deviceDisplayNames.collectAsState()
@@ -113,18 +117,63 @@ fun App() {
         AdbPathManager.getAdbPath()
     }
 
-    val tabs = listOf(
-        TabItem(stringResource(Res.string.home), Icons.Default.Home, "home"),
-        TabItem(stringResource(Res.string.common), Icons.Default.Info, "common"),
-        TabItem(l10n("镜像", "Mirror"), Icons.AutoMirrored.Filled.ScreenShare, "mirror"),
-        TabItem(stringResource(Res.string.terminal), Icons.Default.Code, "terminal"),
-        TabItem(stringResource(Res.string.key_event_page), Icons.Default.VideogameAsset, "keyevent"),
-        TabItem(stringResource(Res.string.app), Icons.Default.Apps, "app"),
-        TabItem(stringResource(Res.string.file_browser), Icons.Default.Folder, "filebrowser"),
-        TabItem(stringResource(Res.string.log), Icons.Default.List, "log"),
-        TabItem(stringResource(Res.string.process), Icons.Default.Memory, "process"),
-        TabItem(stringResource(Res.string.system_page), Icons.Default.PhoneAndroid, "system"),
-        TabItem(stringResource(Res.string.set), Icons.Default.Settings, "setting")
+    val tabGroups = listOf(
+        SidebarGroup(
+            id = "home",
+            label = stringResource(Res.string.home),
+            icon = Icons.Default.Home,
+            defaultRoute = "home",
+            items = listOf(TabItem(stringResource(Res.string.home), Icons.Default.Home, "home")),
+            collapsible = false
+        ),
+        SidebarGroup(
+            id = "common",
+            label = stringResource(Res.string.common),
+            icon = Icons.Default.Info,
+            defaultRoute = "common",
+            items = listOf(TabItem(stringResource(Res.string.common), Icons.Default.Info, "common")),
+            collapsible = false
+        ),
+        SidebarGroup(
+            id = "terminal",
+            label = stringResource(Res.string.terminal),
+            icon = Icons.Default.Code,
+            defaultRoute = "terminal",
+            items = listOf(TabItem(stringResource(Res.string.terminal), Icons.Default.Code, "terminal")),
+            collapsible = false
+        ),
+        SidebarGroup(
+            id = "device",
+            label = l10n("设备操作", "Device Ops"),
+            icon = Icons.Default.PhoneAndroid,
+            defaultRoute = "mirror",
+            items = listOf(
+                TabItem(l10n("镜像", "Mirror"), Icons.AutoMirrored.Filled.ScreenShare, "mirror"),
+                TabItem(stringResource(Res.string.key_event_page), Icons.Default.VideogameAsset, "keyevent"),
+                TabItem(stringResource(Res.string.file_browser), Icons.Default.Folder, "filebrowser"),
+                TabItem(stringResource(Res.string.app), Icons.Default.Apps, "app"),
+            )
+        ),
+        SidebarGroup(
+            id = "diagnostics",
+            label = l10n("诊断分析", "Diagnostics"),
+            icon = Icons.Default.QueryStats,
+            defaultRoute = "log",
+            items = listOf(
+                TabItem(stringResource(Res.string.log), Icons.AutoMirrored.Filled.List, "log"),
+                TabItem(l10n("性能", "Perf"), Icons.Default.Speed, "performance"),
+                TabItem(l10n("进程", "Process"), Icons.Default.PhoneAndroid, "process"),
+                TabItem(stringResource(Res.string.system_page), Icons.Default.PhoneAndroid, "system"),
+            )
+        ),
+        SidebarGroup(
+            id = "settings",
+            label = stringResource(Res.string.set),
+            icon = Icons.Default.Settings,
+            defaultRoute = "setting",
+            items = listOf(TabItem(stringResource(Res.string.set), Icons.Default.Settings, "setting")),
+            collapsible = false
+        )
     )
 
     val navController = rememberNavController()
@@ -193,7 +242,7 @@ fun App() {
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Sidebar(
-                    items = tabs,
+                    groups = tabGroups,
                     selectedRoute = currentRoute,
                     connectedDeviceCount = devices.size,
                     devices = devices,
@@ -309,11 +358,17 @@ fun App() {
                                         )
                                     }
                                 }
-                                composable("process") {
-                                    stateHolder.SaveableStateProvider("process") {
-                                        ProcessScreen(
+                                composable("performance") {
+                                    stateHolder.SaveableStateProvider("performance") {
+                                        PerformanceScreen(
+                                            viewModel = resourceViewModel,
                                             selectedDevice = selectedDevice
                                         )
+                                    }
+                                }
+                                composable("process") {
+                                    stateHolder.SaveableStateProvider("process") {
+                                        ProcessScreen(selectedDevice = selectedDevice)
                                     }
                                 }
                                 composable("system") {

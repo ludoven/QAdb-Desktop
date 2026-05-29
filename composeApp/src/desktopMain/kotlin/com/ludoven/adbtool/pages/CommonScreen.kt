@@ -38,9 +38,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Folder
@@ -53,6 +56,8 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.RestartAlt
 import androidx.compose.material.icons.filled.ScreenSearchDesktop
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Visibility
@@ -89,6 +94,9 @@ import androidx.compose.ui.unit.dp
 import com.ludoven.adbtool.entity.AdbFunctionType
 import com.ludoven.adbtool.entity.MsgContent
 import com.ludoven.adbtool.util.AdbTool
+import com.ludoven.adbtool.util.CommandFavoritesManager
+import com.ludoven.adbtool.util.CustomCommand
+import com.ludoven.adbtool.util.CustomCommandManager
 import com.ludoven.adbtool.util.l10n
 import com.ludoven.adbtool.viewmodel.CommonModel
 import com.ludoven.adbtool.widget.GlassCard
@@ -146,8 +154,14 @@ fun CommonScreen(viewModel: CommonModel) {
     val showDialog by viewModel.showDialog.collectAsState()
     val dialogMsg by viewModel.dialogMessage.collectAsState()
 
-    val categories = remember {
+    var favoriteIds by remember { mutableStateOf(CommandFavoritesManager.load()) }
+    var customCommands by remember { mutableStateOf(CustomCommandManager.load()) }
+    var showAddCommandDialog by remember { mutableStateOf(false) }
+    var editingCommand by remember { mutableStateOf<CustomCommand?>(null) }
+
+    val categories = remember(favoriteIds) {
         listOf(
+            CommandCategoryUi("favorites", l10n("收藏", "Favorites"), Icons.Default.Bookmark),
             CommandCategoryUi("all", l10n("全部", "All"), Icons.Default.Tune),
             CommandCategoryUi("device", l10n("设备", "Device"), Icons.Default.Home),
             CommandCategoryUi("app", l10n("应用管理", "Apps"), Icons.Default.InstallMobile),
@@ -162,9 +176,29 @@ fun CommonScreen(viewModel: CommonModel) {
 
     val allCommands = rememberCommandLibrary()
 
+    val mergedCommands = remember(allCommands, customCommands) {
+        val builtin = allCommands
+        val custom = customCommands.map { cmd ->
+            CommandItemUi(
+                id = cmd.id,
+                title = cmd.title,
+                description = cmd.description,
+                commandPreview = cmd.commandPreview,
+                categoryKey = cmd.categoryKey,
+                icon = Icons.Default.Code,
+                iconTint = Color(0xFF3D73FF),
+                trigger = if (cmd.shellCommand.isNotBlank()) CommandTrigger.SHELL_INPUT else CommandTrigger.DIRECT,
+                actionType = null,
+                shellCommand = cmd.shellCommand.takeIf { it.isNotBlank() },
+                hints = emptyList()
+            )
+        }
+        builtin + custom
+    }
+
     var selectedCategory by remember { mutableStateOf("all") }
     var searchKeyword by remember { mutableStateOf("") }
-    var selectedCommandId by remember { mutableStateOf(allCommands.firstOrNull()?.id.orEmpty()) }
+    var selectedCommandId by remember { mutableStateOf(mergedCommands.firstOrNull()?.id.orEmpty()) }
     var packageNameInput by remember { mutableStateOf("com.example.app") }
     var shellCommandInput by remember { mutableStateOf("getprop") }
     var textInput by remember { mutableStateOf("hello") }
@@ -172,11 +206,15 @@ fun CommonScreen(viewModel: CommonModel) {
     var showRebootConfirm by remember { mutableStateOf(false) }
     var pendingRebootCommand by remember { mutableStateOf<CommandItemUi?>(null) }
 
-    val filteredCommands by remember(allCommands, selectedCategory, searchKeyword) {
+    val filteredCommands by remember(mergedCommands, selectedCategory, searchKeyword, favoriteIds) {
         derivedStateOf {
             val keyword = searchKeyword.trim().lowercase()
-            allCommands.filter { command ->
-                val matchCategory = selectedCategory == "all" || command.categoryKey == selectedCategory
+            mergedCommands.filter { command ->
+                val matchCategory = when (selectedCategory) {
+                    "all" -> true
+                    "favorites" -> command.id in favoriteIds
+                    else -> command.categoryKey == selectedCategory
+                }
                 val matchKeyword = keyword.isBlank() ||
                     command.title.lowercase().contains(keyword) ||
                     command.description.lowercase().contains(keyword) ||
@@ -195,9 +233,9 @@ fun CommonScreen(viewModel: CommonModel) {
     }
 
     val selectedCommand = filteredCommands.firstOrNull { it.id == selectedCommandId }
-        ?: allCommands.firstOrNull { it.id == selectedCommandId }
+        ?: mergedCommands.firstOrNull { it.id == selectedCommandId }
         ?: filteredCommands.firstOrNull()
-        ?: allCommands.first()
+        ?: mergedCommands.first()
 
     val resolvedCommandPreview by remember(selectedCommand, packageNameInput, shellCommandInput, textInput) {
         derivedStateOf {
@@ -212,12 +250,20 @@ fun CommonScreen(viewModel: CommonModel) {
                         AdbFunctionType.CLEAR_CACHE_AND_RESTART ->
                             "adb shell pm clear $pkg && adb shell monkey -p $pkg -c android.intent.category.LAUNCHER 1"
                         else -> selectedCommand.commandPreview
+                            .replace("{package}", pkg)
+                            .replace("{text}", textInput.trim())
                     }
                 }
 
                 CommandTrigger.SHELL_INPUT -> {
-                    val shell = shellCommandInput.trim().ifEmpty { "getprop" }
-                    "adb shell $shell"
+                    if (!selectedCommand.shellCommand.isNullOrBlank()) {
+                        "adb shell ${selectedCommand.shellCommand
+                            .replace("{package}", packageNameInput.trim())
+                            .replace("{text}", textInput.trim())}"
+                    } else {
+                        val shell = shellCommandInput.trim().ifEmpty { "getprop" }
+                        "adb shell $shell"
+                    }
                 }
 
                 CommandTrigger.DIRECT -> {
@@ -226,6 +272,8 @@ fun CommonScreen(viewModel: CommonModel) {
                         "adb shell input text \"$text\""
                     } else {
                         selectedCommand.commandPreview
+                            .replace("{package}", packageNameInput.trim())
+                            .replace("{text}", textInput.trim())
                     }
                 }
             }
@@ -271,7 +319,9 @@ fun CommonScreen(viewModel: CommonModel) {
                     }
 
                     CommandTrigger.SHELL_INPUT -> {
-                        val shell = shellCommandInput.trim()
+                        val shell = (command.shellCommand ?: shellCommandInput.trim())
+                            .replace("{package}", packageNameInput.trim())
+                            .replace("{text}", textInput.trim())
                         if (shell.isBlank()) {
                             executionResult = l10n("执行失败：Shell 命令不能为空", "Failed: shell command cannot be empty")
                             return@launch
@@ -284,8 +334,11 @@ fun CommonScreen(viewModel: CommonModel) {
 
                     CommandTrigger.DIRECT -> {
                         if (!command.shellCommand.isNullOrBlank()) {
+                            val resolvedShell = command.shellCommand
+                                .replace("{package}", packageNameInput.trim())
+                                .replace("{text}", textInput.trim())
                             val output = withContext(Dispatchers.IO) {
-                                AdbTool.execShell(command.shellCommand)
+                                AdbTool.execShell(resolvedShell)
                             }
                             executionResult = output.ifBlank { l10n("执行完成，无输出", "Done, no output") }
                             return@launch
@@ -369,7 +422,8 @@ fun CommonScreen(viewModel: CommonModel) {
         ) {
             CommandCenterHeader(
                 searchKeyword = searchKeyword,
-                onSearchKeywordChange = { searchKeyword = it }
+                onSearchKeywordChange = { searchKeyword = it },
+                onAddCommand = { showAddCommandDialog = true }
             )
 
             CategoryTabs(
@@ -385,7 +439,21 @@ fun CommonScreen(viewModel: CommonModel) {
                 CommandLibraryPanel(
                     commands = filteredCommands,
                     selectedCommandId = selectedCommandId,
+                    favoriteIds = favoriteIds,
                     onSelectCommand = { selectedCommandId = it.id },
+                    onToggleFavorite = { cmd ->
+                        favoriteIds = CommandFavoritesManager.toggle(cmd.id)
+                    },
+                    onEditCustomCommand = { cmd ->
+                        val cc = customCommands.firstOrNull { it.id == cmd.id }
+                        if (cc != null) editingCommand = cc
+                    },
+                    onDeleteCustomCommand = { cmd ->
+                        customCommands = CustomCommandManager.remove(cmd.id)
+                        if (selectedCommandId == cmd.id) {
+                            selectedCommandId = mergedCommands.firstOrNull { it.id != cmd.id }?.id.orEmpty()
+                        }
+                    },
                     modifier = Modifier.weight(1f)
                 )
 
@@ -450,6 +518,25 @@ fun CommonScreen(viewModel: CommonModel) {
                 }
             },
             containerColor = MaterialTheme.colorScheme.surface
+        )
+    }
+
+    if (showAddCommandDialog || editingCommand != null) {
+        CustomCommandDialog(
+            initialCommand = editingCommand,
+            onDismiss = {
+                showAddCommandDialog = false
+                editingCommand = null
+            },
+            onConfirm = { cmd ->
+                if (editingCommand != null) {
+                    customCommands = CustomCommandManager.update(cmd)
+                } else {
+                    customCommands = CustomCommandManager.add(cmd)
+                }
+                showAddCommandDialog = false
+                editingCommand = null
+            }
         )
     }
 
@@ -625,7 +712,8 @@ private fun fallbackCommands(): List<CommandItemUi> = listOf(
 @Composable
 private fun CommandCenterHeader(
     searchKeyword: String,
-    onSearchKeywordChange: (String) -> Unit
+    onSearchKeywordChange: (String) -> Unit,
+    onAddCommand: () -> Unit
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -694,6 +782,27 @@ private fun CommandCenterHeader(
                 .widthIn(min = 420.dp, max = 520.dp)
                 .heightIn(min = 52.dp)
         )
+
+        com.ludoven.adbtool.ui.mac.IconButton(
+            onClick = onAddCommand,
+            modifier = Modifier
+                .size(44.dp)
+                .background(
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                    shape = RoundedCornerShape(12.dp)
+                )
+                .border(
+                    width = 1.dp,
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
+                    shape = RoundedCornerShape(12.dp)
+                )
+        ) {
+            Icon(
+                imageVector = Icons.Default.Add,
+                contentDescription = l10n("添加自定义命令", "Add custom command"),
+                tint = MaterialTheme.colorScheme.primary
+            )
+        }
     }
 }
 
@@ -767,7 +876,11 @@ private fun CategoryTabs(
 private fun CommandLibraryPanel(
     commands: List<CommandItemUi>,
     selectedCommandId: String,
+    favoriteIds: Set<String>,
     onSelectCommand: (CommandItemUi) -> Unit,
+    onToggleFavorite: (CommandItemUi) -> Unit,
+    onEditCustomCommand: (CommandItemUi) -> Unit,
+    onDeleteCustomCommand: (CommandItemUi) -> Unit,
     modifier: Modifier = Modifier
 ) {
     GlassCard(
@@ -816,7 +929,15 @@ private fun CommandLibraryPanel(
                                 command = command,
                                 itemIndex = index,
                                 selected = selectedCommandId == command.id,
-                                onSelect = { onSelectCommand(command) }
+                                isFavorite = command.id in favoriteIds,
+                                onSelect = { onSelectCommand(command) },
+                                onToggleFavorite = { onToggleFavorite(command) },
+                                onEditCustom = if (command.id.startsWith("custom_")) {
+                                    { onEditCustomCommand(command) }
+                                } else null,
+                                onDeleteCustom = if (command.id.startsWith("custom_")) {
+                                    { onDeleteCustomCommand(command) }
+                                } else null
                             )
                         }
                     }
@@ -838,7 +959,11 @@ private fun CommandListItem(
     command: CommandItemUi,
     itemIndex: Int,
     selected: Boolean,
-    onSelect: () -> Unit
+    isFavorite: Boolean,
+    onSelect: () -> Unit,
+    onToggleFavorite: () -> Unit,
+    onEditCustom: (() -> Unit)? = null,
+    onDeleteCustom: (() -> Unit)? = null
 ) {
     val accent = commandItemAccentColor(itemIndex)
     val categoryIcon = categoryIconFor(command.categoryKey)
@@ -852,56 +977,125 @@ private fun CommandListItem(
     } else {
         MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)
     }
+    var showContextMenu by remember { mutableStateOf(false) }
 
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(containerColor, RoundedCornerShape(12.dp))
-            .border(1.dp, borderColor, RoundedCornerShape(12.dp))
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null
-            ) { onSelect() }
-            .padding(horizontal = 8.dp, vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(7.dp)
-    ) {
-        Box(
+    Box {
+        Row(
             modifier = Modifier
-                .size(28.dp)
-                .background(
-                    color = accent.copy(alpha = 0.14f),
-                    shape = RoundedCornerShape(8.dp)
-                ),
-            contentAlignment = Alignment.Center
+                .fillMaxWidth()
+                .background(containerColor, RoundedCornerShape(12.dp))
+                .border(1.dp, borderColor, RoundedCornerShape(12.dp))
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null
+                ) { onSelect() }
+                .padding(horizontal = 8.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(7.dp)
         ) {
-            Icon(
-                imageVector = categoryIcon,
-                contentDescription = command.title,
-                tint = accent,
-                modifier = Modifier.size(17.dp)
-            )
+            Box(
+                modifier = Modifier
+                    .size(28.dp)
+                    .background(
+                        color = accent.copy(alpha = 0.14f),
+                        shape = RoundedCornerShape(8.dp)
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = categoryIcon,
+                    contentDescription = command.title,
+                    tint = accent,
+                    modifier = Modifier.size(17.dp)
+                )
+            }
+
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(3.dp)
+            ) {
+                Text(
+                    text = displayCommandTitle(command),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = command.description,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+
+            com.ludoven.adbtool.ui.mac.IconButton(
+                onClick = onToggleFavorite,
+                modifier = Modifier.size(28.dp)
+            ) {
+                Icon(
+                    imageVector = if (isFavorite) Icons.Default.Star else Icons.Default.StarBorder,
+                    contentDescription = if (isFavorite) l10n("取消收藏", "Unfavorite") else l10n("收藏", "Favorite"),
+                    tint = if (isFavorite) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+
+            if (onEditCustom != null || onDeleteCustom != null) {
+                com.ludoven.adbtool.ui.mac.IconButton(
+                    onClick = { showContextMenu = true },
+                    modifier = Modifier.size(28.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Edit,
+                        contentDescription = l10n("更多操作", "More actions"),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            }
         }
 
-        Column(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(3.dp)
+        com.ludoven.adbtool.ui.mac.DropdownMenu(
+            expanded = showContextMenu,
+            onDismissRequest = { showContextMenu = false }
         ) {
-            Text(
-                text = displayCommandTitle(command),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Text(
-                text = command.description,
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+            if (onEditCustom != null) {
+                com.ludoven.adbtool.ui.mac.DropdownMenuItem(
+                    text = { Text(l10n("编辑命令", "Edit command")) },
+                    onClick = {
+                        showContextMenu = false
+                        onEditCustom()
+                    },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Default.Edit,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                )
+            }
+            if (onDeleteCustom != null) {
+                com.ludoven.adbtool.ui.mac.DropdownMenuItem(
+                    text = { Text(l10n("删除命令", "Delete command")) },
+                    onClick = {
+                        showContextMenu = false
+                        onDeleteCustom()
+                    },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Default.Delete,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                )
+            }
         }
     }
 }
@@ -1203,6 +1397,154 @@ fun TipDialog(dialogText: String, onDismiss: () -> Unit) {
         confirmButton = {
             TextButton(onClick = onDismiss) {
                 Text(stringResource(Res.string.confirm))
+            }
+        },
+        containerColor = MaterialTheme.colorScheme.surface
+    )
+}
+
+@Composable
+private fun CustomCommandDialog(
+    initialCommand: CustomCommand?,
+    onDismiss: () -> Unit,
+    onConfirm: (CustomCommand) -> Unit
+) {
+    val isEditing = initialCommand != null
+    var title by remember { mutableStateOf(initialCommand?.title.orEmpty()) }
+    var commandPreview by remember { mutableStateOf(initialCommand?.commandPreview.orEmpty()) }
+    var shellCommand by remember { mutableStateOf(initialCommand?.shellCommand.orEmpty()) }
+    var description by remember { mutableStateOf(initialCommand?.description.orEmpty()) }
+    var categoryKey by remember { mutableStateOf(initialCommand?.categoryKey ?: "device") }
+    var categoryExpanded by remember { mutableStateOf(false) }
+
+    val categoryOptions = listOf(
+        "device" to l10n("设备", "Device"),
+        "app" to l10n("应用管理", "Apps"),
+        "file" to l10n("文件操作", "Files"),
+        "input" to l10n("输入控制", "Input"),
+        "screen" to l10n("截图录屏", "Screen"),
+        "network" to l10n("网络调试", "Network"),
+        "log" to l10n("日志", "Logs"),
+        "tv" to l10n("TV盒子", "TV")
+    )
+    val selectedCategoryLabel = categoryOptions.firstOrNull { it.first == categoryKey }?.second ?: categoryOptions[0].second
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                if (isEditing) l10n("编辑自定义命令", "Edit Custom Command")
+                else l10n("添加自定义命令", "Add Custom Command")
+            )
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                OutlinedTextField(
+                    value = title,
+                    onValueChange = { title = it },
+                    singleLine = true,
+                    label = { Text(l10n("命令标题", "Command title")) },
+                    placeholder = { Text(l10n("例：查看设备信息", "e.g.: Show device info")) },
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                OutlinedTextField(
+                    value = commandPreview,
+                    onValueChange = { commandPreview = it },
+                    singleLine = true,
+                    label = { Text(l10n("ADB 命令", "ADB command")) },
+                    placeholder = { Text(l10n("例：shell getprop ro.build.display.id", "e.g.: shell getprop ro.build.display.id")) },
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                OutlinedTextField(
+                    value = shellCommand,
+                    onValueChange = { shellCommand = it },
+                    singleLine = true,
+                    label = { Text(l10n("Shell 命令（可选）", "Shell command (optional)")) },
+                    placeholder = { Text(l10n("留空则直接执行 ADB 命令", "Leave empty to run ADB command directly")) },
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Text(
+                    text = l10n("提示：命令中可使用 {package} 和 {text} 作为占位符", "Tip: use {package} and {text} as placeholders in commands"),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                Box {
+                    OutlinedTextField(
+                        value = selectedCategoryLabel,
+                        onValueChange = {},
+                        readOnly = true,
+                        singleLine = true,
+                        label = { Text(l10n("分类", "Category")) },
+                        trailingIcon = {
+                            ExposedDropdownMenuDefaults.TrailingIcon(expanded = categoryExpanded)
+                        },
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { categoryExpanded = !categoryExpanded }
+                    )
+                    com.ludoven.adbtool.ui.mac.DropdownMenu(
+                        expanded = categoryExpanded,
+                        onDismissRequest = { categoryExpanded = false }
+                    ) {
+                        categoryOptions.forEach { (key, label) ->
+                            com.ludoven.adbtool.ui.mac.DropdownMenuItem(
+                                text = { Text(label) },
+                                onClick = {
+                                    categoryKey = key
+                                    categoryExpanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+
+                OutlinedTextField(
+                    value = description,
+                    onValueChange = { description = it },
+                    singleLine = true,
+                    label = { Text(l10n("描述（可选）", "Description (optional)")) },
+                    placeholder = { Text(l10n("命令的简要说明", "Brief description of the command")) },
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    val finalTitle = title.trim()
+                    val finalCommand = commandPreview.trim()
+                    if (finalTitle.isBlank() || finalCommand.isBlank()) return@TextButton
+                    val cmd = CustomCommand(
+                        id = initialCommand?.id ?: "custom_${java.util.UUID.randomUUID()}",
+                        title = finalTitle,
+                        description = description.trim(),
+                        commandPreview = finalCommand,
+                        categoryKey = categoryKey,
+                        shellCommand = shellCommand.trim()
+                    )
+                    onConfirm(cmd)
+                }
+            ) {
+                Text(if (isEditing) l10n("保存", "Save") else l10n("添加", "Add"))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(l10n("取消", "Cancel"))
             }
         },
         containerColor = MaterialTheme.colorScheme.surface

@@ -4,6 +4,8 @@ import java.awt.Desktop
 import java.io.File
 import java.io.IOException
 import java.net.URI
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 import java.util.Properties
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.Dispatchers
@@ -46,6 +48,7 @@ object AdbPathManager {
     )
 
     private val configFile = File(System.getProperty("user.home"), ".adb_path_config")
+    private const val APP_RESOURCES_DIR_PROPERTY = "compose.application.resources.dir"
     private const val HELP_URL = "https://ludoven.github.io/QADB/guide/getting-started.html"
     private const val FRIENDLY_INIT_ERROR = "ADB 初始化失败，请检查 QADB 是否有执行权限，或手动选择 adb 路径。"
 
@@ -59,26 +62,12 @@ object AdbPathManager {
 
     private val commonAdbPaths: List<String>
         get() {
-            val userName = System.getProperty("user.name")
             val osName = System.getProperty("os.name").lowercase()
-
-            return when {
-                osName.contains("mac") -> listOf(
-                    "/Users/$userName/Library/Android/sdk/platform-tools/adb",
-                    "/opt/homebrew/bin/adb",
-                    "/usr/local/bin/adb"
-                )
-                osName.contains("windows") -> listOf(
-                    "C:\\Users\\$userName\\AppData\\Local\\Android\\sdk\\platform-tools\\adb.exe",
-                    "C:\\Program Files (x86)\\Android\\android-sdk\\platform-tools\\adb.exe",
-                    "C:\\Android\\sdk\\platform-tools\\adb.exe"
-                )
-                else -> listOf(
-                    "/home/$userName/Android/Sdk/platform-tools/adb",
-                    "/usr/local/bin/adb",
-                    "/usr/bin/adb"
-                )
-            }
+            return buildSystemAdbCandidates(
+                userHome = File(System.getProperty("user.home")),
+                environment = System.getenv(),
+                osName = osName
+            )
         }
 
     suspend fun getAdbPath(): String? = withContext(Dispatchers.IO) {
@@ -160,25 +149,56 @@ object AdbPathManager {
         osName: String = System.getProperty("os.name"),
         osArch: String = System.getProperty("os.arch")
     ): File? {
-        val normalizedOs = osName.lowercase()
-        val normalizedArch = osArch.lowercase()
-        val relativePath = when {
-            normalizedOs.contains("mac") -> {
-                val archDir = if (
-                    normalizedArch.contains("aarch64") ||
-                    normalizedArch.contains("arm64")
-                ) {
-                    "arm64"
-                } else {
-                    "x64"
-                }
-                "adb/macos/$archDir/adb"
-            }
-            normalizedOs.contains("windows") -> "adb/windows/adb.exe"
-            normalizedOs.contains("linux") -> "adb/linux/adb"
-            else -> return null
-        }
+        val relativePath = bundledAdbRelativePath(osName, osArch) ?: return null
         return File(resourceRoot, relativePath)
+    }
+
+    fun resolvePackagedAdbPath(
+        resourceRoot: File,
+        osName: String = System.getProperty("os.name")
+    ): File? {
+        val executable = if (osName.lowercase().contains("windows")) "adb.exe" else "adb"
+        return File(resourceRoot, "scrcpy/$executable")
+    }
+
+    fun buildSystemAdbCandidates(
+        userHome: File,
+        environment: Map<String, String>,
+        osName: String
+    ): List<String> {
+        val executable = if (osName.lowercase().contains("windows")) "adb.exe" else "adb"
+        val candidates = mutableListOf<String>()
+
+        listOf("ANDROID_HOME", "ANDROID_SDK_ROOT")
+            .mapNotNull { environment[it]?.takeIf(String::isNotBlank) }
+            .forEach { sdkRoot ->
+                candidates += File(sdkRoot, "platform-tools/$executable").path
+            }
+
+        when {
+            osName.lowercase().contains("mac") -> {
+                candidates += File(userHome, "Library/Android/sdk/platform-tools/adb").path
+                candidates += File(userHome, "Library/Android/Sdk/platform-tools/adb").path
+                candidates += "/opt/homebrew/bin/adb"
+                candidates += "/usr/local/bin/adb"
+            }
+            osName.lowercase().contains("windows") -> {
+                val home = userHome.path.trimEnd('\\', '/')
+                candidates += "$home\\AppData\\Local\\Android\\Sdk\\platform-tools\\adb.exe"
+                candidates += "$home\\AppData\\Local\\Android\\sdk\\platform-tools\\adb.exe"
+                candidates += "C:\\Program Files\\Android\\android-sdk\\platform-tools\\adb.exe"
+                candidates += "C:\\Program Files (x86)\\Android\\android-sdk\\platform-tools\\adb.exe"
+                candidates += "C:\\Android\\sdk\\platform-tools\\adb.exe"
+            }
+            else -> {
+                candidates += File(userHome, "Android/Sdk/platform-tools/adb").path
+                candidates += File(userHome, "Android/sdk/platform-tools/adb").path
+                candidates += "/usr/local/bin/adb"
+                candidates += "/usr/bin/adb"
+            }
+        }
+
+        return candidates.distinct()
     }
 
     private fun resolveEnvironment(preferSavedPreference: Boolean): AdbEnvironment {
@@ -225,8 +245,7 @@ object AdbPathManager {
     }
 
     private fun bundledAdbEnvironment(): AdbEnvironment {
-        val bundledPath = findBundledResourceRoots()
-            .mapNotNull { resolveBundledAdbPath(it) }
+        val bundledPath = findBundledAdbCandidates()
             .firstOrNull { it.exists() }
 
         if (bundledPath == null) {
@@ -258,15 +277,30 @@ object AdbPathManager {
 
     private fun findBundledResourceRoots(): List<File> {
         val roots = mutableListOf<File>()
+        System.getProperty(APP_RESOURCES_DIR_PROPERTY)
+            ?.takeIf { it.isNotBlank() }
+            ?.let { roots += File(it) }
         val resource = Thread.currentThread().contextClassLoader.getResource("adb")
         if (resource != null && resource.protocol == "file") {
             runCatching { File(resource.toURI()).parentFile }
                 .getOrNull()
                 ?.let { roots += it }
         }
+        roots += File(System.getProperty("user.dir"), "composeApp/src/desktopMain/appResources")
         roots += File(System.getProperty("user.dir"), "composeApp/src/desktopMain/resources")
+        roots += File(System.getProperty("user.dir"), "src/desktopMain/appResources")
         roots += File(System.getProperty("user.dir"), "src/desktopMain/resources")
         return roots.distinctBy { it.absolutePath }
+    }
+
+    private fun findBundledAdbCandidates(): List<File> {
+        val fileCandidates = findBundledResourceRoots().flatMap { root ->
+            listOfNotNull(
+                resolvePackagedAdbPath(root),
+                resolveBundledAdbPath(root)
+            )
+        }
+        return fileCandidates + listOfNotNull(extractBundledAdbFromClasspath())
     }
 
     private fun ensureExecutableIfPossible(file: File) {
@@ -288,7 +322,7 @@ object AdbPathManager {
 
             val file = File(path)
             val isExecutableFile = file.exists() &&
-                file.canExecute() &&
+                (isWindows() || file.canExecute()) &&
                 (file.name == "adb" || file.name == "adb.exe")
 
             if (!isExecutableFile) {
@@ -338,6 +372,57 @@ object AdbPathManager {
             }
         } catch (e: Exception) {
             null
+        }
+    }
+
+    private fun extractBundledAdbFromClasspath(): File? {
+        val relativePath = bundledAdbRelativePath() ?: return null
+        val classLoader = Thread.currentThread().contextClassLoader
+        val executableResource = classLoader.getResource(relativePath) ?: return null
+        val cacheDir = File(System.getProperty("user.home"), ".qadb/adb-cache")
+        val output = File(cacheDir, relativePath)
+
+        copyResource(classLoader, relativePath, output) ?: return null
+        if (isWindows()) {
+            copyResource(classLoader, "adb/windows/AdbWinApi.dll", File(output.parentFile, "AdbWinApi.dll"))
+            copyResource(classLoader, "adb/windows/AdbWinUsbApi.dll", File(output.parentFile, "AdbWinUsbApi.dll"))
+        }
+        ensureExecutableIfPossible(output)
+        return if (executableResource.protocol.isNotBlank()) output else null
+    }
+
+    private fun copyResource(classLoader: ClassLoader, resourcePath: String, target: File): File? {
+        return runCatching {
+            val stream = classLoader.getResourceAsStream(resourcePath) ?: return null
+            target.parentFile.mkdirs()
+            stream.use {
+                Files.copy(it, target.toPath(), StandardCopyOption.REPLACE_EXISTING)
+            }
+            target
+        }.getOrNull()
+    }
+
+    private fun bundledAdbRelativePath(
+        osName: String = System.getProperty("os.name"),
+        osArch: String = System.getProperty("os.arch")
+    ): String? {
+        val normalizedOs = osName.lowercase()
+        val normalizedArch = osArch.lowercase()
+        return when {
+            normalizedOs.contains("mac") -> {
+                val archDir = if (
+                    normalizedArch.contains("aarch64") ||
+                    normalizedArch.contains("arm64")
+                ) {
+                    "arm64"
+                } else {
+                    "x64"
+                }
+                "adb/macos/$archDir/adb"
+            }
+            normalizedOs.contains("windows") -> "adb/windows/adb.exe"
+            normalizedOs.contains("linux") -> "adb/linux/adb"
+            else -> null
         }
     }
 

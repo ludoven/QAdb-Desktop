@@ -72,14 +72,19 @@ object AdbTool {
                 val process = ProcessBuilder(fullCmd)
                     .redirectErrorStream(true)
                     .start()
-                
-                val output = process.inputStream.bufferedReader().readText().trim()
-                val exitCode = process.waitFor()
-                
-                if (exitCode == 0) {
-                    AdbResult(true, output)
-                } else {
-                    AdbResult(false, output, "Command failed with exit code: $exitCode")
+                ChildProcessRegistry.register(process)
+
+                try {
+                    val output = process.inputStream.bufferedReader().readText().trim()
+                    val exitCode = process.waitFor()
+
+                    if (exitCode == 0) {
+                        AdbResult(true, output)
+                    } else {
+                        AdbResult(false, output, "Command failed with exit code: $exitCode")
+                    }
+                } finally {
+                    ChildProcessRegistry.unregister(process)
                 }
             } catch (e: Exception) {
                 AdbResult(false, "", AdbPathManager.friendlyInitializationError(e.message))
@@ -97,6 +102,7 @@ object AdbTool {
                 ?: return environment.message ?: AdbPathManager.friendlyInitializationError("ADB path not found")
             val fullCmd = mutableListOf(adbPath).apply { addAll(args) }
             val process = ProcessBuilder(fullCmd).redirectErrorStream(true).start()
+            ChildProcessRegistry.register(process)
             try {
                 val output = process.inputStream.bufferedReader().readText()
                 process.waitFor()
@@ -105,6 +111,7 @@ object AdbTool {
                 runCatching { process.inputStream.close() }
                 runCatching { process.outputStream.close() }
                 runCatching { process.destroyForcibly() }
+                ChildProcessRegistry.unregister(process)
             }
         } catch (e: Exception) {
             AdbPathManager.friendlyInitializationError(e.message)
@@ -161,6 +168,7 @@ object AdbTool {
             synchronized(mirrorProcessLock) {
                 val currentProcess = deviceMirrorProcess
                 if (currentProcess != null && !currentProcess.isAlive) {
+                    ChildProcessRegistry.unregister(currentProcess)
                     deviceMirrorProcess = null
                 }
                 if (forceRestart) {
@@ -168,6 +176,7 @@ object AdbTool {
                     if (runningProcess != null && !stopMirrorProcess(runningProcess, MIRROR_STOP_TIMEOUT_MS)) {
                         return@synchronized AdbResult(false, "", "Failed to stop existing mirror process")
                     }
+                    ChildProcessRegistry.unregister(runningProcess)
                     deviceMirrorProcess = null
                 } else if (deviceMirrorProcess?.isAlive == true) {
                     return@synchronized AdbResult(true, DEVICE_MIRROR_ALREADY_RUNNING_MESSAGE)
@@ -183,9 +192,11 @@ object AdbTool {
                     val startupFailure = detectEarlyProcessExit(process, SCRCPY_STARTUP_CHECK_TIMEOUT_MS)
                     if (startupFailure != null) {
                         deviceMirrorProcess = null
+                        ChildProcessRegistry.unregister(process)
                         return@synchronized startupFailure
                     }
                     deviceMirrorProcess = process
+                    ChildProcessRegistry.register(process)
                     AdbResult(true, DEVICE_MIRROR_STARTED_MESSAGE)
                 } catch (e: Exception) {
                     AdbResult(false, "", e.message ?: "Failed to start scrcpy")
@@ -205,6 +216,7 @@ object AdbTool {
 
                 val stopped = stopMirrorProcess(process, MIRROR_STOP_TIMEOUT_MS)
                 if (stopped) {
+                    ChildProcessRegistry.unregister(process)
                     deviceMirrorProcess = null
                     AdbResult(true, "Device mirror stopped")
                 } else {
@@ -220,6 +232,7 @@ object AdbTool {
             return if (process?.isAlive == true) {
                 true
             } else {
+                ChildProcessRegistry.unregister(process)
                 deviceMirrorProcess = null
                 false
             }
@@ -265,6 +278,35 @@ object AdbTool {
             process.waitFor(timeoutMillis, TimeUnit.MILLISECONDS)
         }.getOrDefault(false)
         return stoppedForcibly || !process.isAlive
+    }
+
+    fun shutdownRelatedProcesses() {
+        synchronized(mirrorProcessLock) {
+            deviceMirrorProcess?.let { process ->
+                stopMirrorProcess(process, MIRROR_STOP_TIMEOUT_MS)
+                ChildProcessRegistry.unregister(process)
+            }
+            deviceMirrorProcess = null
+        }
+        ChildProcessRegistry.terminateAll(timeoutMillis = 1_500L)
+        killAdbServer()
+    }
+
+    private fun killAdbServer() {
+        val adbPath = AdbPathManager.currentAdbPath ?: return
+        runCatching {
+            val process = ProcessBuilder(adbPath, "kill-server")
+                .redirectErrorStream(true)
+                .start()
+            try {
+                if (!process.waitFor(1_500L, TimeUnit.MILLISECONDS)) {
+                    process.destroyForcibly()
+                }
+            } finally {
+                runCatching { process.inputStream.close() }
+                runCatching { process.outputStream.close() }
+            }
+        }
     }
     
     /**

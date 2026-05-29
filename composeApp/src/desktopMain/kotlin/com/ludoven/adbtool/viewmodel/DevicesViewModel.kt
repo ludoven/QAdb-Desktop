@@ -10,9 +10,25 @@ import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+
+private data class DeviceCommandOutputs(
+    val props: String,
+    val kernel: String,
+    val wmSize: String,
+    val wmDensity: String,
+    val fontScale: String,
+    val ifconfig: String,
+    val cpuStat: String,
+    val memInfo: String,
+    val dataDf: String,
+    val battery: String,
+    val latencyMs: Long
+)
 
 class DevicesViewModel : BaseViewModel() {
     private val refreshTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
@@ -88,7 +104,44 @@ class DevicesViewModel : BaseViewModel() {
             _isLoading.value = true
 
             withContext(Dispatchers.IO) {
-                val propsOutput = AdbTool.executeAdbCommand("-s", deviceId, "shell", "getprop")
+                val outputs = coroutineScope {
+                    val props = async { AdbTool.executeAdbCommand("-s", deviceId, "shell", "getprop") }
+                    val kernel = async { AdbTool.executeAdbCommand("-s", deviceId, "shell", "uname", "-r") }
+                    val wmSize = async { AdbTool.executeAdbCommand("-s", deviceId, "shell", "wm", "size") }
+                    val wmDensity = async { AdbTool.executeAdbCommand("-s", deviceId, "shell", "wm", "density") }
+                    val fontScale = async {
+                        AdbTool.executeAdbCommand("-s", deviceId, "shell", "settings", "get", "system", "font_scale")
+                    }
+                    val ifconfig = async { AdbTool.executeAdbCommand("-s", deviceId, "shell", "ip addr show wlan0") }
+                    val cpuStat = async { AdbTool.executeAdbCommand("-s", deviceId, "shell", "cat", "/proc/stat") }
+                    val memInfo = async { AdbTool.executeAdbCommand("-s", deviceId, "shell", "cat", "/proc/meminfo") }
+                    val dataDf = async { AdbTool.executeAdbCommand("-s", deviceId, "shell", "df", "/data") }
+                    val battery = async { AdbTool.executeAdbCommand("-s", deviceId, "shell", "dumpsys", "battery") }
+                    val latency = async {
+                        try {
+                            val start = System.currentTimeMillis()
+                            AdbTool.executeAdbCommand("-s", deviceId, "shell", "echo", "ping")
+                            System.currentTimeMillis() - start
+                        } catch (_: Exception) {
+                            -1L
+                        }
+                    }
+                    DeviceCommandOutputs(
+                        props = props.await(),
+                        kernel = kernel.await(),
+                        wmSize = wmSize.await(),
+                        wmDensity = wmDensity.await(),
+                        fontScale = fontScale.await(),
+                        ifconfig = ifconfig.await(),
+                        cpuStat = cpuStat.await(),
+                        memInfo = memInfo.await(),
+                        dataDf = dataDf.await(),
+                        battery = battery.await(),
+                        latencyMs = latency.await()
+                    )
+                }
+
+                val propsOutput = outputs.props
                 val propMap = mutableMapOf<String, String>()
 
                 propsOutput.lines().forEach { line ->
@@ -104,28 +157,26 @@ class DevicesViewModel : BaseViewModel() {
                 val manufacturer = propMap["ro.product.manufacturer"] ?: ""
                 val romVersion = propMap["ro.build.display.id"] ?: ""
                 val buildFingerprint = propMap["ro.build.fingerprint"] ?: ""
-                val kernelVersion = AdbTool.executeAdbCommand("-s", deviceId, "shell", "uname", "-r")
+                val kernelVersion = outputs.kernel
                     .lineSequence()
                     .firstOrNull { it.isNotBlank() }
                     ?.trim()
                     .orEmpty()
                 val screenResolution = formatScreenResolution(
-                    sizeOutput = AdbTool.executeAdbCommand("-s", deviceId, "shell", "wm", "size"),
-                    densityOutput = AdbTool.executeAdbCommand("-s", deviceId, "shell", "wm", "density")
+                    sizeOutput = outputs.wmSize,
+                    densityOutput = outputs.wmDensity
                 )
-                val fontScale = formatFontScale(
-                    AdbTool.executeAdbCommand("-s", deviceId, "shell", "settings", "get", "system", "font_scale")
-                )
+                val fontScale = formatFontScale(outputs.fontScale)
 
                 // IP 和 MAC
-                val ifconfigOutput = AdbTool.executeAdbCommand("-s", deviceId, "shell", "ip addr show wlan0")
+                val ifconfigOutput = outputs.ifconfig
                 val ipMatch = Regex("inet ([0-9.]+)").find(ifconfigOutput)
                 val macMatch = Regex("link/ether ([0-9a-f:]+)").find(ifconfigOutput)
                 val ipAddress = ipMatch?.groupValues?.get(1) ?: ""
                 val macAddress = macMatch?.groupValues?.get(1) ?: ""
 
                 // CPU 使用率（解析 idle 和总时间计算）
-                val cpuStatOutput = AdbTool.executeAdbCommand("-s", deviceId, "shell", "cat", "/proc/stat")
+                val cpuStatOutput = outputs.cpuStat
                 val cpuLine = cpuStatOutput.lines().firstOrNull { it.startsWith("cpu ") }
                 val cpuUsage = cpuLine?.let {
                     val values = it.split(Regex("\\s+")).drop(1).mapNotNull { it.toLongOrNull() }
@@ -141,7 +192,7 @@ class DevicesViewModel : BaseViewModel() {
                 } ?: ""
 
                 // 内存使用率
-                val memOutput = AdbTool.executeAdbCommand("-s", deviceId, "shell", "cat", "/proc/meminfo")
+                val memOutput = outputs.memInfo
                 val totalMem = Regex("MemTotal:\\s+(\\d+)").find(memOutput)?.groupValues?.get(1)?.toIntOrNull() ?: 0
                 val freeMem = Regex("MemAvailable:\\s+(\\d+)").find(memOutput)?.groupValues?.get(1)?.toIntOrNull() ?: 0
                 val memoryUsage = if (totalMem > 0) {
@@ -152,7 +203,7 @@ class DevicesViewModel : BaseViewModel() {
                 }
 
                 // 存储空间（剩余/总共, 单位 GB）
-                val dfOutput = AdbTool.executeAdbCommand("-s", deviceId, "shell", "df", "/data")
+                val dfOutput = outputs.dataDf
                 val storageLine = dfOutput.lines().drop(1).firstOrNull()
                 val storageParts = storageLine?.split(Regex("\\s+")) ?: emptyList()
                 val storageUsage = if (storageParts.size >= 5) {
@@ -166,29 +217,22 @@ class DevicesViewModel : BaseViewModel() {
                 }
 
                 // 电量
-                val batteryOutput = AdbTool.executeAdbCommand("-s", deviceId, "shell", "dumpsys", "battery")
+                val batteryOutput = outputs.battery
                 val level = Regex("level: (\\d+)").find(batteryOutput)?.groupValues?.get(1)
                 val status = Regex("status: (\\d+)").find(batteryOutput)?.groupValues?.get(1)
                 val batteryStatus = BatteryStatus.fromStatusCode(status)
                 val batteryLevel = if (level != null) "$level%" else ""
 
                 // Latency measurement: time a simple adb shell echo command
-                val latencyMs = try {
-                    val start = System.currentTimeMillis()
-                    AdbTool.executeAdbCommand("-s", deviceId, "shell", "echo", "ping")
-                    System.currentTimeMillis() - start
-                } catch (_: Exception) { -1L }
+                val latencyMs = outputs.latencyMs
                 val latencyStr = if (latencyMs >= 0) "${latencyMs}ms" else "--"
 
                 // Connection speed: detect USB vs WiFi
-                val connectionSpeedStr = try {
-                    val transportType = AdbTool.executeAdbCommand("-s", deviceId, "shell", "getprop", "sys.usb.state").trim()
-                    if (deviceId.contains(":") || deviceId.matches(Regex(".*\\.\\d+\\.\\d+.*"))) {
-                        "Wi-Fi"
-                    } else {
-                        "USB"
-                    }
-                } catch (_: Exception) { "--" }
+                val connectionSpeedStr = if (deviceId.contains(":") || deviceId.matches(Regex(".*\\.\\d+\\.\\d+.*"))) {
+                    "Wi-Fi"
+                } else {
+                    "USB"
+                }
 
                 // 创建数据对象
                 val deviceInfo = DeviceInfoData(

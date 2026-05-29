@@ -1,5 +1,6 @@
 package com.ludoven.adbtool.domain.adb
 
+import com.ludoven.adbtool.util.ChildProcessRegistry
 import java.io.BufferedWriter
 import java.io.OutputStreamWriter
 import java.util.concurrent.TimeUnit
@@ -56,6 +57,7 @@ class AdbCommandExecutor(
             trySend(CommandOutput.Command("$ ${fullCommand.joinToString(" ")}"))
 
             process = ProcessBuilder(fullCommand).start()
+            ChildProcessRegistry.register(process!!)
             stdin = BufferedWriter(OutputStreamWriter(process!!.outputStream))
 
             val stdoutJob = launch(Dispatchers.IO) {
@@ -95,6 +97,7 @@ class AdbCommandExecutor(
 
                 val exitCode = runCatching { process!!.exitValue() }.getOrDefault(-1)
                 trySend(CommandOutput.Exit(code = exitCode, durationMs = System.currentTimeMillis() - startedAt))
+                ChildProcessRegistry.unregister(process)
                 close()
             }
 
@@ -106,6 +109,7 @@ class AdbCommandExecutor(
                         process?.destroyForcibly()
                     }
                 }
+                ChildProcessRegistry.unregister(process)
             }
         }.flowOn(Dispatchers.IO)
 
@@ -117,6 +121,7 @@ class AdbCommandExecutor(
                 if (process?.isAlive == true) {
                     process?.destroyForcibly()
                 }
+                ChildProcessRegistry.unregister(process)
             },
             onInterrupt = {
                 val writer = stdin ?: return@RunningProcess
@@ -126,6 +131,7 @@ class AdbCommandExecutor(
                     writer.flush()
                 }.getOrElse {
                     process?.destroy()
+                    ChildProcessRegistry.unregister(process)
                 }
             },
             onWriteLine = { line ->

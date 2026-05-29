@@ -23,6 +23,8 @@ import com.ludoven.adbtool.util.AdbPathManager
 import com.ludoven.adbtool.util.AdbTool
 import com.ludoven.adbtool.util.FileUtils
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -35,6 +37,18 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.zip.ZipFile
 
+internal fun parseRunningPackagesFromActivityProcesses(output: String): Set<String> {
+    val processPattern = Regex("""ProcessRecord\{[^}]*\s(?:\d+:)?([A-Za-z0-9_.]+(?::[A-Za-z0-9_.-]+)?)/""")
+    return output.lineSequence()
+        .mapNotNull { line ->
+            processPattern.find(line)
+                ?.groupValues
+                ?.getOrNull(1)
+                ?.substringBefore(":")
+                ?.takeIf { it.isNotBlank() }
+        }
+        .toSet()
+}
 
 class AppViewModel : BaseViewModel() {
 
@@ -66,6 +80,7 @@ class AppViewModel : BaseViewModel() {
     private val loadingPackages = mutableSetOf<String>()
     private val loadingDetailPackages = mutableSetOf<String>()
     private var activeCacheDeviceKey: String = ""
+    private var runningStatusJob: Job? = null
 
     // Local persistent cache root, split by device id.
     private val iconCacheRootDir = File(System.getProperty("user.home"), ".qadb/icons").also { it.mkdirs() }
@@ -90,11 +105,15 @@ class AppViewModel : BaseViewModel() {
                 val list = getInstalledApps()
                 _appList.value = list
                 hydrateCachedLabels(list)
-                refreshRunningStatus()
+                scheduleRunningStatusRefresh()
             } finally {
                 _isLoading.value = false
             }
         }
+    }
+
+    fun refreshRunningStatusAsync() {
+        scheduleRunningStatusRefresh(delayMillis = 0L)
     }
 
     fun ensureAppAssetsVisible(packageNames: List<String>) {
@@ -381,12 +400,17 @@ class AppViewModel : BaseViewModel() {
         } catch (_: Exception) { null }
     }
 
+    private fun scheduleRunningStatusRefresh(delayMillis: Long = 500L) {
+        runningStatusJob?.cancel()
+        runningStatusJob = viewModelScope.launch(Dispatchers.IO) {
+            if (delayMillis > 0L) delay(delayMillis)
+            refreshRunningStatus()
+        }
+    }
+
     private fun refreshRunningStatus() {
         val runningProcesses = AdbTool.exec("dumpsys activity processes")
-        val runningPackages = runningProcesses.lines().mapNotNull { line ->
-            val match = Regex("ProcessRecord\\{.+?:(.+?)/").find(line)
-            match?.groupValues?.get(1)?.substringBefore(":")
-        }.toSet()
+        val runningPackages = parseRunningPackagesFromActivityProcesses(runningProcesses)
 
         if (runningPackages.isEmpty()) return
 

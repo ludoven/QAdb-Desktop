@@ -28,6 +28,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.ExpandMore
 import com.ludoven.adbtool.ui.mac.DropdownMenu
 import com.ludoven.adbtool.ui.mac.DropdownMenuItem
 import com.ludoven.adbtool.ui.mac.Icon
@@ -52,7 +53,7 @@ import org.jetbrains.compose.resources.stringResource
 
 @Composable
 fun Sidebar(
-    items: List<TabItem>,
+    groups: List<SidebarGroup>,
     selectedRoute: String,
     connectedDeviceCount: Int,
     devices: List<String>,
@@ -62,6 +63,9 @@ fun Sidebar(
     onDeviceSelected: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    var expandedGroupId by remember { mutableStateOf<String?>(null) }
+    val visibleGroupIds = visibleSidebarGroupIds(groups, selectedRoute, expandedGroupId)
+
     GlassCard(
         modifier = modifier
             .fillMaxHeight()
@@ -97,12 +101,35 @@ fun Sidebar(
                 }
             }
 
-            items.forEach { item ->
-                SidebarItem(
-                    item = item,
-                    isSelected = selectedRoute == item.route,
-                    onClick = { onItemClick(item.route) }
+            groups.forEachIndexed { groupIndex, group ->
+                if (groupIndex > 0) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                }
+                val isExpanded = group.collapsible && group.id in visibleGroupIds
+                SidebarGroupHeader(
+                    group = group,
+                    isExpanded = isExpanded,
+                    hasSelection = group.items.any { it.route == selectedRoute },
+                    onClick = {
+                        if (group.collapsible) {
+                            expandedGroupId = when {
+                                expandedGroupId == group.id -> null
+                                else -> group.id
+                            }
+                        } else {
+                            onItemClick(group.defaultRoute)
+                        }
+                    }
                 )
+                if (isExpanded) {
+                    group.items.forEach { item ->
+                        SidebarItem(
+                            item = item,
+                            isSelected = selectedRoute == item.route,
+                            onClick = { onItemClick(item.route) }
+                        )
+                    }
+                }
             }
 
             Spacer(modifier = Modifier.weight(1f))
@@ -115,6 +142,61 @@ fun Sidebar(
                 onDeviceSelected = onDeviceSelected
             )
         }
+    }
+}
+
+@Composable
+private fun SidebarGroupHeader(
+    group: SidebarGroup,
+    isExpanded: Boolean,
+    hasSelection: Boolean,
+    onClick: () -> Unit
+) {
+    val backgroundColor by animateColorAsState(
+        targetValue = if (hasSelection) {
+            MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)
+        } else {
+            Color.Transparent
+        },
+        animationSpec = tween(220)
+    )
+    val contentColor by animateColorAsState(
+        targetValue = if (hasSelection) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+        animationSpec = tween(220)
+    )
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(42.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(backgroundColor)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 11.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = group.icon,
+            contentDescription = group.label,
+            tint = contentColor,
+            modifier = Modifier.size(19.dp)
+        )
+        Spacer(modifier = Modifier.width(10.dp))
+        Text(
+            text = group.label,
+            color = contentColor,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f)
+        )
+        Icon(
+            imageVector = if (isExpanded) Icons.Default.ExpandMore else Icons.AutoMirrored.Filled.KeyboardArrowRight,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (group.collapsible) 1f else 0f),
+            modifier = Modifier.size(18.dp)
+        )
     }
 }
 
@@ -145,11 +227,11 @@ private fun SidebarItem(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(46.dp)
+            .height(38.dp)
             .clip(RoundedCornerShape(10.dp))
             .background(backgroundColor)
             .clickable(onClick = onClick)
-            .padding(horizontal = 10.dp),
+            .padding(start = 20.dp, end = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         if (isSelected) {
@@ -177,8 +259,10 @@ private fun SidebarItem(
         Text(
             text = item.title,
             color = contentColor,
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium
+            style = MaterialTheme.typography.bodySmall,
+            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
         )
     }
 }

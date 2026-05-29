@@ -6,6 +6,7 @@ import com.ludoven.adbtool.entity.LogEntry
 import com.ludoven.adbtool.entity.LogFilter
 import com.ludoven.adbtool.entity.LogLevel
 import com.ludoven.adbtool.util.AdbPathManager
+import com.ludoven.adbtool.util.ChildProcessRegistry
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -94,6 +95,7 @@ class LogViewModel : ViewModel() {
                 logProcess = ProcessBuilder(command)
                     .redirectErrorStream(true)
                     .start()
+                ChildProcessRegistry.register(logProcess!!)
 
                 logProcess?.inputStream?.bufferedReader()?.use { reader ->
                     val dateFormat = SimpleDateFormat("MM-dd HH:mm:ss.SSS", Locale.getDefault())
@@ -158,6 +160,8 @@ class LogViewModel : ViewModel() {
                     _errorMessage.value = "Log capture failed: ${e.message}"
                 }
             } finally {
+                ChildProcessRegistry.unregister(logProcess)
+                logProcess = null
                 withContext(Dispatchers.Main) {
                     _isCapturing.value = false
                 }
@@ -168,6 +172,7 @@ class LogViewModel : ViewModel() {
     fun stopCapture() {
         _isCapturing.value = false
         logProcess?.destroy()
+        ChildProcessRegistry.unregister(logProcess)
         logProcess = null
     }
 

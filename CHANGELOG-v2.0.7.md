@@ -1,5 +1,7 @@
 # v2.0.7 更新日志
 
+发布日期：2026-05-29
+
 ## 性能优化
 
 - **终端输出性能提升**：TerminalController 的行输出从 `UUID.randomUUID()`（基于 SecureRandom）改为 `AtomicLong` 自增 ID，列表追加从双次拷贝优化为单次预分配 ArrayList，在高频命令输出下大幅降低 GC 压力

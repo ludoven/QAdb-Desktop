@@ -78,6 +78,7 @@ import java.io.File
 import java.net.URI
 import javax.swing.JOptionPane
 import kotlinx.coroutines.launch
+import com.ludoven.adbtool.util.AdbTool
 import com.ludoven.adbtool.util.ThemeManager
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
@@ -96,9 +97,13 @@ fun main() = application {
     var alwaysOnTop by remember { mutableStateOf(false) }
     val currentThemeMode by ThemeManager.currentThemeMode.collectAsState()
     val coroutineScope = rememberCoroutineScope()
+    val shutdownAndExit = {
+        AdbTool.shutdownRelatedProcesses()
+        exitApplication()
+    }
 
     Window(
-        onCloseRequest = ::exitApplication,
+        onCloseRequest = shutdownAndExit,
         state = windowState,
         title = "QADB",
         icon = painterResource(Res.drawable.ic_logo),
@@ -109,7 +114,7 @@ fun main() = application {
                 AppMenuBar(
                     alwaysOnTop = alwaysOnTop,
                     onAlwaysOnTopToggle = { alwaysOnTop = !alwaysOnTop },
-                    onClose = ::exitApplication,
+                    onClose = shutdownAndExit,
                     onMinimize = { windowState.isMinimized = true },
                     onZoomIn = { resizeWindow(windowState, 1.08f) },
                     onZoomOut = { resizeWindow(windowState, 0.92f) },
