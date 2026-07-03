@@ -5,8 +5,10 @@ import com.ludoven.adbtool.ui.mac.*
 import com.ludoven.adbtool.util.l10n
 import com.ludoven.adbtool.viewmodel.SystemViewModel
 import com.ludoven.adbtool.widget.DashboardPanel
+import com.ludoven.adbtool.widget.EmptyStatePanel
 import com.ludoven.adbtool.widget.LabeledValueRow
 import com.ludoven.adbtool.widget.OutlineActionButton
+import com.ludoven.adbtool.widget.PageHeader
 
 import adbtool_desktop.composeapp.generated.resources.Res
 import adbtool_desktop.composeapp.generated.resources.battery_status
@@ -43,6 +45,7 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.RestartAlt
 import androidx.compose.material.icons.filled.SystemUpdateAlt
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -84,8 +87,15 @@ fun SystemScreen(
     val scrollState = rememberScrollState()
 
     LaunchedEffect(selectedDevice) {
-        if (!selectedDevice.isNullOrBlank()) {
-            viewModel.loadSystemInfo(selectedDevice)
+        viewModel.setDevice(selectedDevice)
+        val device = selectedDevice?.takeIf { it.isNotBlank() }
+        if (device != null) {
+            viewModel.loadSystemInfo(device)
+        }
+    }
+    DisposableEffect(Unit) {
+        onDispose {
+            viewModel.cancelActiveLoad()
         }
     }
 
@@ -180,31 +190,17 @@ fun SystemScreen(
             .verticalScroll(scrollState),
         verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
-        // Page header
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+        PageHeader(
+            title = stringResource(Res.string.system_page),
+            subtitle = l10n(
+                "查看设备系统信息、管理重启与屏幕参数",
+                "View device system info, manage reboot and screen parameters"
+            )
         ) {
-            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(
-                    text = stringResource(Res.string.system_page),
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = l10n(
-                        "查看设备系统信息、管理重启与屏幕参数",
-                        "View device system info, manage reboot and screen parameters"
-                    ),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
             IconButton(
                 onClick = {
                     if (!selectedDevice.isNullOrBlank()) {
-                        viewModel.loadSystemInfo(selectedDevice)
+                        viewModel.loadSystemInfo(selectedDevice, forceRefresh = true)
                     }
                 },
                 enabled = !selectedDevice.isNullOrBlank() && !isLoading
@@ -215,18 +211,14 @@ fun SystemScreen(
 
         // No device state
         if (selectedDevice.isNullOrBlank()) {
-            Box(
+            EmptyStatePanel(
+                title = stringResource(Res.string.no_device_available),
+                description = l10n("选择设备后即可读取系统属性、电池、CPU 和屏幕信息。", "Select a device to read properties, battery, CPU, and screen info."),
+                icon = Icons.Default.PhoneAndroid,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(200.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = stringResource(Res.string.no_device_available),
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
+                    .height(220.dp)
+            )
             return@Column
         }
 
@@ -419,13 +411,11 @@ private fun SystemPropsSection(
                     .height(300.dp)
             ) {
                 if (filteredProps.isEmpty()) {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text(
-                            text = l10n("暂无属性数据", "No property data available"),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
+                    EmptyStatePanel(
+                        title = l10n("暂无属性数据", "No property data available"),
+                        description = l10n("刷新设备信息后仍为空时，请确认 ADB 授权和设备状态。", "If refresh still returns nothing, check ADB authorization and device state."),
+                        modifier = Modifier.fillMaxSize()
+                    )
                 } else {
                     LazyColumn(
                         modifier = Modifier

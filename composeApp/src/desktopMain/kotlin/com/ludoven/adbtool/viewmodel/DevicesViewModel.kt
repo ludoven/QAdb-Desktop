@@ -10,6 +10,7 @@ import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.*
@@ -30,7 +31,27 @@ private data class DeviceCommandOutputs(
     val latencyMs: Long
 )
 
+internal fun deviceInfoLoadShouldApply(requestedDeviceId: String?, selectedDeviceId: String?): Boolean {
+    val requested = requestedDeviceId?.trim().orEmpty()
+    val selected = selectedDeviceId?.trim().orEmpty()
+    return requested.isNotEmpty() && requested == selected
+}
+
+internal fun deviceInfoLoadShouldCancelForSelectionChange(
+    activeLoadDeviceId: String?,
+    nextSelectedDeviceId: String?
+): Boolean {
+    val active = activeLoadDeviceId?.trim().orEmpty()
+    if (active.isEmpty()) return false
+    return active != nextSelectedDeviceId?.trim().orEmpty()
+}
+
 class DevicesViewModel : BaseViewModel() {
+    companion object {
+        internal fun normalizedDeviceId(deviceId: String?): String? =
+            deviceId?.trim()?.takeIf { it.isNotBlank() }
+    }
+
     private val refreshTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
     private val propRegex = Regex("\\[(.*?)]\\s*:\\s*\\[(.*?)]")
 
@@ -55,6 +76,9 @@ class DevicesViewModel : BaseViewModel() {
     private val _lastRefreshTime = MutableStateFlow("--")
     val lastRefreshTime: StateFlow<String> = _lastRefreshTime.asStateFlow()
 
+    private var deviceInfoLoadJob: Job? = null
+    private var deviceInfoLoadDeviceId: String? = null
+
     fun refreshDevices() {
         viewModelScope.launch {
             _isLoading.value = true
@@ -77,11 +101,22 @@ class DevicesViewModel : BaseViewModel() {
     }
 
     fun selectDevice(deviceId: String?) {
-        _selectedDevice.value = deviceId
-        if (deviceId != null) {
-            AdbTool.selectDeviceId = deviceId
-            loadDeviceInfo(deviceId)
+        val normalizedDeviceId = normalizedDeviceId(deviceId)
+        if (deviceInfoLoadShouldCancelForSelectionChange(deviceInfoLoadDeviceId, normalizedDeviceId)) {
+            deviceInfoLoadJob?.cancel()
+            deviceInfoLoadJob = null
+            deviceInfoLoadDeviceId = null
+            _isLoading.value = false
+        }
+        _selectedDevice.value = normalizedDeviceId
+        if (normalizedDeviceId != null) {
+            AdbTool.selectDeviceId = normalizedDeviceId
+            loadDeviceInfo(normalizedDeviceId)
         } else {
+            deviceInfoLoadJob?.cancel()
+            deviceInfoLoadJob = null
+            deviceInfoLoadDeviceId = null
+            AdbTool.selectDeviceId = null
             _deviceInfo.value = null
             _centerInfo.value = null
             updateLastRefreshTime()
@@ -100,27 +135,29 @@ class DevicesViewModel : BaseViewModel() {
     }
 
     private fun loadDeviceInfo(deviceId: String) {
-        viewModelScope.launch {
+        deviceInfoLoadJob?.cancel()
+        deviceInfoLoadDeviceId = deviceId
+        deviceInfoLoadJob = viewModelScope.launch {
             _isLoading.value = true
 
             withContext(Dispatchers.IO) {
                 val outputs = coroutineScope {
-                    val props = async { AdbTool.executeAdbCommand("-s", deviceId, "shell", "getprop") }
-                    val kernel = async { AdbTool.executeAdbCommand("-s", deviceId, "shell", "uname", "-r") }
-                    val wmSize = async { AdbTool.executeAdbCommand("-s", deviceId, "shell", "wm", "size") }
-                    val wmDensity = async { AdbTool.executeAdbCommand("-s", deviceId, "shell", "wm", "density") }
+                    val props = async { AdbTool.execAdbOutputAsync("-s", deviceId, "shell", "getprop") }
+                    val kernel = async { AdbTool.execAdbOutputAsync("-s", deviceId, "shell", "uname", "-r") }
+                    val wmSize = async { AdbTool.execAdbOutputAsync("-s", deviceId, "shell", "wm", "size") }
+                    val wmDensity = async { AdbTool.execAdbOutputAsync("-s", deviceId, "shell", "wm", "density") }
                     val fontScale = async {
-                        AdbTool.executeAdbCommand("-s", deviceId, "shell", "settings", "get", "system", "font_scale")
+                        AdbTool.execAdbOutputAsync("-s", deviceId, "shell", "settings", "get", "system", "font_scale")
                     }
-                    val ifconfig = async { AdbTool.executeAdbCommand("-s", deviceId, "shell", "ip addr show wlan0") }
-                    val cpuStat = async { AdbTool.executeAdbCommand("-s", deviceId, "shell", "cat", "/proc/stat") }
-                    val memInfo = async { AdbTool.executeAdbCommand("-s", deviceId, "shell", "cat", "/proc/meminfo") }
-                    val dataDf = async { AdbTool.executeAdbCommand("-s", deviceId, "shell", "df", "/data") }
-                    val battery = async { AdbTool.executeAdbCommand("-s", deviceId, "shell", "dumpsys", "battery") }
+                    val ifconfig = async { AdbTool.execAdbOutputAsync("-s", deviceId, "shell", "ip addr show wlan0") }
+                    val cpuStat = async { AdbTool.execAdbOutputAsync("-s", deviceId, "shell", "cat", "/proc/stat") }
+                    val memInfo = async { AdbTool.execAdbOutputAsync("-s", deviceId, "shell", "cat", "/proc/meminfo") }
+                    val dataDf = async { AdbTool.execAdbOutputAsync("-s", deviceId, "shell", "df", "/data") }
+                    val battery = async { AdbTool.execAdbOutputAsync("-s", deviceId, "shell", "dumpsys", "battery") }
                     val latency = async {
                         try {
                             val start = System.currentTimeMillis()
-                            AdbTool.executeAdbCommand("-s", deviceId, "shell", "echo", "ping")
+                            AdbTool.execAdbOutputAsync("-s", deviceId, "shell", "echo", "ping")
                             System.currentTimeMillis() - start
                         } catch (_: Exception) {
                             -1L
@@ -259,6 +296,7 @@ class DevicesViewModel : BaseViewModel() {
                     batteryStatus = batteryStatus
                 )
 
+                if (!deviceInfoLoadShouldApply(deviceId, _selectedDevice.value)) return@withContext
                 _deviceInfo.value = deviceInfo
                 _centerInfo.value = centerInfo
                 if (deviceModel.isNotBlank()) {
@@ -267,7 +305,9 @@ class DevicesViewModel : BaseViewModel() {
                 updateLastRefreshTime()
             }
 
-            _isLoading.value = false
+            if (deviceInfoLoadShouldApply(deviceId, _selectedDevice.value)) {
+                _isLoading.value = false
+            }
         }
     }
 
@@ -285,7 +325,7 @@ class DevicesViewModel : BaseViewModel() {
 
     private suspend fun readDeviceModel(deviceId: String): String {
         return runCatching {
-            AdbTool.executeAdbCommand("-s", deviceId, "shell", "getprop", "ro.product.model")
+            AdbTool.execAdbOutputAsync("-s", deviceId, "shell", "getprop", "ro.product.model")
                 .lineSequence()
                 .firstOrNull { it.isNotBlank() }
                 ?.trim()

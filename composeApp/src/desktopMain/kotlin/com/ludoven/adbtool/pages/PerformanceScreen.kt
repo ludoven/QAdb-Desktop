@@ -46,6 +46,7 @@ import com.ludoven.adbtool.viewmodel.StorageApp
 import com.ludoven.adbtool.viewmodel.StoragePartition
 import com.ludoven.adbtool.widget.BarChartItem
 import com.ludoven.adbtool.widget.DashboardPanel
+import com.ludoven.adbtool.widget.EmptyStatePanel
 import com.ludoven.adbtool.widget.GlassCard
 import com.ludoven.adbtool.widget.HorizontalBarChart
 import com.ludoven.adbtool.widget.LineChartSeries
@@ -416,13 +417,12 @@ private fun EmptyPerformanceState() {
             .height(220.dp),
         borderStroke = BorderStroke(1.dp, Color(0xFFE5E7EB))
     ) {
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text(
-                text = l10n("请先连接设备后再查看性能监控。", "Connect a device to start performance monitoring."),
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
+        EmptyStatePanel(
+            title = l10n("未选择设备", "No device selected"),
+            description = l10n("连接设备后即可开始 CPU、内存和存储监控。", "Connect a device to monitor CPU, memory, and storage."),
+            icon = Icons.Default.Speed,
+            modifier = Modifier.fillMaxSize()
+        )
     }
 }
 

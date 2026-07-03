@@ -1,7 +1,9 @@
 import org.gradle.api.DefaultTask
+import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.file.RegularFileProperty
 import org.gradle.api.provider.Property
 import org.gradle.api.tasks.CacheableTask
+import org.gradle.api.tasks.Internal
 import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.OutputFile
 import org.gradle.api.tasks.TaskAction
@@ -32,18 +34,68 @@ abstract class GenerateAppVersionTask : DefaultTask() {
     }
 }
 
+abstract class RenameWindowsPackageFilesTask : DefaultTask() {
+    @get:Input
+    abstract val versionName: Property<String>
+
+    @get:Internal
+    abstract val binariesDir: DirectoryProperty
+
+    @TaskAction
+    fun rename() {
+        val outputRoots = listOf("main", "main-release")
+        val packageTypes = listOf("msi", "exe")
+        val rootDir = binariesDir.get().asFile
+        val versionSuffix = "-${versionName.get()}"
+
+        outputRoots.forEach { outputRoot ->
+            packageTypes.forEach packageTypeLoop@{ packageType ->
+                val packageDir = rootDir.resolve("$outputRoot/$packageType")
+                if (!packageDir.isDirectory) return@packageTypeLoop
+
+                packageDir.listFiles { file ->
+                    file.isFile && file.extension.equals(packageType, ignoreCase = true)
+                }?.forEach sourceLoop@{ source ->
+                    if (source.nameWithoutExtension.contains(versionSuffix)) return@sourceLoop
+
+                    val target = source.resolveSibling("${source.nameWithoutExtension}$versionSuffix.${source.extension}")
+                    if (target.exists() && !target.delete()) {
+                        throw GradleException("Unable to replace existing Windows package: ${target.absolutePath}")
+                    }
+                    if (!source.renameTo(target)) {
+                        throw GradleException("Unable to rename Windows package: ${source.absolutePath}")
+                    }
+                }
+            }
+        }
+    }
+}
+
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
     alias(libs.plugins.composeMultiplatform)
     alias(libs.plugins.composeCompiler)
-    alias(libs.plugins.composeHotReload)
 }
 
 val appVersion = "2.0.7"
 val generatedVersionSourceDir = layout.buildDirectory.dir("generated/source/appVersion/desktopMain/kotlin")
+val generatedIconHelperResourcesDir = layout.buildDirectory.dir("generated/resources/iconHelper")
 val generateDesktopAppVersion = tasks.register<GenerateAppVersionTask>("generateDesktopAppVersion") {
     versionName.set(appVersion)
     outputFile.set(generatedVersionSourceDir.map { it.file("com/ludoven/adbtool/AppVersion.kt") })
+}
+val syncIconHelperResource = tasks.register<Copy>("syncIconHelperResource") {
+    group = "build"
+    description = "Copies qadb-icon-helper into desktop runtime resources."
+    dependsOn(":qadb-icon-helper:assembleIconHelperDex")
+    from(project(":qadb-icon-helper").layout.buildDirectory.file("outputs/qadb-icon-helper.jar"))
+    into(generatedIconHelperResourcesDir.map { it.dir("qadb") })
+}
+val renameWindowsPackageFiles = tasks.register<RenameWindowsPackageFilesTask>("renameWindowsPackageFiles") {
+    group = "compose desktop"
+    description = "Adds the app version to generated Windows installer filenames."
+    versionName.set(appVersion)
+    binariesDir.set(layout.buildDirectory.dir("compose/binaries"))
 }
 
 kotlin {
@@ -52,6 +104,7 @@ kotlin {
     sourceSets {
         val desktopMain by getting {
             kotlin.srcDir(generatedVersionSourceDir)
+            resources.srcDir(generatedIconHelperResourcesDir)
         }
         
         commonMain.dependencies {
@@ -63,7 +116,6 @@ kotlin {
             implementation(compose.components.uiToolingPreview)
             implementation(libs.androidx.lifecycle.viewmodel)
             implementation(libs.androidx.lifecycle.runtimeCompose)
-            implementation(compose.materialIconsExtended)
             // JetBrains Compose Multiplatform 的 ViewModel 支持
             implementation("org.jetbrains.androidx.lifecycle:lifecycle-viewmodel-compose:2.9.0")
             implementation("org.jetbrains.androidx.navigation:navigation-compose:2.9.0-beta03")
@@ -125,5 +177,18 @@ tasks.withType<KotlinCompile>().configureEach {
     dependsOn(generateDesktopAppVersion)
     compilerOptions {
         freeCompilerArgs.add("-Xnon-local-break-continue")
+    }
+}
+tasks.matching { it.name == "desktopProcessResources" || it.name == "processDesktopMainResources" }.configureEach {
+    dependsOn(syncIconHelperResource)
+}
+listOf(
+    "packageMsi",
+    "packageExe",
+    "packageReleaseMsi",
+    "packageReleaseExe",
+).forEach { taskName ->
+    tasks.matching { it.name == taskName }.configureEach {
+        finalizedBy(renameWindowsPackageFiles)
     }
 }

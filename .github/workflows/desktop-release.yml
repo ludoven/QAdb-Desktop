@@ -73,11 +73,14 @@ jobs:
       - name: Build ZIP portable package
         shell: pwsh
         run: |
+          $versionMatch = Select-String -Path "composeApp/build.gradle.kts" -Pattern 'val appVersion = "([^"]+)"'
+          if (-not $versionMatch) { throw "Unable to read appVersion from composeApp/build.gradle.kts" }
+          $appVersion = $versionMatch.Matches[0].Groups[1].Value
           $appRoot = "composeApp/build/compose/binaries/main-release/app"
           $appDir = Get-ChildItem $appRoot -Directory | Select-Object -First 1
           if (-not $appDir) { throw "No app image directory found under $appRoot" }
           New-Item -ItemType Directory -Path "composeApp/build/compose/binaries/main-release/zip" -Force | Out-Null
-          $zipPath = "composeApp/build/compose/binaries/main-release/zip/$($appDir.Name)-windows-portable.zip"
+          $zipPath = "composeApp/build/compose/binaries/main-release/zip/QADB-$appVersion-windows-portable.zip"
           if (Test-Path $zipPath) { Remove-Item $zipPath -Force }
           Compress-Archive -Path "$($appDir.FullName)/*" -DestinationPath $zipPath
 

@@ -5,6 +5,7 @@ import com.ludoven.adbtool.ui.mac.*
 import adbtool_desktop.composeapp.generated.resources.Res
 import adbtool_desktop.composeapp.generated.resources.connected
 import adbtool_desktop.composeapp.generated.resources.connected_devices_count
+import adbtool_desktop.composeapp.generated.resources.disconnected
 import adbtool_desktop.composeapp.generated.resources.ic_logo
 import adbtool_desktop.composeapp.generated.resources.no_device
 import androidx.compose.animation.animateColorAsState
@@ -25,10 +26,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.ExpandMore
+import com.ludoven.adbtool.ui.icons.IconParkIcons
 import com.ludoven.adbtool.ui.mac.DropdownMenu
 import com.ludoven.adbtool.ui.mac.DropdownMenuItem
 import com.ludoven.adbtool.ui.mac.Icon
@@ -70,27 +68,27 @@ fun Sidebar(
         modifier = modifier
             .fillMaxHeight()
             .width(UiTokens.SidebarWidth),
-        shape = RoundedCornerShape(14.dp),
-        borderStroke = BorderStroke(1.dp, Color(0xFFE5E7EB))
+        shape = RoundedCornerShape(8.dp),
+        borderStroke = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
     ) {
         Column(
             modifier = Modifier
                 .fillMaxHeight()
-                .padding(horizontal = 10.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
+                .padding(horizontal = 14.dp, vertical = 18.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(bottom = 10.dp, start = 6.dp, top = 2.dp)
+            modifier = Modifier.padding(bottom = 18.dp, start = 8.dp, top = 2.dp)
             ) {
                 Image(
                     painter = painterResource(Res.drawable.ic_logo),
                     contentDescription = null,
                     modifier = Modifier
-                        .size(30.dp)
-                        .clip(RoundedCornerShape(8.dp))
+                        .size(34.dp)
+                        .clip(RoundedCornerShape(6.dp))
                 )
-                Spacer(modifier = Modifier.width(10.dp))
+                Spacer(modifier = Modifier.width(12.dp))
                 Column {
                     Text(
                         text = "QADB",
@@ -103,7 +101,7 @@ fun Sidebar(
 
             groups.forEachIndexed { groupIndex, group ->
                 if (groupIndex > 0) {
-                    Spacer(modifier = Modifier.height(6.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
                 }
                 val isExpanded = group.collapsible && group.id in visibleGroupIds
                 SidebarGroupHeader(
@@ -154,7 +152,7 @@ private fun SidebarGroupHeader(
 ) {
     val backgroundColor by animateColorAsState(
         targetValue = if (hasSelection) {
-            MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)
+            MaterialTheme.colorScheme.primary.copy(alpha = 0.11f)
         } else {
             Color.Transparent
         },
@@ -168,11 +166,11 @@ private fun SidebarGroupHeader(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(42.dp)
-            .clip(RoundedCornerShape(10.dp))
+            .height(44.dp)
+            .clip(RoundedCornerShape(6.dp))
             .background(backgroundColor)
             .clickable(onClick = onClick)
-            .padding(horizontal = 11.dp),
+            .padding(horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(
@@ -192,7 +190,7 @@ private fun SidebarGroupHeader(
             modifier = Modifier.weight(1f)
         )
         Icon(
-            imageVector = if (isExpanded) Icons.Default.ExpandMore else Icons.AutoMirrored.Filled.KeyboardArrowRight,
+            imageVector = if (isExpanded) IconParkIcons.ArrowDown else IconParkIcons.Right,
             contentDescription = null,
             tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (group.collapsible) 1f else 0f),
             modifier = Modifier.size(18.dp)
@@ -208,7 +206,7 @@ private fun SidebarItem(
 ) {
     val backgroundColor by animateColorAsState(
         targetValue = if (isSelected) {
-            MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
+            Color(0xFFF5F9FF)
         } else {
             Color.Transparent
         },
@@ -227,8 +225,8 @@ private fun SidebarItem(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(38.dp)
-            .clip(RoundedCornerShape(10.dp))
+            .height(40.dp)
+            .clip(RoundedCornerShape(6.dp))
             .background(backgroundColor)
             .clickable(onClick = onClick)
             .padding(start = 20.dp, end = 10.dp),
@@ -237,8 +235,8 @@ private fun SidebarItem(
         if (isSelected) {
             Box(
                 modifier = Modifier
-                    .width(UiTokens.IndicatorWidth - 1.dp)
-                    .height(24.dp)
+                    .width(3.dp)
+                    .height(22.dp)
                     .clip(RoundedCornerShape(999.dp))
                     .background(MaterialTheme.colorScheme.primary)
             )
@@ -251,7 +249,7 @@ private fun SidebarItem(
             imageVector = item.icon,
             contentDescription = item.title,
             tint = contentColor,
-            modifier = Modifier.size(20.dp)
+            modifier = Modifier.size(18.dp)
         )
 
         Spacer(modifier = Modifier.width(10.dp))
@@ -276,62 +274,74 @@ private fun ConnectedStatusCard(
     onDeviceSelected: (String) -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
-    val selectedDisplay = selectedDevice
-        ?.let { formatSidebarDeviceDisplay(it, deviceDisplayNames[it]) }
-        ?: stringResource(Res.string.no_device)
+    val isConnected = !selectedDevice.isNullOrBlank() && connectedDeviceCount > 0
+    val statusColor = if (isConnected) Color(0xFF2DBE60) else MaterialTheme.colorScheme.onSurfaceVariant
+    val noDeviceText = stringResource(Res.string.no_device)
+    val selectedModel = selectedDevice
+        ?.let { deviceDisplayNames[it]?.trim().orEmpty() }
+        .orEmpty()
+    val selectedTitle = selectedModel
+        .takeIf { it.isNotBlank() }
+        ?: selectedDevice
+        ?: noDeviceText
+    val selectedAddress = selectedDevice
+        ?.let { formatSidebarDeviceAddress(it) }
+        .orEmpty()
+    val statusText = stringResource(if (isConnected) Res.string.connected else Res.string.disconnected)
+    val countText = stringResource(Res.string.connected_devices_count, connectedDeviceCount)
 
     Box {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.85f))
+                .clip(RoundedCornerShape(6.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.22f))
                 .clickable(enabled = devices.isNotEmpty()) { expanded = !expanded }
-                .padding(horizontal = 10.dp, vertical = 10.dp),
+                .padding(horizontal = 10.dp, vertical = 9.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
                 modifier = Modifier
-                    .size(24.dp)
+                    .size(8.dp)
                     .clip(RoundedCornerShape(999.dp))
-                    .background(Color(0xFFE9F9EF).copy(alpha = 0.9f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Default.CheckCircle,
-                    contentDescription = null,
-                    tint = Color(0xFF2DBE60),
-                    modifier = Modifier.size(14.dp)
-                )
-            }
+                    .background(statusColor)
+            )
 
-            Spacer(modifier = Modifier.width(8.dp))
+            Spacer(modifier = Modifier.width(10.dp))
 
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(
-                    text = stringResource(Res.string.connected),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = selectedDisplay,
+                    text = "$statusText · $countText",
                     style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontWeight = FontWeight.Medium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
-                    text = stringResource(Res.string.connected_devices_count, connectedDeviceCount),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    text = selectedTitle,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
+                if (isConnected && selectedAddress.isNotBlank()) {
+                    Text(
+                        text = selectedAddress,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
             }
 
             Icon(
-                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                imageVector = IconParkIcons.Right,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(16.dp)
             )
         }
 
@@ -363,3 +373,6 @@ private fun formatSidebarDeviceDisplay(deviceId: String, model: String?): String
     val cleanModel = model?.trim().orEmpty()
     return if (cleanModel.isNotBlank()) "$cleanModel ($deviceId)" else deviceId
 }
+
+private fun formatSidebarDeviceAddress(deviceId: String): String =
+    deviceId.substringBefore(":").takeIf { it.isNotBlank() } ?: deviceId

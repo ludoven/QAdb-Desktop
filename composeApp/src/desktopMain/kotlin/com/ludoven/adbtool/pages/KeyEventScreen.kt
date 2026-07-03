@@ -70,7 +70,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.automirrored.filled.VolumeDown
+import androidx.compose.material.icons.automirrored.filled.VolumeMute
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Code
@@ -81,17 +87,11 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Keyboard
 import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowLeft
-import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material.icons.filled.Schedule
-import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.VolumeDown
-import androidx.compose.material.icons.filled.VolumeMute
-import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material.icons.filled.WbSunny
 import com.ludoven.adbtool.ui.mac.AlertDialog
 import com.ludoven.adbtool.ui.mac.Button
@@ -131,6 +131,8 @@ import com.ludoven.adbtool.UiTokens
 import com.ludoven.adbtool.viewmodel.KeyEventRecord
 import com.ludoven.adbtool.viewmodel.KeyEventViewModel
 import com.ludoven.adbtool.widget.GlassCard
+import com.ludoven.adbtool.widget.InlineStatusBanner
+import com.ludoven.adbtool.widget.InlineStatusTone
 import com.ludoven.adbtool.util.l10n
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
@@ -213,6 +215,16 @@ fun KeyEventScreen(
         ) {
             item {
                 Header(connectedText = connectedText, connected = !selectedDevice.isNullOrBlank())
+            }
+
+            if (selectedDevice.isNullOrBlank()) {
+                item {
+                    InlineStatusBanner(
+                        text = l10n("当前没有选择设备。按键面板可预览命令，发送前需要先连接并选择设备。", "No device is selected. The key panel can preview commands, but sending needs a connected selected device."),
+                        tone = InlineStatusTone.Warning,
+                        icon = Icons.Default.Info
+                    )
+                }
             }
 
             item {
@@ -435,8 +447,8 @@ private fun VisualKeyPanel(
 private fun DPad(onAction: (KeyAction) -> Unit) {
     val up = KeyAction(KC.DPAD_UP, Res.string.key_up, "KEYCODE_DPAD_UP", Icons.Default.KeyboardArrowUp)
     val down = KeyAction(KC.DPAD_DOWN, Res.string.key_down, "KEYCODE_DPAD_DOWN", Icons.Default.KeyboardArrowDown)
-    val left = KeyAction(KC.DPAD_LEFT, Res.string.key_left, "KEYCODE_DPAD_LEFT", Icons.Default.KeyboardArrowLeft)
-    val right = KeyAction(KC.DPAD_RIGHT, Res.string.key_right, "KEYCODE_DPAD_RIGHT", Icons.Default.KeyboardArrowRight)
+    val left = KeyAction(KC.DPAD_LEFT, Res.string.key_left, "KEYCODE_DPAD_LEFT", Icons.AutoMirrored.Filled.KeyboardArrowLeft)
+    val right = KeyAction(KC.DPAD_RIGHT, Res.string.key_right, "KEYCODE_DPAD_RIGHT", Icons.AutoMirrored.Filled.KeyboardArrowRight)
     val ok = KeyAction(KC.DPAD_OK, Res.string.confirm, "KEYCODE_DPAD_CENTER", Icons.Default.CheckCircle)
 
     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -578,7 +590,7 @@ private fun CustomKeyCodePanel(
                         contentAlignment = Alignment.Center
                     ) {
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Send, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+                            Icon(Icons.AutoMirrored.Filled.Send, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
                             Text(stringResource(Res.string.key_send), color = Color.White, fontWeight = FontWeight.SemiBold)
                         }
                     }
@@ -738,10 +750,10 @@ private fun RecentRecordRow(record: KeyEventRecord) {
 
 private fun iconForCode(code: Int): ImageVector = when (code) {
     KC.HOME -> Icons.Default.Home
-    KC.BACK -> Icons.Default.ArrowBack
+    KC.BACK -> Icons.AutoMirrored.Filled.ArrowBack
     KC.POWER -> Icons.Default.PowerSettingsNew
-    KC.VOL_UP -> Icons.Default.VolumeUp
-    KC.VOL_DOWN -> Icons.Default.VolumeDown
+    KC.VOL_UP -> Icons.AutoMirrored.Filled.VolumeUp
+    KC.VOL_DOWN -> Icons.AutoMirrored.Filled.VolumeDown
     else -> Icons.Default.Keyboard
 }
 
@@ -808,14 +820,14 @@ private fun PressableSurface(
     }
 }
 
-private fun navAction() = KeyAction(KC.BACK, Res.string.key_back, "KEYCODE_BACK", Icons.Default.ArrowBack, Color(0xFF111827))
+private fun navAction() = KeyAction(KC.BACK, Res.string.key_back, "KEYCODE_BACK", Icons.AutoMirrored.Filled.ArrowBack, Color(0xFF111827))
 private fun homeAction() = KeyAction(KC.HOME, Res.string.key_home, "KEYCODE_HOME", Icons.Default.Home, Color(0xFF111827))
 private fun recentAction() = KeyAction(KC.RECENT, Res.string.key_recent, "KEYCODE_APP_SWITCH", Icons.Default.ContentCopy, Color(0xFF111827))
 private fun menuAction() = KeyAction(KC.MENU, Res.string.key_menu, "KEYCODE_MENU", Icons.Default.Menu, Color(0xFF111827))
 private fun powerAction() = KeyAction(KC.POWER, Res.string.key_power, "KEYCODE_POWER", Icons.Default.PowerSettingsNew, Color(0xFFFF4D4F))
-private fun volumeUpAction() = KeyAction(KC.VOL_UP, Res.string.key_volume_up, "KEYCODE_VOLUME_UP", Icons.Default.VolumeUp, Color(0xFF2F7DFF))
-private fun volumeDownAction() = KeyAction(KC.VOL_DOWN, Res.string.key_volume_down, "KEYCODE_VOLUME_DOWN", Icons.Default.VolumeDown, Color(0xFF2F7DFF))
-private fun muteAction() = KeyAction(KC.VOL_MUTE, Res.string.key_volume_mute, "KEYCODE_VOLUME_MUTE", Icons.Default.VolumeMute, Color(0xFF2F7DFF))
+private fun volumeUpAction() = KeyAction(KC.VOL_UP, Res.string.key_volume_up, "KEYCODE_VOLUME_UP", Icons.AutoMirrored.Filled.VolumeUp, Color(0xFF2F7DFF))
+private fun volumeDownAction() = KeyAction(KC.VOL_DOWN, Res.string.key_volume_down, "KEYCODE_VOLUME_DOWN", Icons.AutoMirrored.Filled.VolumeDown, Color(0xFF2F7DFF))
+private fun muteAction() = KeyAction(KC.VOL_MUTE, Res.string.key_volume_mute, "KEYCODE_VOLUME_MUTE", Icons.AutoMirrored.Filled.VolumeMute, Color(0xFF2F7DFF))
 private fun notificationAction() = KeyAction(KC.NOTIFICATION, Res.string.key_status_bar, "KEYCODE_NOTIFICATION", Icons.Default.Bookmark, Color(0xFF9A5BFF))
 private fun quickSettingsAction() = KeyAction(KC.SETTINGS, Res.string.key_quick_settings, "KEYCODE_SETTINGS", Icons.Default.Settings, Color(0xFF2F7DFF))
 private fun screenToggleAction() = KeyAction(KC.WAKEUP, Res.string.key_screen_toggle, "KEYCODE_WAKEUP", Icons.Default.WbSunny, Color(0xFFFF9F1A))

@@ -108,6 +108,9 @@ import com.ludoven.adbtool.ui.mac.headlineMedium
 import com.ludoven.adbtool.ui.mac.labelLarge
 import com.ludoven.adbtool.ui.mac.labelSmall
 import com.ludoven.adbtool.viewmodel.LogViewModel
+import com.ludoven.adbtool.widget.EmptyStatePanel
+import com.ludoven.adbtool.widget.InlineStatusBanner
+import com.ludoven.adbtool.widget.InlineStatusTone
 import org.jetbrains.compose.resources.stringResource
 import java.awt.FileDialog
 import java.awt.Frame
@@ -123,6 +126,9 @@ private enum class QuickKeywordChip {
     CRASH,
     ANR
 }
+
+internal fun logCaptureActionsEnabled(selectedDevice: String?): Boolean =
+    !selectedDevice.isNullOrBlank()
 
 @Composable
 fun LogScreen(
@@ -144,6 +150,7 @@ fun LogScreen(
 
     val filteredLogs by viewModel.filteredLogs.collectAsState()
     val likelyCurrentPackage = remember(logs) { detectLikelyPackage(logs) }
+    val captureDevice = selectedDevice?.takeIf { logCaptureActionsEnabled(it) }
 
     LaunchedEffect(selectedDevice) {
         viewModel.setSelectedDevice(selectedDevice)
@@ -186,11 +193,11 @@ fun LogScreen(
                         onClick = {
                             if (isCapturing) {
                                 viewModel.stopCapture()
-                            } else if (selectedDevice != null) {
-                                viewModel.startCapture(selectedDevice)
+                            } else if (captureDevice != null) {
+                                viewModel.startCapture(captureDevice)
                             }
                         },
-                        enabled = (selectedDevice != null || isCapturing) && !isLoading,
+                        enabled = (captureDevice != null || isCapturing) && !isLoading,
                         colors = ButtonDefaults.buttonColors(
                             containerColor = MaterialTheme.colorScheme.primary,
                             contentColor = Color.White
@@ -252,9 +259,9 @@ fun LogScreen(
                                 leadingIcon = {
                                     Icon(Icons.Default.Refresh, contentDescription = null)
                                 },
-                                enabled = selectedDevice != null && !isLoading,
+                                enabled = captureDevice != null && !isLoading,
                                 onClick = {
-                                    if (selectedDevice != null) viewModel.restartCapture(selectedDevice)
+                                    if (captureDevice != null) viewModel.restartCapture(captureDevice)
                                     showMoreMenu = false
                                 }
                             )
@@ -417,6 +424,14 @@ fun LogScreen(
             }
         }
 
+        if (captureDevice == null && !isCapturing) {
+            InlineStatusBanner(
+                text = stringResource(Res.string.log_no_device),
+                tone = InlineStatusTone.Warning,
+                icon = Icons.Default.Refresh
+            )
+        }
+
         Card(
             modifier = Modifier
                 .weight(1f)
@@ -428,13 +443,17 @@ fun LogScreen(
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.75f))
 
                 if (filteredLogs.isEmpty()) {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text(
-                            text = if (isCapturing) stringResource(Res.string.log_waiting) else stringResource(Res.string.log_empty),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
+                    EmptyStatePanel(
+                        title = if (isCapturing) stringResource(Res.string.log_waiting) else stringResource(Res.string.log_empty),
+                        description = if (isCapturing) {
+                            "日志捕获已启动，等待设备输出新日志。"
+                        } else if (filter != LogFilter()) {
+                            "当前筛选条件没有匹配日志，清除筛选后可查看完整输出。"
+                        } else {
+                            "选择设备并启动捕获后，日志会显示在这里。"
+                        },
+                        modifier = Modifier.fillMaxSize()
+                    )
                 } else {
                     Box(modifier = Modifier.fillMaxSize()) {
                         SelectionContainer {
@@ -617,7 +636,10 @@ private fun QuickFilterChip(
     Box(
         modifier = Modifier
             .clip(androidx.compose.foundation.shape.RoundedCornerShape(999.dp))
-            .background(if (active) Color(0xFFEAF2FF) else MaterialTheme.colorScheme.surfaceVariant)
+            .background(
+                if (active) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f)
+                else MaterialTheme.colorScheme.surfaceVariant
+            )
             .border(
                 1.dp,
                 if (active) Color(0xFFC8DBFF) else MaterialTheme.colorScheme.outlineVariant,
@@ -730,13 +752,14 @@ private fun TableCell(
 
 @Composable
 private fun LevelBadge(level: LogLevel, modifier: Modifier = Modifier) {
+    val colorScheme = MaterialTheme.colorScheme
     val colors = when (level) {
-        LogLevel.VERBOSE -> Color(0xFFF1F5F9) to Color(0xFF475569)
-        LogLevel.DEBUG -> Color(0xFFEAF2FF) to Color(0xFF2563EB)
-        LogLevel.INFO -> Color(0xFFEAF9F1) to Color(0xFF15803D)
-        LogLevel.WARN -> Color(0xFFFFF4E8) to Color(0xFFB45309)
-        LogLevel.ERROR -> Color(0xFFFFEBEB) to Color(0xFFDC2626)
-        LogLevel.FATAL -> Color(0xFFFFE9F0) to Color(0xFFBE185D)
+        LogLevel.VERBOSE -> colorScheme.surfaceVariant to colorScheme.onSurfaceVariant
+        LogLevel.DEBUG -> colorScheme.primaryContainer to colorScheme.onPrimaryContainer
+        LogLevel.INFO -> colorScheme.tertiaryContainer to colorScheme.onTertiaryContainer
+        LogLevel.WARN -> colorScheme.secondaryContainer to colorScheme.onSecondaryContainer
+        LogLevel.ERROR -> colorScheme.errorContainer to colorScheme.onErrorContainer
+        LogLevel.FATAL -> colorScheme.errorContainer to colorScheme.onErrorContainer
     }
     Box(modifier = modifier, contentAlignment = Alignment.CenterStart) {
         Box(

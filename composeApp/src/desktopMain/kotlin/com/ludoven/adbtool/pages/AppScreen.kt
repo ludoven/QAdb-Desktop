@@ -3,6 +3,7 @@ package com.ludoven.adbtool.pages
 import adbtool_desktop.composeapp.generated.resources.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -15,6 +16,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -46,11 +48,9 @@ import androidx.compose.ui.unit.sp
 import com.ludoven.adbtool.entity.AdbFunctionType
 import com.ludoven.adbtool.entity.AppInfoData
 import com.ludoven.adbtool.entity.MsgContent
-import com.ludoven.adbtool.util.AdbTool
 import com.ludoven.adbtool.util.l10n
 import com.ludoven.adbtool.viewmodel.AppViewModel
-import kotlinx.coroutines.async
-import kotlinx.coroutines.coroutineScope
+import com.ludoven.adbtool.widget.EmptyStatePanel
 import kotlinx.coroutines.flow.distinctUntilChanged
 import org.jetbrains.compose.resources.stringResource
 
@@ -120,35 +120,33 @@ private enum class AppSortMode {
     Recent
 }
 
-private val packageLineRegex = Regex("""package:(.+)=([A-Za-z0-9._]+)""")
+internal enum class AppListEmptyReason {
+    NO_DEVICE,
+    NO_RESULTS
+}
 
-suspend fun getInstalledApps(): List<AppInfo> = coroutineScope {
-    val allAppsDef = async { AdbTool.exec("pm list packages -f") }
-    val sysAppsDef = async { AdbTool.exec("pm list packages -s") }
-    val disabledAppsDef = async { AdbTool.exec("pm list packages -d") }
+private object AppVisualTokens {
+    val Primary = Color(0xFF0A84FF)
+    val Text = Color(0xFF111827)
+    val Muted = Color(0xFF6B7280)
+    val Border = Color(0xFFE5E7EB)
+    val BorderStrong = Color(0xFFDDE3EA)
+    val Divider = Color(0xFFEEF0F3)
+    val Surface = Color(0xFFFFFFFF)
+    val Soft = Color(0xFFF3F4F6)
+    val Selected = Color(0xFFEAF3FF)
+    val Success = Color(0xFF16A34A)
+    val Warning = Color(0xFFF97316)
+    val Danger = Color(0xFFE53935)
+}
 
-    val allApps = allAppsDef.await() ?: return@coroutineScope emptyList()
-    val sysApps = sysAppsDef.await() ?: ""
-    val disabledApps = disabledAppsDef.await() ?: ""
-    val sysPackages = sysApps.lines()
-        .mapNotNull { it.substringAfter("package:", "").takeIf { p -> p.isNotEmpty() } }
-        .toSet()
-    val disabledPackages = disabledApps.lines()
-        .mapNotNull { it.substringAfter("package:", "").takeIf { p -> p.isNotEmpty() } }
-        .toSet()
-    allApps.lines().mapNotNull { line ->
-        val match = packageLineRegex.find(line)
-        val (apkPath, packageName) = match?.destructured ?: return@mapNotNull null
-        val debugHint = packageName.contains("debug", ignoreCase = true) || packageName.endsWith(".dev")
-        AppInfo(
-            appName = packageName,
-            packageName = packageName,
-            apkPath = apkPath,
-            isSystemApp = sysPackages.contains(packageName),
-            isDebuggable = debugHint,
-            isDisabled = disabledPackages.contains(packageName)
-        )
-    }.sortedBy { it.packageName }
+internal fun appListEmptyReason(
+    hasSelectedDevice: Boolean,
+    displayedListIsEmpty: Boolean,
+    isLoading: Boolean
+): AppListEmptyReason? {
+    if (isLoading || !displayedListIsEmpty) return null
+    return if (hasSelectedDevice) AppListEmptyReason.NO_RESULTS else AppListEmptyReason.NO_DEVICE
 }
 
 internal fun filterApps(
@@ -173,10 +171,12 @@ internal fun appFilterCounts(apps: List<AppInfo>): Map<AppFilter, Int> {
 
 @Composable
 private fun AppAvatar(app: AppInfo, icon: ImageBitmap?, size: Int = 44) {
+    val shape = RoundedCornerShape((size * 0.22f).dp)
     Box(
         modifier = Modifier
             .size(size.dp)
-            .clip(RoundedCornerShape((size * 0.24f).dp)),
+            .clip(shape)
+            .background(AppVisualTokens.Soft),
         contentAlignment = Alignment.Center
     ) {
         if (icon != null) {
@@ -190,14 +190,14 @@ private fun AppAvatar(app: AppInfo, icon: ImageBitmap?, size: Int = 44) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color(0xFFF2F4F8)),
+                    .background(AppVisualTokens.Soft),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     text = app.appName.take(1).uppercase(),
-                    color = Color(0xFF4B5F80),
-                    fontWeight = FontWeight.Bold,
-                    fontSize = (size * 0.4).sp
+                    color = Color(0xFF475569),
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = (size * 0.34).sp
                 )
             }
         }
@@ -205,7 +205,69 @@ private fun AppAvatar(app: AppInfo, icon: ImageBitmap?, size: Int = 44) {
 }
 
 @Composable
-fun AppScreen(viewModel: AppViewModel) {
+private fun AppSearchField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val shape = RoundedCornerShape(8.dp)
+    val interactionSource = remember { MutableInteractionSource() }
+    val isFocused by interactionSource.collectIsFocusedAsState()
+
+    BasicTextField(
+        value = value,
+        onValueChange = onValueChange,
+        singleLine = true,
+        textStyle = MaterialTheme.typography.bodySmall.copy(color = AppVisualTokens.Text),
+        interactionSource = interactionSource,
+        modifier = modifier
+            .height(40.dp)
+            .clip(shape)
+            .background(AppVisualTokens.Surface)
+            .border(
+                width = 1.dp,
+                color = if (isFocused) AppVisualTokens.Primary.copy(alpha = 0.45f) else AppVisualTokens.BorderStrong,
+                shape = shape
+            ),
+        decorationBox = { innerTextField ->
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    Icons.Default.Search,
+                    contentDescription = null,
+                    tint = AppVisualTokens.Muted,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(Modifier.width(8.dp))
+                Box(
+                    modifier = Modifier.weight(1f),
+                    contentAlignment = Alignment.CenterStart
+                ) {
+                    if (value.isBlank()) {
+                        Text(
+                            text = l10n("搜索应用名称或包名", "Search app name or package"),
+                            color = AppVisualTokens.Muted,
+                            style = MaterialTheme.typography.bodySmall,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                    innerTextField()
+                }
+            }
+        }
+    )
+}
+
+@Composable
+fun AppScreen(
+    viewModel: AppViewModel,
+    selectedDevice: String?
+) {
     val appList by viewModel.appList.collectAsState()
     val searchText by viewModel.searchText.collectAsState()
     val selectedTab by viewModel.selectedTab.collectAsState()
@@ -217,16 +279,27 @@ fun AppScreen(viewModel: AppViewModel) {
     val appInfo by viewModel.appInfo.collectAsState()
 
     var sortMenuExpanded by remember { mutableStateOf(false) }
-    var lastRefreshMillis by remember { mutableStateOf(System.currentTimeMillis()) }
     var pendingDangerAction by remember { mutableStateOf<Pair<AdbFunctionType, AppInfo>?>(null) }
     var confirmActionLabel by remember { mutableStateOf("") }
     var confirmActionMessage by remember { mutableStateOf("") }
     var sortMode by remember { mutableStateOf(AppSortMode.Name) }
 
-    LaunchedEffect(Unit) { viewModel.getAppList() }
+    val hasSelectedDevice = !selectedDevice.isNullOrBlank()
+
+    LaunchedEffect(selectedDevice) { viewModel.getAppList(selectedDevice) }
+    DisposableEffect(Unit) {
+        onDispose {
+            viewModel.cancelPageLoads()
+        }
+    }
 
     val tabs = remember { AppFilter.entries.toList() }
     val selectedFilter = remember(selectedTab) { AppFilter.fromKey(selectedTab) }
+    LaunchedEffect(selectedFilter, selectedDevice) {
+        if (selectedFilter == AppFilter.RUNNING && hasSelectedDevice) {
+            viewModel.refreshRunningStatusAsync()
+        }
+    }
     val filteredList = remember(appList, selectedFilter, searchText) {
         filterApps(appList, selectedFilter, searchText)
     }
@@ -277,8 +350,8 @@ fun AppScreen(viewModel: AppViewModel) {
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
+                .padding(horizontal = 24.dp, vertical = 28.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -291,32 +364,33 @@ fun AppScreen(viewModel: AppViewModel) {
                 ) {
                     OutlinedButton(
                         onClick = {
-                            lastRefreshMillis = System.currentTimeMillis()
-                            viewModel.getAppList()
+                            viewModel.getAppList(selectedDevice, forceRefresh = true)
                         },
-                        shape = RoundedCornerShape(10.dp),
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
+                        enabled = hasSelectedDevice,
+                        shape = RoundedCornerShape(8.dp),
+                        border = BorderStroke(1.dp, AppVisualTokens.BorderStrong),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            containerColor = AppVisualTokens.Surface,
+                            contentColor = AppVisualTokens.Text,
+                            disabledContentColor = AppVisualTokens.Muted.copy(alpha = 0.45f)
+                        ),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
+                        modifier = Modifier.height(36.dp)
                     ) {
                         Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(Modifier.width(6.dp))
-                        Text(l10n("刷新", "Refresh"))
+                        Text(
+                            text = l10n("刷新", "Refresh"),
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.Medium
+                        )
                     }
-                    Text(
-                        text = l10n("最近刷新：", "Last refresh: ") + formatRelativeRefresh(lastRefreshMillis),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
                 }
 
-                OutlinedTextField(
+                AppSearchField(
                     value = searchText,
                     onValueChange = { viewModel.setSearchText(it) },
-                    placeholder = { Text(l10n("搜索应用名称或包名", "Search app name or package")) },
-                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-                    textStyle = MaterialTheme.typography.bodyMedium,
-                    singleLine = true,
-                    modifier = Modifier.widthIn(min = 360.dp, max = 480.dp).height(52.dp),
-                    shape = RoundedCornerShape(10.dp)
+                    modifier = Modifier.widthIn(min = 380.dp, max = 460.dp)
                 )
             }
 
@@ -329,20 +403,19 @@ fun AppScreen(viewModel: AppViewModel) {
                     items(tabs, key = { it.key }) { tab ->
                         val selected = selectedFilter == tab
                         Surface(
-                            shape = RoundedCornerShape(10.dp),
-                            color = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surface,
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (selected) AppVisualTokens.Selected else AppVisualTokens.Surface,
                             border = BorderStroke(
                                 1.dp,
-                                if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.28f)
-                                else Color(0xFFE5E7EB)
+                                if (selected) Color(0xFFBBD7FF) else AppVisualTokens.Border
                             ),
                             modifier = Modifier.clickable { viewModel.setSelectedTab(tab.key) }
                         ) {
                             Text(
                                 text = "${appTabLabel(tab)} ${tabCountMap[tab] ?: 0}",
-                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (selected) AppVisualTokens.Primary else Color(0xFF374151),
                                 fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium
                             )
                         }
@@ -356,12 +429,22 @@ fun AppScreen(viewModel: AppViewModel) {
                     Box {
                         OutlinedButton(
                             onClick = { sortMenuExpanded = true },
-                            shape = RoundedCornerShape(10.dp),
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
+                            shape = RoundedCornerShape(8.dp),
+                            border = BorderStroke(1.dp, AppVisualTokens.Border),
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                containerColor = AppVisualTokens.Surface,
+                                contentColor = AppVisualTokens.Text
+                            ),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
+                            modifier = Modifier.height(32.dp)
                         ) {
                             Icon(Icons.AutoMirrored.Filled.Sort, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(Modifier.width(6.dp))
-                            Text(appSortModeLabel(sortMode))
+                            Text(
+                                text = appSortModeLabel(sortMode),
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = FontWeight.Medium
+                            )
                             Spacer(Modifier.width(2.dp))
                             Icon(Icons.Default.ExpandMore, contentDescription = null, modifier = Modifier.size(16.dp))
                         }
@@ -381,11 +464,11 @@ fun AppScreen(viewModel: AppViewModel) {
                         }
                     }
                     Surface(
-                        shape = RoundedCornerShape(10.dp),
-                        border = BorderStroke(1.dp, Color(0xFFE5E7EB)),
-                        color = MaterialTheme.colorScheme.surface
+                        shape = RoundedCornerShape(8.dp),
+                        border = BorderStroke(1.dp, AppVisualTokens.Border),
+                        color = AppVisualTokens.Surface
                     ) {
-                        Row(modifier = Modifier.padding(4.dp)) {
+                        Row(modifier = Modifier.padding(3.dp)) {
                             ViewToggleButton(
                                 icon = Icons.Default.GridView,
                                 selected = isGridView,
@@ -403,9 +486,9 @@ fun AppScreen(viewModel: AppViewModel) {
 
             Surface(
                 modifier = Modifier.weight(1f).fillMaxWidth(),
-                shape = RoundedCornerShape(14.dp),
-                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.65f),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f))
+                shape = RoundedCornerShape(12.dp),
+                color = AppVisualTokens.Surface,
+                border = BorderStroke(1.dp, AppVisualTokens.Border)
             ) {
                 if (isLoading) {
                     Box(
@@ -424,28 +507,32 @@ fun AppScreen(viewModel: AppViewModel) {
                             )
                         }
                     }
-                } else if (displayedList.isEmpty()) {
-                    Box(
+                } else if (appListEmptyReason(hasSelectedDevice, displayedList.isEmpty(), isLoading) != null) {
+                    val emptyReason = appListEmptyReason(hasSelectedDevice, displayedList.isEmpty(), isLoading)
+                    EmptyStatePanel(
+                        title = when (emptyReason) {
+                            AppListEmptyReason.NO_DEVICE -> l10n("未连接设备", "No device connected")
+                            AppListEmptyReason.NO_RESULTS -> l10n("暂无匹配应用", "No matching apps")
+                            null -> ""
+                        },
+                        description = when (emptyReason) {
+                            AppListEmptyReason.NO_DEVICE -> l10n("连接并选择设备后可查看、搜索和管理应用。", "Connect and select a device to view, search, and manage apps.")
+                            AppListEmptyReason.NO_RESULTS -> l10n("调整搜索词、筛选条件或刷新应用列表后再试。", "Adjust search, filters, or refresh the app list.")
+                            null -> ""
+                        },
+                        icon = Icons.Default.Apps,
                         modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Apps,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                                modifier = Modifier.size(42.dp)
-                            )
-                            Text(
-                                text = l10n("当前筛选条件下暂无应用", "No apps under current filters"),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                        actionLabel = when (emptyReason) {
+                            AppListEmptyReason.NO_DEVICE -> null
+                            AppListEmptyReason.NO_RESULTS -> l10n("刷新", "Refresh")
+                            null -> null
+                        },
+                        onAction = when (emptyReason) {
+                            AppListEmptyReason.NO_DEVICE -> null
+                            AppListEmptyReason.NO_RESULTS -> ({ viewModel.getAppList(selectedDevice, forceRefresh = true) })
+                            null -> null
                         }
-                    }
+                    )
                 } else if (isGridView) {
                     val gridState = rememberLazyGridState()
                     LaunchedEffect(gridState, displayedList) {
@@ -459,10 +546,10 @@ fun AppScreen(viewModel: AppViewModel) {
                     }
                     Column(modifier = Modifier.fillMaxSize().padding(14.dp)) {
                         LazyVerticalGrid(
-                            columns = GridCells.Adaptive(160.dp),
+                            columns = GridCells.Adaptive(152.dp),
                             state = gridState,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
-                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp),
                             modifier = Modifier.weight(1f)
                         ) {
                             items(displayedList, key = { it.packageName }) { app ->
@@ -493,6 +580,7 @@ fun AppScreen(viewModel: AppViewModel) {
                         }
                     }
                     Column(modifier = Modifier.fillMaxSize().padding(horizontal = 14.dp, vertical = 10.dp)) {
+                        AppListColumnHeader()
                         Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
                             LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
                                 items(displayedList, key = { it.packageName }) { app ->
@@ -556,16 +644,6 @@ fun AppScreen(viewModel: AppViewModel) {
     }
 }
 
-private fun formatRelativeRefresh(timestamp: Long): String {
-    val delta = (System.currentTimeMillis() - timestamp).coerceAtLeast(0L) / 1000L
-    return when {
-        delta < 5L -> l10n("刚刚", "just now")
-        delta < 60L -> if (l10n("zh", "en") == "en") "${delta}s ago" else "${delta}s 前"
-        delta < 3600L -> if (l10n("zh", "en") == "en") "${delta / 60}m ago" else "${delta / 60}m 前"
-        else -> if (l10n("zh", "en") == "en") "${delta / 3600}h ago" else "${delta / 3600}h 前"
-    }
-}
-
 private fun appSortModeLabel(mode: AppSortMode): String {
     return when (mode) {
         AppSortMode.Name -> l10n("按名称", "By name")
@@ -593,7 +671,11 @@ private fun AppStatBadge(
     value: String,
     emphasize: Boolean = false
 ) {
-    val borderColor = if (emphasize) MaterialTheme.colorScheme.primary.copy(alpha = 0.25f) else Color(0xFFE5E7EB)
+    val borderColor = if (emphasize) {
+        MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)
+    } else {
+        MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+    }
     val bgColor = if (emphasize) MaterialTheme.colorScheme.primary.copy(alpha = 0.08f) else MaterialTheme.colorScheme.surface
     val valueColor = if (emphasize) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
 
@@ -628,7 +710,7 @@ private fun AppTypeTag(
     accent: Color = MaterialTheme.colorScheme.onSurfaceVariant
 ) {
     Surface(
-        shape = RoundedCornerShape(999.dp),
+        shape = RoundedCornerShape(6.dp),
         color = accent.copy(alpha = 0.1f)
     ) {
         Text(
@@ -636,7 +718,7 @@ private fun AppTypeTag(
             style = MaterialTheme.typography.labelSmall,
             color = accent,
             fontWeight = FontWeight.Medium,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+            modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
         )
     }
 }
@@ -649,19 +731,53 @@ private fun ViewToggleButton(
 ) {
     Box(
         modifier = Modifier
-            .clip(RoundedCornerShape(10.dp))
-            .background(if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f) else Color.Transparent)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 8.dp),
+            .size(30.dp)
+            .clip(RoundedCornerShape(7.dp))
+            .background(if (selected) AppVisualTokens.Selected else Color.Transparent)
+            .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
         Icon(
             imageVector = icon,
             contentDescription = null,
-            tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(18.dp)
+            tint = if (selected) AppVisualTokens.Primary else AppVisualTokens.Muted,
+            modifier = Modifier.size(16.dp)
         )
     }
+}
+
+@Composable
+private fun AppListColumnHeader() {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(32.dp)
+            .padding(horizontal = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        AppColumnHeaderText(l10n("应用", "App"), Modifier.weight(2.25f))
+        AppColumnHeaderText(l10n("类型", "Type"), Modifier.weight(1.25f))
+        AppColumnHeaderText(l10n("版本", "Version"), Modifier.weight(0.85f))
+        AppColumnHeaderText(l10n("大小", "Size"), Modifier.weight(0.75f))
+        AppColumnHeaderText(l10n("状态", "Status"), Modifier.weight(0.9f))
+        AppColumnHeaderText(l10n("操作", "Actions"), Modifier.weight(0.52f))
+    }
+}
+
+@Composable
+private fun AppColumnHeaderText(
+    text: String,
+    modifier: Modifier = Modifier
+) {
+    Text(
+        text = text,
+        modifier = modifier,
+        style = MaterialTheme.typography.labelSmall,
+        color = AppVisualTokens.Muted,
+        fontWeight = FontWeight.Medium,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis
+    )
 }
 
 @Composable
@@ -779,8 +895,8 @@ private fun AppListRow(
     Box(
         modifier = Modifier
             .hoverable(rowInteraction)
-            .clip(RoundedCornerShape(12.dp))
-            .background(if (isRowHovered) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.32f) else Color.Transparent)
+            .clip(RoundedCornerShape(8.dp))
+            .background(if (isRowHovered) AppVisualTokens.Soft else Color.Transparent)
             .pointerInput(app.packageName) {
                 awaitPointerEventScope {
                     while (true) {
@@ -800,28 +916,28 @@ private fun AppListRow(
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(min = 64.dp)
-                .padding(horizontal = 10.dp, vertical = 8.dp),
+                .padding(horizontal = 10.dp, vertical = 7.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Row(
                 modifier = Modifier.weight(2.25f),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                AppAvatar(app = app, icon = icon, size = 34)
+                AppAvatar(app = app, icon = icon, size = 32)
                 Spacer(Modifier.width(10.dp))
                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Text(
                         text = appName,
-                        style = MaterialTheme.typography.bodyLarge,
+                        style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurface,
+                        color = AppVisualTokens.Text,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
                     Text(
                         text = app.packageName,
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = AppVisualTokens.Muted,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -845,7 +961,7 @@ private fun AppListRow(
                     .weight(0.85f)
                     .padding(end = 8.dp),
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurface,
+                color = AppVisualTokens.Text,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -854,7 +970,7 @@ private fun AppListRow(
                 text = app.size,
                 modifier = Modifier.weight(0.75f),
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurface,
+                color = AppVisualTokens.Text,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -867,8 +983,8 @@ private fun AppListRow(
                 }
                 val statusColor = when {
                     app.isDisabled -> Color(0xFF9CA3AF)
-                    app.isRunning -> Color(0xFF2DBE60)
-                    else -> MaterialTheme.colorScheme.onSurfaceVariant
+                    app.isRunning -> AppVisualTokens.Success
+                    else -> AppVisualTokens.Muted
                 }
                 Surface(
                     color = statusColor.copy(alpha = if (app.isRunning) 0.14f else 0.1f),
@@ -877,46 +993,20 @@ private fun AppListRow(
                     Text(
                         text = statusText,
                         color = statusColor,
-                        style = MaterialTheme.typography.labelMedium,
+                        style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Medium,
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                     )
                 }
             }
 
-            Row(
-                modifier = Modifier.weight(1.2f),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
+            Box(
+                modifier = Modifier.weight(0.52f),
+                contentAlignment = Alignment.CenterStart
             ) {
-                val actionAlpha = if (isRowHovered) 1f else 0.38f
-                RowActionButton(
-                    icon = Icons.Default.ChevronRight,
-                    contentDescription = l10n("应用详情", "App details"),
-                    tint = MaterialTheme.colorScheme.primary,
-                    alpha = actionAlpha,
-                    onClick = { onAction(AdbFunctionType.APP_INFO) }
-                )
-                if (app.isRunning) {
-                    RowActionButton(
-                        icon = Icons.Default.Stop,
-                        contentDescription = l10n("停止应用", "Stop app"),
-                        tint = Color(0xFFEF6C00),
-                        alpha = actionAlpha,
-                        onClick = { onAction(AdbFunctionType.FORCE_STOP) }
-                    )
-                } else {
-                    RowActionButton(
-                        icon = Icons.Default.PlayArrow,
-                        contentDescription = l10n("启动应用", "Launch app"),
-                        tint = Color(0xFF22A35A),
-                        alpha = actionAlpha,
-                        onClick = { onAction(AdbFunctionType.LAUNCH) }
-                    )
-                }
                 AppActionMenu(
                     app = app,
-                    alpha = actionAlpha,
+                    alpha = if (isRowHovered) 1f else 0.72f,
                     onAction = onAction,
                     onCopyPackageName = onCopyPackageName,
                     onRequestDangerAction = onRequestDangerAction
@@ -959,7 +1049,7 @@ private fun AppListRow(
             AppActionMenuItem(
                 icon = Icons.Default.DeleteSweep,
                 text = l10n("清除数据", "Clear data"),
-                iconTint = Color(0xFF1565C0)
+                iconTint = AppVisualTokens.Primary
             ) {
                 contextMenuExpanded = false
                 onRequestDangerAction(
@@ -971,7 +1061,7 @@ private fun AppListRow(
             AppActionMenuItem(
                 icon = Icons.Default.Download,
                 text = l10n("导出 APK", "Export APK"),
-                iconTint = Color(0xFF00897B)
+                iconTint = AppVisualTokens.Success
             ) {
                 contextMenuExpanded = false
                 onAction(AdbFunctionType.EXPORT_APK)
@@ -979,7 +1069,7 @@ private fun AppListRow(
             AppActionMenuItem(
                 icon = Icons.Default.PrivacyTip,
                 text = l10n("查看权限", "View permissions"),
-                iconTint = Color(0xFF5C6BC0)
+                iconTint = AppVisualTokens.Primary
             ) {
                 contextMenuExpanded = false
                 onAction(AdbFunctionType.APP_INFO)
@@ -991,8 +1081,8 @@ private fun AppListRow(
             AppActionMenuItem(
                 icon = Icons.Default.Delete,
                 text = l10n("卸载应用", "Uninstall app"),
-                iconTint = Color(0xFFE53935),
-                textColor = Color(0xFFE53935)
+                iconTint = AppVisualTokens.Danger,
+                textColor = AppVisualTokens.Danger
             ) {
                 contextMenuExpanded = false
                 onRequestDangerAction(
@@ -1040,19 +1130,20 @@ private fun AppActionMenu(
 
     Box {
         Surface(
-            shape = RoundedCornerShape(10.dp),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
-            color = MaterialTheme.colorScheme.surface,
+            shape = RoundedCornerShape(8.dp),
+            border = BorderStroke(1.dp, AppVisualTokens.Border),
+            color = AppVisualTokens.Surface,
             modifier = Modifier
-                .size(width = 30.dp, height = 28.dp)
+                .size(28.dp)
                 .graphicsLayer { this.alpha = alpha }
                 .clickable { expanded = true }
         ) {
             Box(contentAlignment = Alignment.Center) {
                 Icon(
-                    imageVector = Icons.Default.MoreVert,
+                    imageVector = Icons.Default.MoreHoriz,
                     contentDescription = l10n("更多操作", "More actions"),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    tint = AppVisualTokens.Muted,
+                    modifier = Modifier.size(16.dp)
                 )
             }
         }
@@ -1091,7 +1182,7 @@ private fun AppActionMenu(
             AppActionMenuItem(
                 icon = if (app.isRunning) Icons.Default.Stop else Icons.Default.PlayArrow,
                 text = if (app.isRunning) l10n("强行停止", "Force stop") else l10n("启动应用", "Launch app"),
-                iconTint = if (app.isRunning) Color(0xFFEF6C00) else Color(0xFF22A35A)
+                iconTint = if (app.isRunning) AppVisualTokens.Warning else AppVisualTokens.Success
             ) {
                 expanded = false
                 if (app.isRunning) {
@@ -1107,7 +1198,7 @@ private fun AppActionMenu(
             AppActionMenuItem(
                 icon = Icons.Default.DeleteSweep,
                 text = l10n("清除数据", "Clear data"),
-                iconTint = Color(0xFF1565C0)
+                iconTint = AppVisualTokens.Primary
             ) {
                 expanded = false
                 onRequestDangerAction(
@@ -1119,7 +1210,7 @@ private fun AppActionMenu(
             AppActionMenuItem(
                 icon = Icons.Default.Download,
                 text = l10n("导出 APK", "Export APK"),
-                iconTint = Color(0xFF00897B)
+                iconTint = AppVisualTokens.Success
             ) {
                 expanded = false
                 onAction(AdbFunctionType.EXPORT_APK)
@@ -1127,7 +1218,7 @@ private fun AppActionMenu(
             AppActionMenuItem(
                 icon = Icons.Default.PrivacyTip,
                 text = l10n("查看权限", "View permissions"),
-                iconTint = Color(0xFF5C6BC0)
+                iconTint = AppVisualTokens.Primary
             ) {
                 expanded = false
                 onAction(AdbFunctionType.APP_INFO)
@@ -1139,8 +1230,8 @@ private fun AppActionMenu(
             AppActionMenuItem(
                 icon = Icons.Default.Delete,
                 text = l10n("卸载应用", "Uninstall app"),
-                iconTint = Color(0xFFE53935),
-                textColor = Color(0xFFE53935)
+                iconTint = AppVisualTokens.Danger,
+                textColor = AppVisualTokens.Danger
             ) {
                 expanded = false
                 onRequestDangerAction(
@@ -1216,12 +1307,15 @@ private fun AppGridCard(
         }
     ) {
         Surface(
-            shape = RoundedCornerShape(14.dp),
-            color = MaterialTheme.colorScheme.surface,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f))
+            shape = RoundedCornerShape(10.dp),
+            color = AppVisualTokens.Surface,
+            border = BorderStroke(1.dp, AppVisualTokens.Border)
         ) {
         Column(
-            modifier = Modifier.fillMaxWidth().padding(11.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .defaultMinSize(minHeight = 128.dp)
+                .padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Row(
@@ -1230,62 +1324,43 @@ private fun AppGridCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 AppAvatar(app = app, icon = icon, size = 34)
-                Box(
-                    modifier = Modifier
-                        .size(8.dp)
-                        .background(
-                            if (app.isRunning) Color(0xFF2DBE60) else MaterialTheme.colorScheme.outlineVariant,
-                            CircleShape
-                        )
+                AppActionMenu(
+                    app = app,
+                    alpha = 0.86f,
+                    onAction = onAction,
+                    onCopyPackageName = onCopyPackageName,
+                    onRequestDangerAction = onRequestDangerAction
                 )
             }
 
             Text(
                 text = app.appName,
-                style = MaterialTheme.typography.bodyLarge,
+                style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.SemiBold,
+                color = AppVisualTokens.Text,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
 
-            if (app.appName != app.packageName) {
-                Text(
-                    text = app.packageName,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
+            Text(
+                text = app.packageName,
+                style = MaterialTheme.typography.labelSmall,
+                color = AppVisualTokens.Muted,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
 
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                RowActionButton(
-                    icon = Icons.Default.Info,
-                    contentDescription = l10n("应用详情", "App details"),
-                    tint = Color(0xFF5C6BC0),
-                    onClick = { onAction(AdbFunctionType.APP_INFO) }
-                )
+            Spacer(modifier = Modifier.height(4.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                AppTypeTag(text = if (app.isSystemApp) l10n("系统", "System") else l10n("用户", "User"))
+                Spacer(modifier = Modifier.weight(1f))
                 if (app.isRunning) {
-                    RowActionButton(
-                        icon = Icons.Default.Stop,
-                        contentDescription = l10n("停止应用", "Stop app"),
-                        tint = Color(0xFFEF6C00),
-                        onClick = { onAction(AdbFunctionType.FORCE_STOP) }
-                    )
-                } else {
-                    RowActionButton(
-                        icon = Icons.Default.PlayArrow,
-                        contentDescription = l10n("启动应用", "Launch app"),
-                        tint = Color(0xFF22A35A),
-                        onClick = { onAction(AdbFunctionType.LAUNCH) }
-                    )
+                    AppTypeTag(text = l10n("运行中", "Running"), accent = AppVisualTokens.Success)
                 }
-                AppActionMenu(
-                    app = app,
-                    onAction = onAction,
-                    onCopyPackageName = onCopyPackageName,
-                    onRequestDangerAction = onRequestDangerAction
-                )
             }
         }
         }
@@ -1309,7 +1384,7 @@ private fun AppGridCard(
             AppActionMenuItem(
                 icon = Icons.Default.ContentCopy,
                 text = l10n("复制包名", "Copy package"),
-                iconTint = Color(0xFF5C6BC0)
+                iconTint = AppVisualTokens.Primary
             ) {
                 contextMenuExpanded = false
                 onCopyPackageName()
@@ -1321,7 +1396,7 @@ private fun AppGridCard(
             AppActionMenuItem(
                 icon = Icons.Default.Info,
                 text = l10n("应用详情", "App details"),
-                iconTint = Color(0xFF5C6BC0)
+                iconTint = AppVisualTokens.Primary
             ) {
                 contextMenuExpanded = false
                 onAction(AdbFunctionType.APP_INFO)
@@ -1329,7 +1404,7 @@ private fun AppGridCard(
             AppActionMenuItem(
                 icon = Icons.Default.PlayArrow,
                 text = l10n("启动应用", "Launch app"),
-                iconTint = Color(0xFF22A35A)
+                iconTint = AppVisualTokens.Success
             ) {
                 contextMenuExpanded = false
                 onAction(AdbFunctionType.LAUNCH)
@@ -1337,7 +1412,7 @@ private fun AppGridCard(
             AppActionMenuItem(
                 icon = Icons.Default.Stop,
                 text = l10n("停止应用", "Stop app"),
-                iconTint = Color(0xFFEF6C00)
+                iconTint = AppVisualTokens.Warning
             ) {
                 contextMenuExpanded = false
                 onRequestDangerAction(
@@ -1349,7 +1424,7 @@ private fun AppGridCard(
             AppActionMenuItem(
                 icon = Icons.Default.DeleteSweep,
                 text = l10n("清除数据", "Clear data"),
-                iconTint = Color(0xFF1565C0)
+                iconTint = AppVisualTokens.Primary
             ) {
                 contextMenuExpanded = false
                 onRequestDangerAction(
@@ -1361,7 +1436,7 @@ private fun AppGridCard(
             AppActionMenuItem(
                 icon = Icons.Default.Download,
                 text = l10n("导出 APK", "Export APK"),
-                iconTint = Color(0xFF00897B)
+                iconTint = AppVisualTokens.Success
             ) {
                 contextMenuExpanded = false
                 onAction(AdbFunctionType.EXPORT_APK)
@@ -1373,8 +1448,8 @@ private fun AppGridCard(
             AppActionMenuItem(
                 icon = Icons.Default.Delete,
                 text = l10n("卸载应用", "Uninstall app"),
-                iconTint = Color(0xFFE53935),
-                textColor = Color(0xFFE53935)
+                iconTint = AppVisualTokens.Danger,
+                textColor = AppVisualTokens.Danger
             ) {
                 contextMenuExpanded = false
                 onRequestDangerAction(
@@ -1391,19 +1466,19 @@ private fun AppGridCard(
 @Composable
 private fun AppListFooter(count: Int) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(top = 10.dp, end = 6.dp),
+        modifier = Modifier.fillMaxWidth().padding(top = 10.dp, start = 2.dp, end = 6.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
             text = l10n("共 $count 个应用", "$count apps"),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            style = MaterialTheme.typography.bodySmall,
+            color = AppVisualTokens.Muted
         )
         Text(
             text = l10n("右键点击可快速操作", "Right click for quick actions"),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+            style = MaterialTheme.typography.bodySmall,
+            color = AppVisualTokens.Muted.copy(alpha = 0.62f)
         )
     }
 }
@@ -1436,7 +1511,7 @@ private fun AppDetailPage(
                 .fillMaxSize()
                 .verticalScroll(scrollState)
                 .padding(end = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(24.dp)
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -1479,7 +1554,7 @@ private fun AppDetailPage(
                         )
                     }
                 }
-                HorizontalDivider(color = Color(0xFFE5E7EB))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
             }
 
             when (selectedTab) {
@@ -1517,13 +1592,13 @@ private fun DetailHeaderCard(
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
-        color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, Color(0xFFE5E7EB))
+        shape = RoundedCornerShape(14.dp),
+        color = AppVisualTokens.Surface,
+        border = BorderStroke(1.dp, AppVisualTokens.Border)
     ) {
         Column(
-            modifier = Modifier.fillMaxWidth().padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(20.dp)
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -1538,11 +1613,11 @@ private fun DetailHeaderCard(
                     AppAvatar(
                         app = AppInfo(appName = appInfo.appName.ifBlank { appInfo.packageName }, packageName = appInfo.packageName),
                         icon = icon,
-                        size = 76
+                        size = 64
                     )
                     Column(
                         modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                        verticalArrangement = Arrangement.spacedBy(7.dp)
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
@@ -1550,9 +1625,9 @@ private fun DetailHeaderCard(
                         ) {
                             Text(
                                 text = appInfo.appName.ifBlank { appInfo.packageName },
-                                style = MaterialTheme.typography.headlineSmall,
+                                style = MaterialTheme.typography.titleLarge,
                                 fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface,
+                                color = AppVisualTokens.Text,
                                 maxLines = 2,
                                 overflow = TextOverflow.Ellipsis
                             )
@@ -1568,7 +1643,7 @@ private fun DetailHeaderCard(
 
                 HeaderStorageUsageCard(
                     appInfo = appInfo,
-                    modifier = Modifier.widthIn(min = 230.dp, max = 300.dp)
+                    modifier = Modifier.widthIn(min = 248.dp, max = 280.dp)
                 )
             }
 
@@ -1590,15 +1665,15 @@ private fun DetailHeaderRow(
     Row(verticalAlignment = Alignment.Top) {
         Text(
             text = label,
-            modifier = Modifier.width(92.dp),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            modifier = Modifier.width(84.dp),
+            style = MaterialTheme.typography.bodySmall,
+            color = AppVisualTokens.Muted
         )
         SelectionContainer {
             SelectableValueText(
                 text = value.ifBlank { "-" },
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface,
+                style = MaterialTheme.typography.bodySmall,
+                color = AppVisualTokens.Text,
                 maxLines = maxLines,
                 overflow = TextOverflow.Ellipsis
             )
@@ -1611,55 +1686,47 @@ private fun HeaderStorageUsageCard(
     appInfo: AppInfoData,
     modifier: Modifier = Modifier
 ) {
-    Surface(
+    Column(
         modifier = modifier,
-        shape = RoundedCornerShape(12.dp),
-        color = Color(0xFFF8F9FB),
-        border = BorderStroke(1.dp, Color(0xFFE5E7EB))
+        verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+        Text(
+            text = l10n("存储占用", "Storage"),
+            style = MaterialTheme.typography.labelMedium,
+            color = AppVisualTokens.Muted,
+            fontWeight = FontWeight.SemiBold
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = l10n("存储占用", "Storage"),
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically
+            StorageRing(total = appInfo.totalSize, size = 72.dp, innerSize = 50.dp)
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                StorageRing(total = appInfo.totalSize, size = 88.dp, innerSize = 62.dp)
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                StorageLegend(AppVisualTokens.Primary, l10n("应用大小", "App size"), appInfo.appSize)
+                StorageLegend(AppVisualTokens.Muted, l10n("应用数据", "App data"), appInfo.dataSize)
+                StorageLegend(AppVisualTokens.Muted, l10n("缓存数据", "Cache"), appInfo.cacheSize)
+                HorizontalDivider(color = AppVisualTokens.Divider)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    StorageLegend(Color(0xFF1F6BFF), l10n("应用大小", "App size"), appInfo.appSize)
-                    StorageLegend(MaterialTheme.colorScheme.onSurfaceVariant, l10n("应用数据", "App data"), appInfo.dataSize)
-                    StorageLegend(MaterialTheme.colorScheme.onSurfaceVariant, l10n("缓存数据", "Cache"), appInfo.cacheSize)
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = l10n("总计", "Total"),
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Text(
-                            text = appInfo.totalSize,
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    }
+                    Text(
+                        text = l10n("总计", "Total"),
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = AppVisualTokens.Text
+                    )
+                    Text(
+                        text = appInfo.totalSize,
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.Bold,
+                        color = AppVisualTokens.Primary
+                    )
                 }
             }
         }
@@ -1680,7 +1747,7 @@ private fun DetailActionsPanel(
             icon = if (appInfo.isRunning) Icons.Default.Stop else Icons.Default.PlayArrow,
             text = if (appInfo.isRunning) l10n("停止应用", "Stop app") else l10n("启动应用", "Launch app"),
             tint = Color.White,
-            bgColor = MaterialTheme.colorScheme.primary,
+            bgColor = AppVisualTokens.Primary,
             modifier = Modifier.width(140.dp)
         ) {
             onAction(if (appInfo.isRunning) AdbFunctionType.FORCE_STOP else AdbFunctionType.LAUNCH)
@@ -1688,8 +1755,8 @@ private fun DetailActionsPanel(
         DetailActionButton(
             icon = Icons.Default.Refresh,
             text = l10n("刷新", "Refresh"),
-            tint = MaterialTheme.colorScheme.onSurface,
-            bgColor = MaterialTheme.colorScheme.surface,
+            tint = AppVisualTokens.Text,
+            bgColor = AppVisualTokens.Surface,
             modifier = Modifier.width(110.dp)
         ) { onAction(AdbFunctionType.APP_INFO) }
         DetailMoreActionMenu(onAction = onAction, onRequestDangerAction = onRequestDangerAction)
@@ -1698,7 +1765,7 @@ private fun DetailActionsPanel(
 
 @Composable
 private fun StatusPill(isRunning: Boolean) {
-    val color = if (isRunning) Color(0xFF2DBE60) else MaterialTheme.colorScheme.onSurfaceVariant
+    val color = if (isRunning) AppVisualTokens.Success else AppVisualTokens.Muted
     Surface(
         color = if (isRunning) Color(0xFFE9F9EF) else color.copy(alpha = 0.12f),
         shape = RoundedCornerShape(999.dp)
@@ -1706,9 +1773,9 @@ private fun StatusPill(isRunning: Boolean) {
         Text(
             text = if (isRunning) l10n("运行中", "Running") else l10n("未运行", "Stopped"),
             color = color,
-            style = MaterialTheme.typography.labelMedium,
+            style = MaterialTheme.typography.labelSmall,
             fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.padding(horizontal = 11.dp, vertical = 5.dp)
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
         )
     }
 }
@@ -1726,12 +1793,12 @@ private fun DetailActionButton(
     Surface(
         onClick = onClick,
         enabled = enabled,
-        modifier = modifier.height(42.dp),
-        shape = RoundedCornerShape(10.dp),
-        color = if (enabled) bgColor else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+        modifier = modifier.height(40.dp),
+        shape = RoundedCornerShape(8.dp),
+        color = if (enabled) bgColor else AppVisualTokens.Soft,
         border = BorderStroke(
             1.dp,
-            if (bgColor == MaterialTheme.colorScheme.surface) Color(0xFFE5E7EB)
+            if (bgColor == AppVisualTokens.Surface) AppVisualTokens.Border
             else bgColor
         )
     ) {
@@ -1743,14 +1810,14 @@ private fun DetailActionButton(
             Icon(
                 icon,
                 contentDescription = text,
-                tint = if (enabled) tint else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                modifier = Modifier.size(17.dp)
+                tint = if (enabled) tint else AppVisualTokens.Muted.copy(alpha = 0.5f),
+                modifier = Modifier.size(16.dp)
             )
             Spacer(Modifier.width(6.dp))
             Text(
                 text,
-                color = if (enabled) tint else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                style = MaterialTheme.typography.labelLarge,
+                color = if (enabled) tint else AppVisualTokens.Muted.copy(alpha = 0.5f),
+                style = MaterialTheme.typography.bodySmall,
                 fontWeight = FontWeight.SemiBold
             )
         }
@@ -1767,8 +1834,8 @@ private fun DetailMoreActionMenu(
         DetailActionButton(
             icon = Icons.Default.MoreHoriz,
             text = l10n("更多操作", "More"),
-            tint = MaterialTheme.colorScheme.onSurface,
-            bgColor = MaterialTheme.colorScheme.surface,
+            tint = AppVisualTokens.Text,
+            bgColor = AppVisualTokens.Surface,
             modifier = Modifier.width(124.dp)
         ) { expanded = true }
 
@@ -1777,13 +1844,13 @@ private fun DetailMoreActionMenu(
             onDismissRequest = { expanded = false },
             modifier = Modifier
                 .width(190.dp)
-                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(12.dp))
-                .border(BorderStroke(1.dp, Color(0xFFE5E7EB)), RoundedCornerShape(12.dp))
+                .background(AppVisualTokens.Surface, RoundedCornerShape(10.dp))
+                .border(BorderStroke(1.dp, AppVisualTokens.Border), RoundedCornerShape(10.dp))
         ) {
             AppActionMenuItem(
                 icon = Icons.Default.DeleteSweep,
                 text = l10n("清除数据", "Clear data"),
-                iconTint = MaterialTheme.colorScheme.onSurfaceVariant
+                iconTint = AppVisualTokens.Muted
             ) {
                 expanded = false
                 onRequestDangerAction(
@@ -1795,17 +1862,17 @@ private fun DetailMoreActionMenu(
             AppActionMenuItem(
                 icon = Icons.Default.Download,
                 text = l10n("导出 APK", "Export APK"),
-                iconTint = MaterialTheme.colorScheme.onSurfaceVariant
+                iconTint = AppVisualTokens.Muted
             ) { expanded = false; onAction(AdbFunctionType.EXPORT_APK) }
             HorizontalDivider(
                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
-                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f)
+                color = AppVisualTokens.Divider
             )
             AppActionMenuItem(
                 icon = Icons.Default.Delete,
                 text = l10n("卸载应用", "Uninstall app"),
-                iconTint = Color(0xFFD93025),
-                textColor = Color(0xFFD93025)
+                iconTint = AppVisualTokens.Danger,
+                textColor = AppVisualTokens.Danger
             ) {
                 expanded = false
                 onRequestDangerAction(
@@ -1824,7 +1891,7 @@ private fun DetailTabItem(
     selected: Boolean,
     onClick: () -> Unit
 ) {
-    val textColor = if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
+    val textColor = if (selected) AppVisualTokens.Text else AppVisualTokens.Muted
     Column(
         modifier = Modifier
             .widthIn(min = 92.dp)
@@ -1839,7 +1906,7 @@ private fun DetailTabItem(
                 else -> tab.title
             },
             color = textColor,
-            style = MaterialTheme.typography.bodyMedium,
+            style = MaterialTheme.typography.bodySmall,
             fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
             maxLines = 1,
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 10.dp)
@@ -1848,7 +1915,7 @@ private fun DetailTabItem(
             modifier = Modifier
                 .height(2.5.dp)
                 .fillMaxWidth()
-                .background(if (selected) MaterialTheme.colorScheme.primary else Color.Transparent)
+                .background(if (selected) AppVisualTokens.Primary else Color.Transparent)
         )
     }
 }
@@ -1857,19 +1924,19 @@ private fun DetailTabItem(
 private fun AppInfoDetailContent(appInfo: AppInfoData) {
     BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
         if (maxWidth < 980.dp) {
-            Column(verticalArrangement = Arrangement.spacedBy(24.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 BasicInfoCard(appInfo)
                 ProcessInfoCard(appInfo)
                 PermissionSummaryCard(appInfo)
                 OperationLogCard(appInfo)
             }
         } else {
-            Column(verticalArrangement = Arrangement.spacedBy(24.dp)) {
-                Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                     BasicInfoCard(appInfo, Modifier.weight(1.05f))
                     ProcessInfoCard(appInfo, Modifier.weight(1f))
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                     PermissionSummaryCard(appInfo, Modifier.weight(1f))
                     OperationLogCard(appInfo, Modifier.weight(1f))
                 }
@@ -1887,18 +1954,18 @@ private fun DetailSectionCard(
     Surface(
         modifier = modifier,
         shape = RoundedCornerShape(12.dp),
-        color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, Color(0xFFE5E7EB))
+        color = AppVisualTokens.Surface,
+        border = BorderStroke(1.dp, AppVisualTokens.Border)
     ) {
         Column(
-            modifier = Modifier.fillMaxWidth().padding(20.dp),
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             Text(
                 text = title,
-                style = MaterialTheme.typography.titleMedium,
+                style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface
+                color = AppVisualTokens.Text
             )
             content()
         }
@@ -1927,11 +1994,12 @@ private fun BasicInfoCard(appInfo: AppInfoData, modifier: Modifier = Modifier) {
 
 @Composable
 private fun DetailInfoGrid(items: List<Pair<String, String>>) {
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        items.chunked(2).forEach { row ->
+    val rows = items.chunked(2)
+    Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {
+        rows.forEachIndexed { index, row ->
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                horizontalArrangement = Arrangement.spacedBy(20.dp)
             ) {
                 row.forEach { (label, value) ->
                     DetailInfoGridCell(
@@ -1944,6 +2012,9 @@ private fun DetailInfoGrid(items: List<Pair<String, String>>) {
                     Spacer(modifier = Modifier.weight(1f))
                 }
             }
+            if (index != rows.lastIndex) {
+                HorizontalDivider(color = AppVisualTokens.Divider)
+            }
         }
     }
 }
@@ -1954,32 +2025,25 @@ private fun DetailInfoGridCell(
     value: String,
     modifier: Modifier = Modifier
 ) {
-    Surface(
-        modifier = modifier,
-        shape = RoundedCornerShape(10.dp),
-        color = Color(0xFFF8F9FB),
-        border = BorderStroke(1.dp, Color(0xFFE5E7EB))
+    Column(
+        modifier = modifier
+            .heightIn(min = 42.dp)
+            .padding(vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(3.dp)
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 10.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = AppVisualTokens.Muted
+        )
+        SelectionContainer {
+            SelectableValueText(
+                text = value.ifBlank { "-" },
+                style = MaterialTheme.typography.bodySmall,
+                color = AppVisualTokens.Text,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
             )
-            SelectionContainer {
-                SelectableValueText(
-                    text = value.ifBlank { "-" },
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
         }
     }
 }
@@ -1997,10 +2061,10 @@ private fun StorageInfoCard(appInfo: AppInfoData, modifier: Modifier = Modifier)
                 modifier = Modifier.weight(1f).padding(start = 20.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                StorageLegend(Color(0xFF1F6BFF), l10n("应用大小", "App size"), appInfo.appSize)
-                StorageLegend(Color(0xFF38C989), l10n("应用数据", "App data"), appInfo.dataSize)
-                StorageLegend(Color(0xFFFF8A1F), l10n("缓存数据", "Cache"), appInfo.cacheSize)
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f))
+                StorageLegend(AppVisualTokens.Primary, l10n("应用大小", "App size"), appInfo.appSize)
+                StorageLegend(AppVisualTokens.Success, l10n("应用数据", "App data"), appInfo.dataSize)
+                StorageLegend(AppVisualTokens.Warning, l10n("缓存数据", "Cache"), appInfo.cacheSize)
+                HorizontalDivider(color = AppVisualTokens.Divider)
                 DetailInfoRow(l10n("总计", "Total"), appInfo.totalSize)
             }
         }
@@ -2022,14 +2086,14 @@ private fun StorageRing(
         modifier = Modifier
             .size(size)
             .clip(CircleShape)
-            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)),
+            .background(AppVisualTokens.Selected),
         contentAlignment = Alignment.Center
     ) {
         Box(
             modifier = Modifier
                 .size(innerSize)
                 .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.surface),
+                .background(AppVisualTokens.Surface),
             contentAlignment = Alignment.Center
         ) {
             Column(
@@ -2043,7 +2107,7 @@ private fun StorageRing(
                     text = valueText,
                     style = if (compact) MaterialTheme.typography.titleSmall else MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface,
+                    color = AppVisualTokens.Text,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -2051,7 +2115,7 @@ private fun StorageRing(
                     Text(
                         text = unitText,
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = AppVisualTokens.Muted,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -2069,11 +2133,11 @@ private fun StorageLegend(color: Color, label: String, value: String) {
         verticalAlignment = Alignment.CenterVertically
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(modifier = Modifier.size(8.dp).background(color, CircleShape))
+            Box(modifier = Modifier.size(7.dp).background(color, CircleShape))
             Spacer(Modifier.width(8.dp))
-            Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(label, style = MaterialTheme.typography.bodySmall, color = AppVisualTokens.Muted)
         }
-        Text(value, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
+        Text(value, style = MaterialTheme.typography.bodySmall, color = AppVisualTokens.Text)
     }
 }
 
@@ -2095,10 +2159,10 @@ private fun PermissionSummaryCard(appInfo: AppInfoData, modifier: Modifier = Mod
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            PermissionTile(l10n("危险权限", "Dangerous"), appInfo.dangerousPermissionCount, Icons.Default.GppMaybe, Color(0xFFDF4C4C), Modifier.weight(1f))
-            PermissionTile(l10n("隐私权限", "Privacy"), appInfo.privacyPermissionCount, Icons.Default.Lock, Color(0xFF1F6BFF), Modifier.weight(1f))
-            PermissionTile(l10n("普通权限", "Normal"), appInfo.normalPermissionCount, Icons.Default.Info, MaterialTheme.colorScheme.onSurfaceVariant, Modifier.weight(1f))
-            PermissionTile(l10n("全部权限", "All"), appInfo.totalPermissionCount, Icons.Default.Apps, MaterialTheme.colorScheme.onSurfaceVariant, Modifier.weight(1f))
+            PermissionTile(l10n("危险权限", "Dangerous"), appInfo.dangerousPermissionCount, Icons.Default.GppMaybe, AppVisualTokens.Danger, Modifier.weight(1f))
+            PermissionTile(l10n("隐私权限", "Privacy"), appInfo.privacyPermissionCount, Icons.Default.Lock, AppVisualTokens.Primary, Modifier.weight(1f))
+            PermissionTile(l10n("普通权限", "Normal"), appInfo.normalPermissionCount, Icons.Default.Info, AppVisualTokens.Muted, Modifier.weight(1f))
+            PermissionTile(l10n("全部权限", "All"), appInfo.totalPermissionCount, Icons.Default.Apps, AppVisualTokens.Muted, Modifier.weight(1f))
         }
     }
 }
@@ -2112,27 +2176,29 @@ private fun PermissionTile(
     modifier: Modifier = Modifier
 ) {
     Surface(
-        modifier = modifier.height(112.dp),
-        shape = RoundedCornerShape(10.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.28f),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f))
+        modifier = modifier.height(76.dp),
+        shape = RoundedCornerShape(8.dp),
+        color = AppVisualTokens.Surface,
+        border = BorderStroke(1.dp, AppVisualTokens.Border)
     ) {
         Column(
-            modifier = Modifier.fillMaxSize().padding(10.dp),
+            modifier = Modifier.fillMaxSize().padding(horizontal = 10.dp, vertical = 9.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.SpaceEvenly
+            verticalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterVertically)
         ) {
             Icon(
                 icon,
                 contentDescription = null,
                 tint = color,
-                modifier = Modifier
-                    .size(30.dp)
-                    .background(color.copy(alpha = 0.1f), RoundedCornerShape(8.dp))
-                    .padding(6.dp)
+                modifier = Modifier.size(17.dp)
             )
-            Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(value.toString(), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Text(label, style = MaterialTheme.typography.labelSmall, color = AppVisualTokens.Muted)
+            Text(
+                value.toString(),
+                style = MaterialTheme.typography.titleMedium,
+                color = AppVisualTokens.Text,
+                fontWeight = FontWeight.Bold
+            )
         }
     }
 }
@@ -2154,8 +2220,8 @@ private fun OperationRow(action: String, time: String) {
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(action, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
-        Text(time, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(action, style = MaterialTheme.typography.bodySmall, color = AppVisualTokens.Text)
+        Text(time, style = MaterialTheme.typography.bodySmall, color = AppVisualTokens.Muted)
     }
 }
 
@@ -2169,14 +2235,14 @@ private fun DetailInfoRow(label: String, value: String) {
         Text(
             text = label,
             modifier = Modifier.width(96.dp),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            style = MaterialTheme.typography.bodySmall,
+            color = AppVisualTokens.Muted
         )
         SelectionContainer(modifier = Modifier.weight(1f)) {
             SelectableValueText(
                 text = value.ifBlank { "-" },
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface,
+                style = MaterialTheme.typography.bodySmall,
+                color = AppVisualTokens.Text,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis
             )
@@ -2215,13 +2281,13 @@ private fun PermissionDetailContent(appInfo: AppInfoData) {
                 "已解析到 ${appInfo.totalPermissionCount} 项权限，其中 ${appInfo.dangerousPermissionCount} 项可能涉及敏感能力。",
                 "Detected ${appInfo.totalPermissionCount} permissions, ${appInfo.dangerousPermissionCount} of them may be sensitive."
             ),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            style = MaterialTheme.typography.bodySmall,
+            color = AppVisualTokens.Muted
         )
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            PermissionTile(l10n("危险权限", "Dangerous"), appInfo.dangerousPermissionCount, Icons.Default.GppMaybe, Color(0xFFFF4D4F), Modifier.width(132.dp))
-            PermissionTile(l10n("隐私权限", "Privacy"), appInfo.privacyPermissionCount, Icons.Default.Lock, Color(0xFF1F6BFF), Modifier.width(132.dp))
-            PermissionTile(l10n("普通权限", "Normal"), appInfo.normalPermissionCount, Icons.Default.Info, Color(0xFF0EA5E9), Modifier.width(132.dp))
+            PermissionTile(l10n("危险权限", "Dangerous"), appInfo.dangerousPermissionCount, Icons.Default.GppMaybe, AppVisualTokens.Danger, Modifier.width(132.dp))
+            PermissionTile(l10n("隐私权限", "Privacy"), appInfo.privacyPermissionCount, Icons.Default.Lock, AppVisualTokens.Primary, Modifier.width(132.dp))
+            PermissionTile(l10n("普通权限", "Normal"), appInfo.normalPermissionCount, Icons.Default.Info, AppVisualTokens.Muted, Modifier.width(132.dp))
         }
 
         Row(
@@ -2232,10 +2298,10 @@ private fun PermissionDetailContent(appInfo: AppInfoData) {
                 val selected = selectedFilter == filter
                 Surface(
                     shape = RoundedCornerShape(8.dp),
-                    color = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                    color = if (selected) AppVisualTokens.Selected else AppVisualTokens.Surface,
                     border = BorderStroke(
                         1.dp,
-                        if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.3f) else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
+                        if (selected) Color(0xFFBBD7FF) else AppVisualTokens.Border
                     ),
                     modifier = Modifier.clickable { selectedFilter = filter }
                 ) {
@@ -2249,7 +2315,7 @@ private fun PermissionDetailContent(appInfo: AppInfoData) {
                         },
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
                         style = MaterialTheme.typography.bodySmall,
-                        color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = if (selected) AppVisualTokens.Primary else AppVisualTokens.Muted,
                         fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium
                     )
                 }
@@ -2314,7 +2380,8 @@ private fun SignatureDetailContent(appInfo: AppInfoData) {
         DetailItemList(
             title = l10n("签名相关", "Signature details"),
             items = appInfo.signatureDetails,
-            emptyText = l10n("当前未解析到签名信息", "No signature information parsed")
+            emptyText = l10n("当前未解析到签名信息", "No signature information parsed"),
+            maxLines = 4
         )
     }
 }
@@ -2323,13 +2390,14 @@ private fun SignatureDetailContent(appInfo: AppInfoData) {
 private fun DetailItemList(
     title: String,
     items: List<String>,
-    emptyText: String
+    emptyText: String,
+    maxLines: Int = 2
 ) {
     Text(
         text = title,
         style = MaterialTheme.typography.titleSmall,
         fontWeight = FontWeight.SemiBold,
-        color = MaterialTheme.colorScheme.onSurface
+        color = AppVisualTokens.Text
     )
     if (items.isEmpty()) {
         Box(
@@ -2340,43 +2408,36 @@ private fun DetailItemList(
         ) {
             Text(
                 text = emptyText,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                style = MaterialTheme.typography.bodySmall,
+                color = AppVisualTokens.Muted
             )
         }
     } else {
         Surface(
-            shape = RoundedCornerShape(12.dp),
-            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f))
+            shape = RoundedCornerShape(8.dp),
+            color = AppVisualTokens.Surface,
+            border = BorderStroke(1.dp, AppVisualTokens.Border)
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(14.dp)
+                    .padding(horizontal = 12.dp, vertical = 6.dp)
             ) {
-                FlowRow(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    items.forEach { item ->
-                        Surface(
-                            shape = RoundedCornerShape(6.dp),
-                            color = MaterialTheme.colorScheme.surface,
-                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f))
-                        ) {
-                            SelectionContainer {
-                                SelectableValueText(
-                                    text = item,
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                    maxLines = 2,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
-                        }
+                items.forEachIndexed { index, item ->
+                    SelectionContainer {
+                        SelectableValueText(
+                            text = item,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 8.dp),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = AppVisualTokens.Text,
+                            maxLines = maxLines,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                    if (index != items.lastIndex) {
+                        HorizontalDivider(color = AppVisualTokens.Divider)
                     }
                 }
             }

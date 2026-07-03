@@ -19,6 +19,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 class TerminalController(
@@ -29,12 +30,17 @@ class TerminalController(
 ) {
     private val maxLines = 5000
     private val maxHistory = 200
+    private val outputBatchSize = 40
+    private val outputFlushDelayMs = 80L
     private val lineCounter = AtomicLong(0)
+    private val outputBufferLock = Any()
+    private val pendingOutputLines = ArrayDeque<TerminalLine>()
 
     private var historyCursor = -1
     private var historyDraft = ""
     private var runningProcess: RunningProcess? = null
     private var runningJob: Job? = null
+    private var pendingOutputFlushJob: Job? = null
 
     private val _session = MutableStateFlow(
         TerminalSession(
@@ -77,6 +83,7 @@ class TerminalController(
     }
 
     fun clearOutput() {
+        clearPendingOutput()
         _session.update { it.copy(lines = emptyList()) }
     }
 
@@ -171,8 +178,10 @@ class TerminalController(
     }
 
     fun dispose() {
+        flushPendingOutput()
         runningProcess?.cancel()
         runningJob?.cancel()
+        pendingOutputFlushJob?.cancel()
     }
 
     private fun executeBuiltIn(parsed: ParsedCommand.BuiltIn) {
@@ -369,16 +378,72 @@ class TerminalController(
             type = type,
             text = text
         )
-        _session.update { current ->
-            val newLines = if (current.lines.size >= maxLines) {
-                ArrayList<TerminalLine>(maxLines).apply {
-                    addAll(current.lines.subList(1, current.lines.size))
-                    add(line)
-                }
+        if (type.shouldBatchOutput()) {
+            val shouldPublish = synchronized(outputBufferLock) {
+                pendingOutputLines.addLast(line)
+                pendingOutputLines.size >= outputBatchSize
+            }
+            if (shouldPublish) {
+                flushPendingOutput()
             } else {
-                ArrayList<TerminalLine>(current.lines.size + 1).apply {
-                    addAll(current.lines)
-                    add(line)
+                schedulePendingOutputFlush()
+            }
+            return
+        }
+
+        flushPendingOutput()
+        publishLines(listOf(line))
+    }
+
+    private fun TerminalLineType.shouldBatchOutput(): Boolean {
+        return this == TerminalLineType.OUTPUT || this == TerminalLineType.ERROR
+    }
+
+    private fun schedulePendingOutputFlush() {
+        synchronized(outputBufferLock) {
+            if (pendingOutputFlushJob?.isActive == true) return
+            pendingOutputFlushJob = scope.launch {
+                delay(outputFlushDelayMs)
+                flushPendingOutput()
+            }
+        }
+    }
+
+    private fun flushPendingOutput() {
+        val lines = synchronized(outputBufferLock) {
+            if (pendingOutputLines.isEmpty()) return
+            pendingOutputFlushJob?.cancel()
+            pendingOutputFlushJob = null
+            pendingOutputLines.toList().also {
+                pendingOutputLines.clear()
+            }
+        }
+        publishLines(lines)
+    }
+
+    private fun clearPendingOutput() = synchronized(outputBufferLock) {
+        pendingOutputFlushJob?.cancel()
+        pendingOutputFlushJob = null
+        pendingOutputLines.clear()
+    }
+
+    private fun publishLines(lines: List<TerminalLine>) {
+        if (lines.isEmpty()) return
+        _session.update { current ->
+            val overflow = current.lines.size + lines.size - maxLines
+            val retainedCurrentLines = if (overflow > 0) {
+                current.lines.drop(overflow.coerceAtMost(current.lines.size))
+            } else {
+                current.lines
+            }
+            val newLines = ArrayList<TerminalLine>(
+                (retainedCurrentLines.size + lines.size).coerceAtMost(maxLines)
+            ).apply {
+                addAll(retainedCurrentLines)
+                if (size + lines.size <= maxLines) {
+                    addAll(lines)
+                } else {
+                    addAll(lines.takeLast(maxLines - size))
                 }
             }
             current.copy(lines = newLines)

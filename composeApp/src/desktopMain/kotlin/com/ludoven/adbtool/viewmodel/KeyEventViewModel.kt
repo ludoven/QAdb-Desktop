@@ -25,6 +25,10 @@ data class KeyEventRecord(
 }
 
 class KeyEventViewModel : BaseViewModel() {
+    companion object {
+        internal fun keyEventDeviceActionsEnabled(deviceId: String?): Boolean =
+            !deviceId.isNullOrBlank()
+    }
 
     private val timeFormatter = DateTimeFormatter.ofPattern("HH:mm:ss")
 
@@ -110,7 +114,7 @@ class KeyEventViewModel : BaseViewModel() {
     }
 
     private fun ensureDeviceSelected(): Boolean {
-        if (AdbTool.selectDeviceId != null) return true
+        if (keyEventDeviceActionsEnabled(AdbTool.selectDeviceId)) return true
         showTipDialog(MsgContent.Resource(Res.string.no_device_available))
         return false
     }

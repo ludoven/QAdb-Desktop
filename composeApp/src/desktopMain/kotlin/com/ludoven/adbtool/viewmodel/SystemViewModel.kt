@@ -4,6 +4,8 @@ import androidx.lifecycle.viewModelScope
 import com.ludoven.adbtool.entity.MsgContent
 import com.ludoven.adbtool.util.AdbTool
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -15,7 +17,24 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+internal fun systemInfoLoadShouldApply(requestedDeviceId: String?, selectedDeviceId: String?): Boolean {
+    val requested = requestedDeviceId?.trim().orEmpty()
+    val selected = selectedDeviceId?.trim().orEmpty()
+    return requested.isNotEmpty() && requested == selected
+}
+
+internal fun systemInfoLoadShouldCancelForDeviceChange(activeLoadDeviceId: String?, nextSelectedDeviceId: String?): Boolean {
+    val active = activeLoadDeviceId?.trim().orEmpty()
+    if (active.isEmpty()) return false
+    return active != nextSelectedDeviceId?.trim().orEmpty()
+}
+
+@OptIn(FlowPreview::class)
 class SystemViewModel : BaseViewModel() {
+    companion object {
+        internal fun systemDeviceActionsEnabled(deviceId: String?): Boolean =
+            !deviceId.isNullOrBlank()
+    }
 
     private val propRegex = Regex("\\[(.*?)]\\s*:\\s*\\[(.*?)]")
 
@@ -40,6 +59,10 @@ class SystemViewModel : BaseViewModel() {
     private val _propSearchText = MutableStateFlow("")
     val propSearchText: StateFlow<String> = _propSearchText.asStateFlow()
 
+    private var systemInfoLoadJob: Job? = null
+    private var systemInfoLoadDeviceId: String? = null
+    private var loadedSystemInfoDeviceId: String? = null
+
     val filteredProps: StateFlow<Map<String, String>> = combine(
         _systemProps,
         _propSearchText.debounce(300L)
@@ -55,24 +78,60 @@ class SystemViewModel : BaseViewModel() {
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
 
     fun setDevice(deviceId: String?) {
-        _selectedDevice.value = deviceId
+        val normalizedDeviceId = deviceId?.trim()?.takeIf { it.isNotBlank() }
+        val changed = _selectedDevice.value != normalizedDeviceId
+        if (systemInfoLoadShouldCancelForDeviceChange(systemInfoLoadDeviceId, normalizedDeviceId)) {
+            systemInfoLoadJob?.cancel()
+            systemInfoLoadJob = null
+            systemInfoLoadDeviceId = null
+            _isLoading.value = false
+        }
+        _selectedDevice.value = normalizedDeviceId
+        if (_selectedDevice.value == null) {
+            systemInfoLoadJob?.cancel()
+            systemInfoLoadJob = null
+            systemInfoLoadDeviceId = null
+            loadedSystemInfoDeviceId = null
+            clearDeviceScopedData()
+        } else if (changed) {
+            loadedSystemInfoDeviceId = null
+            clearDeviceScopedData()
+        }
     }
 
     fun updatePropSearch(text: String) {
         _propSearchText.value = text
     }
 
-    fun loadSystemInfo(deviceId: String) {
-        viewModelScope.launch {
+    fun loadSystemInfo(deviceId: String, forceRefresh: Boolean = false) {
+        val normalizedDeviceId = deviceId.trim()
+        if (!systemDeviceActionsEnabled(normalizedDeviceId)) {
+            systemInfoLoadJob?.cancel()
+            systemInfoLoadJob = null
+            systemInfoLoadDeviceId = null
+            loadedSystemInfoDeviceId = null
+            _isLoading.value = false
+            return
+        }
+        if (!forceRefresh && systemInfoLoadDeviceId == normalizedDeviceId && systemInfoLoadJob?.isActive == true) {
+            return
+        }
+        if (!forceRefresh && loadedSystemInfoDeviceId == normalizedDeviceId) {
+            _isLoading.value = false
+            return
+        }
+        systemInfoLoadJob?.cancel()
+        systemInfoLoadDeviceId = normalizedDeviceId
+        systemInfoLoadJob = viewModelScope.launch {
             _isLoading.value = true
 
             try {
                 withContext(Dispatchers.IO) {
-                    val propsDeferred = async { AdbTool.executeAdbCommand("-s", deviceId, "shell", "getprop") }
-                    val batteryDeferred = async { AdbTool.executeAdbCommand("-s", deviceId, "shell", "dumpsys", "battery") }
-                    val cpuDeferred = async { AdbTool.executeAdbCommand("-s", deviceId, "shell", "cat", "/proc/cpuinfo") }
-                    val screenSizeDeferred = async { AdbTool.executeAdbCommand("-s", deviceId, "shell", "wm", "size") }
-                    val screenDensityDeferred = async { AdbTool.executeAdbCommand("-s", deviceId, "shell", "wm", "density") }
+                    val propsDeferred = async { AdbTool.execAdbOutputAsync("-s", normalizedDeviceId, "shell", "getprop") }
+                    val batteryDeferred = async { AdbTool.execAdbOutputAsync("-s", normalizedDeviceId, "shell", "dumpsys", "battery") }
+                    val cpuDeferred = async { AdbTool.execAdbOutputAsync("-s", normalizedDeviceId, "shell", "cat", "/proc/cpuinfo") }
+                    val screenSizeDeferred = async { AdbTool.execAdbOutputAsync("-s", normalizedDeviceId, "shell", "wm", "size") }
+                    val screenDensityDeferred = async { AdbTool.execAdbOutputAsync("-s", normalizedDeviceId, "shell", "wm", "density") }
 
                     val propsOutput = propsDeferred.await()
                     val batteryOutput = batteryDeferred.await()
@@ -80,6 +139,8 @@ class SystemViewModel : BaseViewModel() {
                     val screenSizeOutput = screenSizeDeferred.await()
                     val screenDensityOutput = screenDensityDeferred.await()
 
+                    if (!systemInfoLoadShouldApply(normalizedDeviceId, _selectedDevice.value)) return@withContext
+                    loadedSystemInfoDeviceId = normalizedDeviceId
                     _systemProps.value = parseSystemProps(propsOutput)
                     _batteryInfo.value = parseBatteryInfo(batteryOutput)
                     _cpuInfo.value = parseCpuInfo(cpuOutput)
@@ -89,14 +150,24 @@ class SystemViewModel : BaseViewModel() {
                 showTipDialog(MsgContent.Text("Failed to load system info: ${e.message}"), autoDismiss = true)
             }
 
-            _isLoading.value = false
+            if (systemInfoLoadShouldApply(normalizedDeviceId, _selectedDevice.value)) {
+                _isLoading.value = false
+            }
         }
     }
 
+    fun cancelActiveLoad() {
+        systemInfoLoadJob?.cancel()
+        systemInfoLoadJob = null
+        systemInfoLoadDeviceId = null
+        _isLoading.value = false
+    }
+
     fun rebootNormal(deviceId: String) {
+        if (!systemDeviceActionsEnabled(deviceId)) return
         viewModelScope.launch {
             val result = withContext(Dispatchers.IO) {
-                AdbTool.executeAdbCommand("-s", deviceId, "reboot")
+                AdbTool.execAdbOutputAsync("-s", deviceId, "reboot")
             }
             showTipDialog(
                 MsgContent.Text(if (result.isBlank()) "Reboot command sent successfully" else result),
@@ -106,9 +177,10 @@ class SystemViewModel : BaseViewModel() {
     }
 
     fun rebootRecovery(deviceId: String) {
+        if (!systemDeviceActionsEnabled(deviceId)) return
         viewModelScope.launch {
             val result = withContext(Dispatchers.IO) {
-                AdbTool.executeAdbCommand("-s", deviceId, "reboot", "recovery")
+                AdbTool.execAdbOutputAsync("-s", deviceId, "reboot", "recovery")
             }
             showTipDialog(
                 MsgContent.Text(if (result.isBlank()) "Reboot to recovery command sent successfully" else result),
@@ -118,9 +190,10 @@ class SystemViewModel : BaseViewModel() {
     }
 
     fun rebootBootloader(deviceId: String) {
+        if (!systemDeviceActionsEnabled(deviceId)) return
         viewModelScope.launch {
             val result = withContext(Dispatchers.IO) {
-                AdbTool.executeAdbCommand("-s", deviceId, "reboot", "bootloader")
+                AdbTool.execAdbOutputAsync("-s", deviceId, "reboot", "bootloader")
             }
             showTipDialog(
                 MsgContent.Text(if (result.isBlank()) "Reboot to bootloader command sent successfully" else result),
@@ -130,9 +203,10 @@ class SystemViewModel : BaseViewModel() {
     }
 
     fun setScreenSize(deviceId: String, size: String) {
+        if (!systemDeviceActionsEnabled(deviceId)) return
         viewModelScope.launch {
             val result = withContext(Dispatchers.IO) {
-                AdbTool.executeAdbCommand("-s", deviceId, "shell", "wm", "size", size)
+                AdbTool.execAdbOutputAsync("-s", deviceId, "shell", "wm", "size", size)
             }
             showTipDialog(
                 MsgContent.Text(if (result.isBlank()) "Screen size set to $size" else result),
@@ -142,9 +216,10 @@ class SystemViewModel : BaseViewModel() {
     }
 
     fun resetScreenSize(deviceId: String) {
+        if (!systemDeviceActionsEnabled(deviceId)) return
         viewModelScope.launch {
             val result = withContext(Dispatchers.IO) {
-                AdbTool.executeAdbCommand("-s", deviceId, "shell", "wm", "size", "reset")
+                AdbTool.execAdbOutputAsync("-s", deviceId, "shell", "wm", "size", "reset")
             }
             showTipDialog(
                 MsgContent.Text(if (result.isBlank()) "Screen size reset to default" else result),
@@ -154,9 +229,10 @@ class SystemViewModel : BaseViewModel() {
     }
 
     fun setScreenDensity(deviceId: String, density: String) {
+        if (!systemDeviceActionsEnabled(deviceId)) return
         viewModelScope.launch {
             val result = withContext(Dispatchers.IO) {
-                AdbTool.executeAdbCommand("-s", deviceId, "shell", "wm", "density", density)
+                AdbTool.execAdbOutputAsync("-s", deviceId, "shell", "wm", "density", density)
             }
             showTipDialog(
                 MsgContent.Text(if (result.isBlank()) "Screen density set to ${density}dpi" else result),
@@ -166,9 +242,10 @@ class SystemViewModel : BaseViewModel() {
     }
 
     fun resetScreenDensity(deviceId: String) {
+        if (!systemDeviceActionsEnabled(deviceId)) return
         viewModelScope.launch {
             val result = withContext(Dispatchers.IO) {
-                AdbTool.executeAdbCommand("-s", deviceId, "shell", "wm", "density", "reset")
+                AdbTool.execAdbOutputAsync("-s", deviceId, "shell", "wm", "density", "reset")
             }
             showTipDialog(
                 MsgContent.Text(if (result.isBlank()) "Screen density reset to default" else result),
@@ -249,5 +326,26 @@ class SystemViewModel : BaseViewModel() {
         }
 
         return result
+    }
+
+    private fun clearDeviceScopedData() {
+        _systemProps.value = emptyMap()
+        _batteryInfo.value = emptyMap()
+        _cpuInfo.value = emptyList()
+        _screenInfo.value = emptyMap()
+        _isLoading.value = false
+    }
+
+    internal fun replaceDeviceScopedDataForTest(
+        systemProps: Map<String, String>,
+        batteryInfo: Map<String, String>,
+        cpuInfo: List<Pair<String, String>>,
+        screenInfo: Map<String, String>
+    ) {
+        _systemProps.value = systemProps
+        _batteryInfo.value = batteryInfo
+        _cpuInfo.value = cpuInfo
+        _screenInfo.value = screenInfo
+        _isLoading.value = true
     }
 }

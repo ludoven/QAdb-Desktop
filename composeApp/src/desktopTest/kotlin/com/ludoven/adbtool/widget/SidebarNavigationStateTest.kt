@@ -25,13 +25,20 @@ class SidebarNavigationStateTest {
             collapsible = false
         ),
         SidebarGroup(
+            id = "app",
+            label = "应用",
+            icon = Icons.Default.Home,
+            defaultRoute = "app",
+            items = listOf(TabItem("应用", Icons.Default.Home, "app")),
+            collapsible = false
+        ),
+        SidebarGroup(
             id = "diagnostics",
             label = "诊断分析",
             icon = Icons.Default.Home,
             defaultRoute = "log",
             items = listOf(
                 TabItem("日志", Icons.Default.Home, "log"),
-                TabItem("性能", Icons.Default.Home, "performance"),
                 TabItem("进程", Icons.Default.Home, "process")
             )
         )
@@ -42,6 +49,14 @@ class SidebarNavigationStateTest {
         assertEquals(
             emptySet(),
             visibleSidebarGroupIds(groups, selectedRoute = "terminal", expandedGroupId = null)
+        )
+    }
+
+    @Test
+    fun `app route should stay standalone`() {
+        assertEquals(
+            emptySet(),
+            visibleSidebarGroupIds(groups, selectedRoute = "app", expandedGroupId = null)
         )
     }
 
@@ -65,7 +80,7 @@ class SidebarNavigationStateTest {
     fun `current collapsible route group should remain visible`() {
         assertEquals(
             setOf("diagnostics"),
-            visibleSidebarGroupIds(groups, selectedRoute = "performance", expandedGroupId = null)
+            visibleSidebarGroupIds(groups, selectedRoute = "log", expandedGroupId = null)
         )
     }
 

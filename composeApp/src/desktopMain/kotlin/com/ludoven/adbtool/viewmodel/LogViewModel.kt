@@ -8,6 +8,7 @@ import com.ludoven.adbtool.entity.LogLevel
 import com.ludoven.adbtool.util.AdbPathManager
 import com.ludoven.adbtool.util.ChildProcessRegistry
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -21,6 +22,7 @@ import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
 
+@OptIn(FlowPreview::class)
 class LogViewModel : ViewModel() {
     companion object {
         internal const val MAX_LOG_ENTRIES = 10_000
@@ -31,6 +33,19 @@ class LogViewModel : ViewModel() {
                 buffer.removeFirst()
             }
             buffer.addLast(entry)
+        }
+
+        internal fun normalizedCaptureDevice(device: String?): String? =
+            device?.takeIf { it.isNotBlank() }
+
+        internal fun shouldStopCaptureForDeviceChange(
+            isCapturing: Boolean,
+            activeCaptureDevice: String?,
+            nextSelectedDevice: String?
+        ): Boolean {
+            if (!isCapturing) return false
+            val activeDevice = normalizedCaptureDevice(activeCaptureDevice) ?: return false
+            return activeDevice != normalizedCaptureDevice(nextSelectedDevice)
         }
     }
 
@@ -57,12 +72,17 @@ class LogViewModel : ViewModel() {
     }.debounce(100).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     private var logProcess: Process? = null
+    private var activeCaptureDevice: String? = null
     private val logBuffer = ArrayDeque<LogEntry>(MAX_LOG_ENTRIES)
     private val logBufferLock = Any()
     private var pendingLogUpdates = 0
 
     fun setSelectedDevice(device: String?) {
-        _selectedDevice.value = device
+        val normalizedDevice = normalizedCaptureDevice(device)
+        _selectedDevice.value = normalizedDevice
+        if (shouldStopCaptureForDeviceChange(_isCapturing.value, activeCaptureDevice, normalizedDevice)) {
+            stopCapture()
+        }
     }
 
     fun updateFilter(filter: LogFilter) {
@@ -70,9 +90,11 @@ class LogViewModel : ViewModel() {
     }
 
     fun startCapture(deviceSerial: String) {
+        val normalizedDevice = normalizedCaptureDevice(deviceSerial) ?: return
         if (_isCapturing.value) return
 
         _isCapturing.value = true
+        activeCaptureDevice = normalizedDevice
         clearLogBuffer()
         _logs.value = emptyList()
 
@@ -86,7 +108,7 @@ class LogViewModel : ViewModel() {
                 val command = buildList {
                     add(adbPath)
                     add("-s")
-                    add(deviceSerial)
+                    add(normalizedDevice)
                     add("logcat")
                     add("-v")
                     add("time")
@@ -162,6 +184,7 @@ class LogViewModel : ViewModel() {
             } finally {
                 ChildProcessRegistry.unregister(logProcess)
                 logProcess = null
+                activeCaptureDevice = null
                 withContext(Dispatchers.Main) {
                     _isCapturing.value = false
                 }
@@ -174,9 +197,11 @@ class LogViewModel : ViewModel() {
         logProcess?.destroy()
         ChildProcessRegistry.unregister(logProcess)
         logProcess = null
+        activeCaptureDevice = null
     }
 
     fun restartCapture(deviceSerial: String) {
+        if (normalizedCaptureDevice(deviceSerial) == null) return
         stopCapture()
         startCapture(deviceSerial)
     }

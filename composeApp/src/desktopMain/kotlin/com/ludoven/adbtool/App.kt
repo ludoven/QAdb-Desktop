@@ -10,7 +10,6 @@ import adbtool_desktop.composeapp.generated.resources.home
 import adbtool_desktop.composeapp.generated.resources.key_event_page
 import adbtool_desktop.composeapp.generated.resources.log
 import adbtool_desktop.composeapp.generated.resources.set
-import adbtool_desktop.composeapp.generated.resources.system_page
 import adbtool_desktop.composeapp.generated.resources.terminal
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
@@ -20,19 +19,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.List
-import androidx.compose.material.icons.automirrored.filled.ScreenShare
-import androidx.compose.material.icons.filled.Apps
-import androidx.compose.material.icons.filled.Code
-import androidx.compose.material.icons.filled.Folder
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.PhoneAndroid
-import androidx.compose.material.icons.filled.QueryStats
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Speed
-import androidx.compose.material.icons.filled.VideogameAsset
+import com.ludoven.adbtool.ui.icons.IconParkIcons
 import com.ludoven.adbtool.ui.mac.ExperimentalMaterial3Api
 import com.ludoven.adbtool.ui.mac.MaterialTheme
 import com.ludoven.adbtool.ui.mac.Scaffold
@@ -49,6 +36,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isCtrlPressed
+import androidx.compose.ui.input.key.isMetaPressed
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.foundation.BorderStroke
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
@@ -63,11 +57,9 @@ import com.ludoven.adbtool.pages.HomeScreen
 import com.ludoven.adbtool.pages.KeyEventScreen
 import com.ludoven.adbtool.pages.LogScreen
 import com.ludoven.adbtool.pages.DeviceMirrorScreen
-import com.ludoven.adbtool.pages.PerformanceScreen
 import com.ludoven.adbtool.pages.ProcessScreen
 import com.ludoven.adbtool.widget.SidebarGroup
 import com.ludoven.adbtool.pages.SettingScreen
-import com.ludoven.adbtool.pages.SystemScreen
 import com.ludoven.adbtool.pages.TerminalScreen
 import com.ludoven.adbtool.util.AdbPathManager
 import com.ludoven.adbtool.util.LanguageManager
@@ -83,8 +75,6 @@ import com.ludoven.adbtool.viewmodel.DevicesViewModel
 import com.ludoven.adbtool.viewmodel.FileBrowserViewModel
 import com.ludoven.adbtool.viewmodel.KeyEventViewModel
 import com.ludoven.adbtool.viewmodel.LogViewModel
-import com.ludoven.adbtool.viewmodel.ResourceViewModel
-import com.ludoven.adbtool.viewmodel.SystemViewModel
 import com.ludoven.adbtool.viewmodel.TerminalViewModel
 import com.ludoven.adbtool.widget.GlassCard
 import com.ludoven.adbtool.widget.Sidebar
@@ -105,12 +95,6 @@ fun App() {
     val logViewModel: LogViewModel = viewModel()
     val terminalViewModel: TerminalViewModel = viewModel()
     val fileBrowserViewModel: FileBrowserViewModel = viewModel()
-    val systemViewModel: SystemViewModel = viewModel()
-    val resourceViewModel: ResourceViewModel = viewModel()
-    val devices by devicesViewModel.devices.collectAsState()
-    val selectedDevice by devicesViewModel.selectedDevice.collectAsState()
-    val deviceDisplayNames by devicesViewModel.deviceDisplayNames.collectAsState()
-
     LaunchedEffect(Unit) {
         LanguageManager.initialize()
         ThemeManager.initialize()
@@ -121,57 +105,62 @@ fun App() {
         SidebarGroup(
             id = "home",
             label = stringResource(Res.string.home),
-            icon = Icons.Default.Home,
+            icon = IconParkIcons.Home,
             defaultRoute = "home",
-            items = listOf(TabItem(stringResource(Res.string.home), Icons.Default.Home, "home")),
+            items = listOf(TabItem(stringResource(Res.string.home), IconParkIcons.Home, "home")),
             collapsible = false
         ),
         SidebarGroup(
             id = "common",
             label = stringResource(Res.string.common),
-            icon = Icons.Default.Info,
+            icon = IconParkIcons.Info,
             defaultRoute = "common",
-            items = listOf(TabItem(stringResource(Res.string.common), Icons.Default.Info, "common")),
+            items = listOf(TabItem(stringResource(Res.string.common), IconParkIcons.Info, "common")),
+            collapsible = false
+        ),
+        SidebarGroup(
+            id = "app",
+            label = stringResource(Res.string.app),
+            icon = IconParkIcons.Application,
+            defaultRoute = "app",
+            items = listOf(TabItem(stringResource(Res.string.app), IconParkIcons.Application, "app")),
             collapsible = false
         ),
         SidebarGroup(
             id = "terminal",
             label = stringResource(Res.string.terminal),
-            icon = Icons.Default.Code,
+            icon = IconParkIcons.Terminal,
             defaultRoute = "terminal",
-            items = listOf(TabItem(stringResource(Res.string.terminal), Icons.Default.Code, "terminal")),
+            items = listOf(TabItem(stringResource(Res.string.terminal), IconParkIcons.Terminal, "terminal")),
             collapsible = false
         ),
         SidebarGroup(
             id = "device",
             label = l10n("设备操作", "Device Ops"),
-            icon = Icons.Default.PhoneAndroid,
+            icon = IconParkIcons.Phone,
             defaultRoute = "mirror",
             items = listOf(
-                TabItem(l10n("镜像", "Mirror"), Icons.AutoMirrored.Filled.ScreenShare, "mirror"),
-                TabItem(stringResource(Res.string.key_event_page), Icons.Default.VideogameAsset, "keyevent"),
-                TabItem(stringResource(Res.string.file_browser), Icons.Default.Folder, "filebrowser"),
-                TabItem(stringResource(Res.string.app), Icons.Default.Apps, "app"),
+                TabItem(l10n("镜像", "Mirror"), IconParkIcons.CastScreen, "mirror"),
+                TabItem(stringResource(Res.string.key_event_page), IconParkIcons.GameHandle, "keyevent"),
+                TabItem(stringResource(Res.string.file_browser), IconParkIcons.Folder, "filebrowser"),
             )
         ),
         SidebarGroup(
             id = "diagnostics",
             label = l10n("诊断分析", "Diagnostics"),
-            icon = Icons.Default.QueryStats,
+            icon = IconParkIcons.ChartLine,
             defaultRoute = "log",
             items = listOf(
-                TabItem(stringResource(Res.string.log), Icons.AutoMirrored.Filled.List, "log"),
-                TabItem(l10n("性能", "Perf"), Icons.Default.Speed, "performance"),
-                TabItem(l10n("进程", "Process"), Icons.Default.PhoneAndroid, "process"),
-                TabItem(stringResource(Res.string.system_page), Icons.Default.PhoneAndroid, "system"),
+                TabItem(stringResource(Res.string.log), IconParkIcons.List, "log"),
+                TabItem(l10n("进程", "Process"), IconParkIcons.Phone, "process"),
             )
         ),
         SidebarGroup(
             id = "settings",
             label = stringResource(Res.string.set),
-            icon = Icons.Default.Settings,
+            icon = IconParkIcons.Setting,
             defaultRoute = "setting",
-            items = listOf(TabItem(stringResource(Res.string.set), Icons.Default.Settings, "setting")),
+            items = listOf(TabItem(stringResource(Res.string.set), IconParkIcons.Setting, "setting")),
             collapsible = false
         )
     )
@@ -180,6 +169,7 @@ fun App() {
     val stateHolder = rememberSaveableStateHolder()
     val currentBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = currentBackStackEntry?.destination?.route ?: "home"
+    val usePlainContentContainer = currentRoute == "setting"
     var showRebootConfirm by remember { mutableStateOf(false) }
     val currentThemeMode by ThemeManager.currentThemeMode.collectAsState()
     val resolvedDarkTheme = when (currentThemeMode) {
@@ -199,6 +189,24 @@ fun App() {
         }
     }
 
+    fun handleGlobalShortcut(key: Key): Boolean {
+        return when (key) {
+            Key.One -> { navigateToRoute("home"); true }
+            Key.Two -> { navigateToRoute("common"); true }
+            Key.Three -> { navigateToRoute("app"); true }
+            Key.Four -> { navigateToRoute("terminal"); true }
+            Key.Five -> { navigateToRoute("mirror"); true }
+            Key.Six -> { navigateToRoute("keyevent"); true }
+            Key.Seven -> { navigateToRoute("filebrowser"); true }
+            Key.Eight -> { navigateToRoute("log"); true }
+            Key.Nine -> { navigateToRoute("process"); true }
+            Key.Zero -> { navigateToRoute("setting"); true }
+            Key.R -> { devicesViewModel.refreshDevices(); true }
+            Key.T -> { navigateToRoute("terminal"); true }
+            else -> false
+        }
+    }
+
     LaunchedEffect(Unit) {
         AppMenuCommandBus.commands.collect { command ->
             when (command) {
@@ -207,7 +215,7 @@ fun App() {
                     val address = command.address.trim()
                     if (address.isNotEmpty()) {
                         val output = withContext(Dispatchers.IO) {
-                            AdbTool.executeAdbCommand("connect", address)
+                            AdbTool.execAdbOutputAsync("connect", address)
                         }
                         commonModel.showTipDialog(MsgContent.Text(output), autoDismiss = true)
                         devicesViewModel.refreshDevices()
@@ -231,8 +239,16 @@ fun App() {
 
     AdbToolTheme(useDarkTheme = resolvedDarkTheme) {
         Scaffold(
-            modifier = Modifier.fillMaxSize(),
-            containerColor = MaterialTheme.colorScheme.background
+            modifier = Modifier
+                .fillMaxSize()
+                .onPreviewKeyEvent { event ->
+                    if (event.type == KeyEventType.KeyDown && (event.isMetaPressed || event.isCtrlPressed)) {
+                        handleGlobalShortcut(event.key)
+                    } else {
+                        false
+                    }
+                },
+            containerColor = if (usePlainContentContainer) Color.White else MaterialTheme.colorScheme.background
         ) { paddingValues ->
             Row(
                 modifier = Modifier
@@ -241,18 +257,12 @@ fun App() {
                     .padding(12.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Sidebar(
+                SidebarContainer(
                     groups = tabGroups,
                     selectedRoute = currentRoute,
-                    connectedDeviceCount = devices.size,
-                    devices = devices,
-                    selectedDevice = selectedDevice,
-                    deviceDisplayNames = deviceDisplayNames,
+                    devicesViewModel = devicesViewModel,
                     onItemClick = { route ->
                         navigateToRoute(route)
-                    },
-                    onDeviceSelected = { deviceId ->
-                        devicesViewModel.selectDevice(deviceId)
                     }
                 )
 
@@ -263,14 +273,18 @@ fun App() {
                 ) {
                     GlassCard(
                         modifier = Modifier.fillMaxSize(),
-                        shape = RoundedCornerShape(14.dp),
-                        borderStroke = BorderStroke(1.dp, Color(0xFFE5E7EB))
+                        shape = RoundedCornerShape(if (usePlainContentContainer) 0.dp else 14.dp),
+                        borderStroke = if (usePlainContentContainer) {
+                            null
+                        } else {
+                            BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
+                        }
                     ) {
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .weight(1f)
-                                .padding(8.dp)
+                                .padding(if (usePlainContentContainer) 0.dp else 8.dp)
                         ) {
                             NavHost(navController, startDestination = "home") {
                                 composable("home") {
@@ -281,11 +295,17 @@ fun App() {
                                             HomeScreen(
                                                 viewModel = devicesViewModel,
                                                 onScreenshot = { commonModel.executeAdbAction(AdbFunctionType.SCREENSHOT) },
+                                                onScreenRecord = { commonModel.executeAdbAction(AdbFunctionType.SCREEN_RECORD) },
                                                 onInstallApk = { commonModel.executeAdbAction(AdbFunctionType.INSTALL_APK) },
                                                 onMirrorDevice = { navigateToRoute("mirror") },
                                                 onOpenShell = {
                                                     navigateToRoute("terminal")
-                                                }
+                                                },
+                                                onOpenLogcat = { navigateToRoute("log") },
+                                                onOpenFileManager = { navigateToRoute("filebrowser") },
+                                                onOpenAppManager = { navigateToRoute("app") },
+                                                onOpenDiagnostics = { navigateToRoute("process") },
+                                                onMoreActions = { navigateToRoute("common") }
                                             )
                                             HomeActionToast(
                                                 visible = commonShowDialog,
@@ -296,6 +316,7 @@ fun App() {
                                 }
                                 composable("mirror") {
                                     stateHolder.SaveableStateProvider("mirror") {
+                                        val selectedDevice by devicesViewModel.selectedDevice.collectAsState()
                                         DeviceMirrorScreen(
                                             viewModel = deviceMirrorViewModel,
                                             selectedDevice = selectedDevice
@@ -304,11 +325,17 @@ fun App() {
                                 }
                                 composable("common") {
                                     stateHolder.SaveableStateProvider("common") {
-                                        CommonScreen(commonModel)
+                                        val selectedDevice by devicesViewModel.selectedDevice.collectAsState()
+                                        CommonScreen(
+                                            viewModel = commonModel,
+                                            selectedDevice = selectedDevice
+                                        )
                                     }
                                 }
                                 composable("keyevent") {
                                     stateHolder.SaveableStateProvider("keyevent") {
+                                        val selectedDevice by devicesViewModel.selectedDevice.collectAsState()
+                                        val deviceDisplayNames by devicesViewModel.deviceDisplayNames.collectAsState()
                                         KeyEventScreen(
                                             viewModel = keyEventViewModel,
                                             selectedDevice = selectedDevice,
@@ -318,6 +345,9 @@ fun App() {
                                 }
                                 composable("terminal") {
                                     stateHolder.SaveableStateProvider("terminal") {
+                                        val devices by devicesViewModel.devices.collectAsState()
+                                        val selectedDevice by devicesViewModel.selectedDevice.collectAsState()
+                                        val deviceDisplayNames by devicesViewModel.deviceDisplayNames.collectAsState()
                                         TerminalScreen(
                                             viewModel = terminalViewModel,
                                             selectedDevice = selectedDevice,
@@ -334,11 +364,16 @@ fun App() {
                                 }
                                 composable("app") {
                                     stateHolder.SaveableStateProvider("app") {
-                                        AppScreen(appViewModel)
+                                        val selectedDevice by devicesViewModel.selectedDevice.collectAsState()
+                                        AppScreen(
+                                            viewModel = appViewModel,
+                                            selectedDevice = selectedDevice
+                                        )
                                     }
                                 }
                                 composable("filebrowser") {
                                     stateHolder.SaveableStateProvider("filebrowser") {
+                                        val selectedDevice by devicesViewModel.selectedDevice.collectAsState()
                                         FileBrowserScreen(
                                             viewModel = fileBrowserViewModel,
                                             selectedDevice = selectedDevice
@@ -352,31 +387,17 @@ fun App() {
                                 }
                                 composable("log") {
                                     stateHolder.SaveableStateProvider("log") {
+                                        val selectedDevice by devicesViewModel.selectedDevice.collectAsState()
                                         LogScreen(
                                             viewModel = logViewModel,
                                             selectedDevice = selectedDevice
                                         )
                                     }
                                 }
-                                composable("performance") {
-                                    stateHolder.SaveableStateProvider("performance") {
-                                        PerformanceScreen(
-                                            viewModel = resourceViewModel,
-                                            selectedDevice = selectedDevice
-                                        )
-                                    }
-                                }
                                 composable("process") {
                                     stateHolder.SaveableStateProvider("process") {
+                                        val selectedDevice by devicesViewModel.selectedDevice.collectAsState()
                                         ProcessScreen(selectedDevice = selectedDevice)
-                                    }
-                                }
-                                composable("system") {
-                                    stateHolder.SaveableStateProvider("system") {
-                                        SystemScreen(
-                                            viewModel = systemViewModel,
-                                            selectedDevice = selectedDevice
-                                        )
                                     }
                                 }
                             }
@@ -406,6 +427,31 @@ fun App() {
             containerColor = MaterialTheme.colorScheme.surface
         )
     }
+}
+
+@Composable
+private fun SidebarContainer(
+    groups: List<SidebarGroup>,
+    selectedRoute: String,
+    devicesViewModel: DevicesViewModel,
+    onItemClick: (String) -> Unit
+) {
+    val devices by devicesViewModel.devices.collectAsState()
+    val selectedDevice by devicesViewModel.selectedDevice.collectAsState()
+    val deviceDisplayNames by devicesViewModel.deviceDisplayNames.collectAsState()
+
+    Sidebar(
+        groups = groups,
+        selectedRoute = selectedRoute,
+        connectedDeviceCount = devices.size,
+        devices = devices,
+        selectedDevice = selectedDevice,
+        deviceDisplayNames = deviceDisplayNames,
+        onItemClick = onItemClick,
+        onDeviceSelected = { deviceId ->
+            devicesViewModel.selectDevice(deviceId)
+        }
+    )
 }
 
 @Composable

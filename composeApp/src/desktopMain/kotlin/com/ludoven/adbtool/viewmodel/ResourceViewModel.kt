@@ -76,11 +76,23 @@ internal fun appendStorageHistory(
     return (history + summary.usedPercent).takeLast(maxHistory)
 }
 
+internal fun resourceRefreshShouldCancelForDeviceChange(activeRefreshDeviceId: String?, nextDeviceId: String?): Boolean {
+    val active = activeRefreshDeviceId?.trim().orEmpty()
+    if (active.isEmpty()) return false
+    return active != nextDeviceId?.trim().orEmpty()
+}
+
 class ResourceViewModel : BaseViewModel() {
 
     companion object {
         private const val MAX_HISTORY = 60
         private const val MAX_PROCESSES = 15
+
+        internal fun resourceDeviceActionsEnabled(deviceId: String?): Boolean =
+            !deviceId.isNullOrBlank()
+
+        internal fun normalizedResourceDeviceId(deviceId: String?): String? =
+            deviceId?.trim()?.takeIf { resourceDeviceActionsEnabled(it) }
     }
 
     private val _cpuHistory = MutableStateFlow<List<Float>>(emptyList())
@@ -129,23 +141,35 @@ class ResourceViewModel : BaseViewModel() {
     val lastUpdatedAtMillis: StateFlow<Long?> = _lastUpdatedAtMillis.asStateFlow()
 
     private var monitoringJob: Job? = null
+    private var refreshOnceJob: Job? = null
+    private var refreshOnceDeviceId: String? = null
     private var currentDeviceId: String? = null
 
     fun setDevice(deviceId: String?) {
-        val changed = currentDeviceId != deviceId
-        currentDeviceId = deviceId
+        val normalizedDeviceId = normalizedResourceDeviceId(deviceId)
+        val changed = currentDeviceId != normalizedDeviceId
+        if (resourceRefreshShouldCancelForDeviceChange(refreshOnceDeviceId, normalizedDeviceId)) {
+            refreshOnceJob?.cancel()
+            refreshOnceJob = null
+            refreshOnceDeviceId = null
+        }
+        currentDeviceId = normalizedDeviceId
         if (changed) {
             stopMonitoring()
             clearResourceState()
-            if (!deviceId.isNullOrBlank()) {
-                startMonitoring(deviceId)
-            }
         }
     }
 
     fun startMonitoring(deviceId: String) {
+        val normalizedDeviceId = normalizedResourceDeviceId(deviceId)
+        if (normalizedDeviceId == null) {
+            stopMonitoring()
+            clearResourceState()
+            currentDeviceId = null
+            return
+        }
         stopMonitoring()
-        currentDeviceId = deviceId
+        currentDeviceId = normalizedDeviceId
         _isMonitoring.value = true
 
         monitoringJob = viewModelScope.launch {
@@ -153,8 +177,8 @@ class ResourceViewModel : BaseViewModel() {
             while (isActive) {
                 try {
                     coroutineScope {
-                        val cpuJob = async(Dispatchers.IO) { refreshCpuData(deviceId) }
-                        val memJob = async(Dispatchers.IO) { refreshMemData(deviceId) }
+                        val cpuJob = async(Dispatchers.IO) { refreshCpuData(normalizedDeviceId) }
+                        val memJob = async(Dispatchers.IO) { refreshMemData(normalizedDeviceId) }
                         cpuJob.await()
                         memJob.await()
                     }
@@ -162,7 +186,7 @@ class ResourceViewModel : BaseViewModel() {
                     if (storageTick >= 5) {
                         storageTick = 0
                         withContext(Dispatchers.IO) {
-                            refreshStorageData(deviceId)
+                            refreshStorageData(normalizedDeviceId)
                         }
                     }
                     _lastUpdatedAtMillis.value = System.currentTimeMillis()
@@ -179,16 +203,28 @@ class ResourceViewModel : BaseViewModel() {
     fun stopMonitoring() {
         monitoringJob?.cancel()
         monitoringJob = null
+        refreshOnceJob?.cancel()
+        refreshOnceJob = null
+        refreshOnceDeviceId = null
         _isMonitoring.value = false
     }
 
     fun refreshOnce(deviceId: String) {
-        viewModelScope.launch {
+        val normalizedDeviceId = normalizedResourceDeviceId(deviceId)
+        if (normalizedDeviceId == null) {
+            stopMonitoring()
+            clearResourceState()
+            currentDeviceId = null
+            return
+        }
+        refreshOnceJob?.cancel()
+        refreshOnceDeviceId = normalizedDeviceId
+        refreshOnceJob = viewModelScope.launch {
             try {
                 withContext(Dispatchers.IO) {
-                    refreshCpuData(deviceId)
-                    refreshMemData(deviceId)
-                    refreshStorageData(deviceId)
+                    refreshCpuData(normalizedDeviceId)
+                    refreshMemData(normalizedDeviceId)
+                    refreshStorageData(normalizedDeviceId)
                 }
                 _lastUpdatedAtMillis.value = System.currentTimeMillis()
             } catch (_: Exception) {
@@ -216,9 +252,9 @@ class ResourceViewModel : BaseViewModel() {
 
     private suspend fun refreshCpuData(deviceId: String) {
         val (statResult, topResult) = coroutineScope {
-            val stat = async { AdbTool.executeAdbCommand("-s", deviceId, "shell", "cat", "/proc/stat") }
+            val stat = async { AdbTool.execAdbOutputAsync("-s", deviceId, "shell", "cat", "/proc/stat") }
             val top = async {
-                AdbTool.executeAdbCommand(
+                AdbTool.execAdbOutputAsync(
                     "-s", deviceId, "shell", "top", "-n", "1", "-b", "-q"
                 )
             }
@@ -285,9 +321,9 @@ class ResourceViewModel : BaseViewModel() {
 
     private suspend fun refreshMemData(deviceId: String) {
         val (meminfoResult, psResult) = coroutineScope {
-            val meminfo = async { AdbTool.executeAdbCommand("-s", deviceId, "shell", "cat", "/proc/meminfo") }
+            val meminfo = async { AdbTool.execAdbOutputAsync("-s", deviceId, "shell", "cat", "/proc/meminfo") }
             val ps = async {
-                AdbTool.executeAdbCommand("-s", deviceId, "shell", "ps", "-eo", "pid,user,rss,comm")
+                AdbTool.execAdbOutputAsync("-s", deviceId, "shell", "ps", "-eo", "pid,user,rss,comm")
             }
             meminfo.await() to ps.await()
         }
@@ -353,7 +389,7 @@ class ResourceViewModel : BaseViewModel() {
     }
 
     private suspend fun refreshStorageData(deviceId: String) {
-        val dfResult = AdbTool.executeAdbCommand("-s", deviceId, "shell", "df", "-h")
+        val dfResult = AdbTool.execAdbOutputAsync("-s", deviceId, "shell", "df", "-h")
         val partitions = parseDfOutput(dfResult)
         val primarySummary = selectPrimaryStorageSummary(partitions)
 
@@ -361,7 +397,7 @@ class ResourceViewModel : BaseViewModel() {
         _primaryStorageSummary.value = primarySummary
         _storageHistory.value = appendStorageHistory(_storageHistory.value, primarySummary, MAX_HISTORY)
 
-        val pkgResult = AdbTool.executeAdbCommand("-s", deviceId, "shell", "pm", "list", "packages", "-f")
+        val pkgResult = AdbTool.execAdbOutputAsync("-s", deviceId, "shell", "pm", "list", "packages", "-f")
         val apkPaths = parseApkPaths(pkgResult)
         _storageApps.value = estimateAppSizes(deviceId, apkPaths)
     }
@@ -438,7 +474,7 @@ class ResourceViewModel : BaseViewModel() {
             samplePackages.map { (name, path) ->
                 async {
                     semaphore.withPermit {
-                        val duResult = AdbTool.executeAdbCommand("-s", deviceId, "shell", "du", "-k", path)
+                        val duResult = AdbTool.execAdbOutputAsync("-s", deviceId, "shell", "du", "-k", path)
                         parsePackageDuSizeMb(duResult)?.let { sizeMb ->
                             StorageApp(name = name, sizeMb = sizeMb)
                         }

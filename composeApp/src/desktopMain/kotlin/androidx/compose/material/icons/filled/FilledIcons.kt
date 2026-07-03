@@ -1,0 +1,87 @@
+package androidx.compose.material.icons.filled
+
+import androidx.compose.material.icons.Icons
+import androidx.compose.ui.graphics.vector.ImageVector
+import com.ludoven.adbtool.ui.icons.CompatIconVectors
+import com.ludoven.adbtool.ui.icons.IconParkIcons
+
+val Icons.Filled.Add: ImageVector get() = CompatIconVectors.Add
+val Icons.Filled.Android: ImageVector get() = IconParkIcons.Application
+val Icons.Filled.Apps: ImageVector get() = IconParkIcons.Application
+val Icons.Filled.Archive: ImageVector get() = IconParkIcons.Folder
+val Icons.Filled.ArrowDownward: ImageVector get() = CompatIconVectors.ArrowDownward
+val Icons.Filled.ArrowDropDown: ImageVector get() = CompatIconVectors.ArrowDropDown
+val Icons.Filled.ArrowDropUp: ImageVector get() = CompatIconVectors.ArrowDropUp
+val Icons.Filled.ArrowUpward: ImageVector get() = CompatIconVectors.ArrowUpward
+val Icons.Filled.AutoAwesomeMotion: ImageVector get() = IconParkIcons.Command
+val Icons.Filled.BatteryChargingFull: ImageVector get() = IconParkIcons.BatteryFull
+val Icons.Filled.Bookmark: ImageVector get() = CompatIconVectors.Star
+val Icons.Filled.CameraAlt: ImageVector get() = IconParkIcons.Camera
+val Icons.Filled.Check: ImageVector get() = CompatIconVectors.Check
+val Icons.Filled.CheckCircle: ImageVector get() = IconParkIcons.CheckCircle
+val Icons.Filled.ChevronRight: ImageVector get() = CompatIconVectors.ChevronRight
+val Icons.Filled.Clear: ImageVector get() = CompatIconVectors.Close
+val Icons.Filled.Close: ImageVector get() = IconParkIcons.Close
+val Icons.Filled.Code: ImageVector get() = IconParkIcons.Code
+val Icons.Filled.ContentCopy: ImageVector get() = IconParkIcons.FileText
+val Icons.Filled.CreateNewFolder: ImageVector get() = IconParkIcons.Folder
+val Icons.Filled.CropFree: ImageVector get() = IconParkIcons.CastScreen
+val Icons.Filled.Delete: ImageVector get() = CompatIconVectors.Delete
+val Icons.Filled.DeleteSweep: ImageVector get() = CompatIconVectors.Delete
+val Icons.Filled.Description: ImageVector get() = IconParkIcons.FileText
+val Icons.Filled.Download: ImageVector get() = IconParkIcons.Download
+val Icons.Filled.Edit: ImageVector get() = CompatIconVectors.Edit
+val Icons.Filled.ExpandMore: ImageVector get() = CompatIconVectors.KeyboardArrowDown
+val Icons.Filled.FileDownload: ImageVector get() = IconParkIcons.Download
+val Icons.Filled.FilterAltOff: ImageVector get() = CompatIconVectors.Sliders
+val Icons.Filled.Folder: ImageVector get() = IconParkIcons.Folder
+val Icons.Filled.FolderOpen: ImageVector get() = IconParkIcons.Folder
+val Icons.Filled.GppMaybe: ImageVector get() = CompatIconVectors.Shield
+val Icons.Filled.GridView: ImageVector get() = CompatIconVectors.Grid
+val Icons.Filled.Home: ImageVector get() = IconParkIcons.Home
+val Icons.Filled.Image: ImageVector get() = IconParkIcons.Camera
+val Icons.Filled.Info: ImageVector get() = IconParkIcons.Info
+val Icons.Filled.InstallMobile: ImageVector get() = IconParkIcons.Application
+val Icons.Filled.Keyboard: ImageVector get() = CompatIconVectors.Keyboard
+val Icons.Filled.KeyboardArrowDown: ImageVector get() = CompatIconVectors.KeyboardArrowDown
+val Icons.Filled.KeyboardArrowUp: ImageVector get() = CompatIconVectors.KeyboardArrowUp
+val Icons.Filled.Language: ImageVector get() = IconParkIcons.Wifi
+val Icons.Filled.Link: ImageVector get() = IconParkIcons.Link
+val Icons.Filled.Lock: ImageVector get() = CompatIconVectors.Lock
+val Icons.Filled.Memory: ImageVector get() = IconParkIcons.StorageCard
+val Icons.Filled.Menu: ImageVector get() = CompatIconVectors.Menu
+val Icons.Filled.MoreHoriz: ImageVector get() = IconParkIcons.More
+val Icons.Filled.MoreVert: ImageVector get() = IconParkIcons.More
+val Icons.Filled.MusicNote: ImageVector get() = IconParkIcons.Video
+val Icons.Filled.Pause: ImageVector get() = CompatIconVectors.Pause
+val Icons.Filled.PhoneAndroid: ImageVector get() = IconParkIcons.Phone
+val Icons.Filled.PhotoCamera: ImageVector get() = IconParkIcons.Camera
+val Icons.Filled.PlayArrow: ImageVector get() = CompatIconVectors.PlayArrow
+val Icons.Filled.PowerSettingsNew: ImageVector get() = CompatIconVectors.Power
+val Icons.Filled.PrivacyTip: ImageVector get() = CompatIconVectors.Shield
+val Icons.Filled.Refresh: ImageVector get() = IconParkIcons.Refresh
+val Icons.Filled.RestartAlt: ImageVector get() = IconParkIcons.Refresh
+val Icons.Filled.Schedule: ImageVector get() = IconParkIcons.Schedule
+val Icons.Filled.ScreenRotation: ImageVector get() = CompatIconVectors.ScreenRotation
+val Icons.Filled.ScreenSearchDesktop: ImageVector get() = IconParkIcons.CastScreen
+val Icons.Filled.SdStorage: ImageVector get() = IconParkIcons.StorageCard
+val Icons.Filled.Search: ImageVector get() = IconParkIcons.Search
+val Icons.Filled.Security: ImageVector get() = CompatIconVectors.Shield
+val Icons.Filled.Settings: ImageVector get() = IconParkIcons.Setting
+val Icons.Filled.Speed: ImageVector get() = IconParkIcons.Speed
+val Icons.Filled.Star: ImageVector get() = CompatIconVectors.Star
+val Icons.Filled.StarBorder: ImageVector get() = CompatIconVectors.Star
+val Icons.Filled.Stop: ImageVector get() = CompatIconVectors.Stop
+val Icons.Filled.StopCircle: ImageVector get() = CompatIconVectors.StopCircle
+val Icons.Filled.Storage: ImageVector get() = IconParkIcons.HardDisk
+val Icons.Filled.SwapHoriz: ImageVector get() = CompatIconVectors.SwapHoriz
+val Icons.Filled.SystemUpdateAlt: ImageVector get() = IconParkIcons.Download
+val Icons.Filled.Tune: ImageVector get() = CompatIconVectors.Sliders
+val Icons.Filled.Upload: ImageVector get() = CompatIconVectors.Upload
+val Icons.Filled.Videocam: ImageVector get() = IconParkIcons.Video
+val Icons.Filled.ViewAgenda: ImageVector get() = CompatIconVectors.Grid
+val Icons.Filled.ViewModule: ImageVector get() = CompatIconVectors.Grid
+val Icons.Filled.Visibility: ImageVector get() = CompatIconVectors.Eye
+val Icons.Filled.VisibilityOff: ImageVector get() = CompatIconVectors.EyeOff
+val Icons.Filled.WbSunny: ImageVector get() = IconParkIcons.BatteryFull
+val Icons.Filled.Wifi: ImageVector get() = IconParkIcons.Wifi

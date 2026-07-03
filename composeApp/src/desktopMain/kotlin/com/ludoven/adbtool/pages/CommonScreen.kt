@@ -50,6 +50,7 @@ import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.InstallMobile
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Memory
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.PlayArrow
@@ -83,10 +84,12 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -97,9 +100,11 @@ import com.ludoven.adbtool.util.AdbTool
 import com.ludoven.adbtool.util.CommandFavoritesManager
 import com.ludoven.adbtool.util.CustomCommand
 import com.ludoven.adbtool.util.CustomCommandManager
+import com.ludoven.adbtool.util.copyPlainTextToClipboard
 import com.ludoven.adbtool.util.l10n
 import com.ludoven.adbtool.viewmodel.CommonModel
-import com.ludoven.adbtool.widget.GlassCard
+import com.ludoven.adbtool.widget.InlineStatusBanner
+import com.ludoven.adbtool.widget.InlineStatusTone
 import java.io.InputStreamReader
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -146,11 +151,16 @@ private fun displayCommandTitle(command: CommandItemUi): String {
     }
 }
 
+internal fun commonCommandRunEnabled(selectedDevice: String?): Boolean =
+    !selectedDevice.isNullOrBlank()
+
 @Composable
 @Preview
-fun CommonScreen(viewModel: CommonModel) {
+fun CommonScreen(
+    viewModel: CommonModel,
+    selectedDevice: String? = null
+) {
     val coroutineScope = rememberCoroutineScope()
-    val clipboardManager = LocalClipboardManager.current
     val showDialog by viewModel.showDialog.collectAsState()
     val dialogMsg by viewModel.dialogMessage.collectAsState()
 
@@ -161,8 +171,8 @@ fun CommonScreen(viewModel: CommonModel) {
 
     val categories = remember(favoriteIds) {
         listOf(
-            CommandCategoryUi("favorites", l10n("收藏", "Favorites"), Icons.Default.Bookmark),
             CommandCategoryUi("all", l10n("全部", "All"), Icons.Default.Tune),
+            CommandCategoryUi("favorites", l10n("收藏", "Favorites"), Icons.Default.Bookmark),
             CommandCategoryUi("device", l10n("设备", "Device"), Icons.Default.Home),
             CommandCategoryUi("app", l10n("应用管理", "Apps"), Icons.Default.InstallMobile),
             CommandCategoryUi("file", l10n("文件操作", "Files"), Icons.Default.Folder),
@@ -237,7 +247,7 @@ fun CommonScreen(viewModel: CommonModel) {
         ?: filteredCommands.firstOrNull()
         ?: mergedCommands.first()
 
-    val resolvedCommandPreview by remember(selectedCommand, packageNameInput, shellCommandInput, textInput) {
+    val resolvedCommandPreview by remember(selectedCommand, selectedDevice, packageNameInput, shellCommandInput, textInput) {
         derivedStateOf {
             when (selectedCommand.trigger) {
                 CommandTrigger.PACKAGE_INPUT -> {
@@ -270,6 +280,13 @@ fun CommonScreen(viewModel: CommonModel) {
                     if (selectedCommand.actionType == AdbFunctionType.INPUT_TEXT) {
                         val text = textInput.ifEmpty { "hello" }
                         "adb shell input text \"$text\""
+                    } else if (selectedCommand.id.startsWith("custom_")) {
+                        resolvedCustomAdbPreview(
+                            rawCommand = selectedCommand.commandPreview,
+                            deviceId = selectedDevice,
+                            packageName = packageNameInput,
+                            text = textInput
+                        )
                     } else {
                         selectedCommand.commandPreview
                             .replace("{package}", packageNameInput.trim())
@@ -281,11 +298,11 @@ fun CommonScreen(viewModel: CommonModel) {
     }
 
     fun copyCommand(command: String) {
-        clipboardManager.setText(AnnotatedString(command))
+        copyPlainTextToClipboard(command)
     }
 
     fun executeCommand(command: CommandItemUi) {
-        if (AdbTool.selectDeviceId.isNullOrBlank()) {
+        if (!commonCommandRunEnabled(selectedDevice)) {
             executionResult = l10n("执行失败：未选择设备", "Failed: no device selected")
             return
         }
@@ -345,6 +362,25 @@ fun CommonScreen(viewModel: CommonModel) {
                         }
 
                         when (command.actionType) {
+                            null -> {
+                                val args = customAdbArgs(
+                                    rawCommand = command.commandPreview,
+                                    deviceId = selectedDevice,
+                                    packageName = packageNameInput,
+                                    text = textInput
+                                )
+                                if (args.isEmpty()) {
+                                    executionResult = l10n("执行失败：ADB 命令不能为空", "Failed: ADB command cannot be empty")
+                                    return@launch
+                                }
+                                val result = withContext(Dispatchers.IO) {
+                                    AdbTool.execAdbAsync(*args.toTypedArray())
+                                }
+                                executionResult = AdbTool.outputText(result).ifBlank {
+                                    l10n("执行完成，无输出", "Done, no output")
+                                }
+                            }
+
                             AdbFunctionType.INPUT_TEXT -> {
                                 val input = textInput
                                 if (input.isBlank()) {
@@ -423,14 +459,19 @@ fun CommonScreen(viewModel: CommonModel) {
             CommandCenterHeader(
                 searchKeyword = searchKeyword,
                 onSearchKeywordChange = { searchKeyword = it },
+                categories = categories,
+                selectedCategory = selectedCategory,
+                onCategorySelected = { selectedCategory = it },
                 onAddCommand = { showAddCommandDialog = true }
             )
 
-            CategoryTabs(
-                categories = categories,
-                selectedCategory = selectedCategory,
-                onCategorySelected = { selectedCategory = it }
-            )
+            if (!commonCommandRunEnabled(selectedDevice)) {
+                InlineStatusBanner(
+                    text = l10n("当前没有选择设备。命令可以浏览和复制，但执行前需要先连接并选择设备。", "No device is selected. Commands can be browsed and copied, but running them needs a connected selected device."),
+                    tone = InlineStatusTone.Warning,
+                    icon = Icons.Default.Info
+                )
+            }
 
             Row(
                 modifier = Modifier.fillMaxSize(),
@@ -454,12 +495,13 @@ fun CommonScreen(viewModel: CommonModel) {
                             selectedCommandId = mergedCommands.firstOrNull { it.id != cmd.id }?.id.orEmpty()
                         }
                     },
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.width(330.dp)
                 )
 
                 CommandDetailPanel(
                     selectedCommand = selectedCommand,
                     resolvedCommandPreview = resolvedCommandPreview,
+                    selectedDevice = selectedDevice,
                     packageNameInput = packageNameInput,
                     onPackageNameInputChange = { packageNameInput = it },
                     shellCommandInput = shellCommandInput,
@@ -468,8 +510,10 @@ fun CommonScreen(viewModel: CommonModel) {
                     onTextInputChange = { textInput = it },
                     executionResult = executionResult,
                     onCopyCommand = ::copyCommand,
+                    onClearResult = { executionResult = l10n("等待执行", "Ready") },
                     onExecuteCommand = ::executeCommand,
-                    modifier = Modifier.weight(2f)
+                    canRunCommand = commonCommandRunEnabled(selectedDevice),
+                    modifier = Modifier.weight(1f)
                 )
             }
         }
@@ -529,10 +573,18 @@ fun CommonScreen(viewModel: CommonModel) {
                 editingCommand = null
             },
             onConfirm = { cmd ->
-                if (editingCommand != null) {
-                    customCommands = CustomCommandManager.update(cmd)
+                val savedCommands = if (editingCommand != null) {
+                    CustomCommandManager.update(cmd)
                 } else {
-                    customCommands = CustomCommandManager.add(cmd)
+                    CustomCommandManager.add(cmd)
+                }
+                if (editingCommand != null) {
+                    customCommands = savedCommands
+                    selectedCommandId = cmd.id
+                } else {
+                    customCommands = savedCommands
+                    selectedCommandId = cmd.id
+                    selectedCategory = "all"
                 }
                 showAddCommandDialog = false
                 editingCommand = null
@@ -683,6 +735,83 @@ private fun categoryIconFor(categoryKey: String): ImageVector = when (categoryKe
     else -> Icons.Default.Info
 }
 
+private fun deviceDisplayLabel(selectedDevice: String?): String {
+    return selectedDevice?.takeIf { it.isNotBlank() }
+        ?: l10n("未选择设备", "No device selected")
+}
+
+internal fun customAdbArgs(
+    rawCommand: String,
+    deviceId: String?,
+    packageName: String,
+    text: String
+): List<String> {
+    val resolved = rawCommand
+        .replace("{package}", packageName.trim())
+        .replace("{text}", text.trim())
+        .trim()
+    if (resolved.isBlank()) return emptyList()
+
+    val tokens = tokenizeCommandLine(resolved).let { parts ->
+        if (parts.firstOrNull() == "adb") parts.drop(1) else parts
+    }
+    if (tokens.isEmpty()) return emptyList()
+
+    val hasExplicitDevice = tokens.withIndex().any { (index, token) ->
+        token == "-d" ||
+            token == "-e" ||
+            token == "--one-device" ||
+            token == "--serial" ||
+            token.startsWith("--serial=") ||
+            (token == "-s" && index + 1 < tokens.size)
+    }
+
+    return if (!hasExplicitDevice && customAdbSubcommandUsesSelectedDevice(tokens) && !deviceId.isNullOrBlank()) {
+        listOf("-s", deviceId.trim()) + tokens
+    } else {
+        tokens
+    }
+}
+
+internal fun resolvedCustomAdbPreview(
+    rawCommand: String,
+    deviceId: String?,
+    packageName: String,
+    text: String
+): String {
+    val args = customAdbArgs(rawCommand, deviceId, packageName, text)
+    return if (args.isEmpty()) {
+        "adb"
+    } else {
+        "adb ${args.joinToString(" ")}"
+    }
+}
+
+private fun customAdbSubcommandUsesSelectedDevice(args: List<String>): Boolean {
+    val firstCommand = args.firstOrNull { !it.startsWith("-") } ?: return true
+    return firstCommand !in setOf(
+        "connect",
+        "disconnect",
+        "devices",
+        "help",
+        "kill-server",
+        "reconnect",
+        "start-server",
+        "version"
+    )
+}
+
+private fun tokenizeCommandLine(input: String): List<String> {
+    val regex = Regex("\"([^\"]*)\"|'([^']*)'|([^\\s]+)")
+    return regex.findAll(input)
+        .mapNotNull { match ->
+            match.groups[1]?.value
+                ?: match.groups[2]?.value
+                ?: match.groups[3]?.value
+        }
+        .toList()
+}
+
 private fun commandItemAccentColor(index: Int): Color {
     val palette = listOf(
         Color(0xFF3D73FF),
@@ -713,96 +842,96 @@ private fun fallbackCommands(): List<CommandItemUi> = listOf(
 private fun CommandCenterHeader(
     searchKeyword: String,
     onSearchKeywordChange: (String) -> Unit,
+    categories: List<CommandCategoryUi>,
+    selectedCategory: String,
+    onCategorySelected: (String) -> Unit,
     onAddCommand: () -> Unit
 ) {
-    Row(
+    Column(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-        verticalAlignment = Alignment.CenterVertically
+        verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         Row(
-            modifier = Modifier.weight(1f),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Box(
-                modifier = Modifier
-                    .size(44.dp)
-                    .background(
-                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
-                        shape = RoundedCornerShape(12.dp)
-                    )
-                    .border(
-                        width = 1.dp,
-                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
-                        shape = RoundedCornerShape(12.dp)
-                    ),
-                contentAlignment = Alignment.Center
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(3.dp)
             ) {
-                Icon(
-                    imageVector = Icons.Default.Code,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary
-                )
-            }
-
-            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(
                     text = l10n("命令中心", "Command Center"),
                     style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
-                    text = l10n("浏览常用 ADB 命令，快速复制并执行", "Browse common ADB commands and run quickly"),
+                    text = l10n("浏览、收藏、编辑并执行常用 ADB 命令", "Browse, favorite, edit and run common ADB commands"),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-        }
 
-        OutlinedTextField(
-            value = searchKeyword,
-            onValueChange = onSearchKeywordChange,
-            leadingIcon = {
-                Icon(
-                    imageVector = Icons.Default.Search,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            },
-            singleLine = true,
-            placeholder = { Text(l10n("搜索命令", "Search commands")) },
-            textStyle = MaterialTheme.typography.bodySmall,
-            shape = RoundedCornerShape(10.dp),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.45f),
-                unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)
-            ),
-            modifier = Modifier
-                .widthIn(min = 420.dp, max = 520.dp)
-                .heightIn(min = 52.dp)
-        )
+            OutlinedTextField(
+                value = searchKeyword,
+                onValueChange = onSearchKeywordChange,
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Default.Search,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(18.dp)
+                    )
+                },
+                trailingIcon = {
+                    Box(
+                        modifier = Modifier
+                            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(6.dp))
+                            .padding(horizontal = 7.dp, vertical = 3.dp)
+                    ) {
+                        Text(
+                            text = "⌘K",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                },
+                singleLine = true,
+                placeholder = { Text(l10n("搜索命令、分类、包名或参数", "Search commands, categories, packages or args")) },
+                textStyle = MaterialTheme.typography.bodyMedium,
+                shape = RoundedCornerShape(8.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
+                    unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
+                ),
+                modifier = Modifier
+                    .widthIn(min = 380.dp, max = 520.dp)
+                    .heightIn(min = 44.dp)
+            )
 
-        com.ludoven.adbtool.ui.mac.IconButton(
-            onClick = onAddCommand,
-            modifier = Modifier
-                .size(44.dp)
-                .background(
-                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
-                    shape = RoundedCornerShape(12.dp)
-                )
-                .border(
-                    width = 1.dp,
-                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
-                    shape = RoundedCornerShape(12.dp)
-                )
-        ) {
-            Icon(
-                imageVector = Icons.Default.Add,
-                contentDescription = l10n("添加自定义命令", "Add custom command"),
-                tint = MaterialTheme.colorScheme.primary
+            CommandActionButton(
+                text = l10n("新建命令", "New Command"),
+                icon = Icons.Default.Add,
+                onClick = onAddCommand,
+                primary = true,
+                modifier = Modifier.height(38.dp)
             )
         }
+
+        CategoryTabs(
+            categories = categories,
+            selectedCategory = selectedCategory,
+            onCategorySelected = onCategorySelected
+        )
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(1.dp)
+                .background(MaterialTheme.colorScheme.outlineVariant)
+        )
     }
 }
 
@@ -813,60 +942,42 @@ private fun CategoryTabs(
     selectedCategory: String,
     onCategorySelected: (String) -> Unit
 ) {
-    Card(
-        shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-        border = BorderStroke(0.dp, Color.Transparent),
-        modifier = Modifier.fillMaxWidth()
+    FlowRow(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(18.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+        maxItemsInEachRow = Int.MAX_VALUE
     ) {
-        FlowRow(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 10.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-            maxItemsInEachRow = Int.MAX_VALUE
-        ) {
-            categories.forEach { category ->
-                val selected = category.key == selectedCategory
-                val chipBg = if (selected) {
-                    MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)
-                } else {
-                    Color.Transparent
-                }
-                val chipColor = if (selected) {
-                    MaterialTheme.colorScheme.primary
-                } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                }
+        categories.forEach { category ->
+            val selected = category.key == selectedCategory
+            val chipBg = if (selected) {
+                MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+            } else {
+                Color.Transparent
+            }
+            val chipColor = if (selected) {
+                MaterialTheme.colorScheme.primary
+            } else {
+                MaterialTheme.colorScheme.onSurface
+            }
 
-                Row(
-                    modifier = Modifier
-                        .background(chipBg, RoundedCornerShape(10.dp))
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null
-                        ) { onCategorySelected(category.key) }
-                        .padding(horizontal = 14.dp, vertical = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Icon(
-                        imageVector = category.icon,
-                        contentDescription = category.label,
-                        tint = chipColor,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Text(
-                        text = category.label,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = chipColor,
-                        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium
-                    )
-                }
+            Row(
+                modifier = Modifier
+                    .background(chipBg, RoundedCornerShape(9.dp))
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null
+                    ) { onCategorySelected(category.key) }
+                    .padding(horizontal = 13.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Text(
+                    text = category.label,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = chipColor,
+                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium
+                )
             }
         }
     }
@@ -883,29 +994,17 @@ private fun CommandLibraryPanel(
     onDeleteCustomCommand: (CommandItemUi) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    GlassCard(
+    Box(
         modifier = modifier.fillMaxHeight(),
-        shape = RoundedCornerShape(18.dp)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(12.dp),
+                .padding(start = 2.dp, top = 4.dp, end = 14.dp, bottom = 4.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = l10n("命令库（共 ${commands.size} 条）", "Command library (${commands.size})"),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-
-            val listState = rememberLazyListState()
-            Box(modifier = Modifier.fillMaxSize()) {
+            Box(modifier = Modifier.weight(1f)) {
+                val listState = rememberLazyListState()
                 if (commands.isEmpty()) {
                     Box(
                         modifier = Modifier.fillMaxSize(),
@@ -950,7 +1049,35 @@ private fun CommandLibraryPanel(
                         .fillMaxHeight()
                 )
             }
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 4.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = l10n("更多命令...", "More commands..."),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.Medium
+                )
+                Text(
+                    text = l10n("共 ${commands.size} 条", "${commands.size} total"),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
+
+        Box(
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .fillMaxHeight()
+                .width(1.dp)
+                .background(MaterialTheme.colorScheme.outlineVariant)
+        )
     }
 }
 
@@ -966,16 +1093,15 @@ private fun CommandListItem(
     onDeleteCustom: (() -> Unit)? = null
 ) {
     val accent = commandItemAccentColor(itemIndex)
-    val categoryIcon = categoryIconFor(command.categoryKey)
     val borderColor = if (selected) {
-        accent.copy(alpha = 0.5f)
+        MaterialTheme.colorScheme.primary
     } else {
         MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)
     }
     val containerColor = if (selected) {
-        accent.copy(alpha = 0.09f)
+        MaterialTheme.colorScheme.primary.copy(alpha = 0.06f)
     } else {
-        MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)
+        MaterialTheme.colorScheme.surface
     }
     var showContextMenu by remember { mutableStateOf(false) }
 
@@ -983,36 +1109,33 @@ private fun CommandListItem(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(containerColor, RoundedCornerShape(12.dp))
-                .border(1.dp, borderColor, RoundedCornerShape(12.dp))
+                .background(containerColor, RoundedCornerShape(8.dp))
+                .border(1.dp, borderColor, RoundedCornerShape(8.dp))
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null
                 ) { onSelect() }
-                .padding(horizontal = 8.dp, vertical = 6.dp),
+                .padding(horizontal = 9.dp, vertical = 7.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(7.dp)
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Box(
                 modifier = Modifier
-                    .size(28.dp)
-                    .background(
-                        color = accent.copy(alpha = 0.14f),
-                        shape = RoundedCornerShape(8.dp)
-                    ),
+                    .size(30.dp)
+                    .background(Brush.linearGradient(listOf(accent, accent.copy(alpha = 0.82f))), RoundedCornerShape(7.dp)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    imageVector = categoryIcon,
+                    imageVector = command.icon,
                     contentDescription = command.title,
-                    tint = accent,
+                    tint = Color.White,
                     modifier = Modifier.size(17.dp)
                 )
             }
 
             Column(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(3.dp)
+                verticalArrangement = Arrangement.spacedBy(2.dp)
             ) {
                 Text(
                     text = displayCommandTitle(command),
@@ -1033,20 +1156,20 @@ private fun CommandListItem(
 
             com.ludoven.adbtool.ui.mac.IconButton(
                 onClick = onToggleFavorite,
-                modifier = Modifier.size(28.dp)
+                modifier = Modifier.size(26.dp)
             ) {
                 Icon(
                     imageVector = if (isFavorite) Icons.Default.Star else Icons.Default.StarBorder,
                     contentDescription = if (isFavorite) l10n("取消收藏", "Unfavorite") else l10n("收藏", "Favorite"),
                     tint = if (isFavorite) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                    modifier = Modifier.size(18.dp)
+                    modifier = Modifier.size(17.dp)
                 )
             }
 
             if (onEditCustom != null || onDeleteCustom != null) {
                 com.ludoven.adbtool.ui.mac.IconButton(
                     onClick = { showContextMenu = true },
-                    modifier = Modifier.size(28.dp)
+                    modifier = Modifier.size(26.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Default.Edit,
@@ -1104,6 +1227,7 @@ private fun CommandListItem(
 private fun CommandDetailPanel(
     selectedCommand: CommandItemUi,
     resolvedCommandPreview: String,
+    selectedDevice: String?,
     packageNameInput: String,
     onPackageNameInputChange: (String) -> Unit,
     shellCommandInput: String,
@@ -1112,226 +1236,452 @@ private fun CommandDetailPanel(
     onTextInputChange: (String) -> Unit,
     executionResult: String,
     onCopyCommand: (String) -> Unit,
+    onClearResult: () -> Unit,
     onExecuteCommand: (CommandItemUi) -> Unit,
+    canRunCommand: Boolean,
     modifier: Modifier = Modifier
 ) {
-    GlassCard(
+    Column(
         modifier = modifier.fillMaxHeight(),
-        shape = RoundedCornerShape(18.dp)
+        verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+                .padding(start = 4.dp, top = 4.dp, end = 2.dp, bottom = 4.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            Text(
-                text = l10n("当前命令", "Current command"),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
-            )
-
             Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = l10n("命令详情", "Command Details"),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    CommandActionButton(
+                        text = l10n("复制", "Copy"),
+                        icon = Icons.Default.ContentCopy,
+                        onClick = { onCopyCommand(resolvedCommandPreview) }
+                    )
+                    CommandActionButton(
+                        text = l10n("运行命令", "Run"),
+                        icon = Icons.Default.PlayArrow,
+                        onClick = { onExecuteCommand(selectedCommand) },
+                        enabled = canRunCommand,
+                        primary = true
+                    )
+                }
+            }
+
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(
-                        MaterialTheme.colorScheme.surface.copy(alpha = 0.6f),
-                        RoundedCornerShape(12.dp)
-                    )
-                    .border(
-                        1.dp,
-                        MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f),
-                        RoundedCornerShape(12.dp)
-                    )
-                    .padding(12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    .padding(vertical = 2.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(40.dp)
+                            .background(
+                                Brush.linearGradient(
+                                    listOf(selectedCommand.iconTint, selectedCommand.iconTint.copy(alpha = 0.8f))
+                                ),
+                                RoundedCornerShape(8.dp)
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = selectedCommand.icon,
+                            contentDescription = selectedCommand.title,
+                            tint = Color.White,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
+
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text(
+                            text = displayCommandTitle(selectedCommand),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            text = selectedCommand.description,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+
                 Box(
                     modifier = Modifier
-                        .size(40.dp)
-                        .background(selectedCommand.iconTint.copy(alpha = 0.14f), RoundedCornerShape(10.dp)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = selectedCommand.icon,
-                        contentDescription = selectedCommand.title,
-                        tint = selectedCommand.iconTint
-                    )
-                }
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Text(
-                        text = displayCommandTitle(selectedCommand),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                    Text(
-                        text = selectedCommand.description,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+                        .fillMaxWidth()
+                        .height(1.dp)
+                        .background(MaterialTheme.colorScheme.outlineVariant)
+                )
             }
 
-            Card(
-                shape = RoundedCornerShape(12.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.55f)
-                ),
-                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-                border = BorderStroke(0.dp, Color.Transparent)
-            ) {
-                Column(
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(
+                    text = l10n("完整命令预览", "Full command preview"),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.58f), RoundedCornerShape(8.dp))
+                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(8.dp))
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null
+                        ) { onCopyCommand(resolvedCommandPreview) }
+                        .padding(horizontal = 10.dp, vertical = 7.dp)
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Text(
-                            text = l10n("命令预览", "Command preview"),
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.SemiBold
+                            text = "adb",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold
                         )
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            CommandActionButton(
-                                text = l10n("复制", "Copy"),
-                                icon = Icons.Default.ContentCopy,
-                                onClick = { onCopyCommand(resolvedCommandPreview) }
-                            )
-                            CommandActionButton(
-                                text = l10n("运行", "Run"),
-                                icon = Icons.Default.PlayArrow,
-                                onClick = { onExecuteCommand(selectedCommand) },
-                                primary = true
-                            )
-                        }
-                    }
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(
-                                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                                RoundedCornerShape(10.dp)
-                            )
-                            .clickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = null
-                            ) { onCopyCommand(resolvedCommandPreview) }
-                            .padding(10.dp)
-                    ) {
                         Text(
-                            text = resolvedCommandPreview,
+                            text = resolvedCommandPreview.removePrefix("adb").trimStart(),
+                            modifier = Modifier.weight(1f),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurface,
-                            fontFamily = FontFamily.Monospace
+                            fontFamily = FontFamily.Monospace,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Icon(
+                            imageVector = Icons.Default.ContentCopy,
+                            contentDescription = l10n("复制命令", "Copy command"),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(18.dp)
                         )
                     }
                 }
             }
 
-            when (selectedCommand.trigger) {
-                CommandTrigger.PACKAGE_INPUT -> {
-                    OutlinedTextField(
-                        value = packageNameInput,
-                        onValueChange = onPackageNameInputChange,
-                        singleLine = true,
-                        label = { Text(l10n("应用包名", "Package name")) },
-                        placeholder = { Text("com.example.app") },
-                        shape = RoundedCornerShape(10.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-
-                CommandTrigger.SHELL_INPUT -> {
-                    OutlinedTextField(
-                        value = shellCommandInput,
-                        onValueChange = onShellCommandInputChange,
-                        singleLine = true,
-                        label = { Text(l10n("Shell 命令", "Shell command")) },
-                        placeholder = { Text("getprop") },
-                        shape = RoundedCornerShape(10.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-
-                CommandTrigger.DIRECT -> {
-                    if (selectedCommand.actionType == AdbFunctionType.INPUT_TEXT) {
-                        OutlinedTextField(
-                            value = textInput,
-                            onValueChange = onTextInputChange,
-                            singleLine = true,
-                            label = { Text(l10n("输入文本", "Input text")) },
-                            placeholder = { Text("hello") },
-                            shape = RoundedCornerShape(10.dp),
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.weight(1f))
-
-            Card(
-                shape = RoundedCornerShape(12.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)
-                ),
-                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-                border = BorderStroke(0.dp, Color.Transparent),
-                modifier = Modifier.fillMaxWidth()
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text(
-                            text = l10n("执行结果", "Execution result"),
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                        CommandActionButton(
-                            text = l10n("复制结果", "Copy result"),
-                            icon = Icons.Default.ContentCopy,
-                            onClick = { onCopyCommand(executionResult) }
-                        )
+                    Text(
+                        text = when (selectedCommand.trigger) {
+                            CommandTrigger.PACKAGE_INPUT -> l10n("应用包名（可编辑）", "Package name")
+                            CommandTrigger.SHELL_INPUT -> l10n("Shell 参数（可编辑）", "Shell args")
+                            CommandTrigger.DIRECT -> if (selectedCommand.actionType == AdbFunctionType.INPUT_TEXT) {
+                                l10n("输入文本（可编辑）", "Input text")
+                            } else {
+                                l10n("命令参数", "Command args")
+                            }
+                        },
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold
+                    )
+
+                    when (selectedCommand.trigger) {
+                        CommandTrigger.PACKAGE_INPUT -> {
+                            OutlinedTextField(
+                                value = packageNameInput,
+                                onValueChange = onPackageNameInputChange,
+                                singleLine = true,
+                                placeholder = { Text("com.example.app") },
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(min = 44.dp)
+                            )
+                        }
+
+                        CommandTrigger.SHELL_INPUT -> {
+                            OutlinedTextField(
+                                value = shellCommandInput,
+                                onValueChange = onShellCommandInputChange,
+                                singleLine = true,
+                                placeholder = { Text("getprop") },
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(min = 44.dp)
+                            )
+                        }
+
+                        CommandTrigger.DIRECT -> {
+                            if (selectedCommand.actionType == AdbFunctionType.INPUT_TEXT) {
+                                OutlinedTextField(
+                                    value = textInput,
+                                    onValueChange = onTextInputChange,
+                                    singleLine = true,
+                                    placeholder = { Text("hello") },
+                                    shape = RoundedCornerShape(8.dp),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .heightIn(min = 44.dp)
+                                )
+                            } else {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(44.dp)
+                                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
+                                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(8.dp))
+                                        .padding(horizontal = 12.dp),
+                                    contentAlignment = Alignment.CenterStart
+                                ) {
+                                    Text(
+                                        text = l10n("无需额外参数", "No extra args"),
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
                     }
-                    val resultScroll = rememberScrollState()
+                }
+
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text(
+                        text = l10n("目标设备", "Target device"),
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold
+                    )
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .heightIn(min = 80.dp, max = 300.dp)
-                            .background(
-                                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
-                                RoundedCornerShape(8.dp)
-                            )
-                            .padding(horizontal = 10.dp, vertical = 8.dp)
-                            .verticalScroll(resultScroll)
+                            .height(44.dp)
+                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
+                            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(8.dp))
+                            .padding(horizontal = 12.dp),
+                        contentAlignment = Alignment.CenterStart
                     ) {
-                        SelectionContainer {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(9.dp)
+                                    .background(
+                                        if (canRunCommand) Color(0xFF34C759) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f),
+                                        RoundedCornerShape(99.dp)
+                                    )
+                            )
                             Text(
-                                text = executionResult,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                text = deviceDisplayLabel(selectedDevice),
+                                modifier = Modifier.weight(1f),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Icon(
+                                imageVector = Icons.Default.KeyboardArrowDown,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(18.dp)
                             )
                         }
                     }
                 }
             }
+
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Text(
+                    text = l10n("执行结果", "Execution result"),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Card(
+                    shape = RoundedCornerShape(8.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF111827)),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+                    border = BorderStroke(1.dp, Color(0xFF1F2937)),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .heightIn(min = 240.dp)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                modifier = Modifier.weight(1f),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(10.dp)
+                                        .background(Color(0xFF34C759), RoundedCornerShape(99.dp))
+                                )
+                                Text(
+                                    text = l10n("执行状态", "Status"),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = Color(0xFF86EFAC),
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                TerminalActionButton(l10n("清空", "Clear"), Icons.Default.Delete, onClearResult)
+                                TerminalActionButton(l10n("复制", "Copy"), Icons.Default.ContentCopy) {
+                                    onCopyCommand(executionResult)
+                                }
+                            }
+                        }
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(1.dp)
+                                .background(Color.White.copy(alpha = 0.08f))
+                        )
+                        val resultScroll = rememberScrollState()
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(1f)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(end = 10.dp)
+                                    .verticalScroll(resultScroll)
+                            ) {
+                                SelectionContainer {
+                                    Text(
+                                        text = terminalResultText(resolvedCommandPreview, executionResult),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = Color(0xFFE5E7EB),
+                                        fontFamily = FontFamily.Monospace
+                                    )
+                                }
+                            }
+                            VerticalScrollbar(
+                                adapter = rememberScrollbarAdapter(resultScroll),
+                                modifier = Modifier
+                                    .align(Alignment.CenterEnd)
+                                    .fillMaxHeight()
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun terminalResultText(
+    commandPreview: String,
+    executionResult: String
+): AnnotatedString = buildAnnotatedString {
+    appendStyledLine("${'$'} $commandPreview", Color(0xFF93C5FD), FontWeight.SemiBold)
+    executionResult.lines().forEachIndexed { index, line ->
+        if (index > 0) append('\n')
+        val color = when {
+            line.contains("执行成功") || line.contains("Success", ignoreCase = true) -> Color(0xFF86EFAC)
+            line.contains("执行失败") ||
+                line.contains("执行异常") ||
+                line.contains("Failed", ignoreCase = true) ||
+                line.contains("Error", ignoreCase = true) -> Color(0xFFFCA5A5)
+            line.contains("执行中") || line.contains("Running", ignoreCase = true) -> Color(0xFFFDE68A)
+            else -> Color(0xFFE5E7EB)
+        }
+        appendStyled(line, color)
+    }
+}
+
+private fun AnnotatedString.Builder.appendStyledLine(
+    text: String,
+    color: Color,
+    fontWeight: FontWeight? = null
+) {
+    appendStyled(text, color, fontWeight)
+    append('\n')
+}
+
+private fun AnnotatedString.Builder.appendStyled(
+    text: String,
+    color: Color,
+    fontWeight: FontWeight? = null
+) {
+    pushStyle(SpanStyle(color = color, fontWeight = fontWeight))
+    append(text)
+    pop()
+}
+
+@Composable
+private fun TerminalActionButton(
+    text: String,
+    icon: ImageVector,
+    onClick: () -> Unit
+) {
+    TextButton(
+        onClick = onClick,
+        modifier = Modifier
+            .height(28.dp)
+            .widthIn(min = 58.dp),
+        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = text,
+                tint = Color.White.copy(alpha = 0.9f),
+                modifier = Modifier.size(15.dp)
+            )
+            Text(
+                text = text,
+                color = Color.White.copy(alpha = 0.9f),
+                style = MaterialTheme.typography.bodySmall,
+                fontWeight = FontWeight.SemiBold
+            )
         }
     }
 }
@@ -1342,26 +1692,28 @@ private fun CommandActionButton(
     icon: ImageVector,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    enabled: Boolean = true,
     primary: Boolean = false
 ) {
-    val contentColor = if (primary) {
-        MaterialTheme.colorScheme.onPrimary
-    } else {
-        MaterialTheme.colorScheme.onSurface
+    val contentColor = when {
+        !enabled -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f)
+        primary -> MaterialTheme.colorScheme.onPrimary
+        else -> MaterialTheme.colorScheme.onSurface
     }
-    val backgroundColor = if (primary) {
-        MaterialTheme.colorScheme.primary
-    } else {
-        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.68f)
+    val backgroundColor = when {
+        !enabled -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.28f)
+        primary -> MaterialTheme.colorScheme.primary
+        else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.68f)
     }
-    val borderColor = if (primary) {
-        MaterialTheme.colorScheme.primary
-    } else {
-        MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.8f)
+    val borderColor = when {
+        !enabled -> MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)
+        primary -> MaterialTheme.colorScheme.primary
+        else -> MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.8f)
     }
 
     TextButton(
         onClick = onClick,
+        enabled = enabled,
         modifier = modifier
             .height(32.dp)
             .background(backgroundColor, RoundedCornerShape(10.dp))
@@ -1432,121 +1784,235 @@ private fun CustomCommandDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
-            Text(
-                if (isEditing) l10n("编辑自定义命令", "Edit Custom Command")
-                else l10n("添加自定义命令", "Add Custom Command")
-            )
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(
+                    modifier = Modifier.widthIn(min = 520.dp, max = 560.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(32.dp)
+                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f), RoundedCornerShape(8.dp)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Add,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text(
+                            text = if (isEditing) l10n("编辑自定义命令", "Edit Custom Command")
+                            else l10n("添加自定义命令", "Add Custom Command"),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = l10n("配置命令标题、执行内容和分类", "Configure title, command body and category"),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+                Box(
+                    modifier = Modifier
+                        .widthIn(min = 520.dp, max = 560.dp)
+                        .height(1.dp)
+                        .background(MaterialTheme.colorScheme.outlineVariant)
+                )
+            }
         },
         text = {
             Column(
                 modifier = Modifier
-                    .fillMaxWidth()
+                    .widthIn(min = 520.dp, max = 560.dp)
                     .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                OutlinedTextField(
+                CustomCommandDialogField(
+                    label = l10n("命令标题", "Command title"),
                     value = title,
                     onValueChange = { title = it },
-                    singleLine = true,
-                    label = { Text(l10n("命令标题", "Command title")) },
-                    placeholder = { Text(l10n("例：查看设备信息", "e.g.: Show device info")) },
-                    shape = RoundedCornerShape(10.dp),
-                    modifier = Modifier.fillMaxWidth()
+                    placeholder = l10n("例：查看设备信息", "e.g.: Show device info"),
+                    required = true
                 )
 
-                OutlinedTextField(
+                CustomCommandDialogField(
+                    label = l10n("ADB 命令", "ADB command"),
                     value = commandPreview,
                     onValueChange = { commandPreview = it },
-                    singleLine = true,
-                    label = { Text(l10n("ADB 命令", "ADB command")) },
-                    placeholder = { Text(l10n("例：shell getprop ro.build.display.id", "e.g.: shell getprop ro.build.display.id")) },
-                    shape = RoundedCornerShape(10.dp),
-                    modifier = Modifier.fillMaxWidth()
+                    placeholder = l10n("例：adb shell getprop ro.build.display.id", "e.g.: adb shell getprop ro.build.display.id"),
+                    required = true
                 )
 
-                OutlinedTextField(
-                    value = shellCommand,
-                    onValueChange = { shellCommand = it },
-                    singleLine = true,
-                    label = { Text(l10n("Shell 命令（可选）", "Shell command (optional)")) },
-                    placeholder = { Text(l10n("留空则直接执行 ADB 命令", "Leave empty to run ADB command directly")) },
-                    shape = RoundedCornerShape(10.dp),
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                Text(
-                    text = l10n("提示：命令中可使用 {package} 和 {text} 作为占位符", "Tip: use {package} and {text} as placeholders in commands"),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-
-                Box {
-                    OutlinedTextField(
-                        value = selectedCategoryLabel,
-                        onValueChange = {},
-                        readOnly = true,
-                        singleLine = true,
-                        label = { Text(l10n("分类", "Category")) },
-                        trailingIcon = {
-                            ExposedDropdownMenuDefaults.TrailingIcon(expanded = categoryExpanded)
-                        },
-                        shape = RoundedCornerShape(10.dp),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { categoryExpanded = !categoryExpanded }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    CustomCommandDialogField(
+                        label = l10n("Shell 命令", "Shell command"),
+                        value = shellCommand,
+                        onValueChange = { shellCommand = it },
+                        placeholder = l10n("可选，留空则直接执行 ADB 命令", "Optional, leave empty to run ADB command"),
+                        modifier = Modifier.weight(1f)
                     )
-                    com.ludoven.adbtool.ui.mac.DropdownMenu(
-                        expanded = categoryExpanded,
-                        onDismissRequest = { categoryExpanded = false }
+
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        categoryOptions.forEach { (key, label) ->
-                            com.ludoven.adbtool.ui.mac.DropdownMenuItem(
-                                text = { Text(label) },
-                                onClick = {
-                                    categoryKey = key
-                                    categoryExpanded = false
-                                }
+                        Text(
+                            text = l10n("分类", "Category"),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Box {
+                            OutlinedTextField(
+                                value = selectedCategoryLabel,
+                                onValueChange = {},
+                                readOnly = true,
+                                singleLine = true,
+                                trailingIcon = {
+                                    ExposedDropdownMenuDefaults.TrailingIcon(expanded = categoryExpanded)
+                                },
+                                shape = RoundedCornerShape(8.dp),
+                                textStyle = MaterialTheme.typography.bodySmall.copy(
+                                    color = MaterialTheme.colorScheme.onSurface
+                                ),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
+                                    unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
+                                ),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(min = 42.dp)
+                                    .clickable { categoryExpanded = !categoryExpanded }
                             )
+                            com.ludoven.adbtool.ui.mac.DropdownMenu(
+                                expanded = categoryExpanded,
+                                onDismissRequest = { categoryExpanded = false }
+                            ) {
+                                categoryOptions.forEach { (key, label) ->
+                                    com.ludoven.adbtool.ui.mac.DropdownMenuItem(
+                                        text = { Text(label) },
+                                        onClick = {
+                                            categoryKey = key
+                                            categoryExpanded = false
+                                        }
+                                    )
+                                }
+                            }
                         }
                     }
                 }
 
-                OutlinedTextField(
+                CustomCommandDialogField(
+                    label = l10n("描述", "Description"),
                     value = description,
                     onValueChange = { description = it },
-                    singleLine = true,
-                    label = { Text(l10n("描述（可选）", "Description (optional)")) },
-                    placeholder = { Text(l10n("命令的简要说明", "Brief description of the command")) },
-                    shape = RoundedCornerShape(10.dp),
-                    modifier = Modifier.fillMaxWidth()
+                    placeholder = l10n("可选，命令的简要说明", "Optional, brief description of the command")
+                )
+
+                Text(
+                    text = l10n("可使用 {package} 和 {text} 作为占位符。", "You can use {package} and {text} as placeholders."),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         },
         confirmButton = {
-            TextButton(
+            CommandActionButton(
+                text = if (isEditing) l10n("保存", "Save") else l10n("添加", "Add"),
+                icon = Icons.Default.Add,
                 onClick = {
                     val finalTitle = title.trim()
                     val finalCommand = commandPreview.trim()
-                    if (finalTitle.isBlank() || finalCommand.isBlank()) return@TextButton
-                    val cmd = CustomCommand(
-                        id = initialCommand?.id ?: "custom_${java.util.UUID.randomUUID()}",
-                        title = finalTitle,
-                        description = description.trim(),
-                        commandPreview = finalCommand,
-                        categoryKey = categoryKey,
-                        shellCommand = shellCommand.trim()
-                    )
-                    onConfirm(cmd)
-                }
-            ) {
-                Text(if (isEditing) l10n("保存", "Save") else l10n("添加", "Add"))
-            }
+                    if (finalTitle.isNotBlank() && finalCommand.isNotBlank()) {
+                        val cmd = CustomCommand(
+                            id = initialCommand?.id ?: "custom_${java.util.UUID.randomUUID()}",
+                            title = finalTitle,
+                            description = description.trim(),
+                            commandPreview = finalCommand,
+                            categoryKey = categoryKey,
+                            shellCommand = shellCommand.trim()
+                        )
+                        onConfirm(cmd)
+                    }
+                },
+                enabled = title.trim().isNotBlank() && commandPreview.trim().isNotBlank(),
+                primary = true,
+                modifier = Modifier.height(32.dp)
+            )
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
+            TextButton(
+                onClick = onDismiss,
+                modifier = Modifier.height(32.dp),
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
+            ) {
                 Text(l10n("取消", "Cancel"))
             }
         },
         containerColor = MaterialTheme.colorScheme.surface
     )
+}
+
+@Composable
+private fun CustomCommandDialogField(
+    label: String,
+    value: String,
+    onValueChange: (String) -> Unit,
+    placeholder: String,
+    modifier: Modifier = Modifier,
+    required: Boolean = false
+) {
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                fontWeight = FontWeight.SemiBold
+            )
+            if (required) {
+                Text(
+                    text = "*",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+        OutlinedTextField(
+            value = value,
+            onValueChange = onValueChange,
+            singleLine = true,
+            placeholder = {
+                Text(
+                    text = placeholder,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
+                    style = MaterialTheme.typography.bodySmall
+                )
+            },
+            textStyle = MaterialTheme.typography.bodySmall.copy(
+                color = MaterialTheme.colorScheme.onSurface
+            ),
+            shape = RoundedCornerShape(8.dp),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
+                unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
+            ),
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 42.dp)
+        )
+    }
 }

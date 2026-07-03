@@ -1,6 +1,7 @@
 package com.ludoven.adbtool.util
 
 import com.ludoven.adbtool.entity.DeviceMirrorSettings
+import java.util.concurrent.CompletableFuture
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -17,6 +18,9 @@ object AdbTool {
     const val DEVICE_MIRROR_ALREADY_RUNNING_MESSAGE = "Device mirror already running"
     private const val SCRCPY_STARTUP_CHECK_TIMEOUT_MS = 500L
     private const val MIRROR_STOP_TIMEOUT_MS = 1500L
+    private const val DEFAULT_ADB_COMMAND_TIMEOUT_MS = 120_000L
+    private const val DEFAULT_SHELL_COMMAND_TIMEOUT_MS = 30_000L
+    private const val OUTPUT_DRAIN_TIMEOUT_MS = 500L
 
     private val mirrorProcessLock = Any()
     @Volatile
@@ -32,6 +36,17 @@ object AdbTool {
         val output: String,
         val errorMessage: String? = null
     )
+
+    internal fun outputText(result: AdbResult): String {
+        return if (result.success) {
+            result.output
+        } else {
+            result.errorMessage ?: result.output.ifBlank { "Unknown error" }
+        }
+    }
+
+    internal fun appShellCommand(vararg args: String): String =
+        buildShellCommand(*args)
     
     /**
      * 获取系统PATH中的ADB路径
@@ -58,37 +73,19 @@ object AdbTool {
      * 统一的命令执行方法，支持更好的错误处理
      */
     private suspend fun executeCommand(vararg args: String): AdbResult {
+        return executeCommandWithTimeout(DEFAULT_ADB_COMMAND_TIMEOUT_MS, *args)
+    }
+
+    private suspend fun executeCommandWithTimeout(timeoutMillis: Long, vararg args: String): AdbResult {
         return withContext(Dispatchers.IO) {
-            try {
-                val adbPath = AdbPathManager.getAdbPath() 
-                    ?: return@withContext AdbResult(
-                        false,
-                        "",
-                        AdbPathManager.adbEnvironment.value.message
-                            ?: AdbPathManager.friendlyInitializationError("ADB path not found")
-                    )
-                
-                val fullCmd = mutableListOf(adbPath).apply { addAll(args) }
-                val process = ProcessBuilder(fullCmd)
-                    .redirectErrorStream(true)
-                    .start()
-                ChildProcessRegistry.register(process)
-
-                try {
-                    val output = process.inputStream.bufferedReader().readText().trim()
-                    val exitCode = process.waitFor()
-
-                    if (exitCode == 0) {
-                        AdbResult(true, output)
-                    } else {
-                        AdbResult(false, output, "Command failed with exit code: $exitCode")
-                    }
-                } finally {
-                    ChildProcessRegistry.unregister(process)
-                }
-            } catch (e: Exception) {
-                AdbResult(false, "", AdbPathManager.friendlyInitializationError(e.message))
-            }
+            val adbPath = AdbPathManager.getAdbPath()
+                ?: return@withContext AdbResult(
+                    false,
+                    "",
+                    AdbPathManager.adbEnvironment.value.message
+                        ?: AdbPathManager.friendlyInitializationError("ADB path not found")
+                )
+            runProcessCommand(adbPath, args.toList(), timeoutMillis)
         }
     }
     
@@ -96,26 +93,63 @@ object AdbTool {
      * 同步版本的命令执行（向后兼容）
      */
     private fun runCommand(vararg args: String): String {
+        val adbPath = AdbPathManager.adbEnvironment.value.path
+            ?: return AdbPathManager.adbEnvironment.value.message
+                ?: AdbPathManager.friendlyInitializationError("ADB path not found")
+        return outputText(runProcessCommand(adbPath, args.toList(), DEFAULT_ADB_COMMAND_TIMEOUT_MS))
+    }
+
+    private fun runCommandWithTimeout(timeoutMillis: Long, vararg args: String): String {
+        val adbPath = AdbPathManager.adbEnvironment.value.path
+            ?: return AdbPathManager.adbEnvironment.value.message
+                ?: AdbPathManager.friendlyInitializationError("ADB path not found")
+        return outputText(runProcessCommand(adbPath, args.toList(), timeoutMillis))
+    }
+
+    private fun runProcessCommand(adbPath: String, args: List<String>, timeoutMillis: Long): AdbResult {
         return try {
-            val environment = AdbPathManager.adbEnvironment.value
-            val adbPath = environment.path
-                ?: return environment.message ?: AdbPathManager.friendlyInitializationError("ADB path not found")
             val fullCmd = mutableListOf(adbPath).apply { addAll(args) }
             val process = ProcessBuilder(fullCmd).redirectErrorStream(true).start()
             ChildProcessRegistry.register(process)
+            val outputFuture = CompletableFuture.supplyAsync {
+                process.inputStream.bufferedReader().use { it.readText() }
+            }
             try {
-                val output = process.inputStream.bufferedReader().readText()
-                process.waitFor()
-                output.trim()
+                val completed = process.waitFor(timeoutMillis, TimeUnit.MILLISECONDS)
+                if (!completed) {
+                    process.destroyForcibly()
+                    val partialOutput = drainProcessOutput(outputFuture).trim()
+                    return AdbResult(
+                        success = false,
+                        output = partialOutput,
+                        errorMessage = "Command timed out after ${timeoutMillis}ms"
+                    )
+                }
+
+                val output = drainProcessOutput(outputFuture).trim()
+                val exitCode = process.exitValue()
+                if (exitCode == 0) {
+                    AdbResult(true, output)
+                } else {
+                    AdbResult(false, output, "Command failed with exit code: $exitCode")
+                }
             } finally {
                 runCatching { process.inputStream.close() }
                 runCatching { process.outputStream.close() }
-                runCatching { process.destroyForcibly() }
+                if (process.isAlive) {
+                    runCatching { process.destroyForcibly() }
+                }
                 ChildProcessRegistry.unregister(process)
             }
         } catch (e: Exception) {
-            AdbPathManager.friendlyInitializationError(e.message)
+            AdbResult(false, "", AdbPathManager.friendlyInitializationError(e.message))
         }
+    }
+
+    private fun drainProcessOutput(outputFuture: CompletableFuture<String>): String {
+        return runCatching {
+            outputFuture.get(OUTPUT_DRAIN_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+        }.getOrDefault("")
     }
 
     /**
@@ -123,7 +157,7 @@ object AdbTool {
      */
     fun execShell(command: String, deviceId: String? = selectDeviceId): String {
         val args = buildDeviceArgs(deviceId) + listOf("shell", command)
-        return runCommand(*args.toTypedArray())
+        return runCommandWithTimeout(DEFAULT_SHELL_COMMAND_TIMEOUT_MS, *args.toTypedArray())
     }
 
     /**
@@ -289,24 +323,6 @@ object AdbTool {
             deviceMirrorProcess = null
         }
         ChildProcessRegistry.terminateAll(timeoutMillis = 1_500L)
-        killAdbServer()
-    }
-
-    private fun killAdbServer() {
-        val adbPath = AdbPathManager.currentAdbPath ?: return
-        runCatching {
-            val process = ProcessBuilder(adbPath, "kill-server")
-                .redirectErrorStream(true)
-                .start()
-            try {
-                if (!process.waitFor(1_500L, TimeUnit.MILLISECONDS)) {
-                    process.destroyForcibly()
-                }
-            } finally {
-                runCatching { process.inputStream.close() }
-                runCatching { process.outputStream.close() }
-            }
-        }
     }
     
     /**
@@ -314,7 +330,7 @@ object AdbTool {
      */
     suspend fun execShellAsync(command: String, deviceId: String? = selectDeviceId): AdbResult {
         val args = buildDeviceArgs(deviceId) + listOf("shell", command)
-        return executeCommand(*args.toTypedArray())
+        return executeCommandWithTimeout(DEFAULT_SHELL_COMMAND_TIMEOUT_MS, *args.toTypedArray())
     }
 
     /**
@@ -322,6 +338,10 @@ object AdbTool {
      */
     suspend fun execAdbAsync(vararg args: String): AdbResult {
         return executeCommand(*args)
+    }
+
+    suspend fun execAdbOutputAsync(vararg args: String): String {
+        return outputText(execAdbAsync(*args))
     }
     
     /**
@@ -520,7 +540,7 @@ object AdbTool {
         }
         
         // 首先获取启动组件
-        val componentResult = execShellAsync("cmd package resolve-activity --brief $packageName", deviceId)
+        val componentResult = execShellAsync(appShellCommand("cmd", "package", "resolve-activity", "--brief", packageName), deviceId)
         if (!componentResult.success) {
             return componentResult
         }
@@ -531,16 +551,16 @@ object AdbTool {
         }
         
         // 启动应用
-        return execShellAsync("am start -n $component", deviceId)
+        return execShellAsync(appShellCommand("am", "start", "-n", component), deviceId)
     }
     
     /**
      * 启动应用 - 同步版本（向后兼容）
      */
     fun startApp(packageName: String, deviceId: String? = selectDeviceId): Boolean {
-        val component = execShell("cmd package resolve-activity --brief $packageName", deviceId).lines().lastOrNull()
+        val component = execShell(appShellCommand("cmd", "package", "resolve-activity", "--brief", packageName), deviceId).lines().lastOrNull()
         return if (!component.isNullOrBlank()) {
-            execShell("am start -n $component", deviceId)
+            execShell(appShellCommand("am", "start", "-n", component), deviceId)
             true
         } else false
     }
@@ -552,14 +572,14 @@ object AdbTool {
         if (deviceId.isNullOrBlank()) {
             return AdbResult(false, "", "Device ID is required")
         }
-        return execShellAsync("am force-stop $packageName", deviceId)
+        return execShellAsync(appShellCommand("am", "force-stop", packageName), deviceId)
     }
     
     /**
      * 停止应用 - 同步版本（向后兼容）
      */
     fun stopApp(packageName: String, deviceId: String? = selectDeviceId): Boolean {
-        execShell("am force-stop $packageName", deviceId)
+        execShell(appShellCommand("am", "force-stop", packageName), deviceId)
         return true
     }
     
@@ -570,14 +590,14 @@ object AdbTool {
         if (deviceId.isNullOrBlank()) {
             return AdbResult(false, "", "Device ID is required")
         }
-        return execShellAsync("pm clear $packageName", deviceId)
+        return execShellAsync(appShellCommand("pm", "clear", packageName), deviceId)
     }
     
     /**
      * 清除应用数据 - 同步版本（向后兼容）
      */
     fun clearAppData(packageName: String, deviceId: String? = selectDeviceId): Boolean {
-        return execShell("pm clear $packageName", deviceId).contains("Success")
+        return execShell(appShellCommand("pm", "clear", packageName), deviceId).contains("Success")
     }
 
     /**
@@ -587,7 +607,7 @@ object AdbTool {
         if (deviceId.isNullOrBlank()) {
             return AdbResult(false, "", "Device ID is required")
         }
-        return execShellAsync("pm reset-permissions $packageName", deviceId)
+        return execShellAsync(appShellCommand("pm", "reset-permissions", packageName), deviceId)
     }
     
     /**
@@ -595,7 +615,7 @@ object AdbTool {
      */
     fun resetPermissions(packageName: String, deviceId: String? = selectDeviceId): Boolean {
         if (deviceId.isNullOrBlank()) return false
-        val output = execShell("pm reset-permissions $packageName", deviceId)
+        val output = execShell(appShellCommand("pm", "reset-permissions", packageName), deviceId)
         return !output.contains("error") && !output.contains("Exception")
     }
     
@@ -608,7 +628,7 @@ object AdbTool {
         }
         
         // 获取应用的所有权限
-        val permissionsResult = execShellAsync("dumpsys package $packageName", deviceId)
+        val permissionsResult = execShellAsync(appShellCommand("dumpsys", "package", packageName), deviceId)
         if (!permissionsResult.success) {
             return permissionsResult
         }
@@ -623,7 +643,7 @@ object AdbTool {
         // 逐个授予权限
         val results = mutableListOf<String>()
         for (permission in permissions) {
-            val grantResult = execShellAsync("pm grant $packageName $permission", deviceId)
+            val grantResult = execShellAsync(appShellCommand("pm", "grant", packageName, permission), deviceId)
             results.add("$permission: ${if (grantResult.success) "granted" else "failed"}")
         }
         
@@ -636,11 +656,11 @@ object AdbTool {
     fun grantAllPermissions(packageName: String, deviceId: String? = selectDeviceId): Boolean {
         if (deviceId.isNullOrBlank()) return false
         
-        val result = execShell("dumpsys package $packageName", deviceId)
+        val result = execShell(appShellCommand("dumpsys", "package", packageName), deviceId)
         val permissions = Regex("android\\.permission\\.[A-Z_\\.]+").findAll(result).map { it.value }.toSet()
         
         return permissions.all { permission ->
-            val grantResult = execShell("pm grant $packageName $permission", deviceId)
+            val grantResult = execShell(appShellCommand("pm", "grant", packageName, permission), deviceId)
             !grantResult.contains("Exception") && !grantResult.contains("error")
         }
     }
@@ -652,7 +672,7 @@ object AdbTool {
         if (deviceId.isNullOrBlank()) {
             return AdbResult(false, "", "Device ID is required")
         }
-        val result = execShellAsync("pm path $packageName", deviceId)
+        val result = execShellAsync(appShellCommand("pm", "path", packageName), deviceId)
         if (result.success) {
             val path = result.output.substringAfter("package:").trim()
             return AdbResult(true, path, null)
@@ -665,7 +685,7 @@ object AdbTool {
      */
     fun getAppPath(packageName: String, deviceId: String? = selectDeviceId): String {
         if (deviceId.isNullOrBlank()) return ""
-        val output = execShell("pm path $packageName", deviceId)
+        val output = execShell(appShellCommand("pm", "path", packageName), deviceId)
         return output.substringAfter("package:").trim()
     }
     
@@ -676,9 +696,13 @@ object AdbTool {
         if (deviceId.isNullOrBlank()) {
             return AdbResult(false, "", "Device ID is required")
         }
-        val result = execShellAsync("dumpsys package $packageName | grep firstInstallTime", deviceId)
+        val result = execShellAsync(appShellCommand("dumpsys", "package", packageName), deviceId)
         if (result.success) {
-            val time = result.output.substringAfter("firstInstallTime=").trim()
+            val time = result.output.lineSequence()
+                .firstOrNull { it.contains("firstInstallTime=") }
+                ?.substringAfter("firstInstallTime=")
+                ?.trim()
+                .orEmpty()
             return AdbResult(true, time, null)
         }
         return result
@@ -689,8 +713,12 @@ object AdbTool {
      */
     fun getInstallTime(packageName: String, deviceId: String? = selectDeviceId): String {
         if (deviceId.isNullOrBlank()) return ""
-        val output = execShell("dumpsys package $packageName | grep firstInstallTime", deviceId)
-        return output.substringAfter("firstInstallTime=").trim()
+        val output = execShell(appShellCommand("dumpsys", "package", packageName), deviceId)
+        return output.lineSequence()
+            .firstOrNull { it.contains("firstInstallTime=") }
+            ?.substringAfter("firstInstallTime=")
+            ?.trim()
+            .orEmpty()
     }
     
     /**
@@ -700,9 +728,13 @@ object AdbTool {
         if (deviceId.isNullOrBlank()) {
             return AdbResult(false, "", "Device ID is required")
         }
-        val result = execShellAsync("dumpsys package $packageName | grep lastUpdateTime", deviceId)
+        val result = execShellAsync(appShellCommand("dumpsys", "package", packageName), deviceId)
         if (result.success) {
-            val time = result.output.substringAfter("lastUpdateTime=").trim()
+            val time = result.output.lineSequence()
+                .firstOrNull { it.contains("lastUpdateTime=") }
+                ?.substringAfter("lastUpdateTime=")
+                ?.trim()
+                .orEmpty()
             return AdbResult(true, time, null)
         }
         return result
@@ -713,8 +745,12 @@ object AdbTool {
      */
     fun getUpdateTime(packageName: String, deviceId: String? = selectDeviceId): String {
         if (deviceId.isNullOrBlank()) return ""
-        val output = execShell("dumpsys package $packageName | grep lastUpdateTime", deviceId)
-        return output.substringAfter("lastUpdateTime=").trim()
+        val output = execShell(appShellCommand("dumpsys", "package", packageName), deviceId)
+        return output.lineSequence()
+            .firstOrNull { it.contains("lastUpdateTime=") }
+            ?.substringAfter("lastUpdateTime=")
+            ?.trim()
+            .orEmpty()
     }
 
     /**
@@ -724,7 +760,7 @@ object AdbTool {
         if (deviceId.isNullOrBlank()) {
             return AdbResult(false, "", "Device ID is required")
         }
-        val result = execShellAsync("dumpsys package $packageName", deviceId)
+        val result = execShellAsync(appShellCommand("dumpsys", "package", packageName), deviceId)
         if (result.success) {
             val isSystem = result.output.contains("flags=[ SYSTEM") || result.output.contains("SYSTEM")
             return AdbResult(true, isSystem.toString(), null)
@@ -737,7 +773,7 @@ object AdbTool {
      */
     fun isSystemApp(packageName: String, deviceId: String? = selectDeviceId): Boolean {
         if (deviceId.isNullOrBlank()) return false
-        val output = execShell("dumpsys package $packageName", deviceId)
+        val output = execShell(appShellCommand("dumpsys", "package", packageName), deviceId)
         return output.contains("flags=[ SYSTEM") || output.contains("SYSTEM")
     }
     
@@ -766,7 +802,7 @@ object AdbTool {
         if (deviceId.isNullOrBlank()) {
             return AdbResult(false, "", "Device ID is required")
         }
-        val result = execShellAsync("dumpsys package $packageName", deviceId)
+        val result = execShellAsync(appShellCommand("dumpsys", "package", packageName), deviceId)
         if (result.success) {
             val targetSdk = result.output.lines()
                 .find { it.contains("targetSdk") }
@@ -783,7 +819,7 @@ object AdbTool {
      */
     fun getTargetSdkVersion(packageName: String, deviceId: String? = selectDeviceId): String {
         if (deviceId.isNullOrBlank()) return ""
-        val output = execShell("dumpsys package $packageName", deviceId)
+        val output = execShell(appShellCommand("dumpsys", "package", packageName), deviceId)
         return output.lines()
             .find { it.contains("targetSdk") }
             ?.substringAfter("targetSdk=")
@@ -798,7 +834,7 @@ object AdbTool {
         if (deviceId.isNullOrBlank()) {
             return AdbResult(false, "", "Device ID is required")
         }
-        val result = execShellAsync("dumpsys package $packageName", deviceId)
+        val result = execShellAsync(appShellCommand("dumpsys", "package", packageName), deviceId)
         if (result.success) {
             val minSdk = result.output.lines()
                 .find { it.contains("minSdk") }
@@ -815,7 +851,7 @@ object AdbTool {
      */
     fun getMinSdkVersion(packageName: String, deviceId: String? = selectDeviceId): String {
         if (deviceId.isNullOrBlank()) return ""
-        val output = execShell("dumpsys package $packageName", deviceId)
+        val output = execShell(appShellCommand("dumpsys", "package", packageName), deviceId)
         return output.lines()
             .find { it.contains("minSdk") }
             ?.substringAfter("minSdk=")
@@ -850,8 +886,7 @@ object AdbTool {
      */
     @Deprecated("Use executeCommand instead", ReplaceWith("executeCommand(*args)"))
     suspend fun executeAdbCommand(vararg args: String): String {
-        val result = executeCommand(*args)
-        return if (result.success) result.output else result.errorMessage ?: "Unknown error"
+        return execAdbOutputAsync(*args)
     }
     
     /**

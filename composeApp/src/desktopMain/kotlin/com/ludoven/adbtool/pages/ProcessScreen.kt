@@ -45,7 +45,10 @@ import com.ludoven.adbtool.ui.mac.IconButton
 import com.ludoven.adbtool.ui.mac.MaterialTheme
 import com.ludoven.adbtool.ui.mac.OutlinedTextField
 import com.ludoven.adbtool.ui.mac.Text
+import com.ludoven.adbtool.widget.EmptyStatePanel
+import com.ludoven.adbtool.widget.PageHeader
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -60,10 +63,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.ludoven.adbtool.util.AdbTool
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
 
-private data class ProcessItem(
+internal data class ProcessItem(
     val name: String,
     val cpuPercent: String,
     val cpuTime: String,
@@ -82,27 +86,52 @@ fun ProcessScreen(selectedDevice: String?) {
     var errorText by remember { mutableStateOf<String?>(null) }
     var sortBy by remember { mutableStateOf(SortColumn.CPU) }
     var sortDesc by remember { mutableStateOf(true) }
+    var loadedDevice by remember { mutableStateOf<String?>(null) }
+    var loadJob by remember { mutableStateOf<Job?>(null) }
     val scope = rememberCoroutineScope()
     val listState = rememberLazyListState()
 
-    fun refresh() {
-        if (selectedDevice.isNullOrBlank()) {
+    fun refresh(forceRefresh: Boolean = false) {
+        val deviceId = selectedDevice?.trim()?.takeIf { it.isNotBlank() }
+        if (deviceId == null) {
+            loadJob?.cancel()
+            loadJob = null
+            loadedDevice = null
             processes = emptyList()
             errorText = null
+            isLoading = false
             return
         }
-        scope.launch {
+        if (!forceRefresh && loadedDevice == deviceId && loadJob?.isActive != true) {
+            isLoading = false
+            return
+        }
+        loadJob?.cancel()
+        loadJob = scope.launch {
             isLoading = true
             errorText = null
-            val result = loadProcessList(selectedDevice)
-            result.onSuccess { processes = it }
-                .onFailure { errorText = it.message ?: "Failed to load process list." }
-            isLoading = false
+            val result = loadProcessList(deviceId)
+            if (selectedDevice?.trim() == deviceId) {
+                result.onSuccess {
+                    processes = it
+                    loadedDevice = deviceId
+                }.onFailure {
+                    errorText = it.message ?: "Failed to load process list."
+                }
+                isLoading = false
+            }
         }
     }
 
     LaunchedEffect(selectedDevice) {
         refresh()
+    }
+    DisposableEffect(Unit) {
+        onDispose {
+            loadJob?.cancel()
+            loadJob = null
+            isLoading = false
+        }
     }
 
     val filteredList = remember(processes, keyword, sortBy, sortDesc) {
@@ -132,36 +161,22 @@ fun ProcessScreen(selectedDevice: String?) {
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+        PageHeader(
+            title = stringResource(Res.string.process_title),
+            subtitle = stringResource(Res.string.process_subtitle)
         ) {
-            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(
-                    text = stringResource(Res.string.process_title),
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = stringResource(Res.string.process_subtitle),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            IconButton(onClick = { refresh() }, enabled = !selectedDevice.isNullOrBlank() && !isLoading) {
+            IconButton(onClick = { refresh(forceRefresh = true) }, enabled = !selectedDevice.isNullOrBlank() && !isLoading) {
                 Icon(Icons.Default.Refresh, contentDescription = stringResource(Res.string.refresh))
             }
         }
 
         if (selectedDevice.isNullOrBlank()) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(
-                    text = stringResource(Res.string.process_no_device),
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
+            EmptyStatePanel(
+                title = stringResource(Res.string.process_no_device),
+                description = "连接或选择设备后即可读取进程列表。",
+                icon = Icons.Default.Refresh,
+                modifier = Modifier.fillMaxSize()
+            )
             return
         }
 
@@ -205,23 +220,21 @@ fun ProcessScreen(selectedDevice: String?) {
                 }
 
                 errorText != null -> {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text(
-                            text = errorText.orEmpty(),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.error
-                        )
-                    }
+                    EmptyStatePanel(
+                        title = "进程读取失败",
+                        description = errorText.orEmpty(),
+                        actionLabel = stringResource(Res.string.refresh),
+                        onAction = { refresh(forceRefresh = true) },
+                        modifier = Modifier.fillMaxSize()
+                    )
                 }
 
                 filteredList.isEmpty() -> {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text(
-                            text = stringResource(Res.string.process_empty),
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
+                    EmptyStatePanel(
+                        title = stringResource(Res.string.process_empty),
+                        description = if (keyword.isBlank()) "设备当前没有返回进程数据。" else "没有进程匹配当前搜索条件。",
+                        modifier = Modifier.fillMaxSize()
+                    )
                 }
 
                 else -> {
@@ -396,14 +409,14 @@ private suspend fun loadProcessList(deviceId: String): Result<List<ProcessItem>>
     return runCatching { parsePsOutput(output) }
 }
 
-private fun parseTopOutput(raw: String): List<ProcessItem> {
+internal fun parseTopOutput(raw: String): List<ProcessItem> {
     val lines = raw.lines().map { it.trim() }.filter { it.isNotBlank() }
     if (lines.isEmpty()) return emptyList()
 
     val headerIndex = lines.indexOfFirst {
         val upper = it.uppercase()
         upper.contains("PID") && upper.contains("CPU") &&
-            (upper.contains("NAME") || upper.contains("CMD") || upper.contains("COMMAND"))
+            (upper.contains("NAME") || upper.contains("CMD") || upper.contains("COMMAND") || upper.contains("ARGS"))
     }
     if (headerIndex < 0 || headerIndex + 1 >= lines.size) return emptyList()
 
@@ -411,7 +424,8 @@ private fun parseTopOutput(raw: String): List<ProcessItem> {
     val pidIndex = header.indexOfFirst { it.equals("PID", true) }
     val userIndex = header.indexOfFirst { it.equals("USER", true) || it.equals("UID", true) }
     val cpuIndex = header.indexOfFirst {
-        it.equals("%CPU", true) || it.equals("CPU%", true) || it.equals("CPU", true)
+        it.equals("%CPU", true) || it.equals("CPU%", true) || it.equals("CPU", true) ||
+            it.contains("CPU", ignoreCase = true)
     }
     val timeIndex = header.indexOfFirst {
         it.equals("TIME+", true) || it.equals("TIME", true) || it.equals("CPUTIME", true)
@@ -421,26 +435,45 @@ private fun parseTopOutput(raw: String): List<ProcessItem> {
     }
     val nameIndex = header.indexOfFirst {
         it.equals("NAME", true) || it.equals("CMD", true) || it.equals("COMMAND", true)
+            || it.equals("ARGS", true)
     }
 
     if (pidIndex < 0 || nameIndex < 0) return emptyList()
+    val mergedStateCpuIndex = header.indexOfFirst {
+        it.contains("CPU", ignoreCase = true) && it.contains("[") && it.contains("]")
+    }
+
+    fun dataIndex(headerIndex: Int): Int {
+        if (headerIndex < 0) return headerIndex
+        return if (mergedStateCpuIndex >= 0 && headerIndex >= mergedStateCpuIndex) {
+            headerIndex + 1
+        } else {
+            headerIndex
+        }
+    }
 
     return lines.drop(headerIndex + 1).mapNotNull { line ->
         val tokens = line.split(Regex("\\s+"))
-        if (tokens.size <= pidIndex || tokens.size <= nameIndex) return@mapNotNull null
-        val name = tokens.drop(nameIndex).joinToString(" ").ifBlank { "-" }
+        val pidDataIndex = dataIndex(pidIndex)
+        val userDataIndex = dataIndex(userIndex)
+        val cpuDataIndex = dataIndex(cpuIndex)
+        val timeDataIndex = dataIndex(timeIndex)
+        val memDataIndex = dataIndex(memIndex)
+        val nameDataIndex = dataIndex(nameIndex)
+        if (tokens.size <= pidDataIndex || tokens.size <= nameDataIndex) return@mapNotNull null
+        val name = tokens.drop(nameDataIndex).joinToString(" ").ifBlank { "-" }
         ProcessItem(
             name = name,
-            cpuPercent = tokens.getOrNull(cpuIndex)?.let { normalizeCpuValue(it) } ?: "-",
-            cpuTime = tokens.getOrNull(timeIndex) ?: "-",
-            memory = tokens.getOrNull(memIndex) ?: "-",
-            pid = tokens.getOrNull(pidIndex) ?: "-",
-            user = tokens.getOrNull(userIndex) ?: "-"
+            cpuPercent = tokens.getOrNull(cpuDataIndex)?.let { normalizeCpuValue(it) } ?: "-",
+            cpuTime = tokens.getOrNull(timeDataIndex) ?: "-",
+            memory = tokens.getOrNull(memDataIndex) ?: "-",
+            pid = tokens.getOrNull(pidDataIndex) ?: "-",
+            user = tokens.getOrNull(userDataIndex) ?: "-"
         )
     }.sortedByDescending { parseCpuForSort(it.cpuPercent) }
 }
 
-private fun parsePsOutput(raw: String): List<ProcessItem> {
+internal fun parsePsOutput(raw: String): List<ProcessItem> {
     val lines = raw.lines().map { it.trim() }.filter { it.isNotBlank() }
     if (lines.isEmpty()) return emptyList()
 
@@ -449,11 +482,21 @@ private fun parsePsOutput(raw: String): List<ProcessItem> {
     val userIndex = header.indexOfFirst { it.equals("USER", ignoreCase = true) || it.equals("UID", ignoreCase = true) }
         .takeIf { it >= 0 } ?: 0
     val nameIndex = header.indexOfFirst {
-        it.equals("NAME", ignoreCase = true) ||
+            it.equals("NAME", ignoreCase = true) ||
             it.equals("CMD", ignoreCase = true) ||
             it.equals("COMMAND", ignoreCase = true) ||
+            it.equals("CMDLINE", ignoreCase = true) ||
             it.equals("ARGS", ignoreCase = true)
     }.takeIf { it >= 0 } ?: (header.size - 1)
+    val residentMemoryIndex = header.indexOfFirst {
+        it.equals("RSS", ignoreCase = true) ||
+            it.equals("RES", ignoreCase = true)
+    }.takeIf { it >= 0 }
+    val virtualMemoryIndex = header.indexOfFirst {
+        it.equals("VSZ", ignoreCase = true) ||
+            it.equals("VSIZE", ignoreCase = true)
+    }.takeIf { it >= 0 }
+    val memoryIndex = residentMemoryIndex ?: virtualMemoryIndex
 
     return lines.drop(1).mapNotNull { line ->
         val tokens = line.split(Regex("\\s+"))
@@ -461,11 +504,12 @@ private fun parsePsOutput(raw: String): List<ProcessItem> {
         val pid = tokens[pidIndex]
         val user = tokens.getOrNull(userIndex) ?: "-"
         val name = tokens.drop(nameIndex).joinToString(" ").ifBlank { tokens.lastOrNull().orEmpty() }
+        val memory = memoryIndex?.let { tokens.getOrNull(it) } ?: "-"
         ProcessItem(
             name = name,
             cpuPercent = "-",
             cpuTime = "-",
-            memory = "-",
+            memory = memory,
             pid = pid,
             user = user,
         )

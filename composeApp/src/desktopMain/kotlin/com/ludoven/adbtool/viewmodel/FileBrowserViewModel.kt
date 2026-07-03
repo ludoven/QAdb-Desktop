@@ -8,11 +8,26 @@ import com.ludoven.adbtool.entity.MsgContent
 import com.ludoven.adbtool.util.AdbTool
 import com.ludoven.adbtool.util.FileUtils
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+
+internal fun fileListLoadShouldApply(
+    requestedPath: String?,
+    requestedDeviceId: String?,
+    currentPath: String?,
+    currentDeviceId: String?
+): Boolean {
+    val path = requestedPath?.trim().orEmpty()
+    val deviceId = requestedDeviceId?.trim().orEmpty()
+    return path.isNotEmpty() &&
+        deviceId.isNotEmpty() &&
+        path == currentPath?.trim().orEmpty() &&
+        deviceId == currentDeviceId?.trim().orEmpty()
+}
 
 class FileBrowserViewModel : BaseViewModel() {
 
@@ -27,6 +42,9 @@ class FileBrowserViewModel : BaseViewModel() {
             "/system" to "系统",
             "/tmp" to "临时文件"
         )
+
+        internal fun listDirectoryCommand(path: String, longFormat: Boolean): String =
+            AdbTool.buildShellCommand("ls", if (longFormat) "-la" else "-l", path)
     }
 
     private val _currentPath = MutableStateFlow("/sdcard")
@@ -62,33 +80,73 @@ class FileBrowserViewModel : BaseViewModel() {
     private val _clipboardMode = MutableStateFlow<ClipboardMode?>(null)
     val clipboardMode: StateFlow<ClipboardMode?> = _clipboardMode.asStateFlow()
 
+    private var loadFilesJob: Job? = null
+    private var loadingPath: String? = null
+    private var loadingDeviceId: String? = null
+    private var loadedPath: String? = null
+    private var loadedDeviceId: String? = null
+
     enum class ClipboardMode { COPY, CUT }
 
-    fun loadFiles(path: String = _currentPath.value, deviceId: String?) {
-        if (deviceId.isNullOrBlank()) {
+    fun loadFiles(path: String = _currentPath.value, deviceId: String?, forceRefresh: Boolean = false) {
+        val normalizedPath = path.trim()
+        val normalizedDeviceId = deviceId?.trim().orEmpty()
+        if (normalizedDeviceId.isBlank()) {
+            loadFilesJob?.cancel()
+            loadFilesJob = null
+            loadingPath = null
+            loadingDeviceId = null
+            loadedPath = null
+            loadedDeviceId = null
             _files.value = emptyList()
             _errorText.value = null
+            _isLoading.value = false
             return
         }
+        if (
+            !forceRefresh &&
+            loadedPath == normalizedPath &&
+            loadedDeviceId == normalizedDeviceId &&
+            loadFilesJob?.isActive != true
+        ) {
+            _isLoading.value = false
+            return
+        }
+        loadFilesJob?.cancel()
+        loadingPath = normalizedPath
+        loadingDeviceId = normalizedDeviceId
         _isLoading.value = true
         _errorText.value = null
-        viewModelScope.launch {
-            val result = listDirectory(path, deviceId)
+        loadFilesJob = viewModelScope.launch {
+            val result = listDirectory(normalizedPath, normalizedDeviceId)
+            if (!fileListLoadShouldApply(normalizedPath, normalizedDeviceId, loadingPath, loadingDeviceId)) return@launch
             result.onSuccess { fileList ->
-                _currentPath.value = path
+                _currentPath.value = normalizedPath
+                loadedPath = normalizedPath
+                loadedDeviceId = normalizedDeviceId
                 _files.value = sortFiles(fileList)
                 // Push to history
                 val hist = _history.value.toMutableList()
                 val idx = _historyIndex.value
                 // Truncate forward history and append
-                val newHist = hist.subList(0, idx + 1) + path
+                val newHist = hist.subList(0, idx + 1) + normalizedPath
                 _history.value = newHist
                 _historyIndex.value = newHist.size - 1
             }.onFailure {
                 _errorText.value = it.message ?: "Failed to load directory"
             }
-            _isLoading.value = false
+            if (fileListLoadShouldApply(normalizedPath, normalizedDeviceId, loadingPath, loadingDeviceId)) {
+                _isLoading.value = false
+            }
         }
+    }
+
+    fun cancelActiveLoad() {
+        loadFilesJob?.cancel()
+        loadFilesJob = null
+        loadingPath = null
+        loadingDeviceId = null
+        _isLoading.value = false
     }
 
     fun navigateTo(path: String, deviceId: String?) {
@@ -179,7 +237,7 @@ class FileBrowserViewModel : BaseViewModel() {
                 if (result.success || result.output.isBlank()) successCount++ else failCount++
             }
             clearClipboard()
-            loadFiles(deviceId = deviceId)
+            loadFiles(deviceId = deviceId, forceRefresh = true)
             if (failCount > 0) {
                 showTipDialog(MsgContent.Text("完成：成功 $successCount 个，失败 $failCount 个"), autoDismiss = true)
             } else {
@@ -199,7 +257,25 @@ class FileBrowserViewModel : BaseViewModel() {
             }
             if (result.success || result.output.isBlank()) {
                 showTipDialog(MsgContent.Text("已删除: ${path.substringAfterLast("/")}"), autoDismiss = true)
-                loadFiles(deviceId = deviceId)
+                loadFiles(deviceId = deviceId, forceRefresh = true)
+            } else {
+                showTipDialog(MsgContent.Text("删除失败: ${result.errorMessage ?: result.output}"))
+            }
+        }
+    }
+
+    fun deleteFiles(paths: List<String>, deviceId: String?) {
+        val targets = paths.map { it.trim() }.filter { it.isNotBlank() }.distinct()
+        if (deviceId.isNullOrBlank() || targets.isEmpty()) return
+        viewModelScope.launch {
+            val args = listOf("rm", "-rf", "--") + targets
+            val command = AdbTool.buildShellCommand(*args.toTypedArray())
+            val result = withContext(Dispatchers.IO) {
+                AdbTool.execShellAsync(command, deviceId)
+            }
+            if (result.success || result.output.isBlank()) {
+                showTipDialog(MsgContent.Text("已删除 ${targets.size} 个项目"), autoDismiss = true)
+                loadFiles(deviceId = deviceId, forceRefresh = true)
             } else {
                 showTipDialog(MsgContent.Text("删除失败: ${result.errorMessage ?: result.output}"))
             }
@@ -216,7 +292,7 @@ class FileBrowserViewModel : BaseViewModel() {
             }
             if (result.success || result.output.isBlank()) {
                 showTipDialog(MsgContent.Text("重命名成功"), autoDismiss = true)
-                loadFiles(deviceId = deviceId)
+                loadFiles(deviceId = deviceId, forceRefresh = true)
             } else {
                 showTipDialog(MsgContent.Text("重命名失败: ${result.errorMessage ?: result.output}"))
             }
@@ -233,7 +309,7 @@ class FileBrowserViewModel : BaseViewModel() {
             }
             if (result.success || result.output.isBlank()) {
                 showTipDialog(MsgContent.Text("已创建目录: $dirName"), autoDismiss = true)
-                loadFiles(deviceId = deviceId)
+                loadFiles(deviceId = deviceId, forceRefresh = true)
             } else {
                 showTipDialog(MsgContent.Text("创建失败: ${result.errorMessage ?: result.output}"))
             }
@@ -281,7 +357,7 @@ class FileBrowserViewModel : BaseViewModel() {
             }
             if (result.success) {
                 showTipDialog(MsgContent.Text("推送成功: $fileName"), autoDismiss = true)
-                loadFiles(deviceId = deviceId)
+                loadFiles(deviceId = deviceId, forceRefresh = true)
             } else {
                 showTipDialog(MsgContent.Text("推送失败: ${result.errorMessage ?: result.output}"))
             }
@@ -343,7 +419,7 @@ class FileBrowserViewModel : BaseViewModel() {
     private suspend fun listDirectory(path: String, deviceId: String): Result<List<FileInfo>> {
         return withContext(Dispatchers.IO) {
             // Try `ls -la` first
-            val result = AdbTool.execShellAsync("ls -la \"$path\"", deviceId)
+            val result = AdbTool.execShellAsync(listDirectoryCommand(path, longFormat = true), deviceId)
             if (result.success && result.output.isNotBlank()) {
                 val parsed = parseLsOutput(result.output, path)
                 if (parsed.isNotEmpty()) {
@@ -351,7 +427,7 @@ class FileBrowserViewModel : BaseViewModel() {
                 }
             }
             // Fallback to `ls -l`
-            val fallback = AdbTool.execShellAsync("ls -l \"$path\"", deviceId)
+            val fallback = AdbTool.execShellAsync(listDirectoryCommand(path, longFormat = false), deviceId)
             if (fallback.success && fallback.output.isNotBlank()) {
                 val parsed = parseLsOutput(fallback.output, path)
                 return@withContext Result.success(parsed)

@@ -9,6 +9,8 @@ import com.ludoven.adbtool.entity.MsgContent
 import com.ludoven.adbtool.util.AdbTool
 import com.ludoven.adbtool.util.l10n
 import com.ludoven.adbtool.viewmodel.FileBrowserViewModel
+import com.ludoven.adbtool.widget.EmptyStatePanel
+import com.ludoven.adbtool.widget.PageHeader
 import androidx.compose.foundation.*
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
@@ -20,6 +22,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.automirrored.filled.InsertDriveFile
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.ExperimentalComposeUiApi
@@ -41,6 +45,12 @@ import androidx.compose.ui.unit.dp
 import kotlin.math.max
 import org.jetbrains.compose.resources.stringResource
 
+internal fun fileBrowserDeviceActionsEnabled(selectedDevice: String?): Boolean =
+    !selectedDevice.isNullOrBlank()
+
+internal fun fileBrowserAvailableSpaceCommand(path: String): String =
+    AdbTool.buildShellCommand("df", "-h", path)
+
 @Composable
 fun FileBrowserScreen(
     viewModel: FileBrowserViewModel,
@@ -58,6 +68,7 @@ fun FileBrowserScreen(
     val clipboardFiles by viewModel.clipboardFiles.collectAsState()
     val showDialog by viewModel.showDialog.collectAsState()
     val dialogMessage by viewModel.dialogMessage.collectAsState()
+    val deviceActionsEnabled = fileBrowserDeviceActionsEnabled(selectedDevice)
 
     val filteredFiles by remember {
         derivedStateOf {
@@ -91,7 +102,7 @@ fun FileBrowserScreen(
         value = "--"
         if (!selectedDevice.isNullOrBlank()) {
             runCatching {
-                val output = AdbTool.execShellAsync("df -h \"$currentPath\"", selectedDevice)
+                val output = AdbTool.execShellAsync(fileBrowserAvailableSpaceCommand(currentPath), selectedDevice)
                 if (output.success) {
                     output.output.lines().lastOrNull { it.trim().isNotEmpty() && !it.contains("Filesystem", true) }
                         ?.split(Regex("\\s+"))
@@ -104,6 +115,11 @@ fun FileBrowserScreen(
 
     LaunchedEffect(selectedDevice) {
         viewModel.loadFiles(deviceId = selectedDevice)
+    }
+    DisposableEffect(Unit) {
+        onDispose {
+            viewModel.cancelActiveLoad()
+        }
     }
 
     // Dialogs
@@ -177,7 +193,10 @@ fun FileBrowserScreen(
             },
             confirmButton = {
                 Button(onClick = {
-                    deleteTargets.forEach { path -> viewModel.deleteFile(path, selectedDevice) }
+                    val targets = deleteTargets
+                    viewModel.deleteFiles(targets, selectedDevice)
+                    selectedPaths = selectedPaths - targets.toSet()
+                    deleteTargets = emptyList()
                     showDeleteConfirm = false
                 }) { Text(l10n("删除", "Delete"), color = MaterialTheme.colorScheme.error) }
             },
@@ -202,28 +221,14 @@ fun FileBrowserScreen(
         modifier = Modifier.fillMaxSize().padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        // Header
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+        PageHeader(
+            title = l10n("文件管理", "File Manager"),
+            subtitle = l10n("浏览和管理设备文件", "Browse and manage device files")
         ) {
-            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(
-                    text = l10n("文件管理", "File Manager"),
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.SemiBold
-                )
-                Text(
-                    text = l10n("浏览和管理设备文件", "Browse and manage device files"),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                 OutlinedButton(
                     onClick = { viewModel.pushFile(selectedDevice) },
+                    enabled = deviceActionsEnabled,
                     shape = RoundedCornerShape(10.dp),
                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
                 ) {
@@ -233,6 +238,7 @@ fun FileBrowserScreen(
                 }
                 OutlinedButton(
                     onClick = { showNewDirDialog = true },
+                    enabled = deviceActionsEnabled,
                     shape = RoundedCornerShape(10.dp),
                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
                 ) {
@@ -276,13 +282,12 @@ fun FileBrowserScreen(
         }
 
         if (selectedDevice.isNullOrBlank()) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(
-                    text = l10n("请先选择设备后查看文件。", "Please select a device first."),
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
+            EmptyStatePanel(
+                title = l10n("未选择设备", "No device selected"),
+                description = l10n("请先连接并选择设备后查看文件。", "Connect and select a device before browsing files."),
+                icon = Icons.Default.Folder,
+                modifier = Modifier.fillMaxSize()
+            )
             return
         }
 
@@ -295,7 +300,7 @@ fun FileBrowserScreen(
             onBack = { viewModel.goBack(selectedDevice) },
             onForward = { viewModel.goForward(selectedDevice) },
             onUp = { viewModel.navigateUp(selectedDevice) },
-            onRefresh = { viewModel.loadFiles(deviceId = selectedDevice) },
+            onRefresh = { viewModel.loadFiles(deviceId = selectedDevice, forceRefresh = true) },
             onNavigateToPath = { viewModel.navigateTo(it, selectedDevice) },
             onSearchChange = { viewModel.setSearchKeyword(it) },
         )
@@ -352,26 +357,24 @@ fun FileBrowserScreen(
                 }
                 errorText != null -> {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text(
-                                text = errorText.orEmpty(),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.error
-                            )
-                            OutlinedButton(onClick = { viewModel.loadFiles(deviceId = selectedDevice) }) {
-                                Text(l10n("重试", "Retry"))
-                            }
-                        }
+                        EmptyStatePanel(
+                            title = l10n("目录读取失败", "Failed to load folder"),
+                            description = errorText.orEmpty(),
+                            actionLabel = l10n("重试", "Retry"),
+                            onAction = { viewModel.loadFiles(deviceId = selectedDevice, forceRefresh = true) }
+                        )
                     }
                 }
                 filteredFiles.isEmpty() -> {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text(
-                            text = l10n("此目录为空", "This folder is empty"),
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
+                    EmptyStatePanel(
+                        title = if (searchKeyword.isBlank()) l10n("此目录为空", "This folder is empty") else l10n("没有匹配文件", "No matching files"),
+                        description = if (searchKeyword.isBlank()) {
+                            l10n("当前路径没有可显示的文件或文件夹。", "This path has no visible files or folders.")
+                        } else {
+                            l10n("调整搜索词或清除筛选后再试。", "Adjust the search term or clear the filter.")
+                        },
+                        modifier = Modifier.fillMaxSize()
+                    )
                 }
                 else -> {
                     Box(
@@ -519,7 +522,7 @@ fun FileBrowserScreen(
                                             viewModel.openFile(fullPath, selectedDevice)
                                             contextMenuExpanded = false
                                         },
-                                        leadingIcon = { Icon(Icons.Default.OpenInNew, l10n("打开", "Open"), modifier = Modifier.size(18.dp)) }
+                                        leadingIcon = { Icon(Icons.AutoMirrored.Filled.OpenInNew, l10n("打开", "Open"), modifier = Modifier.size(18.dp)) }
                                     )
                                 }
 
@@ -528,7 +531,11 @@ fun FileBrowserScreen(
                                 DropdownMenuItem(
                                     text = { Text(l10n("复制路径", "Copy path")) },
                                     onClick = {
-                                        copyToClipboardText(fullPath)
+                                        val copied = copyToClipboardText(fullPath)
+                                        viewModel.showTipDialog(
+                                            MsgContent.Text(if (copied) l10n("已复制路径", "Path copied") else l10n("复制失败", "Copy failed")),
+                                            autoDismiss = copied
+                                        )
                                         contextMenuExpanded = false
                                     },
                                     leadingIcon = { Icon(Icons.Default.ContentCopy, l10n("复制路径", "Copy path"), modifier = Modifier.size(18.dp)) }
@@ -630,7 +637,13 @@ fun FileBrowserScreen(
                     shape = RoundedCornerShape(10.dp)
                 ) { Text(l10n("重命名", "Rename")) }
                 OutlinedButton(
-                    onClick = { selectedPaths.forEach { copyToClipboardText(it) } },
+                    onClick = {
+                        val copied = copyToClipboardText(selectedPaths.joinToString("\n"))
+                        viewModel.showTipDialog(
+                            MsgContent.Text(if (copied) l10n("已复制 ${selectedPaths.size} 个路径", "Copied ${selectedPaths.size} paths") else l10n("复制失败", "Copy failed")),
+                            autoDismiss = copied
+                        )
+                    },
                     shape = RoundedCornerShape(10.dp)
                 ) { Text(l10n("复制路径", "Copy path")) }
                 OutlinedButton(
@@ -648,8 +661,8 @@ fun FileBrowserScreen(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(Color(0xFFF8F9FB), RoundedCornerShape(10.dp))
-                .border(BorderStroke(1.dp, Color(0xFFE5E7EB)), RoundedCornerShape(10.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.28f), RoundedCornerShape(10.dp))
+                .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)), RoundedCornerShape(10.dp))
                 .padding(horizontal = 12.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
@@ -698,7 +711,7 @@ private fun NavigationToolbar(
     Surface(
         shape = RoundedCornerShape(10.dp),
         color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, Color(0xFFE5E7EB))
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
     ) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp),
@@ -739,8 +752,8 @@ private fun NavigationToolbar(
                 Row(
                     modifier = Modifier
                         .weight(1f)
-                        .background(Color(0xFFF8F9FB), RoundedCornerShape(8.dp))
-                        .border(BorderStroke(1.dp, Color(0xFFE5E7EB)), RoundedCornerShape(8.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.28f), RoundedCornerShape(8.dp))
+                        .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)), RoundedCornerShape(8.dp))
                         .padding(horizontal = 10.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
@@ -973,7 +986,7 @@ private fun FileRow(
                         file.name.endsWith(".mp4") || file.name.endsWith(".avi") || file.name.endsWith(".mkv") -> Icons.Default.Videocam
                         file.name.endsWith(".txt") || file.name.endsWith(".log") || file.name.endsWith(".json") || file.name.endsWith(".xml") -> Icons.Default.Description
                         file.name.endsWith(".sh") || file.name.endsWith(".py") || file.name.endsWith(".java") || file.name.endsWith(".kt") -> Icons.Default.Code
-                        else -> Icons.Default.InsertDriveFile
+                        else -> Icons.AutoMirrored.Filled.InsertDriveFile
                     },
                     contentDescription = null,
                     modifier = Modifier.size(18.dp),
@@ -1048,9 +1061,9 @@ private fun FileRow(
     }
 }
 
-private fun copyToClipboardText(text: String) {
-    runCatching {
+private fun copyToClipboardText(text: String): Boolean {
+    return runCatching {
         val clipboard = java.awt.Toolkit.getDefaultToolkit().systemClipboard
         clipboard.setContents(java.awt.datatransfer.StringSelection(text), null)
-    }
+    }.isSuccess
 }

@@ -38,6 +38,11 @@ import kotlinx.coroutines.withContext
 
 
 class CommonModel : BaseViewModel() {
+    companion object {
+        internal fun deviceActionsEnabled(deviceId: String?): Boolean =
+            !deviceId.isNullOrBlank()
+    }
+
     private val _showInputDialog = MutableStateFlow(false)
     val showInputDialog: StateFlow<Boolean> = _showInputDialog.asStateFlow()
 
@@ -319,7 +324,7 @@ class CommonModel : BaseViewModel() {
     }
 
     private fun ensureDeviceSelected(autoDismiss: Boolean = false): Boolean {
-        if (AdbTool.selectDeviceId != null) return true
+        if (deviceActionsEnabled(AdbTool.selectDeviceId)) return true
         showTipDialog(MsgContent.Resource(Res.string.no_device_available), autoDismiss = autoDismiss)
         return false
     }

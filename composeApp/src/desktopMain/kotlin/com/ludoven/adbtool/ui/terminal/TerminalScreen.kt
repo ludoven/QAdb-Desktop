@@ -26,6 +26,8 @@ import com.ludoven.adbtool.domain.terminal.TerminalMode
 import com.ludoven.adbtool.ui.mac.*
 import com.ludoven.adbtool.util.l10n
 import com.ludoven.adbtool.viewmodel.TerminalViewModel
+import com.ludoven.adbtool.widget.InlineStatusBanner
+import com.ludoven.adbtool.widget.InlineStatusTone
 import kotlinx.coroutines.launch
 
 @Composable
@@ -96,6 +98,13 @@ fun TerminalScreen(
                         listState.animateScrollToItem(session.lines.size)
                     }
                 }
+            )
+        }
+
+        if (session.deviceId.isNullOrBlank()) {
+            InlineStatusBanner(
+                text = l10n("当前没有选择设备。ADB shell 和设备相关命令需要先连接并选择设备。", "No device is selected. ADB shell and device commands need a connected selected device."),
+                tone = InlineStatusTone.Warning
             )
         }
 

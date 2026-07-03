@@ -14,14 +14,16 @@ import adbtool_desktop.composeapp.generated.resources.dialog_uninstall_success
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.lifecycle.viewModelScope
+import com.ludoven.adbtool.domain.adb.AppIconHelperClient
 import com.ludoven.adbtool.entity.AdbFunctionType
 import com.ludoven.adbtool.entity.MsgContent
 import com.ludoven.adbtool.entity.AppInfoData
 import com.ludoven.adbtool.pages.AppInfo
-import com.ludoven.adbtool.pages.getInstalledApps
 import com.ludoven.adbtool.util.AdbPathManager
 import com.ludoven.adbtool.util.AdbTool
 import com.ludoven.adbtool.util.FileUtils
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -29,6 +31,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import org.jetbrains.skia.Image
 import java.io.File
@@ -36,6 +40,18 @@ import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.zip.ZipFile
+
+sealed class AppIconState {
+    object Placeholder : AppIconState()
+    object Loading : AppIconState()
+    data class Success(
+        val imagePath: String,
+        val source: String,
+        val cacheHit: Boolean,
+        val elapsedMs: Long
+    ) : AppIconState()
+    data class Failed(val reason: String) : AppIconState()
+}
 
 internal fun parseRunningPackagesFromActivityProcesses(output: String): Set<String> {
     val processPattern = Regex("""ProcessRecord\{[^}]*\s(?:\d+:)?([A-Za-z0-9_.]+(?::[A-Za-z0-9_.-]+)?)/""")
@@ -50,7 +66,55 @@ internal fun parseRunningPackagesFromActivityProcesses(output: String): Set<Stri
         .toSet()
 }
 
+internal fun appListLoadShouldApply(requestedDeviceId: String?, currentDeviceId: String?): Boolean {
+    val requested = requestedDeviceId?.trim().orEmpty()
+    val current = currentDeviceId?.trim().orEmpty()
+    return requested.isNotEmpty() && requested == current
+}
+
+private val packageLineRegex = Regex("""package:(.+)=([A-Za-z0-9._]+)""")
+
+internal suspend fun loadInstalledAppsForDevice(): List<AppInfo> = coroutineScope {
+    val allAppsDef = async { AdbTool.exec("pm list packages -f") }
+    val sysAppsDef = async { AdbTool.exec("pm list packages -s") }
+    val disabledAppsDef = async { AdbTool.exec("pm list packages -d") }
+
+    val allApps = allAppsDef.await() ?: return@coroutineScope emptyList()
+    val sysApps = sysAppsDef.await() ?: ""
+    val disabledApps = disabledAppsDef.await() ?: ""
+    val sysPackages = sysApps.lines()
+        .mapNotNull { it.substringAfter("package:", "").takeIf { p -> p.isNotEmpty() } }
+        .toSet()
+    val disabledPackages = disabledApps.lines()
+        .mapNotNull { it.substringAfter("package:", "").takeIf { p -> p.isNotEmpty() } }
+        .toSet()
+
+    allApps.lines().mapNotNull { line ->
+        val match = packageLineRegex.find(line)
+        val (apkPath, packageName) = match?.destructured ?: return@mapNotNull null
+        val debugHint = packageName.contains("debug", ignoreCase = true) || packageName.endsWith(".dev")
+        AppInfo(
+            appName = packageName,
+            packageName = packageName,
+            apkPath = apkPath,
+            isSystemApp = sysPackages.contains(packageName),
+            isDebuggable = debugHint,
+            isDisabled = disabledPackages.contains(packageName)
+        )
+    }.sortedBy { it.packageName }
+}
+
 class AppViewModel : BaseViewModel() {
+    companion object {
+        private const val VISIBLE_ASSET_LOAD_DEBOUNCE_MS = 250L
+        private const val MAX_VISIBLE_ASSET_BATCH = 24
+
+        internal fun appPackageShellCommand(vararg args: String): String =
+            AdbTool.appShellCommand(*args)
+
+        internal fun appPathShellCommand(vararg args: String): String =
+            AdbTool.buildShellCommand(*args)
+    }
 
     private val _appInfo = MutableStateFlow<AppInfoData?>(null)
     val appInfo: StateFlow<AppInfoData?> = _appInfo.asStateFlow()
@@ -75,15 +139,35 @@ class AppViewModel : BaseViewModel() {
     private val _appIcons = MutableStateFlow<Map<String, ImageBitmap>>(emptyMap())
     val appIcons = _appIcons.asStateFlow()
 
+    private val _appIconStates = MutableStateFlow<Map<String, AppIconState>>(emptyMap())
+    val appIconStates = _appIconStates.asStateFlow()
+
     // Label cache: packageName -> app label
     private val _appLabels = MutableStateFlow<Map<String, String>>(emptyMap())
     private val loadingPackages = mutableSetOf<String>()
     private val loadingDetailPackages = mutableSetOf<String>()
     private var activeCacheDeviceKey: String = ""
+    private var appListLoadDeviceId: String? = null
+    private var loadedAppListDeviceId: String? = null
+    private var appListLoadJob: Job? = null
+    private var iconPrefetchJob: Job? = null
     private var runningStatusJob: Job? = null
+    private var visibleAssetsJob: Job? = null
+    private var visibleDetailsJob: Job? = null
+    private val iconTraceLock = Any()
+    private var iconTraceSessionId = 0L
+    private var iconTraceDeviceId = ""
+    private var iconTraceStartedAt = 0L
+    private var iconTraceListLoadedAt = 0L
+    private var iconTraceTotal = 0
+    private var iconTraceSuccess = 0
+    private var iconTraceFailed = 0
+    private val iconTraceCompletedPackages = mutableSetOf<String>()
 
     // Local persistent cache root, split by device id.
     private val iconCacheRootDir = File(System.getProperty("user.home"), ".qadb/icons").also { it.mkdirs() }
+    private val iconHelperClient = AppIconHelperClient(iconCacheRootDir)
+    private val iconLoadSemaphore = Semaphore(6)
 
     fun clearAppInfo() {
         _appInfo.value = null
@@ -97,19 +181,86 @@ class AppViewModel : BaseViewModel() {
         _isGridView.value = enabled
     }
 
-    fun getAppList() {
-        viewModelScope.launch(Dispatchers.IO) {
+    fun getAppList(deviceId: String? = AdbTool.selectDeviceId, forceRefresh: Boolean = false) {
+        val normalizedDeviceId = deviceId?.trim().orEmpty()
+        if (normalizedDeviceId.isBlank()) {
+            AdbTool.selectDeviceId = null
+            appListLoadJob?.cancel()
+            appListLoadJob = null
+            appListLoadDeviceId = null
+            loadedAppListDeviceId = null
+            iconPrefetchJob?.cancel()
+            iconPrefetchJob = null
+            runningStatusJob?.cancel()
+            runningStatusJob = null
+            visibleAssetsJob?.cancel()
+            visibleAssetsJob = null
+            visibleDetailsJob?.cancel()
+            visibleDetailsJob = null
+            _appList.value = emptyList()
+            _appIcons.value = emptyMap()
+            _appIconStates.value = emptyMap()
+            _appLabels.value = emptyMap()
+            _isLoading.value = false
+            return
+        }
+        AdbTool.selectDeviceId = normalizedDeviceId
+        if (!forceRefresh && appListLoadDeviceId == normalizedDeviceId && appListLoadJob?.isActive == true) {
+            return
+        }
+        if (!forceRefresh && loadedAppListDeviceId == normalizedDeviceId && _appList.value.isNotEmpty()) {
+            _isLoading.value = false
+            return
+        }
+        appListLoadJob?.cancel()
+        iconPrefetchJob?.cancel()
+        runningStatusJob?.cancel()
+        appListLoadDeviceId = normalizedDeviceId
+        val traceSessionId = startIconTrace(normalizedDeviceId)
+        appListLoadJob = viewModelScope.launch(Dispatchers.IO) {
             _isLoading.value = true
+            val listStartedAt = System.currentTimeMillis()
+            logIconTrace(
+                "appListStart",
+                "session=$traceSessionId device=$normalizedDeviceId"
+            )
             try {
                 refreshCacheContextIfNeeded()
-                val list = getInstalledApps()
+                val list = loadInstalledAppsForDevice()
+                if (!appListLoadShouldApply(normalizedDeviceId, appListLoadDeviceId)) return@launch
+                loadedAppListDeviceId = normalizedDeviceId
                 _appList.value = list
                 hydrateCachedLabels(list)
-                scheduleRunningStatusRefresh()
+                markAppListLoaded(traceSessionId, list.size, listStartedAt)
+                if (isFullIconPrefetchEnabled()) {
+                    scheduleAllIconPrefetch(traceSessionId, normalizedDeviceId, list)
+                }
             } finally {
-                _isLoading.value = false
+                if (appListLoadShouldApply(normalizedDeviceId, appListLoadDeviceId)) {
+                    _isLoading.value = false
+                }
             }
         }
+    }
+
+    fun cancelPageLoads() {
+        appListLoadJob?.cancel()
+        appListLoadJob = null
+        iconPrefetchJob?.cancel()
+        iconPrefetchJob = null
+        runningStatusJob?.cancel()
+        runningStatusJob = null
+        visibleAssetsJob?.cancel()
+        visibleAssetsJob = null
+        visibleDetailsJob?.cancel()
+        visibleDetailsJob = null
+        synchronized(loadingPackages) {
+            loadingPackages.clear()
+        }
+        synchronized(loadingDetailPackages) {
+            loadingDetailPackages.clear()
+        }
+        _isLoading.value = false
     }
 
     fun refreshRunningStatusAsync() {
@@ -117,22 +268,39 @@ class AppViewModel : BaseViewModel() {
     }
 
     fun ensureAppAssetsVisible(packageNames: List<String>) {
-        val distinctPackages = packageNames.distinct()
+        val distinctPackages = packageNames.distinct().take(MAX_VISIBLE_ASSET_BATCH)
         if (distinctPackages.isEmpty()) return
 
-        viewModelScope.launch(Dispatchers.IO) {
+        visibleAssetsJob?.cancel()
+        visibleAssetsJob = viewModelScope.launch(Dispatchers.IO) {
+            delay(VISIBLE_ASSET_LOAD_DEBOUNCE_MS)
             refreshCacheContextIfNeeded()
+            val claimedApps = mutableListOf<AppInfo>()
             for (packageName in distinctPackages) {
-                if (_appIcons.value.containsKey(packageName) && _appLabels.value.containsKey(packageName)) continue
+                val iconState = _appIconStates.value[packageName]
+                val iconResolved = _appIcons.value.containsKey(packageName) || iconState is AppIconState.Failed
+                if (iconResolved) continue
                 if (!claimLoading(packageName)) continue
-                try {
-                    val app = _appList.value.firstOrNull { it.packageName == packageName } ?: continue
-                    ensureAppAssets(app)
-                } catch (_: Exception) {
-                    // Silently skip failed icons
-                } finally {
+                val app = _appList.value.firstOrNull { it.packageName == packageName }
+                if (app == null) {
                     releaseLoading(packageName)
+                } else {
+                    claimedApps.add(app)
                 }
+            }
+            if (claimedApps.isEmpty()) return@launch
+
+            try {
+                iconLoadSemaphore.withPermit {
+                    ensureAppAssetsBatch(claimedApps, "visible", iconTraceSessionId)
+                }
+            } catch (error: Exception) {
+                val reason = error.message ?: "unknown asset load error"
+                _appIconStates.value = _appIconStates.value.toMutableMap().apply {
+                    claimedApps.forEach { app -> put(app.packageName, AppIconState.Failed(reason)) }
+                }
+            } finally {
+                claimedApps.forEach { releaseLoading(it.packageName) }
             }
         }
     }
@@ -141,7 +309,8 @@ class AppViewModel : BaseViewModel() {
         val distinctPackages = packageNames.distinct()
         if (distinctPackages.isEmpty()) return
 
-        viewModelScope.launch(Dispatchers.IO) {
+        visibleDetailsJob?.cancel()
+        visibleDetailsJob = viewModelScope.launch(Dispatchers.IO) {
             refreshCacheContextIfNeeded()
             for (packageName in distinctPackages) {
                 val app = _appList.value.firstOrNull { it.packageName == packageName } ?: continue
@@ -150,7 +319,8 @@ class AppViewModel : BaseViewModel() {
                 if (!claimDetailLoading(packageName)) continue
                 try {
                     loadSingleAppDetail(packageName)
-                } catch (_: Exception) {
+                } catch (error: Exception) {
+                    println("QADB app detail failed package=$packageName reason=${error.message ?: error::class.simpleName}")
                     // Skip single package failures to avoid blocking list interaction.
                 } finally {
                     releaseDetailLoading(packageName)
@@ -166,11 +336,115 @@ class AppViewModel : BaseViewModel() {
         activeCacheDeviceKey = currentKey
         _appIcons.value = emptyMap()
         _appLabels.value = emptyMap()
+        _appIconStates.value = emptyMap()
         synchronized(loadingPackages) {
             loadingPackages.clear()
         }
         synchronized(loadingDetailPackages) {
             loadingDetailPackages.clear()
+        }
+    }
+
+    private fun startIconTrace(deviceId: String): Long = synchronized(iconTraceLock) {
+        iconTraceSessionId += 1
+        iconTraceDeviceId = deviceId
+        iconTraceStartedAt = System.currentTimeMillis()
+        iconTraceListLoadedAt = 0L
+        iconTraceTotal = 0
+        iconTraceSuccess = 0
+        iconTraceFailed = 0
+        iconTraceCompletedPackages.clear()
+        iconTraceSessionId
+    }
+
+    private fun markAppListLoaded(sessionId: Long, total: Int, listStartedAt: Long) {
+        val now = System.currentTimeMillis()
+        synchronized(iconTraceLock) {
+            if (sessionId != iconTraceSessionId) return
+            iconTraceListLoadedAt = now
+            iconTraceTotal = total
+        }
+        logIconTrace(
+            "appListLoaded",
+            "session=$sessionId device=$iconTraceDeviceId total=$total listElapsedMs=${now - listStartedAt} totalElapsedMs=${now - iconTraceStartedAt}"
+        )
+    }
+
+    private fun markIconTraceResult(sessionId: Long, packageName: String, success: Boolean) {
+        var completed = false
+        var successCount = 0
+        var failedCount = 0
+        var total = 0
+        var totalElapsed = 0L
+        var iconElapsed = 0L
+        synchronized(iconTraceLock) {
+            if (sessionId != iconTraceSessionId || iconTraceCompletedPackages.contains(packageName)) return
+            iconTraceCompletedPackages.add(packageName)
+            if (success) iconTraceSuccess += 1 else iconTraceFailed += 1
+            completed = iconTraceTotal > 0 && iconTraceCompletedPackages.size >= iconTraceTotal
+            successCount = iconTraceSuccess
+            failedCount = iconTraceFailed
+            total = iconTraceTotal
+            val now = System.currentTimeMillis()
+            totalElapsed = now - iconTraceStartedAt
+            iconElapsed = if (iconTraceListLoadedAt > 0L) now - iconTraceListLoadedAt else 0L
+        }
+        if (completed) {
+            logIconTrace(
+                "allIconsComplete",
+                "session=$sessionId device=$iconTraceDeviceId total=$total success=$successCount failed=$failedCount iconElapsedMs=$iconElapsed totalElapsedMs=$totalElapsed"
+            )
+        }
+    }
+
+    private fun isCurrentIconTrace(sessionId: Long, deviceId: String): Boolean = synchronized(iconTraceLock) {
+        sessionId == iconTraceSessionId && deviceId == iconTraceDeviceId
+    }
+
+    private fun logIconTrace(event: String, message: String) {
+        println("QADB app-icon-trace event=$event $message")
+    }
+
+    private fun isFullIconPrefetchEnabled(): Boolean =
+        System.getProperty("qadb.icon.prefetchAll") == "true"
+
+    private fun isApkFallbackEnabled(): Boolean =
+        System.getProperty("qadb.icon.apkFallback") == "true"
+
+    private fun scheduleAllIconPrefetch(sessionId: Long, deviceId: String, apps: List<AppInfo>) {
+        iconPrefetchJob?.cancel()
+        iconPrefetchJob = viewModelScope.launch(Dispatchers.IO) {
+            val total = apps.size
+            logIconTrace("iconPrefetchStart", "session=$sessionId device=$deviceId total=$total")
+            for (chunk in apps.chunked(16)) {
+                if (!isCurrentIconTrace(sessionId, deviceId)) return@launch
+                val claimedApps = mutableListOf<AppInfo>()
+                for (app in chunk) {
+                    val packageName = app.packageName
+                    val iconState = _appIconStates.value[packageName]
+                    val iconResolved = _appIcons.value.containsKey(packageName) || iconState is AppIconState.Failed
+                    if (iconResolved) {
+                        markIconTraceResult(sessionId, packageName, iconState !is AppIconState.Failed)
+                        continue
+                    }
+                    if (!claimLoading(packageName)) continue
+                    claimedApps.add(app)
+                }
+                if (claimedApps.isEmpty()) continue
+                try {
+                    iconLoadSemaphore.withPermit {
+                        ensureAppAssetsBatch(claimedApps, "prefetch", sessionId)
+                    }
+                } catch (error: Exception) {
+                    val reason = error.message ?: "unknown asset load error"
+                    _appIconStates.value = _appIconStates.value.toMutableMap().apply {
+                        claimedApps.forEach { app -> put(app.packageName, AppIconState.Failed(reason)) }
+                    }
+                    claimedApps.forEach { markIconTraceResult(sessionId, it.packageName, success = false) }
+                } finally {
+                    claimedApps.forEach { releaseLoading(it.packageName) }
+                }
+            }
         }
     }
 
@@ -219,7 +493,7 @@ class AppViewModel : BaseViewModel() {
         }
     }
 
-    private fun ensureAppAssets(app: AppInfo) {
+    private suspend fun ensureAppAssets(app: AppInfo) {
         val packageName = app.packageName
         val cacheDir = currentDeviceCacheDir()
         val iconCacheFile = File(cacheDir, "$packageName.png")
@@ -230,9 +504,59 @@ class AppViewModel : BaseViewModel() {
         }
         if (!_appIcons.value.containsKey(packageName)) {
             loadIconFromCache(packageName, iconCacheFile)
+            if (_appIcons.value.containsKey(packageName)) {
+                _appIconStates.value = _appIconStates.value.toMutableMap().apply {
+                    put(
+                        packageName,
+                        AppIconState.Success(
+                            imagePath = iconCacheFile.absolutePath,
+                            source = "desktopApkCache",
+                            cacheHit = true,
+                            elapsedMs = 0L
+                        )
+                    )
+                }
+            }
         }
         if (_appLabels.value.containsKey(packageName) && _appIcons.value.containsKey(packageName)) return
 
+        val shouldRequestDeviceIcon = !_appIcons.value.containsKey(packageName) &&
+            _appIconStates.value[packageName] !is AppIconState.Failed
+        if (shouldRequestDeviceIcon) {
+            _appIconStates.value = _appIconStates.value.toMutableMap().apply {
+                put(packageName, AppIconState.Loading)
+            }
+            val helperResult = iconHelperClient.fetchIcon(packageName, AdbTool.selectDeviceId)
+            helperResult.onSuccess { result ->
+                persistHelperLabel(result.packageName, result.label)
+                loadIconFromCache(packageName, File(result.localPath))
+                _appIconStates.value = _appIconStates.value.toMutableMap().apply {
+                    put(
+                        packageName,
+                        AppIconState.Success(
+                            imagePath = result.localPath,
+                            source = result.source,
+                            cacheHit = result.cacheHit,
+                            elapsedMs = result.elapsedMs
+                        )
+                    )
+                }
+                println(
+                    "QADB icon helper package=$packageName source=${result.source} " +
+                        "cache=${if (result.cacheHit) "hit" else "miss"} path=${result.remotePath} elapsedMs=${result.elapsedMs}"
+                )
+            }.onFailure { error ->
+                val reason = error.message ?: "unknown icon helper error"
+                _appIconStates.value = _appIconStates.value.toMutableMap().apply {
+                    put(packageName, AppIconState.Failed(reason))
+                }
+                println("QADB icon helper failed package=$packageName reason=$reason")
+            }
+        }
+
+        if (_appLabels.value.containsKey(packageName) && _appIcons.value.containsKey(packageName)) return
+        if (!isApkFallbackEnabled()) return
+        if (!_appIcons.value.containsKey(packageName)) return
         if (app.apkPath.isBlank()) return
         val tmpApk = File(cacheDir, "$packageName.apk")
         val pulled = AdbTool.pullFile(app.apkPath, tmpApk.absolutePath)
@@ -253,11 +577,153 @@ class AppViewModel : BaseViewModel() {
                 extractIconFromApk(tmpApk)?.let { iconBytes ->
                     runCatching { iconCacheFile.writeBytes(iconBytes) }
                     loadIconFromCache(packageName, iconCacheFile)
+                    if (_appIcons.value.containsKey(packageName)) {
+                        _appIconStates.value = _appIconStates.value.toMutableMap().apply {
+                            put(
+                                packageName,
+                                AppIconState.Success(
+                                    imagePath = iconCacheFile.absolutePath,
+                                    source = "desktopApkFallback",
+                                    cacheHit = false,
+                                    elapsedMs = 0L
+                                )
+                            )
+                        }
+                    }
                 }
             }
         } finally {
             tmpApk.delete()
         }
+    }
+
+    private suspend fun ensureAppAssetsBatch(apps: List<AppInfo>, trigger: String, traceSessionId: Long) {
+        val batchStartedAt = System.currentTimeMillis()
+        logIconTrace(
+            "iconBatchStart",
+            "session=$traceSessionId trigger=$trigger size=${apps.size} packages=${apps.take(5).joinToString(",") { it.packageName }}"
+        )
+        val packagesNeedingDeviceIcon = mutableListOf<String>()
+        val cachedLabels = linkedMapOf<String, String>()
+        val loadedIcons = linkedMapOf<String, ImageBitmap>()
+        val stateUpdates = linkedMapOf<String, AppIconState>()
+        for (app in apps) {
+            val packageName = app.packageName
+            if (!_appLabels.value.containsKey(packageName)) {
+                readLabelCache(packageName)?.let { cachedLabels[packageName] = it }
+            }
+            if (!_appIcons.value.containsKey(packageName) && !loadedIcons.containsKey(packageName)) {
+                val iconCacheFile = File(currentDeviceCacheDir(), "$packageName.png")
+                readIconFromCache(iconCacheFile)?.let { bitmap ->
+                    loadedIcons[packageName] = bitmap
+                    stateUpdates[packageName] = AppIconState.Success(
+                        imagePath = iconCacheFile.absolutePath,
+                        source = "desktopApkCache",
+                        cacheHit = true,
+                        elapsedMs = 0L
+                    )
+                }
+            }
+            val shouldRequestDeviceIcon =
+                !_appIcons.value.containsKey(packageName) &&
+                    !loadedIcons.containsKey(packageName) &&
+                    _appIconStates.value[packageName] !is AppIconState.Failed
+            if (shouldRequestDeviceIcon) {
+                packagesNeedingDeviceIcon.add(packageName)
+            }
+        }
+        applyLabelBatch(cachedLabels)
+        applyIconBatch(loadedIcons)
+        applyIconStateBatch(stateUpdates)
+
+        if (packagesNeedingDeviceIcon.isNotEmpty()) {
+            val helperStartedAt = System.currentTimeMillis()
+            applyIconStateBatch(
+                packagesNeedingDeviceIcon.associateWith { AppIconState.Loading }
+            )
+            iconHelperClient.fetchIcons(packagesNeedingDeviceIcon, AdbTool.selectDeviceId)
+                .onSuccess { batch ->
+                    val helperLabels = linkedMapOf<String, String>()
+                    val helperIcons = linkedMapOf<String, ImageBitmap>()
+                    val helperStates = linkedMapOf<String, AppIconState>()
+                    batch.successes.values.forEach { result ->
+                        cleanHelperLabel(result.packageName, result.label)?.let { label ->
+                            helperLabels[result.packageName] = label
+                            runCatching {
+                                File(currentDeviceCacheDir(), "${result.packageName}.label.txt").writeText(label)
+                            }
+                        }
+                        readIconFromCache(File(result.localPath))?.let { bitmap ->
+                            helperIcons[result.packageName] = bitmap
+                        }
+                        helperStates[result.packageName] = AppIconState.Success(
+                            imagePath = result.localPath,
+                            source = result.source,
+                            cacheHit = result.cacheHit,
+                            elapsedMs = result.elapsedMs
+                        )
+                        println(
+                            "QADB icon helper package=${result.packageName} source=${result.source} " +
+                                "cache=${if (result.cacheHit) "hit" else "miss"} path=${result.remotePath} elapsedMs=${result.elapsedMs}"
+                        )
+                    }
+                    batch.failures.forEach { (packageName, reason) ->
+                        helperStates[packageName] = AppIconState.Failed(reason)
+                        println("QADB icon helper failed package=$packageName reason=$reason")
+                    }
+                    applyLabelBatch(helperLabels)
+                    applyIconBatch(helperIcons)
+                    applyIconStateBatch(helperStates)
+                    logIconTrace(
+                        "iconHelperBatchEnd",
+                        "session=$traceSessionId trigger=$trigger requested=${packagesNeedingDeviceIcon.size} success=${batch.successes.size} failed=${batch.failures.size} elapsedMs=${System.currentTimeMillis() - helperStartedAt}"
+                    )
+                }
+                .onFailure { error ->
+                    val reason = error.message ?: "unknown icon helper error"
+                    applyIconStateBatch(
+                        packagesNeedingDeviceIcon.associateWith { AppIconState.Failed(reason) }
+                    )
+                    println("QADB icon helper batch failed count=${packagesNeedingDeviceIcon.size} reason=$reason")
+                    logIconTrace(
+                        "iconHelperBatchEnd",
+                        "session=$traceSessionId trigger=$trigger requested=${packagesNeedingDeviceIcon.size} success=0 failed=${packagesNeedingDeviceIcon.size} elapsedMs=${System.currentTimeMillis() - helperStartedAt} reason=$reason"
+                    )
+                }
+        }
+
+        for (app in apps) {
+            val packageName = app.packageName
+            if (_appIcons.value.containsKey(packageName)) continue
+            val state = _appIconStates.value[packageName]
+            if (state !is AppIconState.Failed) {
+                stateUpdates[packageName] = AppIconState.Failed("device icon helper did not return an icon")
+            }
+        }
+        applyIconStateBatch(stateUpdates)
+
+        var successCount = 0
+        var failedCount = 0
+        for (app in apps) {
+            val packageName = app.packageName
+            val state = _appIconStates.value[packageName]
+            val success = _appIcons.value.containsKey(packageName) || state is AppIconState.Success
+            val failed = state is AppIconState.Failed
+            when {
+                success -> {
+                    successCount += 1
+                    markIconTraceResult(traceSessionId, packageName, success = true)
+                }
+                failed -> {
+                    failedCount += 1
+                    markIconTraceResult(traceSessionId, packageName, success = false)
+                }
+            }
+        }
+        logIconTrace(
+            "iconBatchEnd",
+            "session=$traceSessionId trigger=$trigger size=${apps.size} success=$successCount failed=$failedCount elapsedMs=${System.currentTimeMillis() - batchStartedAt}"
+        )
     }
 
     private fun readLabelCache(packageName: String): String? {
@@ -267,12 +733,52 @@ class AppViewModel : BaseViewModel() {
         return text.takeIf { it.isNotEmpty() }
     }
 
-    private fun loadIconFromCache(packageName: String, iconFile: File) {
-        if (!iconFile.exists() || iconFile.length() <= 0L) return
+    private fun persistHelperLabel(packageName: String, label: String?) {
+        val cleanLabel = cleanHelperLabel(packageName, label) ?: return
+        applyLabelBatch(mapOf(packageName to cleanLabel))
         runCatching {
-            val skiaImage = Image.makeFromEncoded(iconFile.readBytes())
-            val bitmap = skiaImage.toComposeImageBitmap()
-            _appIcons.value = _appIcons.value.toMutableMap().apply { put(packageName, bitmap) }
+            File(currentDeviceCacheDir(), "$packageName.label.txt").writeText(cleanLabel)
+        }
+    }
+
+    private fun cleanHelperLabel(packageName: String, label: String?): String? {
+        return label
+            ?.trim()
+            ?.takeIf { it.isNotEmpty() && it != packageName }
+    }
+
+    private fun loadIconFromCache(packageName: String, iconFile: File) {
+        val bitmap = readIconFromCache(iconFile) ?: return
+        applyIconBatch(mapOf(packageName to bitmap))
+    }
+
+    private fun readIconFromCache(iconFile: File): ImageBitmap? {
+        if (!iconFile.exists() || iconFile.length() <= 0L) return null
+        return runCatching {
+            Image.makeFromEncoded(iconFile.readBytes()).toComposeImageBitmap()
+        }.getOrNull()
+    }
+
+    private fun applyIconBatch(icons: Map<String, ImageBitmap>) {
+        if (icons.isEmpty()) return
+        _appIcons.value = _appIcons.value.toMutableMap().apply { putAll(icons) }
+    }
+
+    private fun applyIconStateBatch(states: Map<String, AppIconState>) {
+        if (states.isEmpty()) return
+        _appIconStates.value = _appIconStates.value.toMutableMap().apply { putAll(states) }
+    }
+
+    private fun applyLabelBatch(labels: Map<String, String>) {
+        if (labels.isEmpty()) return
+        val changedLabels = labels.filter { (packageName, label) ->
+            label.isNotBlank() && _appLabels.value[packageName] != label
+        }
+        if (changedLabels.isEmpty()) return
+
+        _appLabels.value = _appLabels.value.toMutableMap().apply { putAll(changedLabels) }
+        _appList.value = _appList.value.map { app ->
+            changedLabels[app.packageName]?.let { label -> app.copy(appName = label) } ?: app
         }
     }
 
@@ -421,16 +927,16 @@ class AppViewModel : BaseViewModel() {
 
     private fun loadSingleAppDetail(packageName: String) {
         val app = _appList.value.firstOrNull { it.packageName == packageName } ?: return
-        val dumpsys = AdbTool.exec("dumpsys package $packageName")
-        val versionName = Regex("versionName=([^\\s]+)").find(dumpsys)?.groupValues?.get(1) ?: app.versionName
+        val dumpsys = AdbTool.exec(appPackageShellCommand("dumpsys", "package", packageName))
+        val versionName = parseVersionName(dumpsys) ?: app.versionName
         val firstInstallTime = Regex("firstInstallTime=([^\n]+)").find(dumpsys)?.groupValues?.get(1)?.trim() ?: app.installTime
         val installTimestamp = parseInstallTimestamp(firstInstallTime)
         val pkgFlags = Regex("pkgFlags=\\[([^\\]]+)]").find(dumpsys)?.groupValues?.get(1).orEmpty()
         val isDebuggable = pkgFlags.contains("DEBUGGABLE", ignoreCase = true) || app.isDebuggable
-        val enabledToken = Regex("enabled=(\\S+)").find(dumpsys)?.groupValues?.get(1)?.lowercase()
-        val isDisabled = enabledToken == "0" || enabledToken == "false" || app.isDisabled
+        val isDisabled = parseDisabledState(dumpsys) || app.isDisabled
+        val isRunning = queryPackageRunning(packageName) ?: app.isRunning
         val packagePath = app.apkPath.takeIf { it.isNotBlank() }
-            ?: AdbTool.exec("pm path $packageName").lineSequence()
+            ?: AdbTool.exec(appPackageShellCommand("pm", "path", packageName)).lineSequence()
                 .firstOrNull { it.startsWith("package:") }
                 ?.removePrefix("package:")
                 ?.trim()
@@ -449,7 +955,8 @@ class AppViewModel : BaseViewModel() {
                     installTimestamp = installTimestamp,
                     lastUsedTimestamp = installTimestamp ?: current.lastUsedTimestamp,
                     isDebuggable = isDebuggable,
-                    isDisabled = isDisabled
+                    isDisabled = isDisabled,
+                    isRunning = isRunning
                 )
             } else {
                 current
@@ -476,10 +983,10 @@ class AppViewModel : BaseViewModel() {
                 withContext(Dispatchers.IO) {
                     when (type) {
                         AdbFunctionType.UNINSTALL -> {
-                            val result = AdbTool.exec("pm uninstall $packageName")
+                            val result = AdbTool.exec(appPackageShellCommand("pm", "uninstall", packageName))
                             if (result.contains("Success")) {
                                 withContext(Dispatchers.Main) {
-                                    getAppList()
+                                    getAppList(forceRefresh = true)
                                     showTipDialog(MsgContent.Resource(Res.string.dialog_uninstall_success))
                                 }
                             } else {
@@ -487,20 +994,33 @@ class AppViewModel : BaseViewModel() {
                             }
                         }
                         AdbFunctionType.LAUNCH -> {
-                            AdbTool.exec("monkey -p $packageName -c android.intent.category.LAUNCHER 1")
+                            AdbTool.exec(
+                                appPackageShellCommand(
+                                    "monkey",
+                                    "-p",
+                                    packageName,
+                                    "-c",
+                                    "android.intent.category.LAUNCHER",
+                                    "1"
+                                )
+                            )
                             _appList.value = _appList.value.map { app ->
                                 if (app.packageName == packageName) app.copy(isRunning = true) else app
                             }
                         }
                         AdbFunctionType.FORCE_STOP -> {
-                            AdbTool.exec("am force-stop $packageName")
+                            AdbTool.exec(appPackageShellCommand("am", "force-stop", packageName))
                             _appList.value = _appList.value.map { app ->
                                 if (app.packageName == packageName) app.copy(isRunning = false) else app
                             }
                         }
-                        AdbFunctionType.CLEAR_DATA -> AdbTool.exec("pm clear $packageName")
+                        AdbFunctionType.CLEAR_DATA -> AdbTool.exec(appPackageShellCommand("pm", "clear", packageName))
                         AdbFunctionType.EXPORT_APK -> {
-                            val path = AdbTool.exec("pm path $packageName").split(":").getOrNull(1)?.trim()
+                            val path = AdbTool.exec(appPackageShellCommand("pm", "path", packageName))
+                                .lineSequence()
+                                .firstOrNull { it.startsWith("package:") }
+                                ?.removePrefix("package:")
+                                ?.trim()
                             if (path != null) {
                                 val folderPath = withContext(Dispatchers.Main) { FileUtils.selectFolder() }
                                 if (folderPath != null) {
@@ -538,8 +1058,8 @@ class AppViewModel : BaseViewModel() {
 
         viewModelScope.launch(Dispatchers.IO) {
             runCatching {
-                val dumpsys = AdbTool.exec("dumpsys package $packageName")
-                val versionName = Regex("versionName=([^\\s]+)").find(dumpsys)?.groupValues?.get(1) ?: "-"
+                val dumpsys = AdbTool.exec(appPackageShellCommand("dumpsys", "package", packageName))
+                val versionName = parseVersionName(dumpsys) ?: "-"
                 val versionCode = Regex("versionCode=([^\\s]+)").find(dumpsys)?.groupValues?.get(1) ?: "-"
                 val minSdk = Regex("minSdk=([^\\s]+)").find(dumpsys)?.groupValues?.get(1) ?: "-"
                 val targetSdk = Regex("targetSdk=([^\\s]+)").find(dumpsys)?.groupValues?.get(1) ?: "-"
@@ -549,18 +1069,15 @@ class AppViewModel : BaseViewModel() {
                 val supportedAbi = Regex("primaryCpuAbi=([^\n]+)").find(dumpsys)?.groupValues?.get(1)?.trim() ?: "-"
                 val isSystemApp = dumpsys.contains("pkgFlags=[") && dumpsys.substringAfter("pkgFlags=[").substringBefore("]").contains("SYSTEM")
                 val packagePath = app?.apkPath?.takeIf { it.isNotBlank() }
-                    ?: AdbTool.exec("pm path $packageName").lineSequence()
+                    ?: AdbTool.exec(appPackageShellCommand("pm", "path", packageName)).lineSequence()
                         .firstOrNull { it.startsWith("package:") }
                         ?.removePrefix("package:")
                         ?.trim()
                         .orEmpty()
                 val sizeBytes = queryPackageSizeBytes(packagePath, packageName) ?: app?.sizeBytes
                 val sizeText = app?.size?.takeIf { it != "-" } ?: sizeBytes?.let { formatSize(it) } ?: "-"
-                val processId = if (app?.isRunning == true) {
-                    AdbTool.exec("pidof $packageName").trim().takeIf { it.isNotEmpty() } ?: "-"
-                } else {
-                    "-"
-                }
+                val processId = AdbTool.exec(appPackageShellCommand("pidof", packageName)).trim().takeIf { it.isNotEmpty() } ?: "-"
+                val isRunning = processId != "-"
                 val permissionStats = parsePermissionStats(dumpsys)
                 val permissionDetails = parsePermissionDetails(dumpsys)
                 val activityDetails = parseActivityDetails(dumpsys, packageName)
@@ -581,15 +1098,15 @@ class AppViewModel : BaseViewModel() {
                     lastUpdateTime = lastUpdateTime,
                     supportedAbi = supportedAbi,
                     isSystemApp = isSystemApp,
-                    isRunning = app?.isRunning == true,
+                    isRunning = isRunning,
                     apkPath = packagePath,
                     dataDir = "/data/user/0/$packageName",
                     installLocation = if (isSystemApp) "系统分区" else "内部存储",
                     appSize = sizeText,
                     totalSize = sizeText,
                     processId = processId,
-                    memoryUsage = if (app?.isRunning == true) "运行中" else "-",
-                    startTime = if (app?.isRunning == true) "已启动" else "-",
+                    memoryUsage = if (isRunning) "运行中" else "-",
+                    startTime = if (isRunning) "已启动" else "-",
                     dangerousPermissionCount = permissionStats.dangerous,
                     privacyPermissionCount = permissionStats.privacy,
                     normalPermissionCount = permissionStats.normal,
@@ -615,7 +1132,8 @@ class AppViewModel : BaseViewModel() {
                                     lastUsedTimestamp = parseInstallTimestamp(lastUpdateTime)
                                         ?: parseInstallTimestamp(firstInstallTime),
                                     isDebuggable = pkgFlagsContainsDebuggable(dumpsys) || current.isDebuggable,
-                                    isDisabled = parseDisabledState(dumpsys) || current.isDisabled
+                                    isDisabled = parseDisabledState(dumpsys) || current.isDisabled,
+                                    isRunning = isRunning
                                 )
                             } else {
                                 current
@@ -673,9 +1191,24 @@ class AppViewModel : BaseViewModel() {
         return flags.contains("DEBUGGABLE", ignoreCase = true)
     }
 
+    private fun parseVersionName(dumpsys: String): String? {
+        return Regex("""(?m)^\s*versionName=(.*)$""")
+            .find(dumpsys)
+            ?.groupValues
+            ?.getOrNull(1)
+            ?.trim()
+            ?.takeIf { it.isNotEmpty() && it != "null" }
+    }
+
     private fun parseDisabledState(dumpsys: String): Boolean {
         val enabledToken = Regex("enabled=(\\S+)").find(dumpsys)?.groupValues?.get(1)?.lowercase()
-        return enabledToken == "0" || enabledToken == "false"
+        return enabledToken == "2" ||
+            enabledToken == "3" ||
+            enabledToken == "4" ||
+            enabledToken == "false" ||
+            enabledToken == "disabled" ||
+            enabledToken == "disabled-user" ||
+            enabledToken == "disabled_until_used"
     }
 
     private fun parsePermissionDetails(dumpsys: String): List<String> {
@@ -756,27 +1289,45 @@ class AppViewModel : BaseViewModel() {
     }
 
     private fun queryPackageSizeBytes(packagePath: String, packageName: String): Long? {
-        val resolvedPath = packagePath.ifBlank {
-            AdbTool.exec("pm path $packageName").lineSequence()
-                .firstOrNull { it.startsWith("package:") }
-                ?.removePrefix("package:")
-                ?.trim()
-                .orEmpty()
-        }
-        if (resolvedPath.isBlank()) return null
+        val paths = packageApkPaths(packagePath, packageName)
+        if (paths.isEmpty()) return null
 
-        val escapedPath = resolvedPath.replace("'", "'\\''")
-        val byStat = AdbTool.exec("stat -c %s '$escapedPath'")
+        val statSizes = paths.mapNotNull { path -> queryRemoteFileSizeBytes(path) }
+        if (statSizes.isNotEmpty()) return statSizes.sum().takeIf { it > 0L }
+
+        val duSizes = paths.mapNotNull { path -> queryRemoteDuSizeBytes(path) }
+        return duSizes.sum().takeIf { it > 0L }
+    }
+
+    private fun packageApkPaths(packagePath: String, packageName: String): List<String> {
+        val paths = linkedSetOf<String>()
+        packagePath.trim().takeIf { it.isNotEmpty() }?.let { paths.add(it) }
+        AdbTool.exec(appPackageShellCommand("pm", "path", packageName)).lineSequence()
+            .map { it.trim() }
+            .filter { it.startsWith("package:") }
+            .map { it.removePrefix("package:").trim() }
+            .filter { it.isNotEmpty() }
+            .forEach { paths.add(it) }
+        return paths.toList()
+    }
+
+    private fun queryRemoteFileSizeBytes(path: String): Long? {
+        return AdbTool.exec(appPathShellCommand("stat", "-c", "%s", path))
             .lineSequence()
             .mapNotNull { it.trim().toLongOrNull() }
-            .firstOrNull()
-        if (byStat != null && byStat > 0L) return byStat
+            .firstOrNull { it > 0L }
+    }
 
-        val duOutput = AdbTool.exec("du -k '$escapedPath'")
+    private fun queryRemoteDuSizeBytes(path: String): Long? {
+        val duOutput = AdbTool.exec(appPathShellCommand("du", "-k", path))
         val kb = Regex("""^\s*(\d+)""").find(duOutput)?.groupValues?.getOrNull(1)?.toLongOrNull()
-        if (kb != null && kb > 0L) return kb * 1024L
+        return kb?.takeIf { it > 0L }?.let { it * 1024L }
+    }
 
-        return null
+    private fun queryPackageRunning(packageName: String): Boolean? {
+        val output = AdbTool.exec(appPackageShellCommand("pidof", packageName)).trim()
+        if (output.isNotEmpty() && !output.startsWith("Command failed")) return true
+        return false
     }
 
     private fun formatSize(bytes: Long): String {
@@ -793,10 +1344,17 @@ class AppViewModel : BaseViewModel() {
     }
 
     fun copyToClipboard(text: String) {
-        try {
+        val copied = try {
             val clipboard = java.awt.Toolkit.getDefaultToolkit().systemClipboard
             clipboard.setContents(java.awt.datatransfer.StringSelection(text), null)
-        } catch (_: Exception) {}
+            true
+        } catch (_: Exception) {
+            false
+        }
+        showTipDialog(
+            MsgContent.Text(if (copied) "已复制到剪贴板" else "复制失败"),
+            autoDismiss = copied
+        )
     }
 
     private fun parseInstallTimestamp(raw: String): Long? {

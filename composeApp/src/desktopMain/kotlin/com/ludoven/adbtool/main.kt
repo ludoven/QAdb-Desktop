@@ -216,9 +216,9 @@ private fun MenuBarScope.AppMenuBar(
         Menu(stringResource(Res.string.menu_page_navigation)) {
             Item(stringResource(Res.string.menu_go_home)) { AppMenuCommandBus.dispatch(AppMenuCommand.Navigate("home")) }
             Item(stringResource(Res.string.menu_go_common)) { AppMenuCommandBus.dispatch(AppMenuCommand.Navigate("common")) }
+            Item(stringResource(Res.string.menu_go_app)) { AppMenuCommandBus.dispatch(AppMenuCommand.Navigate("app")) }
             Item(stringResource(Res.string.menu_go_terminal)) { AppMenuCommandBus.dispatch(AppMenuCommand.Navigate("terminal")) }
             Item(stringResource(Res.string.menu_go_keyevent)) { AppMenuCommandBus.dispatch(AppMenuCommand.Navigate("keyevent")) }
-            Item(stringResource(Res.string.menu_go_app)) { AppMenuCommandBus.dispatch(AppMenuCommand.Navigate("app")) }
             Item(stringResource(Res.string.menu_go_file)) { AppMenuCommandBus.dispatch(AppMenuCommand.Navigate("filebrowser")) }
             Item(stringResource(Res.string.menu_go_log)) { AppMenuCommandBus.dispatch(AppMenuCommand.Navigate("log")) }
             Item(stringResource(Res.string.menu_go_process)) { AppMenuCommandBus.dispatch(AppMenuCommand.Navigate("process")) }

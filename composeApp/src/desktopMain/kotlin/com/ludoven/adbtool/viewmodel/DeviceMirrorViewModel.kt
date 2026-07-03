@@ -21,6 +21,21 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 class DeviceMirrorViewModel : BaseViewModel() {
+    companion object {
+        internal fun connectionWatcherTarget(
+            requestedDeviceId: String?,
+            activeDeviceId: String?
+        ): String? {
+            return requestedDeviceId?.takeIf { it.isNotBlank() }
+                ?: activeDeviceId?.takeIf { it.isNotBlank() }
+        }
+
+        internal fun mirrorActionTarget(
+            requestedDeviceId: String?,
+            activeDeviceId: String?
+        ): String? = connectionWatcherTarget(requestedDeviceId, activeDeviceId)
+    }
+
     private val _settings = MutableStateFlow(DeviceMirrorSettings())
     val settings: StateFlow<DeviceMirrorSettings> = _settings.asStateFlow()
 
@@ -312,7 +327,10 @@ class DeviceMirrorViewModel : BaseViewModel() {
 
     fun watchDeviceConnectionState(deviceId: String?) {
         deviceConnectionWatcherJob?.cancel()
-        val targetDeviceId = resolveTargetDeviceId(deviceId)
+        val targetDeviceId = connectionWatcherTarget(
+            requestedDeviceId = deviceId,
+            activeDeviceId = _activeDeviceId.value
+        )
         if (targetDeviceId.isNullOrBlank()) {
             _deviceConnectionState.value = "disconnected"
             return
@@ -339,9 +357,10 @@ class DeviceMirrorViewModel : BaseViewModel() {
     }
 
     private fun resolveTargetDeviceId(deviceId: String?): String? {
-        return deviceId?.takeIf { it.isNotBlank() }
-            ?: _activeDeviceId.value?.takeIf { it.isNotBlank() }
-            ?: AdbTool.selectDeviceId?.takeIf { it.isNotBlank() }
+        return mirrorActionTarget(
+            requestedDeviceId = deviceId,
+            activeDeviceId = _activeDeviceId.value
+        )
     }
 
     private fun formatAdbError(result: AdbTool.AdbResult, fallback: String): String {
@@ -352,5 +371,12 @@ class DeviceMirrorViewModel : BaseViewModel() {
         val text = (result.output + "\n" + result.errorMessage.orEmpty()).lowercase()
         return text.contains("securityexception")
             && (text.contains("injectinputevent") || text.contains("inject_events"))
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        stopMirrorStateWatcher()
+        deviceConnectionWatcherJob?.cancel()
+        deviceConnectionWatcherJob = null
     }
 }
