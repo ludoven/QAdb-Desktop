@@ -77,7 +77,7 @@ plugins {
     alias(libs.plugins.composeCompiler)
 }
 
-val appVersion = "2.0.7"
+val appVersion = "2.1.0"
 val currentOsName = System.getProperty("os.name").lowercase()
 val nativeTargetFormats = when {
     currentOsName.contains("mac") -> arrayOf(TargetFormat.Dmg)
@@ -152,7 +152,10 @@ kotlin {
 compose.desktop {
     application {
         mainClass = "com.ludoven.adbtool.MainKt"
-        jvmArgs += listOf("-Djna.nosys=true")
+        jvmArgs += listOf(
+            "-Djna.nosys=true",
+            "-Dawt.useSystemAAFontSettings=on"
+        )
         buildTypes.release.proguard {
             configurationFiles.from(project.file("proguard-rules.pro"))
         }
