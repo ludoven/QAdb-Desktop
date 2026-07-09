@@ -147,8 +147,12 @@ private object HomeVisualTokens {
     val Border = Color(0xFFE5E7EB)
     val Soft = Color(0xFFF3F4F6)
     val Divider = Color(0xFFE7EAF0)
+    val Success = Color(0xFF16A34A)
     val Warning = Color(0xFFF97316)
     val Danger = Color(0xFFEF4444)
+    val Purple = Color(0xFF7C3AED)
+    val Teal = Color(0xFF0F766E)
+    val Cyan = Color(0xFF0891B2)
 }
 
 @Composable
@@ -175,7 +179,7 @@ fun HomeScreen(
     onOpenFileManager: () -> Unit = {},
     onOpenAppManager: () -> Unit = {},
     onOpenDiagnostics: () -> Unit = {},
-    onMoreActions: () -> Unit = {}
+    onOpenAppDetails: (String) -> Unit = {}
 ) {
     val devices by viewModel.devices.collectAsState()
     val deviceDisplayNames by viewModel.deviceDisplayNames.collectAsState()
@@ -304,7 +308,7 @@ fun HomeScreen(
         suffix = batterySupporting
     )
     val batteryProgress = parsePercentProgress(centerInfo?.batteryLevel)
-    val batteryAccent = if ((batteryProgress ?: 1f) <= 0.2f) HomeVisualTokens.Warning else HomeVisualTokens.Primary
+    val batteryAccent = if ((batteryProgress ?: 1f) <= 0.2f) HomeVisualTokens.Warning else HomeVisualTokens.Success
     val headerBatteryInfo = centerInfo?.batteryLevel.orDash()
     val selectedDeviceLabel = selectedDevice
         ?.let { formatPrimaryDeviceName(deviceInfo?.deviceModel, deviceDisplayNames[it], it) }
@@ -320,14 +324,13 @@ fun HomeScreen(
     val trackedOpenFileManager = { onOpenFileManager() }
     val trackedOpenAppManager = { onOpenAppManager() }
     val trackedOpenDiagnostics = { onOpenDiagnostics() }
-    val trackedMoreActions = { onMoreActions() }
     val statusCards = listOf(
         HomeStatusCardModel(
             title = stringResource(Res.string.cpu_usage),
             value = centerInfo?.cpuUsage.orDash(),
             supporting = l10n("当前 CPU 使用率", "Current CPU usage"),
             icon = IconParkIcons.Cpu,
-            accentColor = HomeVisualTokens.Primary,
+            accentColor = HomeVisualTokens.Purple,
             progress = parsePercentProgress(centerInfo?.cpuUsage)
         ),
         HomeStatusCardModel(
@@ -335,7 +338,7 @@ fun HomeScreen(
             value = centerInfo?.storageUsage.orDash("-- / --"),
             supporting = formatStorageSupporting(centerInfo?.storageUsage),
             icon = IconParkIcons.HardDisk,
-            accentColor = HomeVisualTokens.Primary,
+            accentColor = HomeVisualTokens.Teal,
             progress = parseStorageProgress(centerInfo?.storageUsage)
         ),
         HomeStatusCardModel(
@@ -343,7 +346,7 @@ fun HomeScreen(
             value = centerInfo?.memoryUsage.orDash(),
             supporting = formatMemorySupporting(centerInfo?.memoryUsage),
             icon = IconParkIcons.StorageCard,
-            accentColor = HomeVisualTokens.Primary,
+            accentColor = HomeVisualTokens.Cyan,
             progress = parsePercentProgress(centerInfo?.memoryUsage)
         ),
         HomeStatusCardModel(
@@ -395,8 +398,7 @@ fun HomeScreen(
                         compactLayout = compactLayout,
                         relativeUpdated = relativeUpdated,
                         isLoading = isLoading,
-                        onRefresh = { viewModel.refreshDevices() },
-                        onMoreActions = trackedMoreActions
+                        onRefresh = { viewModel.refreshDevices() }
                     )
                 }
 
@@ -448,8 +450,7 @@ fun HomeScreen(
                         onSelectorExpandedChange = { showDropdown = it },
                         onDeviceSelected = { viewModel.selectDevice(it) },
                         onRefresh = { viewModel.refreshDevices() },
-                        onDisconnect = { viewModel.disconnectSelectedDevice() },
-                        onMoreActions = trackedMoreActions
+                        onDisconnect = { viewModel.disconnectSelectedDevice() }
                     )
 
                     HomeStatusCardsSection(
@@ -490,7 +491,8 @@ fun HomeScreen(
                                 isLoading = isForegroundLoading,
                                 errorMessage = foregroundError,
                                 lastUpdated = foregroundUpdatedAt,
-                                onRefresh = { refreshForegroundApp() }
+                                onRefresh = { refreshForegroundApp() },
+                                onOpenDetails = onOpenAppDetails
                             )
                         }
                     } else {
@@ -529,7 +531,8 @@ fun HomeScreen(
                                         isLoading = isForegroundLoading,
                                         errorMessage = foregroundError,
                                         lastUpdated = foregroundUpdatedAt,
-                                        onRefresh = { refreshForegroundApp() }
+                                        onRefresh = { refreshForegroundApp() },
+                                        onOpenDetails = onOpenAppDetails
                                     )
                                 }
                                 HomeDeviceInfoSummarySection(
@@ -576,8 +579,7 @@ private fun EmptyDeviceStatePanel(
     compactLayout: Boolean,
     relativeUpdated: String,
     isLoading: Boolean,
-    onRefresh: () -> Unit,
-    onMoreActions: () -> Unit
+    onRefresh: () -> Unit
 ) {
     GlassCard(
         modifier = Modifier
@@ -602,8 +604,7 @@ private fun EmptyDeviceStatePanel(
                         compactLayout = true,
                         relativeUpdated = relativeUpdated,
                         isLoading = isLoading,
-                        onRefresh = onRefresh,
-                        onMoreActions = onMoreActions
+                        onRefresh = onRefresh
                     )
                     EmptyConnectGuidePanel(
                         modifier = Modifier.fillMaxWidth(),
@@ -621,8 +622,7 @@ private fun EmptyDeviceStatePanel(
                         compactLayout = false,
                         relativeUpdated = relativeUpdated,
                         isLoading = isLoading,
-                        onRefresh = onRefresh,
-                        onMoreActions = onMoreActions
+                        onRefresh = onRefresh
                     )
                     EmptyConnectGuidePanel(
                         modifier = Modifier.weight(1f),
@@ -640,7 +640,6 @@ private fun EmptyDeviceHero(
     relativeUpdated: String,
     isLoading: Boolean,
     onRefresh: () -> Unit,
-    onMoreActions: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -653,8 +652,7 @@ private fun EmptyDeviceHero(
         EmptyDeviceActions(
             compactLayout = compactLayout,
             isLoading = isLoading,
-            onRefresh = onRefresh,
-            onMoreActions = onMoreActions
+            onRefresh = onRefresh
         )
     }
 }
@@ -727,8 +725,7 @@ private fun EmptyDeviceIllustration() {
 private fun EmptyDeviceActions(
     compactLayout: Boolean,
     isLoading: Boolean,
-    onRefresh: () -> Unit,
-    onMoreActions: () -> Unit
+    onRefresh: () -> Unit
 ) {
     if (compactLayout) {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -740,14 +737,6 @@ private fun EmptyDeviceActions(
                 onClick = onRefresh,
                 modifier = Modifier.width(220.dp)
             )
-            EmptyDeviceActionButton(
-                text = stringResource(Res.string.home_more_actions),
-                icon = IconParkIcons.Application,
-                primary = false,
-                enabled = true,
-                onClick = onMoreActions,
-                modifier = Modifier.width(220.dp)
-            )
         }
     } else {
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -757,14 +746,6 @@ private fun EmptyDeviceActions(
                 primary = true,
                 enabled = !isLoading,
                 onClick = onRefresh,
-                modifier = Modifier.width(180.dp)
-            )
-            EmptyDeviceActionButton(
-                text = stringResource(Res.string.home_more_actions),
-                icon = IconParkIcons.Application,
-                primary = false,
-                enabled = true,
-                onClick = onMoreActions,
                 modifier = Modifier.width(180.dp)
             )
         }
@@ -982,8 +963,7 @@ private fun HomeTopCommandPanel(
     onSelectorExpandedChange: (Boolean) -> Unit,
     onDeviceSelected: (String) -> Unit,
     onRefresh: () -> Unit,
-    onDisconnect: () -> Unit,
-    onMoreActions: () -> Unit
+    onDisconnect: () -> Unit
 ) {
     val panelShape = RoundedCornerShape(16.dp)
     Column(
@@ -1019,7 +999,6 @@ private fun HomeTopCommandPanel(
                     isConnected = isConnected,
                     onRefresh = onRefresh,
                     onDisconnect = onDisconnect,
-                    onMoreActions = onMoreActions,
                     modifier = Modifier.align(Alignment.End)
                 )
             }
@@ -1048,8 +1027,7 @@ private fun HomeTopCommandPanel(
                     isLoading = isLoading,
                     isConnected = isConnected,
                     onRefresh = onRefresh,
-                    onDisconnect = onDisconnect,
-                    onMoreActions = onMoreActions
+                    onDisconnect = onDisconnect
                 )
             }
         }
@@ -1062,7 +1040,6 @@ private fun HomeHeaderDeviceActions(
     isConnected: Boolean,
     onRefresh: () -> Unit,
     onDisconnect: () -> Unit,
-    onMoreActions: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Row(
@@ -1083,13 +1060,6 @@ private fun HomeHeaderDeviceActions(
             tint = HomeVisualTokens.Danger,
             enabled = isConnected,
             onClick = onDisconnect
-        )
-        HomeHeaderActionButton(
-            icon = IconParkIcons.More,
-            label = l10n("更多", "More"),
-            tint = HomeVisualTokens.Muted,
-            enabled = true,
-            onClick = onMoreActions
         )
     }
 }
@@ -1436,8 +1406,10 @@ private fun HomeForegroundAppSection(
     isLoading: Boolean,
     errorMessage: String?,
     lastUpdated: String,
-    onRefresh: () -> Unit
+    onRefresh: () -> Unit,
+    onOpenDetails: (String) -> Unit
 ) {
+    val detailsPackageName = foregroundApp?.packageName?.takeIf { it.isNotBlank() && it != "--" }
     HomePlainSection(modifier = modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier
@@ -1467,7 +1439,10 @@ private fun HomeForegroundAppSection(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(if (compactLayout) 116.dp else 104.dp),
+                    .height(if (compactLayout) 116.dp else 104.dp)
+                    .homeNoRippleClickable(enabled = detailsPackageName != null) {
+                        detailsPackageName?.let(onOpenDetails)
+                    },
                 verticalAlignment = Alignment.Top,
                 horizontalArrangement = Arrangement.spacedBy(if (compactLayout) 12.dp else 14.dp)
             ) {
@@ -1531,6 +1506,17 @@ private fun HomeForegroundAppSection(
                             )
                         }
                     }
+                }
+
+                if (detailsPackageName != null) {
+                    Icon(
+                        imageVector = IconParkIcons.Right,
+                        contentDescription = null,
+                        tint = HomeVisualTokens.Muted,
+                        modifier = Modifier
+                            .padding(top = 3.dp)
+                            .size(16.dp)
+                    )
                 }
             }
         }
@@ -2021,8 +2007,7 @@ private fun DeviceHeroPanel(
     onOpenShell: () -> Unit,
     onInstallApk: () -> Unit,
     onScreenshot: () -> Unit,
-    onOpenLogcat: () -> Unit,
-    onMoreActions: () -> Unit
+    onOpenLogcat: () -> Unit
 ) {
     GlassCard(
         modifier = Modifier.fillMaxWidth(),
@@ -2176,8 +2161,7 @@ private fun DeviceHeroPanel(
                 onOpenShell = onOpenShell,
                 onInstallApk = onInstallApk,
                 onScreenshot = onScreenshot,
-                onOpenLogcat = onOpenLogcat,
-                onMoreActions = onMoreActions
+                onOpenLogcat = onOpenLogcat
             )
         }
     }
@@ -2256,15 +2240,13 @@ private fun HomeToolbarActions(
     onOpenShell: () -> Unit,
     onInstallApk: () -> Unit,
     onScreenshot: () -> Unit,
-    onOpenLogcat: () -> Unit,
-    onMoreActions: () -> Unit
+    onOpenLogcat: () -> Unit
 ) {
     val actions = listOf(
         HomeToolbarAction(stringResource(Res.string.install_apk_short), IconParkIcons.Download, HomeVisualTokens.Primary, onInstallApk),
-        HomeToolbarAction(stringResource(Res.string.key_screenshot_short), IconParkIcons.Camera, HomeVisualTokens.Primary, onScreenshot),
-        HomeToolbarAction(stringResource(Res.string.shell_command), IconParkIcons.Terminal, HomeVisualTokens.Primary, onOpenShell),
-        HomeToolbarAction(stringResource(Res.string.terminal_tab_logcat), IconParkIcons.Info, HomeVisualTokens.Primary, onOpenLogcat),
-        HomeToolbarAction(stringResource(Res.string.home_more_actions), IconParkIcons.Application, HomeVisualTokens.Text, onMoreActions)
+        HomeToolbarAction(stringResource(Res.string.key_screenshot_short), IconParkIcons.Camera, HomeVisualTokens.Cyan, onScreenshot),
+        HomeToolbarAction(stringResource(Res.string.shell_command), IconParkIcons.Terminal, HomeVisualTokens.Purple, onOpenShell),
+        HomeToolbarAction(stringResource(Res.string.terminal_tab_logcat), IconParkIcons.Info, HomeVisualTokens.Warning, onOpenLogcat)
     )
 
     if (compactLayout) {
@@ -2421,7 +2403,7 @@ private fun HomeQuickActionsSection(
         HomeToolbarAction(
             stringResource(Res.string.key_screenshot_short),
             IconParkIcons.Camera,
-            HomeVisualTokens.Primary,
+            HomeVisualTokens.Cyan,
             onScreenshot,
             stringResource(Res.string.screenshot_desc)
         ),
@@ -2435,21 +2417,21 @@ private fun HomeQuickActionsSection(
         HomeToolbarAction(
             stringResource(Res.string.file_manager),
             IconParkIcons.Folder,
-            HomeVisualTokens.Warning,
+            HomeVisualTokens.Teal,
             onOpenFileManager,
             stringResource(Res.string.file_manager_desc)
         ),
         HomeToolbarAction(
             stringResource(Res.string.app),
             IconParkIcons.Application,
-            HomeVisualTokens.Primary,
+            HomeVisualTokens.Purple,
             onOpenAppManager,
             l10n("查看应用", "View apps")
         ),
         HomeToolbarAction(
             l10n("投屏控制", "Mirror Control"),
             IconParkIcons.CastScreen,
-            HomeVisualTokens.Primary,
+            HomeVisualTokens.Success,
             onMirrorDevice,
             l10n("投屏到电脑", "Mirror to desktop")
         )
@@ -3503,8 +3485,7 @@ private fun QuickActionsPanel(
     onMirrorDevice: () -> Unit = {},
     onOpenShell: () -> Unit = {},
     onOpenLogcat: () -> Unit = {},
-    onOpenFileManager: () -> Unit = {},
-    onMoreActions: () -> Unit = {}
+    onOpenFileManager: () -> Unit = {}
 ) {
     DashboardPanel(
         modifier = modifier,
@@ -3513,11 +3494,10 @@ private fun QuickActionsPanel(
     ) {
         val actions = listOf(
             HomeToolbarAction(stringResource(Res.string.install_apk_short), IconParkIcons.Download, HomeVisualTokens.Primary, onInstallApk),
-            HomeToolbarAction(stringResource(Res.string.key_screenshot_short), IconParkIcons.Camera, HomeVisualTokens.Primary, onScreenshot),
-            HomeToolbarAction(stringResource(Res.string.shell_command), IconParkIcons.Terminal, HomeVisualTokens.Primary, onOpenShell),
-            HomeToolbarAction(stringResource(Res.string.terminal_tab_logcat), IconParkIcons.Info, HomeVisualTokens.Primary, onOpenLogcat),
-            HomeToolbarAction(stringResource(Res.string.file_browser), IconParkIcons.HardDisk, HomeVisualTokens.Warning, onOpenFileManager),
-            HomeToolbarAction(stringResource(Res.string.home_more_actions), IconParkIcons.Application, HomeVisualTokens.Muted, onMoreActions)
+            HomeToolbarAction(stringResource(Res.string.key_screenshot_short), IconParkIcons.Camera, HomeVisualTokens.Cyan, onScreenshot),
+            HomeToolbarAction(stringResource(Res.string.shell_command), IconParkIcons.Terminal, HomeVisualTokens.Purple, onOpenShell),
+            HomeToolbarAction(stringResource(Res.string.terminal_tab_logcat), IconParkIcons.Info, HomeVisualTokens.Warning, onOpenLogcat),
+            HomeToolbarAction(stringResource(Res.string.file_browser), IconParkIcons.HardDisk, HomeVisualTokens.Teal, onOpenFileManager)
         )
 
         if (singleRow) {

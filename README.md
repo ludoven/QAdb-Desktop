@@ -126,8 +126,12 @@ QADB 适合以下用户：
 | Windows | `.exe` | 免安装 / 便携版本 |
 | Windows | `.zip` | 解压即用（便携包） |
 | macOS | `.dmg` | 适用于 macOS 用户 |
+| Linux | `.deb` | Debian / Ubuntu / Linux Mint 等发行版 |
+| Linux | `.rpm` | Fedora / openSUSE / RHEL 系发行版 |
+| Linux | `.tar.gz` | 解压即用（便携包） |
 
 > macOS 如果提示“无法验证开发者”或“无法打开”，可以在「系统设置」→「隐私与安全性」中允许打开。
+> Linux 设备镜像依赖 `scrcpy`，如果安装包内没有 Linux `scrcpy` 资源，请先通过系统包管理器安装 `scrcpy`，或通过 `SCRCPY_PATH` 指定路径。
 
 ---
 

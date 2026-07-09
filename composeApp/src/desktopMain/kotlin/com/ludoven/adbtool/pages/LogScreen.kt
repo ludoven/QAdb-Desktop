@@ -104,9 +104,9 @@ import com.ludoven.adbtool.ui.mac.OutlinedButton
 import com.ludoven.adbtool.ui.mac.Text
 import com.ludoven.adbtool.ui.mac.bodyMedium
 import com.ludoven.adbtool.ui.mac.bodySmall
-import com.ludoven.adbtool.ui.mac.headlineMedium
 import com.ludoven.adbtool.ui.mac.labelLarge
 import com.ludoven.adbtool.ui.mac.labelSmall
+import com.ludoven.adbtool.ui.mac.titleMedium
 import com.ludoven.adbtool.viewmodel.LogViewModel
 import com.ludoven.adbtool.widget.EmptyStatePanel
 import com.ludoven.adbtool.widget.InlineStatusBanner
@@ -165,8 +165,8 @@ fun LogScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 24.dp, vertical = 20.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
+            .padding(horizontal = 22.dp, vertical = 18.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -176,12 +176,13 @@ fun LogScreen(
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
                     text = stringResource(Res.string.log_title),
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Bold
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 17.sp
                 )
                 Text(
                     text = stringResource(Res.string.log_subtitle),
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
@@ -273,13 +274,13 @@ fun LogScreen(
 
         Card(
             modifier = Modifier.fillMaxWidth(),
-            shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp)
+            shape = androidx.compose.foundation.shape.RoundedCornerShape(10.dp)
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                    .padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -436,7 +437,7 @@ fun LogScreen(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth(),
-            shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp)
+            shape = androidx.compose.foundation.shape.RoundedCornerShape(10.dp)
         ) {
             Column(modifier = Modifier.fillMaxSize()) {
                 LogTableHeader()
@@ -517,7 +518,7 @@ private fun CaptureStatusBadge(isCapturing: Boolean) {
             .clip(androidx.compose.foundation.shape.RoundedCornerShape(999.dp))
             .background(background)
             .border(1.dp, MaterialTheme.colorScheme.outlineVariant, androidx.compose.foundation.shape.RoundedCornerShape(999.dp))
-            .padding(horizontal = 10.dp, vertical = 5.dp)
+            .padding(horizontal = 9.dp, vertical = 4.dp)
     ) {
         Text(
             text = if (isCapturing) stringResource(Res.string.log_capture_running) else stringResource(Res.string.log_capture_paused),
@@ -543,9 +544,9 @@ private fun ToolbarButton(
             containerColor = if (isActive) MaterialTheme.colorScheme.primary.copy(alpha = 0.1f) else Color.Transparent,
             contentColor = if (isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
         ),
-        modifier = Modifier.height(34.dp)
+        modifier = Modifier.height(32.dp)
     ) {
-        Icon(icon, contentDescription = null, modifier = Modifier.width(14.dp))
+        Icon(icon, contentDescription = null, modifier = Modifier.width(13.dp))
         Spacer(modifier = Modifier.width(5.dp))
         Text(text = text, style = MaterialTheme.typography.bodySmall)
     }

@@ -18,27 +18,54 @@ import adbtool_desktop.composeapp.generated.resources.logs_failed
 import adbtool_desktop.composeapp.generated.resources.logs_saved
 import adbtool_desktop.composeapp.generated.resources.no_device_available
 import adbtool_desktop.composeapp.generated.resources.recording_failed
-import adbtool_desktop.composeapp.generated.resources.recording_in_progress
 import adbtool_desktop.composeapp.generated.resources.recording_saved
 import adbtool_desktop.composeapp.generated.resources.screenshot_failed
 import adbtool_desktop.composeapp.generated.resources.screenshot_success
 import androidx.lifecycle.viewModelScope
 import com.ludoven.adbtool.entity.AdbFunctionType
 import com.ludoven.adbtool.entity.MsgContent
+import com.ludoven.adbtool.util.AdbPathManager
 import com.ludoven.adbtool.util.AdbTool
+import com.ludoven.adbtool.util.ChildProcessRegistry
 import com.ludoven.adbtool.util.FileUtils
 import com.ludoven.adbtool.util.ScrcpyPathManager
+import com.ludoven.adbtool.util.l10n
 import java.io.File
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+data class ScreenRecordUiState(
+    val isRecording: Boolean = false,
+    val isStopping: Boolean = false,
+    val localPath: String = "",
+    val durationSeconds: Int? = null,
+    val startedAtMillis: Long = 0L
+)
+
+private data class ScreenRecordSession(
+    val process: Process,
+    val outputFuture: CompletableFuture<String>,
+    val deviceId: String,
+    val remotePath: String,
+    val localPath: String,
+    val durationSeconds: Int?,
+    val startedAtMillis: Long
+)
 
 class CommonModel : BaseViewModel() {
     companion object {
+        private const val SCREEN_RECORD_MAX_SECONDS = 180
+        private const val SCREEN_RECORD_STOP_TIMEOUT_MS = 2_000L
+
         internal fun deviceActionsEnabled(deviceId: String?): Boolean =
             !deviceId.isNullOrBlank()
     }
@@ -46,11 +73,24 @@ class CommonModel : BaseViewModel() {
     private val _showInputDialog = MutableStateFlow(false)
     val showInputDialog: StateFlow<Boolean> = _showInputDialog.asStateFlow()
 
+    private val _screenRecordConfigRequests = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    val screenRecordConfigRequests: SharedFlow<Unit> = _screenRecordConfigRequests.asSharedFlow()
+
+    private val _screenRecordState = MutableStateFlow(ScreenRecordUiState())
+    val screenRecordState: StateFlow<ScreenRecordUiState> = _screenRecordState.asStateFlow()
+
+    private var activeScreenRecordSession: ScreenRecordSession? = null
+
     fun executeAdbAction(
         type: AdbFunctionType
     ) {
         if (type == AdbFunctionType.DEVICE_MIRROR) {
             startDeviceMirror()
+            return
+        }
+
+        if (type == AdbFunctionType.SCREEN_RECORD) {
+            requestScreenRecordConfig()
             return
         }
 
@@ -65,7 +105,7 @@ class CommonModel : BaseViewModel() {
                     AdbFunctionType.INPUT_TEXT -> showInputDialog(true)
                     AdbFunctionType.DEVICE_MIRROR -> Unit
                     AdbFunctionType.SCREENSHOT -> screenShoot()
-                    AdbFunctionType.SCREEN_RECORD -> screenRecord()
+                    AdbFunctionType.SCREEN_RECORD -> Unit
                     AdbFunctionType.CAPTURE_LOGS -> captureLogs()
                     AdbFunctionType.OPEN_FILE_MANAGER -> execResult("am start -a android.intent.action.VIEW -d file:///sdcard")
                     AdbFunctionType.KEY_BACK -> execResult("input keyevent 4")
@@ -216,6 +256,87 @@ class CommonModel : BaseViewModel() {
         _showInputDialog.value = show
     }
 
+    fun requestScreenRecordConfig() {
+        if (!ensureDeviceSelected(autoDismiss = true)) return
+        _screenRecordConfigRequests.tryEmit(Unit)
+    }
+
+    fun startScreenRecord(durationSeconds: Int?) {
+        if (!ensureDeviceSelected(autoDismiss = true)) return
+        if (_screenRecordState.value.isRecording || activeScreenRecordSession != null) {
+            showTipDialog(MsgContent.Text(l10n("已有录屏任务进行中", "A screen recording is already running")), true)
+            return
+        }
+
+        val normalizedDuration = durationSeconds?.coerceIn(1, SCREEN_RECORD_MAX_SECONDS)
+        viewModelScope.launch {
+            val deviceId = AdbTool.selectDeviceId.orEmpty()
+            val folderPath = withContext(Dispatchers.IO) { FileUtils.selectFolder() }
+            if (folderPath == null) {
+                showTipDialog(MsgContent.Resource(Res.string.folder_not_selected), true)
+                return@launch
+            }
+
+            val timestamp = System.currentTimeMillis()
+            val remotePath = "/sdcard/record_$timestamp.mp4"
+            val localPath = "$folderPath/record_$timestamp.mp4"
+            val session = withContext(Dispatchers.IO) {
+                createScreenRecordSession(
+                    deviceId = deviceId,
+                    remotePath = remotePath,
+                    localPath = localPath,
+                    durationSeconds = normalizedDuration
+                )
+            }
+
+            if (session == null) {
+                showTipDialog(MsgContent.Resource(Res.string.recording_failed), true)
+                return@launch
+            }
+
+            activeScreenRecordSession = session
+            _screenRecordState.value = ScreenRecordUiState(
+                isRecording = true,
+                localPath = localPath,
+                durationSeconds = normalizedDuration,
+                startedAtMillis = session.startedAtMillis
+            )
+
+            if (normalizedDuration == null) {
+                showTipDialog(MsgContent.Text(l10n("录屏已开始，停止后自动保存。", "Recording started. Stop it to save automatically.")), true)
+            } else {
+                showTipDialog(MsgContent.Text(l10n("开始录屏（${normalizedDuration}秒）...", "Recording for ${normalizedDuration}s...")))
+                val completed = withContext(Dispatchers.IO) {
+                    waitForFixedScreenRecordProcess(session, normalizedDuration)
+                }
+                if (activeScreenRecordSession !== session) return@launch
+                val success = withContext(Dispatchers.IO) {
+                    finishScreenRecordSession(session, stopProcess = !completed)
+                }
+                activeScreenRecordSession = null
+                _screenRecordState.value = ScreenRecordUiState()
+                showScreenRecordResult(success, localPath)
+            }
+        }
+    }
+
+    fun stopScreenRecord() {
+        val session = activeScreenRecordSession ?: run {
+            _screenRecordState.value = ScreenRecordUiState()
+            return
+        }
+
+        viewModelScope.launch {
+            _screenRecordState.value = _screenRecordState.value.copy(isStopping = true)
+            val success = withContext(Dispatchers.IO) {
+                finishScreenRecordSession(session, stopProcess = true)
+            }
+            activeScreenRecordSession = null
+            _screenRecordState.value = ScreenRecordUiState()
+            showScreenRecordResult(success, session.localPath)
+        }
+    }
+
     private suspend fun screenShoot() {
         val folderPath = withContext(Dispatchers.IO) {
             FileUtils.selectFolder()
@@ -237,34 +358,104 @@ class CommonModel : BaseViewModel() {
         showTipDialog(localizedText, true)
     }
 
-    private suspend fun screenRecord() {
-        val folderPath = withContext(Dispatchers.IO) { FileUtils.selectFolder() }
-        if (folderPath == null) {
-            showTipDialog(MsgContent.Resource(Res.string.folder_not_selected), true)
-            return
+    private suspend fun createScreenRecordSession(
+        deviceId: String,
+        remotePath: String,
+        localPath: String,
+        durationSeconds: Int?
+    ): ScreenRecordSession? {
+        val adbPath = AdbPathManager.getAdbPath() ?: return null
+        return runCatching {
+            val command = buildList {
+                add(adbPath)
+                if (deviceId.isNotBlank()) {
+                    add("-s")
+                    add(deviceId)
+                }
+                add("shell")
+                add("screenrecord")
+                if (durationSeconds != null) {
+                    add("--time-limit")
+                    add(durationSeconds.toString())
+                }
+                add(remotePath)
+            }
+            val process = ProcessBuilder(command)
+                .redirectErrorStream(true)
+                .start()
+            ChildProcessRegistry.register(process)
+            val outputFuture = CompletableFuture.supplyAsync {
+                process.inputStream.bufferedReader().use { it.readText() }
+            }
+            ScreenRecordSession(
+                process = process,
+                outputFuture = outputFuture,
+                deviceId = deviceId,
+                remotePath = remotePath,
+                localPath = localPath,
+                durationSeconds = durationSeconds,
+                startedAtMillis = System.currentTimeMillis()
+            )
+        }.getOrNull()
+    }
+
+    private fun waitForFixedScreenRecordProcess(session: ScreenRecordSession, durationSeconds: Int): Boolean {
+        return runCatching {
+            session.process.waitFor((durationSeconds + 10L) * 1000L, TimeUnit.MILLISECONDS)
+        }.getOrDefault(false)
+    }
+
+    private fun finishScreenRecordSession(session: ScreenRecordSession, stopProcess: Boolean): Boolean {
+        return runCatching {
+            if (stopProcess) {
+                requestRemoteScreenRecordStop(session.deviceId)
+                stopScreenRecordProcess(session.process)
+            }
+            drainScreenRecordOutput(session)
+            val pulled = AdbTool.pullFile(session.remotePath, session.localPath, session.deviceId)
+            AdbTool.execShell(AdbTool.buildShellCommand("rm", "-f", session.remotePath), session.deviceId)
+            pulled
+        }.getOrDefault(false).also {
+            runCatching { session.process.inputStream.close() }
+            runCatching { session.process.outputStream.close() }
+            if (session.process.isAlive) {
+                runCatching { session.process.destroyForcibly() }
+            }
+            ChildProcessRegistry.unregister(session.process)
         }
+    }
 
-        showTipDialog(MsgContent.Resource(Res.string.recording_in_progress))
-
-        val timestamp = System.currentTimeMillis()
-        val remotePath = "/sdcard/record_$timestamp.mp4"
-        val localPath = "$folderPath/record_$timestamp.mp4"
-
-        val success = withContext(Dispatchers.IO) {
-            runCatching {
-                AdbTool.execShell("screenrecord --time-limit 15 $remotePath")
-                val pulled = AdbTool.pullFile(remotePath, localPath)
-                AdbTool.execShell("rm $remotePath")
-                pulled
-            }.getOrDefault(false)
+    private fun requestRemoteScreenRecordStop(deviceId: String) {
+        runCatching {
+            AdbTool.execShell("pidof screenrecord >/dev/null 2>&1 && kill -2 \$(pidof screenrecord)", deviceId)
         }
+    }
 
-        val localized = if (success) {
+    private fun stopScreenRecordProcess(process: Process) {
+        if (!process.isAlive) return
+        process.destroy()
+        val stopped = runCatching {
+            process.waitFor(SCREEN_RECORD_STOP_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+        }.getOrDefault(false)
+        if (!stopped && process.isAlive) {
+            process.destroyForcibly()
+            runCatching { process.waitFor(SCREEN_RECORD_STOP_TIMEOUT_MS, TimeUnit.MILLISECONDS) }
+        }
+    }
+
+    private fun drainScreenRecordOutput(session: ScreenRecordSession): String {
+        return runCatching {
+            session.outputFuture.get(500L, TimeUnit.MILLISECONDS)
+        }.getOrDefault("")
+    }
+
+    private fun showScreenRecordResult(success: Boolean, localPath: String) {
+        val message = if (success) {
             MsgContent.Resource(Res.string.recording_saved, listOf(localPath))
         } else {
             MsgContent.Resource(Res.string.recording_failed)
         }
-        showTipDialog(localized, true)
+        showTipDialog(message, true)
     }
 
     private suspend fun captureLogs() {

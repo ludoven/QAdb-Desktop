@@ -106,7 +106,7 @@ internal suspend fun loadInstalledAppsForDevice(): List<AppInfo> = coroutineScop
 
 class AppViewModel : BaseViewModel() {
     companion object {
-        private const val VISIBLE_ASSET_LOAD_DEBOUNCE_MS = 250L
+        private const val VISIBLE_ASSET_LOAD_DEBOUNCE_MS = 120L
         private const val MAX_VISIBLE_ASSET_BATCH = 24
 
         internal fun appPackageShellCommand(vararg args: String): String =
@@ -496,7 +496,7 @@ class AppViewModel : BaseViewModel() {
     private suspend fun ensureAppAssets(app: AppInfo) {
         val packageName = app.packageName
         val cacheDir = currentDeviceCacheDir()
-        val iconCacheFile = File(cacheDir, "$packageName.png")
+        val iconCacheFile = File(cacheDir, AppIconHelperClient.localIconCacheFileName(packageName))
         val labelCacheFile = File(cacheDir, "$packageName.label.txt")
 
         if (!_appLabels.value.containsKey(packageName)) {
@@ -556,7 +556,7 @@ class AppViewModel : BaseViewModel() {
 
         if (_appLabels.value.containsKey(packageName) && _appIcons.value.containsKey(packageName)) return
         if (!isApkFallbackEnabled()) return
-        if (!_appIcons.value.containsKey(packageName)) return
+        if (_appIcons.value.containsKey(packageName)) return
         if (app.apkPath.isBlank()) return
         val tmpApk = File(cacheDir, "$packageName.apk")
         val pulled = AdbTool.pullFile(app.apkPath, tmpApk.absolutePath)
@@ -613,7 +613,7 @@ class AppViewModel : BaseViewModel() {
                 readLabelCache(packageName)?.let { cachedLabels[packageName] = it }
             }
             if (!_appIcons.value.containsKey(packageName) && !loadedIcons.containsKey(packageName)) {
-                val iconCacheFile = File(currentDeviceCacheDir(), "$packageName.png")
+                val iconCacheFile = File(currentDeviceCacheDir(), AppIconHelperClient.localIconCacheFileName(packageName))
                 readIconFromCache(iconCacheFile)?.let { bitmap ->
                     loadedIcons[packageName] = bitmap
                     stateUpdates[packageName] = AppIconState.Success(
@@ -975,7 +975,7 @@ class AppViewModel : BaseViewModel() {
     fun executeAdbAction(type: AdbFunctionType, packageName: String) {
         val appName = _appList.value.find { it.packageName == packageName }?.appName ?: packageName
         if (type == AdbFunctionType.APP_INFO) {
-            openAppInfoFast(packageName)
+            openAppInfo(packageName)
             return
         }
         viewModelScope.launch {
@@ -1043,7 +1043,7 @@ class AppViewModel : BaseViewModel() {
         }
     }
 
-    private fun openAppInfoFast(packageName: String) {
+    fun openAppInfo(packageName: String) {
         val app = _appList.value.firstOrNull { it.packageName == packageName }
         _appInfo.value = AppInfoData(
             appName = app?.appName ?: packageName,

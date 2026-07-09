@@ -17,6 +17,7 @@ import adbtool_desktop.composeapp.generated.resources.process_user
 import adbtool_desktop.composeapp.generated.resources.refresh
 import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -46,7 +47,6 @@ import com.ludoven.adbtool.ui.mac.MaterialTheme
 import com.ludoven.adbtool.ui.mac.OutlinedTextField
 import com.ludoven.adbtool.ui.mac.Text
 import com.ludoven.adbtool.widget.EmptyStatePanel
-import com.ludoven.adbtool.widget.PageHeader
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -62,6 +62,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.ludoven.adbtool.util.AdbTool
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -158,16 +159,17 @@ fun ProcessScreen(selectedDevice: String?) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(16.dp),
+            .padding(horizontal = 22.dp, vertical = 18.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        PageHeader(
+        DiagnosticsCompactHeader(
             title = stringResource(Res.string.process_title),
             subtitle = stringResource(Res.string.process_subtitle)
         ) {
-            IconButton(onClick = { refresh(forceRefresh = true) }, enabled = !selectedDevice.isNullOrBlank() && !isLoading) {
-                Icon(Icons.Default.Refresh, contentDescription = stringResource(Res.string.refresh))
-            }
+            CompactRefreshButton(
+                onClick = { refresh(forceRefresh = true) },
+                enabled = !selectedDevice.isNullOrBlank() && !isLoading
+            )
         }
 
         if (selectedDevice.isNullOrBlank()) {
@@ -180,146 +182,151 @@ fun ProcessScreen(selectedDevice: String?) {
             return
         }
 
-        OutlinedTextField(
-            value = keyword,
-            onValueChange = { keyword = it },
+        Card(
             modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            label = { Text(stringResource(Res.string.process_search_hint)) }
-        )
-
-        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                text = "${filteredList.size}",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold
-            )
-            Spacer(modifier = Modifier.width(6.dp))
-            Text(
-                text = stringResource(Res.string.process_title),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            shape = RoundedCornerShape(10.dp)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                OutlinedTextField(
+                    value = keyword,
+                    onValueChange = { keyword = it },
+                    modifier = Modifier.weight(1f).height(40.dp),
+                    singleLine = true,
+                    label = { Text(stringResource(Res.string.process_search_hint)) }
+                )
+                ProcessCountPill(count = filteredList.size)
+            }
         }
 
-        Box(
+        Card(
             modifier = Modifier
                 .weight(1f)
-                .fillMaxWidth()
-                .background(
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.28f),
-                    shape = RoundedCornerShape(12.dp)
-                )
-                .padding(8.dp)
+                .fillMaxWidth(),
+            shape = RoundedCornerShape(10.dp)
         ) {
-            when {
-                isLoading -> {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator()
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(8.dp)
+            ) {
+                when {
+                    isLoading -> {
+                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            CircularProgressIndicator()
+                        }
                     }
-                }
 
-                errorText != null -> {
-                    EmptyStatePanel(
-                        title = "进程读取失败",
-                        description = errorText.orEmpty(),
-                        actionLabel = stringResource(Res.string.refresh),
-                        onAction = { refresh(forceRefresh = true) },
-                        modifier = Modifier.fillMaxSize()
-                    )
-                }
+                    errorText != null -> {
+                        EmptyStatePanel(
+                            title = "进程读取失败",
+                            description = errorText.orEmpty(),
+                            actionLabel = stringResource(Res.string.refresh),
+                            onAction = { refresh(forceRefresh = true) },
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
 
-                filteredList.isEmpty() -> {
-                    EmptyStatePanel(
-                        title = stringResource(Res.string.process_empty),
-                        description = if (keyword.isBlank()) "设备当前没有返回进程数据。" else "没有进程匹配当前搜索条件。",
-                        modifier = Modifier.fillMaxSize()
-                    )
-                }
+                    filteredList.isEmpty() -> {
+                        EmptyStatePanel(
+                            title = stringResource(Res.string.process_empty),
+                            description = if (keyword.isBlank()) "设备当前没有返回进程数据。" else "没有进程匹配当前搜索条件。",
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
 
-                else -> {
-                    Box(modifier = Modifier.fillMaxSize()) {
-                        LazyColumn(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(end = 12.dp),
-                            state = listState,
-                            verticalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            item {
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(horizontal = 8.dp, vertical = 4.dp)
-                                ) {
-                                    SortableColumnHeader(
-                                        text = stringResource(Res.string.process_name),
-                                        width = 240.dp,
-                                        column = SortColumn.NAME,
-                                        currentSort = sortBy,
-                                        descending = sortDesc,
-                                        onClick = {
-                                            if (sortBy == SortColumn.NAME) sortDesc = !sortDesc
-                                            else { sortBy = SortColumn.NAME; sortDesc = true }
-                                        }
-                                    )
-                                    SortableColumnHeader(
-                                        text = stringResource(Res.string.process_cpu),
-                                        width = 70.dp,
-                                        column = SortColumn.CPU,
-                                        currentSort = sortBy,
-                                        descending = sortDesc,
-                                        onClick = {
-                                            if (sortBy == SortColumn.CPU) sortDesc = !sortDesc
-                                            else { sortBy = SortColumn.CPU; sortDesc = true }
-                                        }
-                                    )
-                                    SortableColumnHeader(
-                                        text = stringResource(Res.string.process_cpu_time),
-                                        width = 100.dp,
-                                        column = SortColumn.CPU_TIME,
-                                        currentSort = sortBy,
-                                        descending = sortDesc,
-                                        onClick = {
-                                            if (sortBy == SortColumn.CPU_TIME) sortDesc = !sortDesc
-                                            else { sortBy = SortColumn.CPU_TIME; sortDesc = true }
-                                        }
-                                    )
-                                    SortableColumnHeader(
-                                        text = stringResource(Res.string.process_memory),
-                                        width = 82.dp,
-                                        column = SortColumn.MEMORY,
-                                        currentSort = sortBy,
-                                        descending = sortDesc,
-                                        onClick = {
-                                            if (sortBy == SortColumn.MEMORY) sortDesc = !sortDesc
-                                            else { sortBy = SortColumn.MEMORY; sortDesc = true }
-                                        }
-                                    )
-                                    SortableColumnHeader(
-                                        text = stringResource(Res.string.process_pid),
-                                        width = 70.dp,
-                                        column = SortColumn.PID,
-                                        currentSort = sortBy,
-                                        descending = sortDesc,
-                                        onClick = {
-                                            if (sortBy == SortColumn.PID) sortDesc = !sortDesc
-                                            else { sortBy = SortColumn.PID; sortDesc = false }
-                                        }
-                                    )
-                                    SortableColumnHeader(
-                                        text = stringResource(Res.string.process_user),
-                                        width = null,
-                                        column = SortColumn.USER,
-                                        currentSort = sortBy,
-                                        descending = sortDesc,
-                                        onClick = {
-                                            if (sortBy == SortColumn.USER) sortDesc = !sortDesc
-                                            else { sortBy = SortColumn.USER; sortDesc = true }
-                                        }
-                                    )
+                    else -> {
+                        Box(modifier = Modifier.fillMaxSize()) {
+                            LazyColumn(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(end = 12.dp),
+                                state = listState,
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                item {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .background(
+                                                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.56f),
+                                                RoundedCornerShape(8.dp)
+                                            )
+                                            .padding(horizontal = 8.dp, vertical = 7.dp)
+                                    ) {
+                                        SortableColumnHeader(
+                                            text = stringResource(Res.string.process_name),
+                                            width = 240.dp,
+                                            column = SortColumn.NAME,
+                                            currentSort = sortBy,
+                                            descending = sortDesc,
+                                            onClick = {
+                                                if (sortBy == SortColumn.NAME) sortDesc = !sortDesc
+                                                else { sortBy = SortColumn.NAME; sortDesc = true }
+                                            }
+                                        )
+                                        SortableColumnHeader(
+                                            text = stringResource(Res.string.process_cpu),
+                                            width = 70.dp,
+                                            column = SortColumn.CPU,
+                                            currentSort = sortBy,
+                                            descending = sortDesc,
+                                            onClick = {
+                                                if (sortBy == SortColumn.CPU) sortDesc = !sortDesc
+                                                else { sortBy = SortColumn.CPU; sortDesc = true }
+                                            }
+                                        )
+                                        SortableColumnHeader(
+                                            text = stringResource(Res.string.process_cpu_time),
+                                            width = 100.dp,
+                                            column = SortColumn.CPU_TIME,
+                                            currentSort = sortBy,
+                                            descending = sortDesc,
+                                            onClick = {
+                                                if (sortBy == SortColumn.CPU_TIME) sortDesc = !sortDesc
+                                                else { sortBy = SortColumn.CPU_TIME; sortDesc = true }
+                                            }
+                                        )
+                                        SortableColumnHeader(
+                                            text = stringResource(Res.string.process_memory),
+                                            width = 82.dp,
+                                            column = SortColumn.MEMORY,
+                                            currentSort = sortBy,
+                                            descending = sortDesc,
+                                            onClick = {
+                                                if (sortBy == SortColumn.MEMORY) sortDesc = !sortDesc
+                                                else { sortBy = SortColumn.MEMORY; sortDesc = true }
+                                            }
+                                        )
+                                        SortableColumnHeader(
+                                            text = stringResource(Res.string.process_pid),
+                                            width = 70.dp,
+                                            column = SortColumn.PID,
+                                            currentSort = sortBy,
+                                            descending = sortDesc,
+                                            onClick = {
+                                                if (sortBy == SortColumn.PID) sortDesc = !sortDesc
+                                                else { sortBy = SortColumn.PID; sortDesc = false }
+                                            }
+                                        )
+                                        SortableColumnHeader(
+                                            text = stringResource(Res.string.process_user),
+                                            width = null,
+                                            column = SortColumn.USER,
+                                            currentSort = sortBy,
+                                            descending = sortDesc,
+                                            onClick = {
+                                                if (sortBy == SortColumn.USER) sortDesc = !sortDesc
+                                                else { sortBy = SortColumn.USER; sortDesc = true }
+                                            }
+                                        )
+                                    }
                                 }
-                            }
 
                             items(filteredList) { item ->
                                 Row(
@@ -383,6 +390,95 @@ fun ProcessScreen(selectedDevice: String?) {
                 }
             }
         }
+    }
+}
+}
+
+
+@Composable
+private fun DiagnosticsCompactHeader(
+    title: String,
+    subtitle: String,
+    trailing: @Composable () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                fontSize = 17.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+        Box(modifier = Modifier.padding(start = 12.dp)) {
+            trailing()
+        }
+    }
+}
+
+@Composable
+private fun CompactRefreshButton(
+    onClick: () -> Unit,
+    enabled: Boolean
+) {
+    val shape = RoundedCornerShape(8.dp)
+    IconButton(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = Modifier
+            .size(30.dp)
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.58f), shape)
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, shape)
+    ) {
+        Icon(
+            Icons.Default.Refresh,
+            contentDescription = stringResource(Res.string.refresh),
+            modifier = Modifier.size(16.dp),
+            tint = if (enabled) MaterialTheme.colorScheme.onSurfaceVariant
+            else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)
+        )
+    }
+}
+
+@Composable
+private fun ProcessCountPill(count: Int) {
+    val shape = RoundedCornerShape(999.dp)
+    Row(
+        modifier = Modifier
+            .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f), shape)
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, shape)
+            .padding(horizontal = 12.dp, vertical = 7.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(5.dp)
+    ) {
+        Text(
+            text = "$count",
+            style = MaterialTheme.typography.titleMedium,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.primary
+        )
+        Text(
+            text = stringResource(Res.string.process_title),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
 

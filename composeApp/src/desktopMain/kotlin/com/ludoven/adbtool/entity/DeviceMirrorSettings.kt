@@ -2,7 +2,7 @@ package com.ludoven.adbtool.entity
 
 data class DeviceMirrorSettings(
     val launchProfile: MirrorLaunchProfile = MirrorLaunchProfile.SMOOTH,
-    val alwaysOnTop: Boolean = true,
+    val alwaysOnTop: Boolean = false,
     val fullscreen: Boolean = false,
     val borderless: Boolean = false,
     val maxSize: Int? = 1280,

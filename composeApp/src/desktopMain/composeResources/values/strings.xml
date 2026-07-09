@@ -137,7 +137,7 @@
     <string name="folder_not_selected">未选择文件夹</string>
     <string name="screenshot_success">截图保存成功！</string>
     <string name="screenshot_failed">截图失败</string>
-    <string name="recording_in_progress">开始录屏（15秒）...</string>
+    <string name="recording_in_progress">正在录屏...</string>
     <string name="recording_saved">录屏保存成功：%1$s</string>
     <string name="recording_failed">录屏失败</string>
     <string name="logs_saved">抓日志成功：%1$s</string>

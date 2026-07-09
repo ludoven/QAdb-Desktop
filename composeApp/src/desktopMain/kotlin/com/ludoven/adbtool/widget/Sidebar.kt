@@ -64,12 +64,13 @@ fun Sidebar(
     var expandedGroupId by remember { mutableStateOf<String?>(null) }
     val visibleGroupIds = visibleSidebarGroupIds(groups, selectedRoute, expandedGroupId)
 
-    GlassCard(
+    Surface(
         modifier = modifier
             .fillMaxHeight()
             .width(UiTokens.SidebarWidth),
-        shape = RoundedCornerShape(8.dp),
-        borderStroke = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
+        shape = RoundedCornerShape(UiTokens.RadiusSmall),
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
     ) {
         Column(
             modifier = Modifier
@@ -167,7 +168,7 @@ private fun SidebarGroupHeader(
         modifier = Modifier
             .fillMaxWidth()
             .height(44.dp)
-            .clip(RoundedCornerShape(6.dp))
+            .clip(RoundedCornerShape(UiTokens.RowRadius))
             .background(backgroundColor)
             .clickable(onClick = onClick)
             .padding(horizontal = 12.dp),
@@ -206,7 +207,7 @@ private fun SidebarItem(
 ) {
     val backgroundColor by animateColorAsState(
         targetValue = if (isSelected) {
-            Color(0xFFF5F9FF)
+            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.62f)
         } else {
             Color.Transparent
         },
@@ -225,8 +226,8 @@ private fun SidebarItem(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(40.dp)
-            .clip(RoundedCornerShape(6.dp))
+            .height(UiTokens.ToolbarHeight)
+            .clip(RoundedCornerShape(UiTokens.RowRadius))
             .background(backgroundColor)
             .clickable(onClick = onClick)
             .padding(start = 20.dp, end = 10.dp),
@@ -237,7 +238,7 @@ private fun SidebarItem(
                 modifier = Modifier
                     .width(3.dp)
                     .height(22.dp)
-                    .clip(RoundedCornerShape(999.dp))
+                    .clip(RoundedCornerShape(UiTokens.BadgeRadius))
                     .background(MaterialTheme.colorScheme.primary)
             )
             Spacer(modifier = Modifier.width(10.dp))
@@ -249,7 +250,7 @@ private fun SidebarItem(
             imageVector = item.icon,
             contentDescription = item.title,
             tint = contentColor,
-            modifier = Modifier.size(18.dp)
+                modifier = Modifier.size(UiTokens.IconMedium)
         )
 
         Spacer(modifier = Modifier.width(10.dp))
@@ -294,7 +295,7 @@ private fun ConnectedStatusCard(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(6.dp))
+                .clip(RoundedCornerShape(UiTokens.RowRadius))
                 .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.22f))
                 .clickable(enabled = devices.isNotEmpty()) { expanded = !expanded }
                 .padding(horizontal = 10.dp, vertical = 9.dp),
@@ -303,7 +304,7 @@ private fun ConnectedStatusCard(
             Box(
                 modifier = Modifier
                     .size(8.dp)
-                    .clip(RoundedCornerShape(999.dp))
+                    .clip(RoundedCornerShape(UiTokens.BadgeRadius))
                     .background(statusColor)
             )
 

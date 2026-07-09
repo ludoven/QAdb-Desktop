@@ -3,19 +3,24 @@ package com.ludoven.adbtool.util
 import java.io.File
 
 object ScrcpyPathManager {
-    const val ERROR_BUNDLED_SCRCPY_NOT_FOUND = "bundled scrcpy not found"
+    const val ERROR_BUNDLED_SCRCPY_NOT_FOUND = "scrcpy not found"
 
     private const val APP_RESOURCES_DIR_PROPERTY = "compose.application.resources.dir"
 
     fun getScrcpyPath(): String? {
-        val candidates = runtimeResourceRoots().flatMap { root ->
+        val bundledCandidates = runtimeResourceRoots().flatMap { root ->
             listOfNotNull(
                 resolvePackagedScrcpyPath(root),
                 resolveBundledScrcpyPath(root)
             )
         }
+        val systemCandidates = buildSystemScrcpyCandidates(
+            userHome = File(System.getProperty("user.home")),
+            environment = System.getenv(),
+            osName = System.getProperty("os.name")
+        ).map(::File)
 
-        return candidates
+        return (bundledCandidates + systemCandidates)
             .firstOrNull { it.exists() && ensureExecutableIfPossible(it) }
             ?.absolutePath
     }
@@ -27,6 +32,40 @@ object ScrcpyPathManager {
     ): File? {
         val platformDir = platformResourceDir(resourceRoot, osName, osArch) ?: return null
         return File(platformDir, "scrcpy/${executableName(osName)}")
+    }
+
+    fun buildSystemScrcpyCandidates(
+        userHome: File,
+        environment: Map<String, String>,
+        osName: String
+    ): List<String> {
+        val executable = executableName(osName)
+        val normalizedOs = osName.lowercase()
+        val candidates = mutableListOf<String>()
+
+        environment["SCRCPY_PATH"]
+            ?.takeIf { it.isNotBlank() }
+            ?.let { candidates += it }
+
+        when {
+            normalizedOs.contains("mac") -> {
+                candidates += "/opt/homebrew/bin/$executable"
+                candidates += "/usr/local/bin/$executable"
+            }
+            normalizedOs.contains("windows") -> {
+                val home = userHome.path.trimEnd('\\', '/')
+                candidates += "$home\\scoop\\shims\\$executable"
+                candidates += "$home\\AppData\\Local\\Microsoft\\WinGet\\Links\\$executable"
+            }
+            normalizedOs.contains("linux") -> {
+                candidates += "/usr/bin/$executable"
+                candidates += "/usr/local/bin/$executable"
+                candidates += "/snap/bin/$executable"
+                candidates += File(userHome, ".local/bin/$executable").path
+            }
+        }
+
+        return candidates.distinct()
     }
 
     private fun resolvePackagedScrcpyPath(resourceRoot: File): File {
@@ -52,6 +91,7 @@ object ScrcpyPathManager {
         val osId = when {
             osName.equals("Mac OS X", ignoreCase = true) || osName.lowercase().contains("mac") -> "macos"
             osName.startsWith("Win", ignoreCase = true) || osName.lowercase().contains("windows") -> "windows"
+            osName.lowercase().contains("linux") -> "linux"
             else -> return null
         }
         val archId = when (osArch.lowercase()) {

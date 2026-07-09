@@ -171,7 +171,11 @@ private data class KeyAction(
 fun KeyEventScreen(
     viewModel: KeyEventViewModel,
     selectedDevice: String? = null,
-    deviceDisplayNames: Map<String, String> = emptyMap()
+    deviceDisplayNames: Map<String, String> = emptyMap(),
+    modifier: Modifier = Modifier,
+    embedded: Boolean = false,
+    showHeader: Boolean = true,
+    useInternalScroll: Boolean = true
 ) {
     val showToast by viewModel.showToast.collectAsState()
     val toastMsg by viewModel.toastMessage.collectAsState()
@@ -194,6 +198,13 @@ fun KeyEventScreen(
     } else {
         "${stringResource(Res.string.connected)} · $deviceName"
     }
+    val contentSpacing = if (embedded) 10.dp else 12.dp
+    val contentPadding = PaddingValues(if (embedded) 0.dp else 16.dp)
+    val rootModifier = if (useInternalScroll) {
+        modifier.fillMaxSize()
+    } else {
+        modifier.fillMaxWidth()
+    }
 
     fun dispatchKey(code: Int, commandName: String) {
         previewRecord = KeyEventRecord(code, commandName, "")
@@ -206,91 +217,83 @@ fun KeyEventScreen(
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        LazyColumn(
-            state = scrollState,
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-            modifier = Modifier.fillMaxSize()
-        ) {
-            item {
-                Header(connectedText = connectedText, connected = !selectedDevice.isNullOrBlank())
-            }
-
-            if (selectedDevice.isNullOrBlank()) {
+    Box(modifier = rootModifier) {
+        if (useInternalScroll) {
+            LazyColumn(
+                state = scrollState,
+                contentPadding = contentPadding,
+                modifier = Modifier.fillMaxSize()
+            ) {
                 item {
-                    InlineStatusBanner(
-                        text = l10n("当前没有选择设备。按键面板可预览命令，发送前需要先连接并选择设备。", "No device is selected. The key panel can preview commands, but sending needs a connected selected device."),
-                        tone = InlineStatusTone.Warning,
-                        icon = Icons.Default.Info
+                    KeyEventContent(
+                        modifier = Modifier.fillMaxWidth(),
+                        contentSpacing = contentSpacing,
+                        selectedDevice = selectedDevice,
+                        showHeader = showHeader,
+                        connectedText = connectedText,
+                        customCode = customCode,
+                        onCustomCodeChange = { customCode = it.filter(Char::isDigit) },
+                        longPressMode = longPressMode,
+                        showAdbCommand = showAdbCommand,
+                        onLongPressModeChange = { longPressMode = it },
+                        onShowAdbCommandChange = { showAdbCommand = it },
+                        onSendCustomCode = {
+                            val code = customCode.toIntOrNull() ?: return@KeyEventContent
+                            dispatchKey(code, "KeyCode($code)")
+                            customCode = ""
+                        },
+                        onClearCustomCode = { customCode = "" },
+                        previewRecord = previewRecord,
+                        recentRecords = recentRecords,
+                        onAction = { action -> dispatchKey(action.code, action.commandName) },
+                        onCopyPreview = { copyToClipboard(previewRecord.adbCommand) },
+                        onClearRecent = viewModel::clearRecentKeyEvents
                     )
                 }
             }
 
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(14.dp),
-                    verticalAlignment = Alignment.Top
-                ) {
-                    Column(
-                        modifier = Modifier.weight(1.05f),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        VisualKeyPanel(
-                            showAdbCommand = showAdbCommand,
-                            onAction = { action -> dispatchKey(action.code, action.commandName) }
-                        )
-                    }
-
-                    Column(
-                        modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        CustomKeyCodePanel(
-                            customCode = customCode,
-                            onCustomCodeChange = { customCode = it.filter(Char::isDigit) },
-                            longPressMode = longPressMode,
-                            showAdbCommand = showAdbCommand,
-                            onLongPressModeChange = { longPressMode = it },
-                            onShowAdbCommandChange = { showAdbCommand = it },
-                            onSend = {
-                                val code = customCode.toIntOrNull() ?: return@CustomKeyCodePanel
-                                dispatchKey(code, "KeyCode($code)")
-                                customCode = ""
-                            },
-                            onClear = { customCode = "" }
-                        )
-                        CommandPreview(
-                            record = previewRecord,
-                            onCopy = { copyToClipboard(previewRecord.adbCommand) }
-                        )
-                        RecentSentPanel(
-                            records = recentRecords,
-                            onClear = viewModel::clearRecentKeyEvents
-                        )
-                    }
-                }
-            }
+            VerticalScrollbar(
+                adapter = rememberScrollbarAdapter(scrollState),
+                modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight()
+            )
+        } else {
+            KeyEventContent(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(contentPadding),
+                contentSpacing = contentSpacing,
+                selectedDevice = selectedDevice,
+                showHeader = showHeader,
+                connectedText = connectedText,
+                customCode = customCode,
+                onCustomCodeChange = { customCode = it.filter(Char::isDigit) },
+                longPressMode = longPressMode,
+                showAdbCommand = showAdbCommand,
+                onLongPressModeChange = { longPressMode = it },
+                onShowAdbCommandChange = { showAdbCommand = it },
+                onSendCustomCode = {
+                    val code = customCode.toIntOrNull() ?: return@KeyEventContent
+                    dispatchKey(code, "KeyCode($code)")
+                    customCode = ""
+                },
+                onClearCustomCode = { customCode = "" },
+                previewRecord = previewRecord,
+                recentRecords = recentRecords,
+                onAction = { action -> dispatchKey(action.code, action.commandName) },
+                onCopyPreview = { copyToClipboard(previewRecord.adbCommand) },
+                onClearRecent = viewModel::clearRecentKeyEvents
+            )
         }
 
-        VerticalScrollbar(
-            adapter = rememberScrollbarAdapter(scrollState),
-            modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight()
-        )
-    }
-
-    if (showToast) {
-        toastMsg?.let { msg ->
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.BottomCenter
-            ) {
+        if (showToast) {
+            toastMsg?.let { msg ->
                 Surface(
                     shape = RoundedCornerShape(12.dp),
                     color = MaterialTheme.colorScheme.inverseSurface,
                     shadowElevation = 6.dp,
-                    modifier = Modifier.padding(bottom = 24.dp)
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = 24.dp)
                 ) {
                     Text(
                         text = msg,
@@ -345,6 +348,85 @@ fun KeyEventScreen(
             },
             containerColor = MaterialTheme.colorScheme.surface
         )
+    }
+}
+
+@Composable
+private fun KeyEventContent(
+    modifier: Modifier = Modifier,
+    contentSpacing: Dp,
+    selectedDevice: String?,
+    showHeader: Boolean,
+    connectedText: String,
+    customCode: String,
+    onCustomCodeChange: (String) -> Unit,
+    longPressMode: Boolean,
+    showAdbCommand: Boolean,
+    onLongPressModeChange: (Boolean) -> Unit,
+    onShowAdbCommandChange: (Boolean) -> Unit,
+    onSendCustomCode: () -> Unit,
+    onClearCustomCode: () -> Unit,
+    previewRecord: KeyEventRecord,
+    recentRecords: List<KeyEventRecord>,
+    onAction: (KeyAction) -> Unit,
+    onCopyPreview: () -> Unit,
+    onClearRecent: () -> Unit
+) {
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(contentSpacing)
+    ) {
+        if (showHeader) {
+            Header(connectedText = connectedText, connected = !selectedDevice.isNullOrBlank())
+        }
+
+        if (selectedDevice.isNullOrBlank()) {
+            InlineStatusBanner(
+                text = l10n("当前没有选择设备。按键面板可预览命令，发送前需要先连接并选择设备。", "No device is selected. The key panel can preview commands, but sending needs a connected selected device."),
+                tone = InlineStatusTone.Warning,
+                icon = Icons.Default.Info
+            )
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            verticalAlignment = Alignment.Top
+        ) {
+            Column(
+                modifier = Modifier.weight(1.05f),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                VisualKeyPanel(
+                    showAdbCommand = showAdbCommand,
+                    onAction = onAction
+                )
+            }
+
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                CustomKeyCodePanel(
+                    customCode = customCode,
+                    onCustomCodeChange = onCustomCodeChange,
+                    longPressMode = longPressMode,
+                    showAdbCommand = showAdbCommand,
+                    onLongPressModeChange = onLongPressModeChange,
+                    onShowAdbCommandChange = onShowAdbCommandChange,
+                    onSend = onSendCustomCode,
+                    onClear = onClearCustomCode
+                )
+                CommandPreview(
+                    record = previewRecord,
+                    onCopy = onCopyPreview
+                )
+                RecentSentPanel(
+                    records = recentRecords,
+                    onClear = onClearRecent
+                )
+            }
+        }
     }
 }
 

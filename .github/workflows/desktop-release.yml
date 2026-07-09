@@ -94,10 +94,76 @@ jobs:
             composeApp/build/compose/binaries/main-release/zip/*.zip
           if-no-files-found: error
 
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Setup Linux packaging tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y fakeroot rpm
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build DEB, RPM and distributable app image
+        run: ./gradlew :composeApp:packageReleaseDeb :composeApp:packageReleaseRpm :composeApp:packageReleaseAppImage
+
+      - name: Rename Linux packages with architecture
+        run: |
+          set -euo pipefail
+          for ext in deb rpm; do
+            package_dir="composeApp/build/compose/binaries/main-release/$ext"
+            package_file="$(ls "$package_dir"/*."$ext" | head -n 1)"
+            base_name="$(basename "$package_file" ."$ext")"
+            target_file="$package_dir/${base_name}-linux-x64.$ext"
+            rm -f "$target_file"
+            mv "$package_file" "$target_file"
+          done
+
+      - name: Build Linux portable tarball
+        run: |
+          set -euo pipefail
+          app_version="$(sed -n 's/.*val appVersion = "\([^"]*\)".*/\1/p' composeApp/build.gradle.kts | head -n 1)"
+          if [ -z "$app_version" ]; then
+            echo "Unable to read appVersion from composeApp/build.gradle.kts" >&2
+            exit 1
+          fi
+          app_root="composeApp/build/compose/binaries/main-release/app"
+          app_dir="$(find "$app_root" -mindepth 1 -maxdepth 1 -type d | head -n 1)"
+          if [ -z "$app_dir" ]; then
+            echo "No app image directory found under $app_root" >&2
+            exit 1
+          fi
+          tar_dir="composeApp/build/compose/binaries/main-release/tar"
+          mkdir -p "$tar_dir"
+          tar_path="$tar_dir/QADB-$app_version-linux-x64.tar.gz"
+          rm -f "$tar_path"
+          tar -czf "$tar_path" -C "$app_dir" .
+
+      - name: Upload Linux artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: qadb-linux-packages-x64
+          path: |
+            composeApp/build/compose/binaries/main-release/deb/*-linux-x64.deb
+            composeApp/build/compose/binaries/main-release/rpm/*-linux-x64.rpm
+            composeApp/build/compose/binaries/main-release/tar/*.tar.gz
+          if-no-files-found: error
+
   publish-release:
     needs:
       - build-macos
       - build-windows
+      - build-linux
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     steps:
@@ -114,6 +180,12 @@ jobs:
           name: qadb-windows-installers
           path: release-assets/windows
 
+      - name: Download Linux artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: qadb-linux-packages-x64
+          path: release-assets/linux
+
       - name: List release assets
         run: find release-assets -type f -print
 
@@ -128,3 +200,6 @@ jobs:
             release-assets/windows/msi/*.msi
             release-assets/windows/exe/*.exe
             release-assets/windows/zip/*.zip
+            release-assets/linux/deb/*.deb
+            release-assets/linux/rpm/*.rpm
+            release-assets/linux/tar/*.tar.gz

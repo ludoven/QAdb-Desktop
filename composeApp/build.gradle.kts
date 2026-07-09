@@ -78,6 +78,13 @@ plugins {
 }
 
 val appVersion = "2.0.7"
+val currentOsName = System.getProperty("os.name").lowercase()
+val nativeTargetFormats = when {
+    currentOsName.contains("mac") -> arrayOf(TargetFormat.Dmg)
+    currentOsName.contains("windows") -> arrayOf(TargetFormat.Msi, TargetFormat.Exe)
+    currentOsName.contains("linux") -> arrayOf(TargetFormat.Deb, TargetFormat.Rpm, TargetFormat.AppImage)
+    else -> emptyArray()
+}
 val generatedVersionSourceDir = layout.buildDirectory.dir("generated/source/appVersion/desktopMain/kotlin")
 val generatedIconHelperResourcesDir = layout.buildDirectory.dir("generated/resources/iconHelper")
 val generateDesktopAppVersion = tasks.register<GenerateAppVersionTask>("generateDesktopAppVersion") {
@@ -151,7 +158,7 @@ compose.desktop {
         }
 
         nativeDistributions {
-            targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Exe)
+            targetFormats(*nativeTargetFormats)
             appResourcesRootDir.set(project.layout.projectDirectory.dir("src/desktopMain/appResources"))
 
             packageVersion = appVersion
@@ -164,6 +171,16 @@ compose.desktop {
                 shortcut = true
                 menu = true
                 menuGroup = "QADB"
+            }
+
+            linux {
+                packageName = "qadb"
+                shortcut = true
+                menuGroup = "Development"
+                appCategory = "Development"
+                debMaintainer = "ludoven"
+                rpmLicenseType = "MIT"
+                iconFile.set(project.file("src/desktopMain/composeResources/drawable/ic_logo.png"))
             }
 
             macOS {

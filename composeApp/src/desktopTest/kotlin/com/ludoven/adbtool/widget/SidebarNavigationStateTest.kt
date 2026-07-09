@@ -17,11 +17,11 @@ class SidebarNavigationStateTest {
             collapsible = false
         ),
         SidebarGroup(
-            id = "terminal",
-            label = "终端",
+            id = "device-control",
+            label = "设备控制",
             icon = Icons.Default.Home,
-            defaultRoute = "terminal",
-            items = listOf(TabItem("终端", Icons.Default.Home, "terminal")),
+            defaultRoute = "device-control",
+            items = listOf(TabItem("设备控制", Icons.Default.Home, "device-control")),
             collapsible = false
         ),
         SidebarGroup(
@@ -33,14 +33,28 @@ class SidebarNavigationStateTest {
             collapsible = false
         ),
         SidebarGroup(
-            id = "diagnostics",
-            label = "诊断分析",
+            id = "filebrowser",
+            label = "文件",
             icon = Icons.Default.Home,
-            defaultRoute = "log",
-            items = listOf(
-                TabItem("日志", Icons.Default.Home, "log"),
-                TabItem("进程", Icons.Default.Home, "process")
-            )
+            defaultRoute = "filebrowser",
+            items = listOf(TabItem("文件", Icons.Default.Home, "filebrowser")),
+            collapsible = false
+        ),
+        SidebarGroup(
+            id = "diagnostics",
+            label = "诊断",
+            icon = Icons.Default.Home,
+            defaultRoute = "diagnostics",
+            items = listOf(TabItem("诊断", Icons.Default.Home, "diagnostics")),
+            collapsible = false
+        ),
+        SidebarGroup(
+            id = "terminal",
+            label = "终端",
+            icon = Icons.Default.Home,
+            defaultRoute = "terminal",
+            items = listOf(TabItem("终端", Icons.Default.Home, "terminal")),
+            collapsible = false
         )
     )
 
@@ -63,7 +77,7 @@ class SidebarNavigationStateTest {
     @Test
     fun `user expanded collapsible group should be visible from standalone route`() {
         assertEquals(
-            setOf("diagnostics"),
+            emptySet(),
             visibleSidebarGroupIds(groups, selectedRoute = "home", expandedGroupId = "diagnostics")
         )
     }
@@ -77,18 +91,18 @@ class SidebarNavigationStateTest {
     }
 
     @Test
-    fun `current collapsible route group should remain visible`() {
+    fun `diagnostics route should stay standalone`() {
         assertEquals(
-            setOf("diagnostics"),
-            visibleSidebarGroupIds(groups, selectedRoute = "log", expandedGroupId = null)
+            emptySet(),
+            visibleSidebarGroupIds(groups, selectedRoute = "diagnostics", expandedGroupId = null)
         )
     }
 
     @Test
-    fun `process route should keep diagnostics group visible`() {
+    fun `device control route should stay standalone`() {
         assertEquals(
-            setOf("diagnostics"),
-            visibleSidebarGroupIds(groups, selectedRoute = "process", expandedGroupId = null)
+            emptySet(),
+            visibleSidebarGroupIds(groups, selectedRoute = "device-control", expandedGroupId = null)
         )
     }
 }

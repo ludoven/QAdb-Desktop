@@ -23,6 +23,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.ludoven.adbtool.UiTokens
 
 enum class InlineStatusTone {
     Info,
@@ -49,14 +51,15 @@ fun PageHeader(
         ) {
             Text(
                 text = title,
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold,
+                style = MaterialTheme.typography.titleLarge,
+                fontSize = 22.sp,
+                fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
             Text(
                 text = subtitle,
-                style = MaterialTheme.typography.bodyMedium,
+                style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis
@@ -90,10 +93,10 @@ fun EmptyStatePanel(
             if (icon != null) {
                 Box(
                     modifier = Modifier
-                        .size(42.dp)
+                        .size(40.dp)
                         .background(
-                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.72f),
-                            RoundedCornerShape(12.dp)
+                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.62f),
+                            RoundedCornerShape(UiTokens.RadiusMedium)
                         ),
                     contentAlignment = Alignment.Center
                 ) {
@@ -101,7 +104,7 @@ fun EmptyStatePanel(
                         imageVector = icon,
                         contentDescription = title,
                         tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(22.dp)
+                        modifier = Modifier.size(UiTokens.IconLarge)
                     )
                 }
             }
@@ -134,21 +137,21 @@ fun InlineStatusBanner(
 ) {
     val accent = when (tone) {
         InlineStatusTone.Info -> MaterialTheme.colorScheme.primary
-        InlineStatusTone.Success -> Color(0xFF16A34A)
-        InlineStatusTone.Warning -> Color(0xFFB7791F)
+        InlineStatusTone.Success -> MaterialTheme.colorScheme.secondary
+        InlineStatusTone.Warning -> MaterialTheme.colorScheme.tertiary
         InlineStatusTone.Danger -> MaterialTheme.colorScheme.error
     }
     val background = when (tone) {
         InlineStatusTone.Info -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.42f)
-        InlineStatusTone.Success -> Color(0xFFE9F9EF).copy(alpha = 0.86f)
-        InlineStatusTone.Warning -> Color(0xFFFFF7D6).copy(alpha = 0.86f)
-        InlineStatusTone.Danger -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.56f)
+        InlineStatusTone.Success -> MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.48f)
+        InlineStatusTone.Warning -> MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.46f)
+        InlineStatusTone.Danger -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.52f)
     }
 
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .background(background, RoundedCornerShape(10.dp))
+            .background(background, RoundedCornerShape(UiTokens.RadiusMedium))
             .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -158,7 +161,7 @@ fun InlineStatusBanner(
                 imageVector = icon,
                 contentDescription = null,
                 tint = accent,
-                modifier = Modifier.size(16.dp)
+                modifier = Modifier.size(UiTokens.IconSmall)
             )
         }
         Text(
@@ -184,7 +187,7 @@ fun ActionProgressButton(
     Button(
         onClick = onClick,
         enabled = enabled && !isBusy,
-        modifier = modifier.height(40.dp),
+        modifier = modifier.height(UiTokens.ControlHeight),
         colors = ButtonDefaults.buttonColors(
             containerColor = MaterialTheme.colorScheme.primary,
             contentColor = Color.White
@@ -202,7 +205,7 @@ fun ActionProgressButton(
                 imageVector = icon,
                 contentDescription = null,
                 tint = Color.White,
-                modifier = Modifier.size(16.dp)
+                modifier = Modifier.size(UiTokens.IconSmall)
             )
         }
         Spacer(modifier = Modifier.width(7.dp))
@@ -224,7 +227,7 @@ fun FramedStateSurface(
 ) {
     GlassCard(
         modifier = modifier,
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(UiTokens.RadiusLarge),
         borderStroke = BorderStroke(
             width = 1.dp,
             color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.64f)

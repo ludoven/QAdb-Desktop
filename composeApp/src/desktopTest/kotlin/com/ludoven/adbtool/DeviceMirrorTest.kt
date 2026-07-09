@@ -114,6 +114,36 @@ class DeviceMirrorTest {
     }
 
     @Test
+    fun `bundled scrcpy path should resolve Linux x64 resource`() {
+        val root = File("/tmp/qadb-app-resources")
+
+        assertEquals(
+            File(root, "linux-x64/scrcpy/scrcpy").absolutePath,
+            ScrcpyPathManager.resolveBundledScrcpyPath(root, "Linux", "amd64")?.absolutePath
+        )
+    }
+
+    @Test
+    fun `system scrcpy candidates should include common Linux paths`() {
+        val home = File("/home/qadb")
+
+        assertEquals(
+            listOf(
+                "/custom/bin/scrcpy",
+                "/usr/bin/scrcpy",
+                "/usr/local/bin/scrcpy",
+                "/snap/bin/scrcpy",
+                "/home/qadb/.local/bin/scrcpy"
+            ),
+            ScrcpyPathManager.buildSystemScrcpyCandidates(
+                userHome = home,
+                environment = mapOf("SCRCPY_PATH" to "/custom/bin/scrcpy"),
+                osName = "Linux"
+            )
+        )
+    }
+
+    @Test
     fun `early process exit should be reported as startup failure`() {
         val process = startFailingProcess()
 

@@ -21,12 +21,8 @@ import adbtool_desktop.composeapp.generated.resources.menu_feedback
 import adbtool_desktop.composeapp.generated.resources.menu_file
 import adbtool_desktop.composeapp.generated.resources.menu_github
 import adbtool_desktop.composeapp.generated.resources.menu_go_app
-import adbtool_desktop.composeapp.generated.resources.menu_go_common
 import adbtool_desktop.composeapp.generated.resources.menu_go_file
 import adbtool_desktop.composeapp.generated.resources.menu_go_home
-import adbtool_desktop.composeapp.generated.resources.menu_go_keyevent
-import adbtool_desktop.composeapp.generated.resources.menu_go_log
-import adbtool_desktop.composeapp.generated.resources.menu_go_process
 import adbtool_desktop.composeapp.generated.resources.menu_go_setting
 import adbtool_desktop.composeapp.generated.resources.menu_go_terminal
 import adbtool_desktop.composeapp.generated.resources.menu_help
@@ -80,6 +76,7 @@ import javax.swing.JOptionPane
 import kotlinx.coroutines.launch
 import com.ludoven.adbtool.util.AdbTool
 import com.ludoven.adbtool.util.ThemeManager
+import com.ludoven.adbtool.util.l10n
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 
@@ -206,6 +203,7 @@ private fun MenuBarScope.AppMenuBar(
     }
 
     Menu(menuTools) {
+        Item(l10n("命令中心", "Command Center")) { AppMenuCommandBus.dispatch(AppMenuCommand.Navigate("common")) }
         Item(stringResource(Res.string.menu_terminal)) { AppMenuCommandBus.dispatch(AppMenuCommand.OpenTerminalTool) }
         Item(stringResource(Res.string.menu_install_apk)) { AppMenuCommandBus.dispatch(AppMenuCommand.InstallApk) }
         Item(stringResource(Res.string.menu_view_activity)) { AppMenuCommandBus.dispatch(AppMenuCommand.ViewCurrentActivity) }
@@ -215,13 +213,11 @@ private fun MenuBarScope.AppMenuBar(
     Menu(menuView) {
         Menu(stringResource(Res.string.menu_page_navigation)) {
             Item(stringResource(Res.string.menu_go_home)) { AppMenuCommandBus.dispatch(AppMenuCommand.Navigate("home")) }
-            Item(stringResource(Res.string.menu_go_common)) { AppMenuCommandBus.dispatch(AppMenuCommand.Navigate("common")) }
+            Item(l10n("前往设备控制", "Go to Device Control")) { AppMenuCommandBus.dispatch(AppMenuCommand.Navigate("device-control")) }
             Item(stringResource(Res.string.menu_go_app)) { AppMenuCommandBus.dispatch(AppMenuCommand.Navigate("app")) }
-            Item(stringResource(Res.string.menu_go_terminal)) { AppMenuCommandBus.dispatch(AppMenuCommand.Navigate("terminal")) }
-            Item(stringResource(Res.string.menu_go_keyevent)) { AppMenuCommandBus.dispatch(AppMenuCommand.Navigate("keyevent")) }
             Item(stringResource(Res.string.menu_go_file)) { AppMenuCommandBus.dispatch(AppMenuCommand.Navigate("filebrowser")) }
-            Item(stringResource(Res.string.menu_go_log)) { AppMenuCommandBus.dispatch(AppMenuCommand.Navigate("log")) }
-            Item(stringResource(Res.string.menu_go_process)) { AppMenuCommandBus.dispatch(AppMenuCommand.Navigate("process")) }
+            Item(l10n("前往诊断", "Go to Diagnostics")) { AppMenuCommandBus.dispatch(AppMenuCommand.Navigate("diagnostics")) }
+            Item(stringResource(Res.string.menu_go_terminal)) { AppMenuCommandBus.dispatch(AppMenuCommand.Navigate("terminal")) }
             Item(stringResource(Res.string.menu_go_setting)) { AppMenuCommandBus.dispatch(AppMenuCommand.Navigate("setting")) }
         }
         Separator()

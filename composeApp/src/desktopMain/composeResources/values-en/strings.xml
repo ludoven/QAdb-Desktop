@@ -142,7 +142,7 @@
     <string name="folder_not_selected">No folder selected</string>
     <string name="screenshot_success">Screenshot saved successfully!</string>
     <string name="screenshot_failed">Screenshot failed</string>
-    <string name="recording_in_progress">Recording started (15s)...</string>
+    <string name="recording_in_progress">Recording in progress...</string>
     <string name="recording_saved">Recording saved: %1$s</string>
     <string name="recording_failed">Screen record failed</string>
     <string name="logs_saved">Logs captured: %1$s</string>

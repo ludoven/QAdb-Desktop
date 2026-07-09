@@ -74,23 +74,38 @@ class AppIconHelperClient(
                 failures[parsedPackageName] = parsed.reason.ifBlank { output }
                 continue
             }
-            val localFile = File(deviceCacheDir, File(parsed.path).name)
-            if (!localFile.isFile || localFile.length() <= 0L) {
-                val pullResult = pullRemotePng(parsed.path, localFile, deviceId)
-                if (!pullResult.success || !localFile.isFile || localFile.length() <= 0L) {
-                    failures[parsedPackageName] = AdbTool.outputText(pullResult)
+            val stableLocalFile = File(deviceCacheDir, localIconCacheFileName(parsedPackageName))
+            val inlinePng = decodeBase64Bytes(parsed.dataBase64)
+            val localPath = if (inlinePng != null) {
+                val writeResult = runCatching {
+                    stableLocalFile.parentFile?.mkdirs()
+                    stableLocalFile.writeBytes(inlinePng)
+                }
+                val writeError = writeResult.exceptionOrNull()
+                if (writeError != null) {
+                    failures[parsedPackageName] = writeError.message ?: "Failed to write inline icon data"
                     continue
                 }
-            }
-            val stableLocalFile = File(deviceCacheDir, "${safeFileToken(parsedPackageName)}.png")
-            if (!stableLocalFile.isFile || stableLocalFile.length() != localFile.length()) {
-                runCatching { localFile.copyTo(stableLocalFile, overwrite = true) }
+                stableLocalFile.absolutePath
+            } else {
+                val localFile = File(deviceCacheDir, File(parsed.path).name)
+                if (!localFile.isFile || localFile.length() <= 0L) {
+                    val pullResult = pullRemotePng(parsed.path, localFile, deviceId)
+                    if (!pullResult.success || !localFile.isFile || localFile.length() <= 0L) {
+                        failures[parsedPackageName] = AdbTool.outputText(pullResult)
+                        continue
+                    }
+                }
+                if (!stableLocalFile.isFile || stableLocalFile.length() != localFile.length()) {
+                    runCatching { localFile.copyTo(stableLocalFile, overwrite = true) }
+                }
+                stableLocalFile.takeIf { it.isFile && it.length() > 0L }?.absolutePath
+                    ?: localFile.absolutePath
             }
             successes[parsedPackageName] = DeviceIconResult(
                 packageName = parsedPackageName,
                 label = parsed.label,
-                localPath = stableLocalFile.takeIf { it.isFile && it.length() > 0L }?.absolutePath
-                    ?: localFile.absolutePath,
+                localPath = localPath,
                 remotePath = parsed.path,
                 source = parsed.source,
                 cacheHit = parsed.cacheHit,
@@ -246,6 +261,7 @@ class AppIconHelperClient(
             source = values["source"].orEmpty(),
             cacheHit = values["cache"] == "hit",
             elapsedMs = values["elapsedMs"]?.toLongOrNull() ?: 0L,
+            dataBase64 = values["data64"].orEmpty(),
             reason = if (line.startsWith("ERR ")) line.substringAfter("reason=", "").substringBefore(" source=") else ""
         )
     }
@@ -260,6 +276,13 @@ class AppIconHelperClient(
         }.getOrNull()
     }
 
+    private fun decodeBase64Bytes(value: String?): ByteArray? {
+        if (value.isNullOrBlank()) return null
+        return runCatching {
+            Base64.getUrlDecoder().decode(value).takeIf { it.isNotEmpty() }
+        }.getOrNull()
+    }
+
     private data class HelperOutput(
         val ok: Boolean,
         val packageName: String,
@@ -268,6 +291,7 @@ class AppIconHelperClient(
         val source: String,
         val cacheHit: Boolean,
         val elapsedMs: Long,
+        val dataBase64: String,
         val reason: String
     )
 
@@ -324,5 +348,9 @@ class AppIconHelperClient(
         const val REMOTE_HELPER_JAR = "$REMOTE_BASE_DIR/qadb-icon-helper.jar"
         const val HELPER_MAIN_CLASS = "com.ludoven.qadb.icon.IconHelperMain"
         private const val BUNDLED_HELPER_RESOURCE = "/qadb/qadb-icon-helper.jar"
+        private const val LOCAL_ICON_CACHE_VERSION = 5
+
+        fun localIconCacheFileName(packageName: String): String =
+            "${packageName.replace(Regex("[^A-Za-z0-9._-]"), "_")}.v$LOCAL_ICON_CACHE_VERSION.png"
     }
 }

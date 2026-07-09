@@ -1,13 +1,17 @@
 package com.ludoven.qadb.icon;
 
 import android.content.Context;
+import android.content.ComponentName;
 import android.content.Intent;
 import android.content.pm.ActivityInfo;
 import android.content.pm.ApplicationInfo;
+import android.content.pm.LauncherActivityInfo;
+import android.content.pm.LauncherApps;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.content.res.AssetManager;
+import android.content.res.Configuration;
 import android.content.res.Resources;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
@@ -23,17 +27,19 @@ import android.util.DisplayMetrics;
 import java.io.ByteArrayOutputStream;
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.InputStreamReader;
 import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 
 public final class IconHelperMain {
     private static final String CACHE_DIR = "/data/local/tmp/qadb/icons";
     private static final int DEFAULT_SIZE_PX = 192;
+    private static final int ICON_CACHE_VERSION = 5;
+    private static final int MAX_INLINE_ICON_BYTES = 256 * 1024;
 
     private IconHelperMain() {
     }
@@ -138,11 +144,11 @@ public final class IconHelperMain {
             String cachePath = cachePath(packageName, packageInfo, applicationInfo);
             File cacheFile = new File(cachePath);
             if (cacheFile.isFile() && cacheFile.length() > 0L) {
-                ok(packageName, label, cachePath, "cache", true, startedAt);
+                ok(packageName, label, cachePath, "cache", true, startedAt, inlinePngBytes(readFileBytes(cacheFile)));
                 return;
             }
 
-            IconResult iconResult = resolveIcon(context, packageManager, packageName, applicationInfo);
+            IconResult iconResult = resolveIcon(context, packageManager, packageName, applicationInfo, sizePx);
             if (iconResult.drawable == null) {
                 iconResult = new IconResult(null, "generatedDefault");
             }
@@ -182,7 +188,7 @@ public final class IconHelperMain {
                 return;
             }
 
-            ok(packageName, label, cachePath, source, false, startedAt);
+            ok(packageName, label, cachePath, source, false, startedAt, inlinePngBytes(png));
         } catch (Throwable throwable) {
             throwable.printStackTrace(System.err);
             fail(packageName, throwable.getClass().getSimpleName() + ": " + nullToEmpty(throwable.getMessage()), startedAt, null);
@@ -193,24 +199,46 @@ public final class IconHelperMain {
         Context context,
         PackageManager packageManager,
         String packageName,
-        ApplicationInfo applicationInfo
+        ApplicationInfo applicationInfo,
+        int sizePx
     ) {
-        List<IconResult> candidates = new ArrayList<IconResult>();
-        candidates.add(loadLauncherActivityIcon(packageManager, packageName));
-        candidates.add(loadApplicationInfoIcon(packageManager, applicationInfo));
-        candidates.add(loadApplicationIcon(packageManager, packageName));
-        candidates.add(loadPackageResourceIcon(packageManager, applicationInfo, applicationInfo.icon, "packageResources.applicationInfo.icon"));
-        candidates.add(loadResourceIcon(context, applicationInfo, applicationInfo.icon, "applicationInfo.icon"));
+        IconCandidateFilter filter = new IconCandidateFilter(packageManager, sizePx);
+        IconResult candidate = loadLauncherAppsIcon(context, packageName);
+        if (filter.accept(candidate)) return candidate;
+
+        candidate = loadPackageContextIcon(context, packageName, applicationInfo.icon, "packageContext.applicationInfo.icon");
+        if (filter.accept(candidate)) return candidate;
+
+        candidate = loadPackageResourceIcon(packageManager, applicationInfo, applicationInfo.icon, "packageResources.applicationInfo.icon");
+        if (filter.accept(candidate)) return candidate;
+
+        candidate = loadResourceIcon(applicationInfo, applicationInfo.icon, "applicationInfo.icon");
+        if (filter.accept(candidate)) return candidate;
+
         int roundIcon = roundIconResId(applicationInfo);
         if (roundIcon != 0) {
-            candidates.add(loadPackageResourceIcon(packageManager, applicationInfo, roundIcon, "packageResources.roundIcon"));
-            candidates.add(loadResourceIcon(context, applicationInfo, roundIcon, "roundIcon"));
+            candidate = loadPackageContextIcon(context, packageName, roundIcon, "packageContext.roundIcon");
+            if (filter.accept(candidate)) return candidate;
+
+            candidate = loadPackageResourceIcon(packageManager, applicationInfo, roundIcon, "packageResources.roundIcon");
+            if (filter.accept(candidate)) return candidate;
+
+            candidate = loadResourceIcon(applicationInfo, roundIcon, "roundIcon");
+            if (filter.accept(candidate)) return candidate;
         }
-        for (IconResult candidate : candidates) {
-            if (candidate != null && candidate.drawable != null) {
-                return candidate;
-            }
-        }
+
+        candidate = loadLaunchIntentIcon(packageManager, packageName);
+        if (filter.accept(candidate)) return candidate;
+
+        candidate = loadLauncherActivityIcon(packageManager, packageName);
+        if (filter.accept(candidate)) return candidate;
+
+        candidate = loadApplicationInfoIcon(packageManager, applicationInfo);
+        if (filter.accept(candidate)) return candidate;
+
+        candidate = loadApplicationIcon(packageManager, packageName);
+        if (filter.accept(candidate)) return candidate;
+
         try {
             return new IconResult(packageManager.getDefaultActivityIcon(), "default");
         } catch (Throwable ignored) {
@@ -233,6 +261,24 @@ public final class IconHelperMain {
         return (Context) getSystemContext.invoke(activityThread);
     }
 
+    private static IconResult loadLauncherAppsIcon(Context context, String packageName) {
+        if (Build.VERSION.SDK_INT < 21 || context == null || packageName == null || packageName.length() == 0) return null;
+        try {
+            Object service = context.getSystemService(Context.LAUNCHER_APPS_SERVICE);
+            if (!(service instanceof LauncherApps)) return null;
+            LauncherApps launcherApps = (LauncherApps) service;
+            List<LauncherActivityInfo> activities = launcherApps.getActivityList(packageName, Process.myUserHandle());
+            if (activities == null || activities.isEmpty()) return null;
+            for (LauncherActivityInfo activityInfo : activities) {
+                if (activityInfo == null) continue;
+                Drawable icon = activityInfo.getIcon(0);
+                if (icon != null) return new IconResult(icon, "launcherApps");
+            }
+        } catch (Throwable ignored) {
+        }
+        return null;
+    }
+
     private static IconResult loadLauncherActivityIcon(PackageManager packageManager, String packageName) {
         try {
             Intent intent = new Intent(Intent.ACTION_MAIN);
@@ -251,12 +297,64 @@ public final class IconHelperMain {
             for (ResolveInfo info : infos) {
                 ActivityInfo activityInfo = info.activityInfo;
                 if (activityInfo == null) continue;
-                Drawable icon = activityInfo.loadIcon(packageManager);
-                if (icon != null) return new IconResult(icon, "launcherActivityIcon");
+                IconResult icon = loadActivityInfoIcon(packageManager, activityInfo, "launcherActivityIcon");
+                if (icon != null && icon.drawable != null) return icon;
             }
         } catch (Throwable ignored) {
         }
         return null;
+    }
+
+    private static IconResult loadLaunchIntentIcon(PackageManager packageManager, String packageName) {
+        IconResult result = loadLaunchIntentIcon(packageManager, packageName, false);
+        return result != null ? result : loadLaunchIntentIcon(packageManager, packageName, true);
+    }
+
+    private static IconResult loadLaunchIntentIcon(PackageManager packageManager, String packageName, boolean leanback) {
+        try {
+            Intent intent = leanback
+                ? packageManager.getLeanbackLaunchIntentForPackage(packageName)
+                : packageManager.getLaunchIntentForPackage(packageName);
+            if (intent == null) return null;
+            ComponentName component = intent.getComponent();
+            ActivityInfo activityInfo = component != null
+                ? packageManager.getActivityInfo(component, packageQueryFlags())
+                : null;
+            if (activityInfo == null) {
+                ResolveInfo resolveInfo = packageManager.resolveActivity(intent, packageQueryFlags());
+                activityInfo = resolveInfo == null ? null : resolveInfo.activityInfo;
+            }
+            if (activityInfo == null) return null;
+            return loadActivityInfoIcon(
+                packageManager,
+                activityInfo,
+                leanback ? "leanbackLaunchIntentIcon" : "launchIntentIcon"
+            );
+        } catch (Throwable ignored) {
+        }
+        return null;
+    }
+
+    private static IconResult loadActivityInfoIcon(
+        PackageManager packageManager,
+        ActivityInfo activityInfo,
+        String source
+    ) {
+        if (activityInfo == null) return null;
+        int iconResId = activityInfo.getIconResource();
+        if (iconResId == 0) iconResId = activityInfo.icon;
+        IconResult candidate = loadPackageResourceIcon(packageManager, activityInfo.applicationInfo, iconResId, source + ".resource");
+        if (candidate != null && candidate.drawable != null) return candidate;
+
+        candidate = loadResourceIcon(activityInfo.applicationInfo, iconResId, source + ".assetResource");
+        if (candidate != null && candidate.drawable != null) return candidate;
+
+        try {
+            Drawable icon = activityInfo.loadIcon(packageManager);
+            return icon == null ? null : new IconResult(icon, source + ".loadIcon");
+        } catch (Throwable ignored) {
+            return null;
+        }
     }
 
     private static IconResult loadApplicationIcon(PackageManager packageManager, String packageName) {
@@ -273,6 +371,25 @@ public final class IconHelperMain {
         try {
             Drawable icon = applicationInfo.loadIcon(packageManager);
             return icon == null ? null : new IconResult(icon, "applicationInfo.loadIcon");
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
+    private static IconResult loadPackageContextIcon(
+        Context context,
+        String packageName,
+        int iconResId,
+        String source
+    ) {
+        if (context == null || packageName == null || packageName.length() == 0 || iconResId == 0) return null;
+        try {
+            Context packageContext = context.createPackageContext(packageName, Context.CONTEXT_IGNORE_SECURITY);
+            Resources resources = packageContext.getResources();
+            Drawable drawable = Build.VERSION.SDK_INT >= 21
+                ? resources.getDrawable(iconResId, packageContext.getTheme())
+                : resources.getDrawable(iconResId);
+            return drawable == null ? null : new IconResult(drawable, source);
         } catch (Throwable ignored) {
             return null;
         }
@@ -297,7 +414,6 @@ public final class IconHelperMain {
     }
 
     private static IconResult loadResourceIcon(
-        Context context,
         ApplicationInfo applicationInfo,
         int iconResId,
         String source
@@ -314,9 +430,11 @@ public final class IconHelperMain {
                     addAssetPath(assetManager, addAssetPath, splitSourceDir);
                 }
             }
-            Resources base = context.getResources();
-            DisplayMetrics metrics = base.getDisplayMetrics();
-            Resources resources = new Resources(assetManager, metrics, base.getConfiguration());
+            DisplayMetrics metrics = new DisplayMetrics();
+            metrics.setToDefaults();
+            Configuration configuration = new Configuration();
+            configuration.setToDefaults();
+            Resources resources = new Resources(assetManager, metrics, configuration);
             Drawable drawable = Build.VERSION.SDK_INT >= 21
                 ? resources.getDrawable(iconResId, null)
                 : resources.getDrawable(iconResId);
@@ -352,6 +470,16 @@ public final class IconHelperMain {
         ApplicationInfo applicationInfo
     ) {
         try {
+            CharSequence label = applicationInfo == null ? null : applicationInfo.loadLabel(packageManager);
+            if (label != null && label.length() > 0) return label.toString();
+        } catch (Throwable ignored) {
+        }
+        try {
+            CharSequence label = packageManager.getApplicationLabel(applicationInfo);
+            if (label != null && label.length() > 0) return label.toString();
+        } catch (Throwable ignored) {
+        }
+        try {
             Intent intent = new Intent(Intent.ACTION_MAIN);
             intent.addCategory(Intent.CATEGORY_LAUNCHER);
             intent.setPackage(packageName);
@@ -362,16 +490,6 @@ public final class IconHelperMain {
                     if (label != null && label.length() > 0) return label.toString();
                 }
             }
-        } catch (Throwable ignored) {
-        }
-        try {
-            CharSequence label = applicationInfo == null ? null : applicationInfo.loadLabel(packageManager);
-            if (label != null && label.length() > 0) return label.toString();
-        } catch (Throwable ignored) {
-        }
-        try {
-            CharSequence label = packageManager.getApplicationLabel(applicationInfo);
-            if (label != null && label.length() > 0) return label.toString();
         } catch (Throwable ignored) {
         }
         return packageName;
@@ -397,6 +515,26 @@ public final class IconHelperMain {
         }
         bitmap.recycle();
         return output.toByteArray();
+    }
+
+    private static byte[] readFileBytes(File file) throws Exception {
+        ByteArrayOutputStream output = new ByteArrayOutputStream((int) Math.min(file.length(), 64 * 1024));
+        FileInputStream input = new FileInputStream(file);
+        try {
+            byte[] buffer = new byte[16 * 1024];
+            int read;
+            while ((read = input.read(buffer)) != -1) {
+                output.write(buffer, 0, read);
+            }
+        } finally {
+            input.close();
+        }
+        return output.toByteArray();
+    }
+
+    private static byte[] inlinePngBytes(byte[] png) {
+        if (png == null || png.length == 0 || png.length > MAX_INLINE_ICON_BYTES) return null;
+        return png;
     }
 
     private static byte[] fallbackPngBytes(int sizePx) throws Exception {
@@ -429,7 +567,7 @@ public final class IconHelperMain {
             ? applicationInfo.splitSourceDirs.length
             : 0;
         return CACHE_DIR + "/" + safeFileToken(packageName) + "_" + versionCode + "_" + lastUpdateTime
-            + "_" + sourceSize + "_" + splitCount + ".png";
+            + "_" + sourceSize + "_" + splitCount + "_v" + ICON_CACHE_VERSION + ".png";
     }
 
     private static String safeFileToken(String value) {
@@ -468,13 +606,22 @@ public final class IconHelperMain {
             + " elapsedMs=" + (System.currentTimeMillis() - startedAt));
     }
 
-    private static void ok(String packageName, String label, String path, String source, boolean cacheHit, long startedAt) {
+    private static void ok(
+        String packageName,
+        String label,
+        String path,
+        String source,
+        boolean cacheHit,
+        long startedAt,
+        byte[] png
+    ) {
         System.out.println("OK package=" + nullToEmpty(packageName)
             + " label64=" + base64(label)
             + " path=" + path
             + " source=" + source
             + " cache=" + (cacheHit ? "hit" : "miss")
-            + " elapsedMs=" + (System.currentTimeMillis() - startedAt));
+            + " elapsedMs=" + (System.currentTimeMillis() - startedAt)
+            + " data64=" + base64(png));
     }
 
     private static void fail(String packageName, String reason, long startedAt, String source) {
@@ -490,6 +637,51 @@ public final class IconHelperMain {
 
     private static String base64(String value) {
         return Base64.encodeToString(nullToEmpty(value).getBytes(StandardCharsets.UTF_8), Base64.URL_SAFE | Base64.NO_WRAP);
+    }
+
+    private static String base64(byte[] value) {
+        if (value == null || value.length == 0) return "";
+        return Base64.encodeToString(value, Base64.URL_SAFE | Base64.NO_WRAP);
+    }
+
+    private static boolean sameBytes(byte[] left, byte[] right) {
+        if (left == right) return true;
+        if (left == null || right == null || left.length != right.length) return false;
+        for (int index = 0; index < left.length; index++) {
+            if (left[index] != right[index]) return false;
+        }
+        return true;
+    }
+
+    private static final class IconCandidateFilter {
+        private final PackageManager packageManager;
+        private final int sizePx;
+        private byte[] defaultIconBytes;
+
+        IconCandidateFilter(PackageManager packageManager, int sizePx) {
+            this.packageManager = packageManager;
+            this.sizePx = sizePx;
+        }
+
+        boolean accept(IconResult candidate) {
+            if (candidate == null || candidate.drawable == null) return false;
+            return !isDefaultActivityIcon(candidate.drawable);
+        }
+
+        private boolean isDefaultActivityIcon(Drawable drawable) {
+            try {
+                return sameBytes(drawableToPngBytes(drawable, sizePx), defaultIconBytes());
+            } catch (Throwable ignored) {
+                return false;
+            }
+        }
+
+        private byte[] defaultIconBytes() throws Exception {
+            if (defaultIconBytes == null) {
+                defaultIconBytes = drawableToPngBytes(packageManager.getDefaultActivityIcon(), sizePx);
+            }
+            return defaultIconBytes;
+        }
     }
 
     private static final class IconResult {

@@ -4,4 +4,6 @@ Bundled version: v3.3.4
 Source: https://github.com/Genymobile/scrcpy/releases/tag/v3.3.4
 
 This application bundles official portable release artifacts for macOS arm64,
-macOS x64, and Windows x64. See scrcpy-LICENSE for license terms.
+macOS x64, and Windows x64. Linux packages use a bundled scrcpy when a
+linux-x64 app resource is present, otherwise QADB falls back to the system
+scrcpy executable. See scrcpy-LICENSE for license terms.

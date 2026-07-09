@@ -788,7 +788,7 @@ fun Switch(
         modifier = modifier,
         colors = M2SwitchDefaults.colors(
             checkedThumbColor = Color.White,
-            checkedTrackColor = MaterialTheme.colorScheme.primary,
+            checkedTrackColor = Color(0xFF437AFF),
             uncheckedThumbColor = Color.White,
             uncheckedTrackColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.9f)
         )
