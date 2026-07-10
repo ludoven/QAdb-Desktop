@@ -14,6 +14,11 @@ import kotlin.test.assertTrue
 class DeviceMirrorTest {
 
     @Test
+    fun `mirror settings should not be always on top by default`() {
+        assertFalse(DeviceMirrorSettings().alwaysOnTop)
+    }
+
+    @Test
     fun `build scrcpy command targets selected device by serial`() {
         val command = AdbTool.buildScrcpyCommand(
             scrcpyPath = "/opt/homebrew/bin/scrcpy",
@@ -28,7 +33,6 @@ class DeviceMirrorTest {
                 "emulator-5554",
                 "--window-title",
                 "QADB Device Mirror",
-                "--always-on-top",
                 "--max-size",
                 "1280",
                 "--max-fps",

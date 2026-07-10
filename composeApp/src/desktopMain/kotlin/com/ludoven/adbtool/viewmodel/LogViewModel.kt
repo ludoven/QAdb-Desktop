@@ -9,6 +9,8 @@ import com.ludoven.adbtool.util.AdbPathManager
 import com.ludoven.adbtool.util.ChildProcessRegistry
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -27,6 +29,7 @@ class LogViewModel : ViewModel() {
     companion object {
         internal const val MAX_LOG_ENTRIES = 10_000
         private const val LOG_UI_BATCH_SIZE = 40
+        private const val LOG_UI_PUBLISH_INTERVAL_MS = 100L
 
         internal fun appendWithLimit(buffer: ArrayDeque<LogEntry>, entry: LogEntry, maxEntries: Int = MAX_LOG_ENTRIES) {
             if (buffer.size >= maxEntries) {
@@ -37,6 +40,10 @@ class LogViewModel : ViewModel() {
 
         internal fun normalizedCaptureDevice(device: String?): String? =
             device?.takeIf { it.isNotBlank() }
+
+        internal fun shouldPublishUiBatch(pendingUpdates: Int, elapsedMs: Long): Boolean =
+            pendingUpdates >= LOG_UI_BATCH_SIZE ||
+                (pendingUpdates > 0 && elapsedMs >= LOG_UI_PUBLISH_INTERVAL_MS)
 
         internal fun shouldStopCaptureForDeviceChange(
             isCapturing: Boolean,
@@ -76,6 +83,8 @@ class LogViewModel : ViewModel() {
     private val logBuffer = ArrayDeque<LogEntry>(MAX_LOG_ENTRIES)
     private val logBufferLock = Any()
     private var pendingLogUpdates = 0
+    private var lastLogPublishAtMillis = System.currentTimeMillis()
+    private var pendingUiPublishJob: Job? = null
 
     fun setSelectedDevice(device: String?) {
         val normalizedDevice = normalizedCaptureDevice(device)
@@ -169,8 +178,14 @@ class LogViewModel : ViewModel() {
                         }
 
                         val shouldPublish = bufferLogEntry(entry)
-                        withContext(Dispatchers.Main) {
-                            publishBufferedLogs(force = false, shouldPublish = shouldPublish)
+                        if (shouldPublish) {
+                            pendingUiPublishJob?.cancel()
+                            pendingUiPublishJob = null
+                            withContext(Dispatchers.Main) {
+                                publishBufferedLogs(force = false, shouldPublish = true)
+                            }
+                        } else {
+                            schedulePendingUiPublish()
                         }
                     }
                 }
@@ -194,6 +209,8 @@ class LogViewModel : ViewModel() {
 
     fun stopCapture() {
         _isCapturing.value = false
+        pendingUiPublishJob?.cancel()
+        pendingUiPublishJob = null
         logProcess?.destroy()
         ChildProcessRegistry.unregister(logProcess)
         logProcess = null
@@ -281,16 +298,20 @@ class LogViewModel : ViewModel() {
     private fun bufferLogEntry(entry: LogEntry): Boolean = synchronized(logBufferLock) {
         appendWithLimit(logBuffer, entry)
         pendingLogUpdates += 1
-        pendingLogUpdates >= LOG_UI_BATCH_SIZE
+        shouldPublishUiBatch(
+            pendingUpdates = pendingLogUpdates,
+            elapsedMs = System.currentTimeMillis() - lastLogPublishAtMillis
+        )
     }
 
     private fun publishBufferedLogs(force: Boolean, shouldPublish: Boolean) {
         if (!force && !shouldPublish) return
         val snapshot = synchronized(logBufferLock) {
-            if (!force && pendingLogUpdates < LOG_UI_BATCH_SIZE) {
+            if (!force && (!shouldPublish || pendingLogUpdates == 0)) {
                 null
             } else {
                 pendingLogUpdates = 0
+                lastLogPublishAtMillis = System.currentTimeMillis()
                 logBuffer.toList()
             }
         }
@@ -299,9 +320,23 @@ class LogViewModel : ViewModel() {
         }
     }
 
-    private fun clearLogBuffer() = synchronized(logBufferLock) {
-        logBuffer.clear()
-        pendingLogUpdates = 0
+    private fun schedulePendingUiPublish() {
+        if (pendingUiPublishJob?.isActive == true) return
+        pendingUiPublishJob = viewModelScope.launch {
+            delay(LOG_UI_PUBLISH_INTERVAL_MS)
+            publishBufferedLogs(force = false, shouldPublish = true)
+            pendingUiPublishJob = null
+        }
+    }
+
+    private fun clearLogBuffer() {
+        pendingUiPublishJob?.cancel()
+        pendingUiPublishJob = null
+        synchronized(logBufferLock) {
+            logBuffer.clear()
+            pendingLogUpdates = 0
+            lastLogPublishAtMillis = System.currentTimeMillis()
+        }
     }
 
     private fun createLogEntry(

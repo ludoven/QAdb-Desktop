@@ -72,11 +72,13 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -91,6 +93,7 @@ import androidx.compose.ui.unit.sp
 import com.ludoven.adbtool.entity.LogEntry
 import com.ludoven.adbtool.entity.LogFilter
 import com.ludoven.adbtool.entity.LogLevel
+import com.ludoven.adbtool.UiTokens
 import com.ludoven.adbtool.ui.mac.Button
 import com.ludoven.adbtool.ui.mac.ButtonDefaults
 import com.ludoven.adbtool.ui.mac.Card
@@ -118,6 +121,7 @@ import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlinx.coroutines.flow.collect
 
 private enum class QuickKeywordChip {
     CURRENT_APP,
@@ -146,6 +150,7 @@ fun LogScreen(
     var showLevelMenu by remember { mutableStateOf(false) }
     var showMoreMenu by remember { mutableStateOf(false) }
     var autoScroll by remember { mutableStateOf(true) }
+    var userPinnedToBottom by remember { mutableStateOf(true) }
     var selectedQuickChip by remember { mutableStateOf<QuickKeywordChip?>(null) }
 
     val filteredLogs by viewModel.filteredLogs.collectAsState()
@@ -156,16 +161,34 @@ fun LogScreen(
         viewModel.setSelectedDevice(selectedDevice)
     }
 
-    LaunchedEffect(filteredLogs.size, isCapturing, autoScroll) {
-        if (isCapturing && autoScroll && filteredLogs.isNotEmpty()) {
-            listState.animateScrollToItem(filteredLogs.size - 1)
+    DisposableEffect(viewModel) {
+        onDispose {
+            viewModel.stopCapture()
+        }
+    }
+
+    LaunchedEffect(listState) {
+        snapshotFlow {
+            val layoutInfo = listState.layoutInfo
+            val lastVisibleIndex = layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1
+            Triple(listState.isScrollInProgress, lastVisibleIndex, layoutInfo.totalItemsCount)
+        }.collect { (isScrolling, lastVisibleIndex, totalItemsCount) ->
+            if (isScrolling) {
+                userPinnedToBottom = totalItemsCount == 0 || lastVisibleIndex >= totalItemsCount - 2
+            }
+        }
+    }
+
+    LaunchedEffect(filteredLogs.size, isCapturing, autoScroll, userPinnedToBottom) {
+        if (isCapturing && autoScroll && userPinnedToBottom && filteredLogs.isNotEmpty()) {
+            listState.scrollToItem(filteredLogs.size - 1)
         }
     }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 22.dp, vertical = 18.dp),
+            .padding(horizontal = UiTokens.PagePaddingCompact, vertical = UiTokens.SectionSpacingCompact),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Row(
@@ -242,7 +265,10 @@ fun LogScreen(
                         text = stringResource(Res.string.log_auto_scroll),
                         icon = Icons.Default.AutoAwesomeMotion,
                         isActive = autoScroll,
-                        onClick = { autoScroll = !autoScroll }
+                        onClick = {
+                            autoScroll = !autoScroll
+                            if (autoScroll) userPinnedToBottom = true
+                        }
                     )
 
                     Box {

@@ -198,9 +198,6 @@ fun HomeScreen(
     var foregroundError by remember { mutableStateOf<String?>(null) }
     var isForegroundLoading by remember { mutableStateOf(false) }
     var foregroundUpdatedAt by remember { mutableStateOf("--") }
-    var deviceTextInput by remember { mutableStateOf("") }
-    var textInputResult by remember { mutableStateOf<String?>(null) }
-    var isSendingText by remember { mutableStateOf(false) }
 
     if (showDialog) {
         dialogMessage?.let { message ->
@@ -229,8 +226,6 @@ fun HomeScreen(
     )
     val noConnectedDeviceMessage = l10n("没有连接设备", "No connected device")
     val foregroundUnavailableMessage = l10n("未读取到当前应用", "Current app not found")
-    val textInputBlankMessage = l10n("输入文本不能为空", "Input text cannot be empty")
-    val textInputSentMessage = l10n("文本已发送到设备", "Text sent to device")
 
     suspend fun loadForegroundAppForDevice(deviceId: String) {
         isForegroundLoading = true
@@ -262,41 +257,12 @@ fun HomeScreen(
         }
     }
 
-    fun sendTextToDevice() {
-        val deviceId = selectedDevice
-        val text = deviceTextInput.trim()
-        when {
-            deviceId.isNullOrBlank() -> {
-                textInputResult = noConnectedDeviceMessage
-            }
-            text.isBlank() -> {
-                textInputResult = textInputBlankMessage
-            }
-            else -> {
-                coroutineScope.launch {
-                    isSendingText = true
-                    val result = withContext(Dispatchers.IO) {
-                        AdbTool.inputTextAsync(text, deviceId)
-                    }
-                    textInputResult = if (result.success) {
-                        deviceTextInput = ""
-                        textInputSentMessage
-                    } else {
-                        result.errorMessage ?: result.output.ifBlank { l10n("发送失败", "Send failed") }
-                    }
-                    isSendingText = false
-                }
-            }
-        }
-    }
-
     LaunchedEffect(selectedDevice) {
         val deviceId = selectedDevice
         if (deviceId.isNullOrBlank()) {
             foregroundApp = null
             foregroundError = null
             foregroundUpdatedAt = "--"
-            textInputResult = null
         } else {
             loadForegroundAppForDevice(deviceId)
         }
@@ -470,14 +436,6 @@ fun HomeScreen(
 	                                onOpenFileManager = trackedOpenFileManager,
 	                                onOpenAppManager = trackedOpenAppManager,
 	                                onMirrorDevice = trackedMirrorDevice,
-                                    textInput = deviceTextInput,
-                                    onTextInputChange = {
-                                        deviceTextInput = it
-                                        textInputResult = null
-                                    },
-                                    onSendText = { sendTextToDevice() },
-                                    isSendingText = isSendingText,
-                                    textInputResult = textInputResult
 	                            )
                             HomeDeviceInfoSummarySection(
                                 compactLayout = true,
@@ -515,14 +473,6 @@ fun HomeScreen(
                                         onOpenFileManager = trackedOpenFileManager,
                                         onOpenAppManager = trackedOpenAppManager,
                                         onMirrorDevice = trackedMirrorDevice,
-                                        textInput = deviceTextInput,
-                                        onTextInputChange = {
-                                            deviceTextInput = it
-                                            textInputResult = null
-                                        },
-                                        onSendText = { sendTextToDevice() },
-                                        isSendingText = isSendingText,
-                                        textInputResult = textInputResult
                                     )
                                     HomeForegroundAppSection(
                                         modifier = Modifier.fillMaxWidth(),
@@ -2385,12 +2335,7 @@ private fun HomeQuickActionsSection(
     onScreenRecord: () -> Unit,
     onOpenFileManager: () -> Unit,
     onOpenAppManager: () -> Unit,
-    onMirrorDevice: () -> Unit,
-    textInput: String,
-    onTextInputChange: (String) -> Unit,
-    onSendText: () -> Unit,
-    isSendingText: Boolean,
-    textInputResult: String?
+    onMirrorDevice: () -> Unit
 ) {
     val actions = listOf(
         HomeToolbarAction(
@@ -2403,7 +2348,7 @@ private fun HomeQuickActionsSection(
         HomeToolbarAction(
             stringResource(Res.string.key_screenshot_short),
             IconParkIcons.Camera,
-            HomeVisualTokens.Cyan,
+            HomeVisualTokens.Primary,
             onScreenshot,
             stringResource(Res.string.screenshot_desc)
         ),
@@ -2417,21 +2362,21 @@ private fun HomeQuickActionsSection(
         HomeToolbarAction(
             stringResource(Res.string.file_manager),
             IconParkIcons.Folder,
-            HomeVisualTokens.Teal,
+            HomeVisualTokens.Primary,
             onOpenFileManager,
             stringResource(Res.string.file_manager_desc)
         ),
         HomeToolbarAction(
             stringResource(Res.string.app),
             IconParkIcons.Application,
-            HomeVisualTokens.Purple,
+            HomeVisualTokens.Primary,
             onOpenAppManager,
             l10n("查看应用", "View apps")
         ),
         HomeToolbarAction(
             l10n("投屏控制", "Mirror Control"),
             IconParkIcons.CastScreen,
-            HomeVisualTokens.Success,
+            HomeVisualTokens.Primary,
             onMirrorDevice,
             l10n("投屏到电脑", "Mirror to desktop")
         )
@@ -2466,114 +2411,7 @@ private fun HomeQuickActionsSection(
                     if (rowItems.size == 1) Spacer(modifier = Modifier.weight(1f))
                 }
             }
-
-            HomeDeviceTextInputAction(
-                textInput = textInput,
-                onTextInputChange = onTextInputChange,
-                onSendText = onSendText,
-                isSendingText = isSendingText,
-                resultText = textInputResult
-            )
         }
-    }
-}
-
-@Composable
-private fun HomeDeviceTextInputAction(
-    textInput: String,
-    onTextInputChange: (String) -> Unit,
-    onSendText: () -> Unit,
-    isSendingText: Boolean,
-    resultText: String?
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = 2.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(1.dp)
-                .background(HomeVisualTokens.Divider)
-        )
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            OutlinedTextField(
-                value = textInput,
-                onValueChange = onTextInputChange,
-                enabled = !isSendingText,
-                singleLine = true,
-                leadingIcon = {
-                    Icon(
-                        imageVector = IconParkIcons.Phone,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(17.dp)
-                    )
-                },
-                placeholder = { Text(l10n("输入要发送到设备的文本", "Text to send to device")) },
-                textStyle = MaterialTheme.typography.bodySmall,
-                shape = RoundedCornerShape(8.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = HomeVisualTokens.Primary.copy(alpha = 0.48f),
-                    unfocusedBorderColor = HomeVisualTokens.Border,
-                    focusedContainerColor = MaterialTheme.colorScheme.surface,
-                    unfocusedContainerColor = MaterialTheme.colorScheme.surface
-                ),
-                modifier = Modifier
-                    .weight(1f)
-                    .heightIn(min = 44.dp)
-            )
-            HomeSendTextButton(
-                isSending = isSendingText,
-                onClick = onSendText
-            )
-        }
-        resultText?.takeIf { it.isNotBlank() }?.let { message ->
-            Text(
-                text = message,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                style = MaterialTheme.typography.labelSmall,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
-    }
-}
-
-@Composable
-private fun HomeSendTextButton(
-    isSending: Boolean,
-    onClick: () -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .height(42.dp)
-            .background(HomeVisualTokens.Primary, RoundedCornerShape(8.dp))
-            .homeNoRippleClickable(enabled = !isSending, onClick = onClick)
-            .padding(horizontal = 14.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp)
-    ) {
-        Icon(
-            imageVector = IconParkIcons.Send,
-            contentDescription = null,
-            tint = Color.White,
-            modifier = Modifier.size(16.dp)
-        )
-        Text(
-            text = if (isSending) l10n("发送中", "Sending") else l10n("发送", "Send"),
-            color = Color.White,
-            style = MaterialTheme.typography.bodySmall,
-            fontWeight = FontWeight.SemiBold,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
     }
 }
 

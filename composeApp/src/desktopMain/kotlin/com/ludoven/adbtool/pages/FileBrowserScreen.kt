@@ -1,5 +1,7 @@
 package com.ludoven.adbtool.pages
 
+import com.ludoven.adbtool.UiTokens
+
 import com.ludoven.adbtool.ui.mac.*
 
 import com.ludoven.adbtool.entity.FileInfo
@@ -218,7 +220,7 @@ fun FileBrowserScreen(
     }
 
     Column(
-        modifier = Modifier.fillMaxSize().padding(16.dp),
+        modifier = Modifier.fillMaxSize().padding(UiTokens.PagePaddingCompact),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         PageHeader(

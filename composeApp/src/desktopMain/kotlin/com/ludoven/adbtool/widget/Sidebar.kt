@@ -12,8 +12,13 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
+import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -40,7 +45,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -151,26 +162,43 @@ private fun SidebarGroupHeader(
     hasSelection: Boolean,
     onClick: () -> Unit
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isHovered by interactionSource.collectIsHoveredAsState()
+    var isFocused by remember { mutableStateOf(false) }
+    val shape = RoundedCornerShape(UiTokens.RowRadius)
     val backgroundColor by animateColorAsState(
-        targetValue = if (hasSelection) {
-            MaterialTheme.colorScheme.primary.copy(alpha = 0.11f)
-        } else {
-            Color.Transparent
+        targetValue = when {
+            hasSelection -> MaterialTheme.colorScheme.primary.copy(alpha = 0.11f)
+            isHovered -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f)
+            else -> Color.Transparent
         },
-        animationSpec = tween(220)
+        animationSpec = tween(if (hasSelection) UiTokens.SelectionDurationMillis else UiTokens.HoverDurationMillis)
     )
     val contentColor by animateColorAsState(
         targetValue = if (hasSelection) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-        animationSpec = tween(220)
+        animationSpec = tween(UiTokens.SelectionDurationMillis)
     )
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .height(44.dp)
-            .clip(RoundedCornerShape(UiTokens.RowRadius))
+            .clip(shape)
             .background(backgroundColor)
-            .clickable(onClick = onClick)
+            .border(
+                width = if (isFocused) 2.dp else 0.dp,
+                color = if (isFocused) MaterialTheme.colorScheme.primary else Color.Transparent,
+                shape = shape
+            )
+            .semantics {
+                role = Role.Button
+                selected = hasSelection
+                if (group.collapsible) stateDescription = if (isExpanded) "Expanded" else "Collapsed"
+            }
+            .onFocusChanged { isFocused = it.isFocused }
+            .hoverable(interactionSource)
+            .clickable(interactionSource = interactionSource, indication = null, role = Role.Button, onClick = onClick)
+            .focusable(interactionSource = interactionSource)
             .padding(horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -205,13 +233,17 @@ private fun SidebarItem(
     isSelected: Boolean,
     onClick: () -> Unit
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isHovered by interactionSource.collectIsHoveredAsState()
+    var isFocused by remember { mutableStateOf(false) }
+    val shape = RoundedCornerShape(UiTokens.RowRadius)
     val backgroundColor by animateColorAsState(
-        targetValue = if (isSelected) {
-            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.62f)
-        } else {
-            Color.Transparent
+        targetValue = when {
+            isSelected -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.62f)
+            isHovered -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f)
+            else -> Color.Transparent
         },
-        animationSpec = tween(220)
+        animationSpec = tween(if (isSelected) UiTokens.SelectionDurationMillis else UiTokens.HoverDurationMillis)
     )
 
     val contentColor by animateColorAsState(
@@ -220,16 +252,28 @@ private fun SidebarItem(
         } else {
             MaterialTheme.colorScheme.onSurfaceVariant
         },
-        animationSpec = tween(220)
+        animationSpec = tween(UiTokens.SelectionDurationMillis)
     )
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .height(UiTokens.ToolbarHeight)
-            .clip(RoundedCornerShape(UiTokens.RowRadius))
+            .clip(shape)
             .background(backgroundColor)
-            .clickable(onClick = onClick)
+            .border(
+                width = if (isFocused) 2.dp else 0.dp,
+                color = if (isFocused) MaterialTheme.colorScheme.primary else Color.Transparent,
+                shape = shape
+            )
+            .semantics {
+                role = Role.Button
+                selected = isSelected
+            }
+            .onFocusChanged { isFocused = it.isFocused }
+            .hoverable(interactionSource)
+            .clickable(interactionSource = interactionSource, indication = null, role = Role.Button, onClick = onClick)
+            .focusable(interactionSource = interactionSource)
             .padding(start = 20.dp, end = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -275,6 +319,9 @@ private fun ConnectedStatusCard(
     onDeviceSelected: (String) -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
+    var isFocused by remember { mutableStateOf(false) }
+    val interactionSource = remember { MutableInteractionSource() }
+    val shape = RoundedCornerShape(UiTokens.RowRadius)
     val isConnected = !selectedDevice.isNullOrBlank() && connectedDeviceCount > 0
     val statusColor = if (isConnected) Color(0xFF2DBE60) else MaterialTheme.colorScheme.onSurfaceVariant
     val noDeviceText = stringResource(Res.string.no_device)
@@ -295,9 +342,25 @@ private fun ConnectedStatusCard(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(UiTokens.RowRadius))
+                .clip(shape)
                 .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.22f))
-                .clickable(enabled = devices.isNotEmpty()) { expanded = !expanded }
+                .border(
+                    width = if (isFocused) 2.dp else 0.dp,
+                    color = if (isFocused) MaterialTheme.colorScheme.primary else Color.Transparent,
+                    shape = shape
+                )
+                .semantics {
+                    role = Role.Button
+                    stateDescription = if (expanded) "Expanded" else "Collapsed"
+                }
+                .onFocusChanged { isFocused = it.isFocused }
+                .clickable(
+                    enabled = devices.isNotEmpty(),
+                    interactionSource = interactionSource,
+                    indication = null,
+                    role = Role.Button
+                ) { expanded = !expanded }
+                .focusable(enabled = devices.isNotEmpty(), interactionSource = interactionSource)
                 .padding(horizontal = 10.dp, vertical = 9.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {

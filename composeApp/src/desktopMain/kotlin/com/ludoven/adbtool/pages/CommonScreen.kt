@@ -1,5 +1,7 @@
 package com.ludoven.adbtool.pages
 
+import com.ludoven.adbtool.UiTokens
+
 import com.ludoven.adbtool.ui.mac.*
 
 import adbtool_desktop.composeapp.generated.resources.Res
@@ -453,7 +455,7 @@ fun CommonScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 14.dp, vertical = 10.dp),
+                .padding(horizontal = UiTokens.PagePaddingCompact, vertical = UiTokens.SectionSpacingCompact),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             CommandCenterHeader(
@@ -812,17 +814,7 @@ private fun tokenizeCommandLine(input: String): List<String> {
         .toList()
 }
 
-private fun commandItemAccentColor(index: Int): Color {
-    val palette = listOf(
-        Color(0xFF3D73FF),
-        Color(0xFF22B573),
-        Color(0xFFFF9F43),
-        Color(0xFF9166FF),
-        Color(0xFF25AFC8),
-        Color(0xFFFF6B6B)
-    )
-    return palette[index % palette.size]
-}
+private fun commandItemAccentColor(@Suppress("UNUSED_PARAMETER") index: Int): Color = Color(0xFF3D73FF)
 
 private fun fallbackCommands(): List<CommandItemUi> = listOf(
     CommandItemUi(

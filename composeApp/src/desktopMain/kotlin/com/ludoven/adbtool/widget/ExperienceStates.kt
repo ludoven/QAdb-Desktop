@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -170,6 +171,64 @@ fun InlineStatusBanner(
             color = accent,
             maxLines = 3,
             overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+@Composable
+fun StatusBadge(
+    text: String,
+    modifier: Modifier = Modifier,
+    tone: InlineStatusTone = InlineStatusTone.Info
+) {
+    val foreground = when (tone) {
+        InlineStatusTone.Info -> MaterialTheme.colorScheme.primary
+        InlineStatusTone.Success -> MaterialTheme.colorScheme.secondary
+        InlineStatusTone.Warning -> MaterialTheme.colorScheme.tertiary
+        InlineStatusTone.Danger -> MaterialTheme.colorScheme.error
+    }
+    val background = when (tone) {
+        InlineStatusTone.Info -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.58f)
+        InlineStatusTone.Success -> MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.58f)
+        InlineStatusTone.Warning -> MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.58f)
+        InlineStatusTone.Danger -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.58f)
+    }
+    Box(
+        modifier = modifier
+            .background(background, RoundedCornerShape(UiTokens.BadgeRadius))
+            .padding(horizontal = 9.dp, vertical = 4.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.Medium,
+            color = foreground,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+@Composable
+fun DesktopToolbar(
+    modifier: Modifier = Modifier,
+    content: @Composable RowScope.() -> Unit
+) {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(UiTokens.RadiusMedium),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.28f),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.72f))
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(UiTokens.ToolbarHeight)
+                .padding(horizontal = 6.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            content = content
         )
     }
 }

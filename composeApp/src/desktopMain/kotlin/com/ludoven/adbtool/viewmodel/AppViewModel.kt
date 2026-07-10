@@ -145,7 +145,6 @@ class AppViewModel : BaseViewModel() {
     // Label cache: packageName -> app label
     private val _appLabels = MutableStateFlow<Map<String, String>>(emptyMap())
     private val loadingPackages = mutableSetOf<String>()
-    private val loadingDetailPackages = mutableSetOf<String>()
     private var activeCacheDeviceKey: String = ""
     private var appListLoadDeviceId: String? = null
     private var loadedAppListDeviceId: String? = null
@@ -153,7 +152,6 @@ class AppViewModel : BaseViewModel() {
     private var iconPrefetchJob: Job? = null
     private var runningStatusJob: Job? = null
     private var visibleAssetsJob: Job? = null
-    private var visibleDetailsJob: Job? = null
     private val iconTraceLock = Any()
     private var iconTraceSessionId = 0L
     private var iconTraceDeviceId = ""
@@ -195,8 +193,6 @@ class AppViewModel : BaseViewModel() {
             runningStatusJob = null
             visibleAssetsJob?.cancel()
             visibleAssetsJob = null
-            visibleDetailsJob?.cancel()
-            visibleDetailsJob = null
             _appList.value = emptyList()
             _appIcons.value = emptyMap()
             _appIconStates.value = emptyMap()
@@ -252,13 +248,8 @@ class AppViewModel : BaseViewModel() {
         runningStatusJob = null
         visibleAssetsJob?.cancel()
         visibleAssetsJob = null
-        visibleDetailsJob?.cancel()
-        visibleDetailsJob = null
         synchronized(loadingPackages) {
             loadingPackages.clear()
-        }
-        synchronized(loadingDetailPackages) {
-            loadingDetailPackages.clear()
         }
         _isLoading.value = false
     }
@@ -305,30 +296,6 @@ class AppViewModel : BaseViewModel() {
         }
     }
 
-    fun ensureAppDetailsVisible(packageNames: List<String>) {
-        val distinctPackages = packageNames.distinct()
-        if (distinctPackages.isEmpty()) return
-
-        visibleDetailsJob?.cancel()
-        visibleDetailsJob = viewModelScope.launch(Dispatchers.IO) {
-            refreshCacheContextIfNeeded()
-            for (packageName in distinctPackages) {
-                val app = _appList.value.firstOrNull { it.packageName == packageName } ?: continue
-                val hasDetails = app.versionName != "-" && app.installTime != "-" && app.size != "-"
-                if (hasDetails) continue
-                if (!claimDetailLoading(packageName)) continue
-                try {
-                    loadSingleAppDetail(packageName)
-                } catch (error: Exception) {
-                    println("QADB app detail failed package=$packageName reason=${error.message ?: error::class.simpleName}")
-                    // Skip single package failures to avoid blocking list interaction.
-                } finally {
-                    releaseDetailLoading(packageName)
-                }
-            }
-        }
-    }
-
     private fun refreshCacheContextIfNeeded() {
         val currentKey = currentDeviceCacheKey()
         if (activeCacheDeviceKey == currentKey) return
@@ -339,9 +306,6 @@ class AppViewModel : BaseViewModel() {
         _appIconStates.value = emptyMap()
         synchronized(loadingPackages) {
             loadingPackages.clear()
-        }
-        synchronized(loadingDetailPackages) {
-            loadingDetailPackages.clear()
         }
     }
 
@@ -467,16 +431,6 @@ class AppViewModel : BaseViewModel() {
 
     private fun releaseLoading(packageName: String) = synchronized(loadingPackages) {
         loadingPackages.remove(packageName)
-    }
-
-    private fun claimDetailLoading(packageName: String): Boolean = synchronized(loadingDetailPackages) {
-        if (loadingDetailPackages.contains(packageName)) return@synchronized false
-        loadingDetailPackages.add(packageName)
-        true
-    }
-
-    private fun releaseDetailLoading(packageName: String) = synchronized(loadingDetailPackages) {
-        loadingDetailPackages.remove(packageName)
     }
 
     private fun hydrateCachedLabels(list: List<AppInfo>) {
@@ -922,45 +876,6 @@ class AppViewModel : BaseViewModel() {
 
         _appList.value = _appList.value.map { app ->
             app.copy(isRunning = runningPackages.contains(app.packageName))
-        }
-    }
-
-    private fun loadSingleAppDetail(packageName: String) {
-        val app = _appList.value.firstOrNull { it.packageName == packageName } ?: return
-        val dumpsys = AdbTool.exec(appPackageShellCommand("dumpsys", "package", packageName))
-        val versionName = parseVersionName(dumpsys) ?: app.versionName
-        val firstInstallTime = Regex("firstInstallTime=([^\n]+)").find(dumpsys)?.groupValues?.get(1)?.trim() ?: app.installTime
-        val installTimestamp = parseInstallTimestamp(firstInstallTime)
-        val pkgFlags = Regex("pkgFlags=\\[([^\\]]+)]").find(dumpsys)?.groupValues?.get(1).orEmpty()
-        val isDebuggable = pkgFlags.contains("DEBUGGABLE", ignoreCase = true) || app.isDebuggable
-        val isDisabled = parseDisabledState(dumpsys) || app.isDisabled
-        val isRunning = queryPackageRunning(packageName) ?: app.isRunning
-        val packagePath = app.apkPath.takeIf { it.isNotBlank() }
-            ?: AdbTool.exec(appPackageShellCommand("pm", "path", packageName)).lineSequence()
-                .firstOrNull { it.startsWith("package:") }
-                ?.removePrefix("package:")
-                ?.trim()
-                .orEmpty()
-
-        val sizeBytes = queryPackageSizeBytes(packagePath, packageName) ?: app.sizeBytes
-        val sizeText = sizeBytes?.let { formatSize(it) } ?: app.size
-
-        _appList.value = _appList.value.map { current ->
-            if (current.packageName == packageName) {
-                current.copy(
-                    versionName = versionName,
-                    installTime = firstInstallTime,
-                    size = sizeText,
-                    sizeBytes = sizeBytes,
-                    installTimestamp = installTimestamp,
-                    lastUsedTimestamp = installTimestamp ?: current.lastUsedTimestamp,
-                    isDebuggable = isDebuggable,
-                    isDisabled = isDisabled,
-                    isRunning = isRunning
-                )
-            } else {
-                current
-            }
         }
     }
 

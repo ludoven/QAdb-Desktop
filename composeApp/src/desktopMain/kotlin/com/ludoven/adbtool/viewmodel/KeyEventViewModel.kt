@@ -35,8 +35,43 @@ class KeyEventViewModel : BaseViewModel() {
     private val _recentKeyEvents = MutableStateFlow<List<KeyEventRecord>>(emptyList())
     val recentKeyEvents: StateFlow<List<KeyEventRecord>> = _recentKeyEvents.asStateFlow()
 
+    private val _textInput = MutableStateFlow("")
+    val textInput: StateFlow<String> = _textInput.asStateFlow()
+
+    private val _isSendingText = MutableStateFlow(false)
+    val isSendingText: StateFlow<Boolean> = _isSendingText.asStateFlow()
+
+    private val _textSendMessage = MutableStateFlow<String?>(null)
+    val textSendMessage: StateFlow<String?> = _textSendMessage.asStateFlow()
+
     fun clearRecentKeyEvents() {
         _recentKeyEvents.value = emptyList()
+    }
+
+    fun updateTextInput(text: String) {
+        _textInput.value = text
+        _textSendMessage.value = null
+    }
+
+    fun sendText(deviceId: String?) {
+        val text = _textInput.value.trim()
+        when {
+            deviceId.isNullOrBlank() -> _textSendMessage.value = "没有连接设备"
+            text.isBlank() -> _textSendMessage.value = "输入文本不能为空"
+            else -> viewModelScope.launch {
+                _isSendingText.value = true
+                val result = withContext(Dispatchers.IO) {
+                    AdbTool.inputTextAsync(text, deviceId)
+                }
+                _textSendMessage.value = if (result.success) {
+                    _textInput.value = ""
+                    "文本已发送到设备"
+                } else {
+                    result.errorMessage ?: result.output.ifBlank { "发送失败" }
+                }
+                _isSendingText.value = false
+            }
+        }
     }
 
     private val _toastMessage = MutableStateFlow<String?>(null)

@@ -43,8 +43,17 @@ class FileBrowserViewModel : BaseViewModel() {
             "/tmp" to "临时文件"
         )
 
+        internal fun normalizeDirectoryPathForListing(path: String): String {
+            val normalized = path.trim().ifEmpty { "/" }
+            return if (normalized == "/") "/" else "${normalized.trimEnd('/')}/"
+        }
+
         internal fun listDirectoryCommand(path: String, longFormat: Boolean): String =
-            AdbTool.buildShellCommand("ls", if (longFormat) "-la" else "-l", path)
+            AdbTool.buildShellCommand(
+                "ls",
+                if (longFormat) "-la" else "-l",
+                normalizeDirectoryPathForListing(path)
+            )
     }
 
     private val _currentPath = MutableStateFlow("/sdcard")

@@ -20,15 +20,19 @@ class DeviceRepository {
     }
 
     companion object {
+        private val adbDeviceLineRegex = Regex(
+            """^(.+?)\s+(device|offline|unauthorized|recovery|sideload|bootloader|no permissions)(?:\s+.*)?$"""
+        )
+
         fun parseDevices(adbDevicesOutput: String): List<String> {
             return adbDevicesOutput
                 .lineSequence()
-                .drop(1)
                 .map { it.trim() }
                 .filter { it.isNotBlank() }
                 .mapNotNull { line ->
-                    val cols = line.split(Regex("\\s+"))
-                    if (cols.size >= 2 && cols[1] == "device") cols[0] else null
+                    val match = adbDeviceLineRegex.matchEntire(line) ?: return@mapNotNull null
+                    val (deviceId, state) = match.destructured
+                    deviceId.trim().takeIf { state == "device" && it.isNotEmpty() }
                 }
                 .toList()
         }

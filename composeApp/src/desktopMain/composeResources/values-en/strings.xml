@@ -338,7 +338,6 @@
     
     <!-- Page Titles -->
     <string name="key_event_page">Keys</string>
-    <string name="system_page">System Page</string>
 
     <!-- Key Event Simulation Page -->
     <string name="key_event_title">Key Event Simulation</string>

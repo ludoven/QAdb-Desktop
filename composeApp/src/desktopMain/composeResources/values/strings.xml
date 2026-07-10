@@ -334,7 +334,6 @@
     
     <!-- 页面标题 -->
     <string name="key_event_page">按键</string>
-    <string name="system_page">系统页面</string>
 
     <!-- 按键模拟页面 -->
     <string name="key_event_title">按键模拟</string>

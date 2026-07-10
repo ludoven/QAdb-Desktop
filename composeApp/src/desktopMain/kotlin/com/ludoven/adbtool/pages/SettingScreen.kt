@@ -1,5 +1,7 @@
 package com.ludoven.adbtool.pages
 
+import com.ludoven.adbtool.UiTokens
+
 import adbtool_desktop.composeapp.generated.resources.Res
 import adbtool_desktop.composeapp.generated.resources.adb_auto_detect
 import adbtool_desktop.composeapp.generated.resources.adb_current_using
@@ -120,6 +122,7 @@ import com.ludoven.adbtool.util.FileUtils
 import com.ludoven.adbtool.util.GitHubUpdateManager
 import com.ludoven.adbtool.util.LanguageManager
 import com.ludoven.adbtool.util.ThemeManager
+import com.ludoven.adbtool.widget.PageHeader
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
 import java.awt.Desktop
@@ -283,27 +286,17 @@ fun SettingScreen() {
     ) {
         Column(
             modifier = Modifier
+                .align(Alignment.TopCenter)
                 .widthIn(max = 880.dp)
                 .fillMaxWidth()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 24.dp, vertical = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(24.dp)
+                .padding(horizontal = UiTokens.PagePadding, vertical = UiTokens.PagePaddingCompact),
+            verticalArrangement = Arrangement.spacedBy(UiTokens.SectionSpacing)
         ) {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(
-                    text = stringResource(Res.string.set),
-                    style = MaterialTheme.typography.headlineSmall,
-                    color = SettingColors.Text,
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 24.sp
-                )
-                Text(
-                    text = stringResource(Res.string.settings_subtitle),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = SettingColors.SecondaryText,
-                    fontSize = 13.sp
-                )
-            }
+            PageHeader(
+                title = stringResource(Res.string.set),
+                subtitle = stringResource(Res.string.settings_subtitle)
+            )
 
             SettingsSection(title = stringResource(Res.string.adb_path_setting)) {
                 val sourceText = settingAdbSourceText(adbEnvironment.source)

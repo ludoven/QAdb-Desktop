@@ -17,6 +17,8 @@ import androidx.compose.ui.unit.dp
 import com.ludoven.adbtool.UiTokens
 import com.ludoven.adbtool.viewmodel.DeviceMirrorViewModel
 import com.ludoven.adbtool.viewmodel.KeyEventViewModel
+import com.ludoven.adbtool.util.l10n
+import com.ludoven.adbtool.widget.PageHeader
 
 enum class DeviceControlTab {
     Mirror,
@@ -49,6 +51,10 @@ fun DeviceControlScreen(
                 modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
+                PageHeader(
+                    title = l10n("设备控制", "Device Control"),
+                    subtitle = l10n("镜像、文本输入、方向键和常用系统按键", "Mirror, text input, directional pad and common system keys")
+                )
                 if (stacked) {
                     Column(
                         modifier = Modifier.fillMaxWidth(),

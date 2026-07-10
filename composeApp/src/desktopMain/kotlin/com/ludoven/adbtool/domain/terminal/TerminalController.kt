@@ -93,6 +93,14 @@ class TerminalController(
         historyDraft = ""
     }
 
+    fun updateSearchQuery(query: String) {
+        _session.update { it.copy(searchQuery = query) }
+    }
+
+    fun setFollowOutput(enabled: Boolean) {
+        _session.update { it.copy(followOutput = enabled) }
+    }
+
     fun previousHistory() {
         val history = _session.value.history
         if (history.isEmpty()) return

@@ -1,5 +1,7 @@
 package com.ludoven.adbtool.pages
 
+import com.ludoven.adbtool.UiTokens
+
 import adbtool_desktop.composeapp.generated.resources.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -350,7 +352,7 @@ fun AppScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .padding(horizontal = 24.dp, vertical = 28.dp),
+                .padding(horizontal = UiTokens.PagePadding, vertical = UiTokens.PagePaddingCompact),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Row(
@@ -541,7 +543,6 @@ fun AppScreen(
                                 .mapNotNull { item -> displayedList.getOrNull(item.index)?.packageName }
                         }.distinctUntilChanged().collect { visiblePackages ->
                             viewModel.ensureAppAssetsVisible(visiblePackages)
-                            viewModel.ensureAppDetailsVisible(visiblePackages)
                         }
                     }
                     Column(modifier = Modifier.fillMaxSize().padding(14.dp)) {
@@ -576,7 +577,6 @@ fun AppScreen(
                                 .mapNotNull { item -> displayedList.getOrNull(item.index)?.packageName }
                         }.distinctUntilChanged().collect { visiblePackages ->
                             viewModel.ensureAppAssetsVisible(visiblePackages)
-                            viewModel.ensureAppDetailsVisible(visiblePackages)
                         }
                     }
                     Column(modifier = Modifier.fillMaxSize().padding(horizontal = 14.dp, vertical = 10.dp)) {
@@ -956,7 +956,7 @@ private fun AppListRow(
             }
 
             Text(
-                text = app.versionName,
+                text = app.versionName.takeUnless { it.isBlank() || it == "-" } ?: l10n("待读取", "On demand"),
                 modifier = Modifier
                     .weight(0.85f)
                     .padding(end = 8.dp),
@@ -967,7 +967,7 @@ private fun AppListRow(
             )
 
             Text(
-                text = app.size,
+                text = app.size.takeUnless { it.isBlank() || it == "-" } ?: l10n("待读取", "On demand"),
                 modifier = Modifier.weight(0.75f),
                 style = MaterialTheme.typography.bodySmall,
                 color = AppVisualTokens.Text,

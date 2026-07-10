@@ -54,54 +54,6 @@ import androidx.compose.ui.unit.sp
 import com.ludoven.adbtool.UiTokens
 
 @Composable
-fun GradientButton(
-    onClick: () -> Unit,
-    text: String,
-    modifier: Modifier = Modifier,
-    enabled: Boolean = true,
-    startColor: Color = MaterialTheme.colorScheme.primary,
-    endColor: Color = MaterialTheme.colorScheme.secondary
-) {
-    val interactionSource = remember { MutableInteractionSource() }
-    val isHovered by interactionSource.collectIsHoveredAsState()
-    val scale by animateFloatAsState(if (isHovered) 1.02f else 1f)
-
-    Button(
-        onClick = onClick,
-        modifier = modifier.scale(scale),
-        enabled = enabled,
-        colors = ButtonDefaults.buttonColors(
-            containerColor = Color.Transparent,
-            disabledContainerColor = Color.Transparent
-        ),
-        contentPadding = PaddingValues(0.dp),
-        shape = RoundedCornerShape(UiTokens.RadiusMedium),
-        interactionSource = interactionSource
-    ) {
-        Box(
-            modifier = Modifier
-                .background(
-                    if (enabled) {
-                        Brush.horizontalGradient(listOf(startColor, endColor))
-                    } else {
-                        Brush.horizontalGradient(listOf(Color.Gray, Color.Gray))
-                    },
-                    shape = RoundedCornerShape(UiTokens.RadiusMedium)
-                )
-                .padding(horizontal = 20.dp, vertical = 11.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = text,
-                color = Color.White,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.SemiBold
-            )
-        }
-    }
-}
-
-@Composable
 fun GlassCard(
     modifier: Modifier = Modifier,
     shape: Shape = RoundedCornerShape(UiTokens.RadiusLarge),
@@ -278,38 +230,4 @@ fun CreativeGridItem(
             )
         }
     }
-}
-
-@Composable
-fun CreativeTextField(
-    value: String,
-    onValueChange: (String) -> Unit,
-    modifier: Modifier = Modifier,
-    label: String? = null,
-    placeholder: String? = null,
-    leadingIcon: ImageVector? = null,
-    singleLine: Boolean = true,
-    keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
-    keyboardActions: KeyboardActions = KeyboardActions.Default
-) {
-    OutlinedTextField(
-        value = value,
-        onValueChange = onValueChange,
-        modifier = modifier,
-        label = label?.let { { Text(it) } },
-        placeholder = placeholder?.let { { Text(it) } },
-        leadingIcon = leadingIcon?.let {
-            { Icon(imageVector = it, contentDescription = null) }
-        },
-        singleLine = singleLine,
-        keyboardOptions = keyboardOptions,
-        keyboardActions = keyboardActions,
-        shape = RoundedCornerShape(UiTokens.RadiusMedium),
-        colors = OutlinedTextFieldDefaults.colors(
-            focusedBorderColor = MaterialTheme.colorScheme.primary,
-            unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
-            focusedContainerColor = MaterialTheme.colorScheme.surface,
-            unfocusedContainerColor = MaterialTheme.colorScheme.surface
-        )
-    )
 }

@@ -27,21 +27,9 @@ import com.ludoven.adbtool.viewmodel.DevicesViewModel
 import com.ludoven.adbtool.viewmodel.FileBrowserViewModel
 import com.ludoven.adbtool.viewmodel.KeyEventViewModel
 import com.ludoven.adbtool.viewmodel.LogViewModel
-import com.ludoven.adbtool.viewmodel.PrimaryStorageSummary
-import com.ludoven.adbtool.viewmodel.ResourceViewModel
-import com.ludoven.adbtool.viewmodel.SystemViewModel
-import com.ludoven.adbtool.viewmodel.appendStorageHistory
 import com.ludoven.adbtool.viewmodel.appListLoadShouldApply
-import com.ludoven.adbtool.viewmodel.calculateMemUsedMb
-import com.ludoven.adbtool.viewmodel.calculateMemUsedPercent
 import com.ludoven.adbtool.viewmodel.fileListLoadShouldApply
-import com.ludoven.adbtool.viewmodel.parsePackageDuSizeMb
 import com.ludoven.adbtool.viewmodel.parseRunningPackagesFromActivityProcesses
-import com.ludoven.adbtool.viewmodel.resourceRefreshShouldCancelForDeviceChange
-import com.ludoven.adbtool.viewmodel.selectPrimaryStorageSummary
-import com.ludoven.adbtool.viewmodel.StoragePartition
-import com.ludoven.adbtool.viewmodel.systemInfoLoadShouldCancelForDeviceChange
-import com.ludoven.adbtool.viewmodel.systemInfoLoadShouldApply
 import java.util.ArrayDeque
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -148,6 +136,18 @@ class SecurityAndPerformanceFixesTest {
     }
 
     @Test
+    fun `log ui publishing should be capped by batch size or interval`() {
+        assertEquals(false, LogViewModel.shouldPublishUiBatch(pendingUpdates = 1, elapsedMs = 99))
+        assertEquals(true, LogViewModel.shouldPublishUiBatch(pendingUpdates = 1, elapsedMs = 100))
+        assertEquals(true, LogViewModel.shouldPublishUiBatch(pendingUpdates = 40, elapsedMs = 0))
+    }
+
+    @Test
+    fun `log ui publishing should ignore an empty batch`() {
+        assertEquals(false, LogViewModel.shouldPublishUiBatch(pendingUpdates = 0, elapsedMs = 1_000))
+    }
+
+    @Test
     fun `app filters should use stable keys instead of localized labels`() {
         val apps = listOf(
             AppInfo(appName = "User App", packageName = "com.example.user", isSystemApp = false),
@@ -191,64 +191,6 @@ class SecurityAndPerformanceFixesTest {
             setOf("com.example.player", "com.android.systemui"),
             parseRunningPackagesFromActivityProcesses(output)
         )
-    }
-
-    @Test
-    fun `du parser should convert kilobytes to megabytes`() {
-        assertEquals(12L, parsePackageDuSizeMb("12288\t/data/app/example/base.apk"))
-        assertEquals(null, parsePackageDuSizeMb("du: /data/app/example/base.apk: Permission denied"))
-    }
-
-    @Test
-    fun `memory derived metrics should report used size and percent`() {
-        assertEquals(6144L, calculateMemUsedMb(totalMb = 8192L, availableMb = 2048L))
-        assertEquals(75f, calculateMemUsedPercent(totalMb = 8192L, availableMb = 2048L))
-        assertEquals(0f, calculateMemUsedPercent(totalMb = 0L, availableMb = 0L))
-    }
-
-    @Test
-    fun `primary storage summary should prefer data mount then writable partition then largest used`() {
-        val withData = listOf(
-            StoragePartition("/system", totalGb = 8.0, usedGb = 5.0, availGb = 3.0),
-            StoragePartition("/data", totalGb = 128.0, usedGb = 64.0, availGb = 64.0)
-        )
-        assertEquals(
-            PrimaryStorageSummary("/data", totalGb = 128.0, usedGb = 64.0, availGb = 64.0, usedPercent = 50f),
-            selectPrimaryStorageSummary(withData)
-        )
-
-        val writableFallback = listOf(
-            StoragePartition("/metadata", totalGb = 1.0, usedGb = 0.3, availGb = 0.7),
-            StoragePartition("/sdcard", totalGb = 256.0, usedGb = 100.0, availGb = 156.0)
-        )
-        assertEquals(
-            "/sdcard",
-            selectPrimaryStorageSummary(writableFallback)?.mount
-        )
-
-        val largestUsedFallback = listOf(
-            StoragePartition("/a", totalGb = 4.0, usedGb = 1.0, availGb = 3.0),
-            StoragePartition("/b", totalGb = 4.0, usedGb = 2.5, availGb = 1.5)
-        )
-        assertEquals(
-            "/b",
-            selectPrimaryStorageSummary(largestUsedFallback)?.mount
-        )
-    }
-
-    @Test
-    fun `storage history should append primary usage and keep max size`() {
-        val initial = List(60) { 10f + it }
-        val updated = appendStorageHistory(
-            history = initial,
-            summary = PrimaryStorageSummary("/data", totalGb = 128.0, usedGb = 96.0, availGb = 32.0, usedPercent = 75f),
-            maxHistory = 60
-        )
-
-        assertEquals(60, updated.size)
-        assertEquals(11f, updated.first())
-        assertEquals(75f, updated.last())
-        assertEquals(updated, appendStorageHistory(updated, null, maxHistory = 60))
     }
 
     @Test
@@ -304,13 +246,31 @@ class SecurityAndPerformanceFixesTest {
         val path = "/sdcard/Alice's Downloads"
 
         assertEquals(
-            "'ls' '-la' '/sdcard/Alice'\\''s Downloads'",
+            "'ls' '-la' '/sdcard/Alice'\\''s Downloads/'",
             FileBrowserViewModel.listDirectoryCommand(path, longFormat = true)
         )
         assertEquals(
-            "'ls' '-l' '/sdcard/Alice'\\''s Downloads'",
+            "'ls' '-l' '/sdcard/Alice'\\''s Downloads/'",
             FileBrowserViewModel.listDirectoryCommand(path, longFormat = false)
         )
+        assertEquals("/", FileBrowserViewModel.normalizeDirectoryPathForListing("/"))
+        assertEquals("/sdcard/", FileBrowserViewModel.normalizeDirectoryPathForListing("/sdcard"))
+        assertEquals("/sdcard/Download/", FileBrowserViewModel.normalizeDirectoryPathForListing(" /sdcard/Download/ "))
+    }
+
+    @Test
+    fun `blank directory path should normalize to root`() {
+        assertEquals("/", FileBrowserViewModel.normalizeDirectoryPathForListing("   "))
+    }
+
+    @Test
+    fun `directory normalization should collapse trailing separators`() {
+        assertEquals("/sdcard/Download/", FileBrowserViewModel.normalizeDirectoryPathForListing("/sdcard/Download///"))
+    }
+
+    @Test
+    fun `root listing command should not add a duplicate separator`() {
+        assertEquals("'ls' '-la' '/'", FileBrowserViewModel.listDirectoryCommand("/", longFormat = true))
     }
 
     @Test
@@ -509,44 +469,6 @@ class SecurityAndPerformanceFixesTest {
     }
 
     @Test
-    fun `system view model should clear device scoped data when selected device is cleared`() {
-        val viewModel = SystemViewModel()
-        viewModel.replaceDeviceScopedDataForTest(
-            systemProps = mapOf("ro.product.model" to "Pixel"),
-            batteryInfo = mapOf("level" to "80"),
-            cpuInfo = listOf("Processor" to "ARM"),
-            screenInfo = mapOf("Physical size" to "1080x2400")
-        )
-
-        viewModel.setDevice("   ")
-
-        assertEquals(null, viewModel.selectedDevice.value)
-        assertEquals(emptyMap(), viewModel.systemProps.value)
-        assertEquals(emptyMap(), viewModel.batteryInfo.value)
-        assertEquals(emptyList(), viewModel.cpuInfo.value)
-        assertEquals(emptyMap(), viewModel.screenInfo.value)
-        assertEquals(false, viewModel.isLoading.value)
-    }
-
-    @Test
-    fun `system info load result should only apply to selected device`() {
-        assertEquals(true, systemInfoLoadShouldApply(requestedDeviceId = "device-a", selectedDeviceId = "device-a"))
-        assertEquals(true, systemInfoLoadShouldApply(requestedDeviceId = " device-a ", selectedDeviceId = "device-a"))
-        assertEquals(false, systemInfoLoadShouldApply(requestedDeviceId = "device-a", selectedDeviceId = "device-b"))
-        assertEquals(false, systemInfoLoadShouldApply(requestedDeviceId = "device-a", selectedDeviceId = null))
-        assertEquals(false, systemInfoLoadShouldApply(requestedDeviceId = "   ", selectedDeviceId = "device-a"))
-    }
-
-    @Test
-    fun `system info load should cancel when selected device changes`() {
-        assertEquals(false, systemInfoLoadShouldCancelForDeviceChange(activeLoadDeviceId = null, nextSelectedDeviceId = "device-a"))
-        assertEquals(false, systemInfoLoadShouldCancelForDeviceChange(activeLoadDeviceId = "device-a", nextSelectedDeviceId = "device-a"))
-        assertEquals(true, systemInfoLoadShouldCancelForDeviceChange(activeLoadDeviceId = "device-a", nextSelectedDeviceId = "device-b"))
-        assertEquals(true, systemInfoLoadShouldCancelForDeviceChange(activeLoadDeviceId = "device-a", nextSelectedDeviceId = null))
-        assertEquals(true, systemInfoLoadShouldCancelForDeviceChange(activeLoadDeviceId = "device-a", nextSelectedDeviceId = "   "))
-    }
-
-    @Test
     fun `top parser should support android args process column`() {
         val output = """
             Tasks: 245 total,   1 running, 244 sleeping
@@ -607,37 +529,4 @@ class SecurityAndPerformanceFixesTest {
         assertEquals(true, homeDeviceConnected("emulator-5554"))
     }
 
-    @Test
-    fun `resource monitoring actions should require selected device`() {
-        assertEquals(false, ResourceViewModel.resourceDeviceActionsEnabled(null))
-        assertEquals(false, ResourceViewModel.resourceDeviceActionsEnabled(""))
-        assertEquals(false, ResourceViewModel.resourceDeviceActionsEnabled("   "))
-        assertEquals(true, ResourceViewModel.resourceDeviceActionsEnabled("emulator-5554"))
-    }
-
-    @Test
-    fun `resource device id should be normalized before adb use`() {
-        assertEquals(null, ResourceViewModel.normalizedResourceDeviceId(null))
-        assertEquals(null, ResourceViewModel.normalizedResourceDeviceId(""))
-        assertEquals(null, ResourceViewModel.normalizedResourceDeviceId("   "))
-        assertEquals("emulator-5554", ResourceViewModel.normalizedResourceDeviceId("emulator-5554"))
-        assertEquals("emulator-5554", ResourceViewModel.normalizedResourceDeviceId(" emulator-5554 "))
-    }
-
-    @Test
-    fun `resource refresh should cancel when device changes`() {
-        assertEquals(false, resourceRefreshShouldCancelForDeviceChange(activeRefreshDeviceId = null, nextDeviceId = "device-a"))
-        assertEquals(false, resourceRefreshShouldCancelForDeviceChange(activeRefreshDeviceId = "device-a", nextDeviceId = "device-a"))
-        assertEquals(true, resourceRefreshShouldCancelForDeviceChange(activeRefreshDeviceId = "device-a", nextDeviceId = "device-b"))
-        assertEquals(true, resourceRefreshShouldCancelForDeviceChange(activeRefreshDeviceId = "device-a", nextDeviceId = null))
-        assertEquals(true, resourceRefreshShouldCancelForDeviceChange(activeRefreshDeviceId = "device-a", nextDeviceId = "   "))
-    }
-
-    @Test
-    fun `system actions should require selected device`() {
-        assertEquals(false, SystemViewModel.systemDeviceActionsEnabled(null))
-        assertEquals(false, SystemViewModel.systemDeviceActionsEnabled(""))
-        assertEquals(false, SystemViewModel.systemDeviceActionsEnabled("   "))
-        assertEquals(true, SystemViewModel.systemDeviceActionsEnabled("emulator-5554"))
-    }
 }

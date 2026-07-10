@@ -10,5 +10,7 @@ data class TerminalSession(
     val runningCommand: String?,
     val lines: List<TerminalLine>,
     val devices: List<String>,
-    val deviceDisplayNames: Map<String, String>
+    val deviceDisplayNames: Map<String, String>,
+    val searchQuery: String = "",
+    val followOutput: Boolean = true
 )

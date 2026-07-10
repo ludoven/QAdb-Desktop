@@ -43,6 +43,14 @@ class TerminalViewModel : ViewModel() {
         controller.clearInput()
     }
 
+    fun updateSearchQuery(query: String) {
+        controller.updateSearchQuery(query)
+    }
+
+    fun setFollowOutput(enabled: Boolean) {
+        controller.setFollowOutput(enabled)
+    }
+
     fun applyPreviousHistoryCommand() {
         controller.previousHistory()
     }

@@ -12,9 +12,18 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.ludoven.adbtool.UiTokens
@@ -39,8 +48,15 @@ fun <T> ProductTabBar(
     ) {
         tabs.forEach { tab ->
             val isSelected = tab.key == selected
+            var isFocused by remember(tab.key) { mutableStateOf(false) }
             Surface(
                 onClick = { onSelected(tab.key) },
+                modifier = Modifier
+                    .semantics {
+                        role = Role.Tab
+                        this.selected = isSelected
+                    }
+                    .onFocusChanged { isFocused = it.isFocused },
                 shape = RoundedCornerShape(UiTokens.ControlHeight / 2),
                 color = if (isSelected) {
                     MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.78f)
@@ -56,6 +72,8 @@ fun <T> ProductTabBar(
                     1.dp,
                     if (isSelected) {
                         MaterialTheme.colorScheme.primary.copy(alpha = 0.24f)
+                    } else if (isFocused) {
+                        MaterialTheme.colorScheme.primary
                     } else {
                         MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.58f)
                     }

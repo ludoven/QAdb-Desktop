@@ -8,6 +8,48 @@ import kotlin.test.assertEquals
 class TerminalControllerPerformanceTest {
 
     @Test
+    fun `terminal session should default to empty search and follow output`() {
+        val session = TerminalController().session.value
+
+        assertEquals("", session.searchQuery)
+        assertEquals(true, session.followOutput)
+    }
+
+    @Test
+    fun `terminal should bind the selected available device`() {
+        val controller = TerminalController()
+
+        controller.bindDeviceState(
+            devices = listOf("device-a", "device-b"),
+            displayNames = emptyMap(),
+            selectedDevice = "device-b"
+        )
+
+        assertEquals("device-b", controller.session.value.deviceId)
+    }
+
+    @Test
+    fun `terminal should fall back when the bound device disappears`() {
+        val controller = TerminalController()
+        controller.bindDeviceState(listOf("device-a", "device-b"), emptyMap(), "device-b")
+
+        controller.bindDeviceState(listOf("device-a"), emptyMap(), "device-b")
+
+        assertEquals("device-a", controller.session.value.deviceId)
+    }
+
+    @Test
+    fun `terminal search updates should preserve the selected device`() {
+        val controller = TerminalController()
+        controller.bindDeviceState(listOf("device-a"), emptyMap(), "device-a")
+
+        controller.updateSearchQuery("fatal")
+
+        assertEquals("device-a", controller.session.value.deviceId)
+        assertEquals("fatal", controller.session.value.searchQuery)
+    }
+
+    @Test
     fun `terminal output should publish in batches instead of every line`() {
         val controller = TerminalController()
 
@@ -36,6 +78,19 @@ class TerminalControllerPerformanceTest {
         assertEquals(5_000, lines.size)
         assertEquals("line-40", lines.first().text)
         assertEquals("line-5039", lines.last().text)
+    }
+
+    @Test
+    fun `terminal ui state should update without creating another session`() {
+        val controller = TerminalController()
+        val sessionId = controller.session.value.id
+
+        controller.updateSearchQuery("error")
+        controller.setFollowOutput(false)
+
+        assertEquals(sessionId, controller.session.value.id)
+        assertEquals("error", controller.session.value.searchQuery)
+        assertEquals(false, controller.session.value.followOutput)
     }
 
     private fun TerminalController.appendLineForTest(text: String) {

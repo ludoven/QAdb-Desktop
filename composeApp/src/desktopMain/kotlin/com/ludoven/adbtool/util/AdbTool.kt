@@ -1,6 +1,7 @@
 package com.ludoven.adbtool.util
 
 import com.ludoven.adbtool.entity.DeviceMirrorSettings
+import com.ludoven.adbtool.domain.adb.DeviceRepository
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CoroutineScope
@@ -362,10 +363,7 @@ object AdbTool {
     suspend fun getConnectedDevices(): List<String> {
         val result = executeCommand("devices")
         return if (result.success) {
-            result.output.lines().drop(1).mapNotNull {
-                val parts = it.trim().split("\\s+".toRegex())
-                if (parts.size >= 2 && parts[1] == "device") parts[0] else null
-            }
+            DeviceRepository.parseDevices(result.output)
         } else {
             emptyList()
         }
