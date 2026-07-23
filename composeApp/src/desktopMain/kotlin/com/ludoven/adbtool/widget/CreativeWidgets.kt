@@ -89,7 +89,7 @@ fun SectionCard(
                 .padding(contentPadding)
         ) {
             ModernSectionTitle(title = title, icon = icon)
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(UiTokens.SpaceLarge))
             content()
         }
     }
@@ -112,7 +112,7 @@ fun ModernSectionTitle(
                 tint = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.size(20.dp)
             )
-            Spacer(modifier = Modifier.width(12.dp))
+            Spacer(modifier = Modifier.width(UiTokens.SpaceMedium))
         }
         Text(
             text = title,
@@ -136,9 +136,9 @@ fun InfoRow(
                 color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.38f),
                 shape = RoundedCornerShape(UiTokens.RadiusSmall)
             )
-            .padding(horizontal = 12.dp, vertical = 10.dp),
+            .padding(horizontal = UiTokens.SpaceMedium, vertical = UiTokens.SpaceSmall),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp)
+        horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
     ) {
         Text(
             text = label,
@@ -201,7 +201,7 @@ fun CreativeGridItem(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(16.dp),
+                .padding(UiTokens.SpaceLarge),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
@@ -218,7 +218,7 @@ fun CreativeGridItem(
                     tint = iconColor
                 )
             }
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(UiTokens.SpaceMedium))
             Text(
                 text = title,
                 style = MaterialTheme.typography.bodyMedium,

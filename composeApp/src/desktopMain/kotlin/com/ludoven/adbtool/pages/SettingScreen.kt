@@ -1,6 +1,8 @@
 package com.ludoven.adbtool.pages
 
 import com.ludoven.adbtool.UiTokens
+import com.ludoven.adbtool.QadbColors
+import com.ludoven.adbtool.ui.icons.IconParkIcons
 
 import adbtool_desktop.composeapp.generated.resources.Res
 import adbtool_desktop.composeapp.generated.resources.adb_auto_detect
@@ -130,22 +132,22 @@ import java.io.File
 import java.util.prefs.Preferences
 
 private object SettingColors {
-    val PageBackground = Color.White
-    val Surface = Color.White
-    val SoftSurface = Color(0xFFF8FAFD)
-    val Text = Color(0xFF1C1C1E)
-    val SecondaryText = Color(0xFF6E6E73)
-    val Muted = Color(0xFF8E8E93)
-    val Border = Color(0xFFE6E8EB)
-    val Divider = Color(0xFFF0F1F3)
-    val Primary = Color(0xFF0A84FF)
-    val PrimarySoft = Color(0xFFEAF3FF)
-    val PrimaryBorder = Color(0xFFBBD7FF)
-    val ButtonBorder = Color(0xFFE6E8EB)
-    val NeutralButton = SoftSurface
-    val ControlBackground = Color(0xFFF9FAFB)
-    val Danger = Color(0xFFDC2626)
-    val Success = Color(0xFF16A34A)
+    val PageBackground: Color @Composable get() = QadbColors.background
+    val Surface: Color @Composable get() = QadbColors.surface
+    val SoftSurface: Color @Composable get() = QadbColors.surfaceVariant
+    val Text: Color @Composable get() = QadbColors.textPrimary
+    val SecondaryText: Color @Composable get() = QadbColors.textSecondary
+    val Muted: Color @Composable get() = QadbColors.textTertiary
+    val Border: Color @Composable get() = QadbColors.border
+    val Divider: Color @Composable get() = QadbColors.divider
+    val Primary: Color @Composable get() = QadbColors.primary
+    val PrimarySoft: Color @Composable get() = QadbColors.primaryContainer
+    val PrimaryBorder: Color @Composable get() = QadbColors.primary.copy(alpha = 0.34f)
+    val ButtonBorder: Color @Composable get() = QadbColors.border
+    val NeutralButton: Color @Composable get() = QadbColors.surfaceVariant
+    val ControlBackground: Color @Composable get() = QadbColors.disabledSurface
+    val Danger: Color @Composable get() = QadbColors.danger
+    val Success: Color @Composable get() = QadbColors.success
 }
 
 @Composable
@@ -160,32 +162,32 @@ private fun SettingActionButton(
 ) {
     val contentColor = when {
         !enabled -> SettingColors.Muted
-        primary -> Color.White
+        primary -> QadbColors.onPrimary
         else -> SettingColors.Text
     }
     val iconColor = when {
         !enabled -> SettingColors.Muted
-        primary -> Color.White
+        primary -> QadbColors.onPrimary
         else -> SettingColors.Muted
     }
 
     val content: @Composable () -> Unit = {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
         ) {
             if (loading) {
                 CircularProgressIndicator(
                     modifier = Modifier.size(14.dp),
                     strokeWidth = 2.dp,
-                    color = if (primary && enabled) Color.White else SettingColors.Primary
+                    color = if (primary && enabled) QadbColors.onPrimary else SettingColors.Primary
                 )
             } else {
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
                     tint = iconColor,
-                    modifier = Modifier.size(16.dp)
+                    modifier = Modifier.size(UiTokens.IconSmall)
                 )
             }
             Text(
@@ -193,7 +195,7 @@ private fun SettingActionButton(
                 color = contentColor,
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.SemiBold,
-                fontSize = 13.sp,
+                fontSize = UiTokens.TextBody,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -205,14 +207,14 @@ private fun SettingActionButton(
             onClick = onClick,
             modifier = modifier.height(36.dp),
             enabled = enabled,
-            shape = RoundedCornerShape(8.dp),
+            shape = RoundedCornerShape(UiTokens.RadiusMedium),
             colors = ButtonDefaults.buttonColors(
                 containerColor = SettingColors.Primary,
-                contentColor = Color.White,
+                contentColor = QadbColors.onPrimary,
                 disabledContainerColor = SettingColors.ControlBackground,
                 disabledContentColor = SettingColors.Muted
             ),
-            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 0.dp)
+            contentPadding = PaddingValues(horizontal = UiTokens.SpaceMedium, vertical = 0.dp)
         ) {
             content()
         }
@@ -221,14 +223,14 @@ private fun SettingActionButton(
             onClick = onClick,
             modifier = modifier.height(36.dp),
             enabled = enabled,
-            shape = RoundedCornerShape(8.dp),
+            shape = RoundedCornerShape(UiTokens.RadiusMedium),
             border = BorderStroke(1.dp, SettingColors.ButtonBorder.copy(alpha = 0.72f)),
             colors = ButtonDefaults.outlinedButtonColors(
                 containerColor = SettingColors.NeutralButton,
                 contentColor = SettingColors.Text,
                 disabledContentColor = SettingColors.Muted
             ),
-            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 0.dp)
+            contentPadding = PaddingValues(horizontal = UiTokens.SpaceMedium, vertical = 0.dp)
         ) {
             content()
         }
@@ -328,7 +330,7 @@ fun SettingScreen() {
                     versionLabel = stringResource(Res.string.adb_version_label),
                     versionDescription = stringResource(Res.string.settings_adb_version_desc),
                     versionValue = adbEnvironment.version ?: notSetText,
-                    trailingIcon = Icons.Default.Folder,
+                    trailingIcon = IconParkIcons.Folder,
                     trailingIconDescription = stringResource(Res.string.adb_path_label),
                     onTrailingAction = {
                         openPathLocation(adbEnvironment.path)
@@ -338,7 +340,7 @@ fun SettingScreen() {
                 ActionButtonRow {
                     SettingActionButton(
                         text = stringResource(Res.string.adb_auto_detect),
-                        icon = Icons.Default.Refresh,
+                        icon = IconParkIcons.Refresh,
                         onClick = {
                             coroutineScope.launch {
                                 AdbPathManager.autoDetect()
@@ -349,7 +351,7 @@ fun SettingScreen() {
 
                     SettingActionButton(
                         text = stringResource(Res.string.adb_select_adb),
-                        icon = Icons.Default.FolderOpen,
+                        icon = IconParkIcons.Folder,
                         onClick = {
                             coroutineScope.launch {
                                 val newPath = FileUtils.selectFile()
@@ -362,7 +364,7 @@ fun SettingScreen() {
 
                     SettingActionButton(
                         text = stringResource(Res.string.adb_restore_bundled),
-                        icon = Icons.Default.Settings,
+                        icon = IconParkIcons.Setting,
                         onClick = {
                             coroutineScope.launch {
                                 AdbPathManager.useBundledAdb()
@@ -473,7 +475,7 @@ fun SettingScreen() {
                 ActionButtonRow {
                     SettingActionButton(
                         text = stringResource(Res.string.check_update),
-                        icon = Icons.Default.Refresh,
+                        icon = IconParkIcons.Refresh,
                         onClick = {
                             coroutineScope.launch {
                                 isCheckingUpdate = true
@@ -513,7 +515,7 @@ fun SettingScreen() {
                     if (downloadableAsset != null) {
                         SettingActionButton(
                             text = stringResource(Res.string.download_and_install),
-                            icon = Icons.Default.Download,
+                            icon = IconParkIcons.Download,
                             onClick = {
                                 val asset = downloadableAsset
                                 if (asset != null) {
@@ -569,15 +571,15 @@ private fun SettingsSection(
 ) {
     Column(
         modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
+        verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
     ) {
         Text(
             text = title,
-            modifier = Modifier.padding(horizontal = 16.dp),
+            modifier = Modifier.padding(horizontal = UiTokens.SpaceLarge),
             style = MaterialTheme.typography.titleMedium,
             color = SettingColors.Text,
             fontWeight = FontWeight.Medium,
-            fontSize = 16.sp
+            fontSize = UiTokens.TextSection
         )
         Column(
             modifier = Modifier.fillMaxWidth(),
@@ -589,7 +591,7 @@ private fun SettingsSection(
 @Composable
 private fun SectionDivider() {
     HorizontalDivider(
-        modifier = Modifier.padding(horizontal = 16.dp),
+        modifier = Modifier.padding(horizontal = UiTokens.SpaceLarge),
         color = SettingColors.Divider
     )
 }
@@ -600,8 +602,8 @@ private fun ActionButtonRow(content: @Composable () -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .horizontalScroll(rememberScrollState())
-            .padding(horizontal = 16.dp, vertical = 14.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+            .padding(horizontal = UiTokens.SpaceLarge, vertical = UiTokens.SpaceMedium),
+        horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall),
         verticalAlignment = Alignment.CenterVertically
     ) {
         content()
@@ -628,7 +630,7 @@ private fun AdbEnvironmentSummary(
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(UiTokens.RadiusLarge),
         color = SettingColors.SoftSurface,
         tonalElevation = 0.dp,
         shadowElevation = 0.dp
@@ -636,27 +638,27 @@ private fun AdbEnvironmentSummary(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 14.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+                .padding(horizontal = UiTokens.SpaceLarge, vertical = UiTokens.SpaceMedium),
+            verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceXSmall)) {
                     Text(
                         text = statusLabel,
                         style = MaterialTheme.typography.bodyMedium,
                         color = SettingColors.Text,
                         fontWeight = FontWeight.Medium,
-                        fontSize = 14.sp
+                        fontSize = UiTokens.TextBodyLarge
                     )
                 }
                 StatusPill(statusText = statusText, tone = tone)
             }
 
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)) {
                 SummaryInfoRow(
                     title = sourceLabel,
                     description = sourceDescription,
@@ -691,29 +693,29 @@ private fun SummaryInfoRow(
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Column(modifier = Modifier.weight(0.44f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Column(modifier = Modifier.weight(0.44f), verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceXSmall)) {
             Text(
                 text = title,
                 style = MaterialTheme.typography.bodyMedium,
                 color = SettingColors.Text,
                 fontWeight = FontWeight.Medium,
-                fontSize = 14.sp
+                fontSize = UiTokens.TextBodyLarge
             )
             Text(
                 text = description,
                 style = MaterialTheme.typography.bodySmall,
                 color = SettingColors.Muted,
-                fontSize = 12.sp,
+                fontSize = UiTokens.TextCaption,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
         }
         Row(
             modifier = Modifier.weight(0.56f),
-            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
+            horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall, Alignment.End),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
@@ -721,7 +723,7 @@ private fun SummaryInfoRow(
                 style = MaterialTheme.typography.bodyMedium,
                 color = SettingColors.Text,
                 fontWeight = FontWeight.Medium,
-                fontSize = 14.sp,
+                fontSize = UiTokens.TextBodyLarge,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -729,13 +731,13 @@ private fun SummaryInfoRow(
                 OutlinedButton(
                     onClick = onTrailingAction,
                     modifier = Modifier.height(30.dp),
-                    shape = RoundedCornerShape(8.dp),
+                    shape = RoundedCornerShape(UiTokens.RadiusMedium),
                     border = BorderStroke(1.dp, SettingColors.ButtonBorder.copy(alpha = 0.72f)),
                     colors = ButtonDefaults.outlinedButtonColors(
                         containerColor = SettingColors.Surface,
                         contentColor = SettingColors.Muted
                     ),
-                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+                    contentPadding = PaddingValues(horizontal = UiTokens.SpaceSmall, vertical = 0.dp)
                 ) {
                     Icon(
                         imageVector = trailingIcon,
@@ -761,17 +763,17 @@ private fun StatusPill(statusText: String, tone: StatusTone) {
 
     Surface(
         modifier = Modifier.widthIn(max = 360.dp),
-        shape = RoundedCornerShape(999.dp),
+        shape = RoundedCornerShape(UiTokens.BadgeRadius),
         color = background,
         border = BorderStroke(1.dp, border)
     ) {
         Text(
             text = statusText,
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp),
+            modifier = Modifier.padding(horizontal = UiTokens.SpaceSmall, vertical = UiTokens.SpaceXSmall),
             style = MaterialTheme.typography.bodySmall,
             color = color,
             fontWeight = FontWeight.SemiBold,
-            fontSize = 12.sp,
+            fontSize = UiTokens.TextCaption,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
@@ -783,44 +785,45 @@ private fun SettingValueRow(
     title: String,
     description: String,
     value: String,
-    valueColor: Color = SettingColors.Text,
+    valueColor: Color = Color.Unspecified,
     trailingIcon: ImageVector? = null,
     trailingIconDescription: String? = null,
     onTrailingAction: (() -> Unit)? = null
 ) {
+    val resolvedValueColor = if (valueColor == Color.Unspecified) SettingColors.Text else valueColor
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .height(56.dp)
-            .padding(horizontal = 16.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+            .padding(horizontal = UiTokens.SpaceLarge),
+        horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Column(modifier = Modifier.weight(0.62f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+        Column(modifier = Modifier.weight(0.62f), verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceXSmall)) {
             Text(
                 text = title,
                 style = MaterialTheme.typography.bodyMedium,
                 color = SettingColors.Text,
                 fontWeight = FontWeight.Medium,
-                fontSize = 14.sp
+                fontSize = UiTokens.TextBodyLarge
             )
             Text(
                 text = description,
                 style = MaterialTheme.typography.bodySmall,
                 color = SettingColors.Muted,
-                fontSize = 12.sp
+                fontSize = UiTokens.TextCaption
             )
         }
         Column(
             modifier = Modifier.weight(0.38f),
             horizontalAlignment = Alignment.End,
-            verticalArrangement = Arrangement.spacedBy(4.dp)
+            verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceXSmall)
         ) {
             Text(
                 text = value,
                 style = MaterialTheme.typography.bodyMedium,
-                color = valueColor,
-                fontSize = 14.sp,
+                color = resolvedValueColor,
+                fontSize = UiTokens.TextBodyLarge,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis
             )
@@ -828,13 +831,13 @@ private fun SettingValueRow(
                 OutlinedButton(
                     onClick = onTrailingAction,
                     modifier = Modifier.height(30.dp),
-                    shape = RoundedCornerShape(8.dp),
+                    shape = RoundedCornerShape(UiTokens.RadiusMedium),
                     border = BorderStroke(1.dp, SettingColors.ButtonBorder.copy(alpha = 0.72f)),
                     colors = ButtonDefaults.outlinedButtonColors(
                         containerColor = SettingColors.Surface,
                         contentColor = SettingColors.Muted
                     ),
-                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+                    contentPadding = PaddingValues(horizontal = UiTokens.SpaceSmall, vertical = 0.dp)
                 ) {
                     Icon(
                         imageVector = trailingIcon,
@@ -861,30 +864,30 @@ private fun SettingsDropdownRow(
         modifier = Modifier
             .fillMaxWidth()
             .height(56.dp)
-            .padding(horizontal = 16.dp),
+            .padding(horizontal = UiTokens.SpaceLarge),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
+        horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium)
     ) {
-        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceXSmall)) {
             Text(
                 text = title,
                 style = MaterialTheme.typography.bodyMedium,
                 color = SettingColors.Text,
                 fontWeight = FontWeight.Medium,
-                fontSize = 14.sp
+                fontSize = UiTokens.TextBodyLarge
             )
             Text(
                 text = description,
                 style = MaterialTheme.typography.bodySmall,
                 color = SettingColors.Muted,
-                fontSize = 12.sp
+                fontSize = UiTokens.TextCaption
             )
         }
 
         Box {
             Surface(
                 onClick = { onExpandedChange(!expanded) },
-                shape = RoundedCornerShape(8.dp),
+                shape = RoundedCornerShape(UiTokens.RadiusMedium),
                 color = SettingColors.Surface,
                 border = BorderStroke(1.dp, SettingColors.ButtonBorder.copy(alpha = 0.72f)),
                 tonalElevation = 0.dp,
@@ -893,22 +896,22 @@ private fun SettingsDropdownRow(
                 Row(
                     modifier = Modifier
                         .height(32.dp)
-                        .padding(horizontal = 10.dp),
+                        .padding(horizontal = UiTokens.SpaceSmall),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
                         text = value,
                         style = MaterialTheme.typography.bodyMedium,
                         color = SettingColors.Text,
-                        fontSize = 14.sp,
+                        fontSize = UiTokens.TextBodyLarge,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
                     Icon(
-                        imageVector = Icons.Default.ArrowDropDown,
+                        imageVector = IconParkIcons.ArrowDown,
                         contentDescription = null,
                         tint = SettingColors.Muted,
-                        modifier = Modifier.size(16.dp)
+                        modifier = Modifier.size(UiTokens.IconSmall)
                     )
                 }
             }
@@ -933,23 +936,23 @@ private fun SettingSwitchRow(
         modifier = Modifier
             .fillMaxWidth()
             .height(56.dp)
-            .padding(horizontal = 16.dp),
+            .padding(horizontal = UiTokens.SpaceLarge),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceXSmall)) {
             Text(
                 text = title,
                 style = MaterialTheme.typography.bodyMedium,
                 color = SettingColors.Text,
                 fontWeight = FontWeight.Medium,
-                fontSize = 14.sp
+                fontSize = UiTokens.TextBodyLarge
             )
             Text(
                 text = description,
                 style = MaterialTheme.typography.bodySmall,
                 color = SettingColors.Muted,
-                fontSize = 12.sp
+                fontSize = UiTokens.TextCaption
             )
         }
         Switch(checked = checked, onCheckedChange = onCheckedChange)

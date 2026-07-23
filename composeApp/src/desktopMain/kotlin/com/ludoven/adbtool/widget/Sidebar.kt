@@ -57,6 +57,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.ludoven.adbtool.TabItem
 import com.ludoven.adbtool.UiTokens
+import com.ludoven.adbtool.QadbColors
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 
@@ -86,21 +87,21 @@ fun Sidebar(
         Column(
             modifier = Modifier
                 .fillMaxHeight()
-                .padding(horizontal = 14.dp, vertical = 18.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
+                .padding(horizontal = UiTokens.SpaceMedium, vertical = UiTokens.SpaceLarge),
+            verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(bottom = 18.dp, start = 8.dp, top = 2.dp)
+            modifier = Modifier.padding(bottom = UiTokens.SpaceLarge, start = UiTokens.SpaceSmall, top = UiTokens.SpaceXSmall)
             ) {
                 Image(
                     painter = painterResource(Res.drawable.ic_logo),
                     contentDescription = null,
                     modifier = Modifier
                         .size(34.dp)
-                        .clip(RoundedCornerShape(6.dp))
+                        .clip(RoundedCornerShape(UiTokens.RadiusSmall))
                 )
-                Spacer(modifier = Modifier.width(12.dp))
+                Spacer(modifier = Modifier.width(UiTokens.SpaceMedium))
                 Column {
                     Text(
                         text = "QADB",
@@ -113,7 +114,7 @@ fun Sidebar(
 
             groups.forEachIndexed { groupIndex, group ->
                 if (groupIndex > 0) {
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(UiTokens.SpaceSmall))
                 }
                 val isExpanded = group.collapsible && group.id in visibleGroupIds
                 SidebarGroupHeader(
@@ -182,7 +183,7 @@ private fun SidebarGroupHeader(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(44.dp)
+            .height(UiTokens.ListRowHeight)
             .clip(shape)
             .background(backgroundColor)
             .border(
@@ -199,7 +200,7 @@ private fun SidebarGroupHeader(
             .hoverable(interactionSource)
             .clickable(interactionSource = interactionSource, indication = null, role = Role.Button, onClick = onClick)
             .focusable(interactionSource = interactionSource)
-            .padding(horizontal = 12.dp),
+            .padding(horizontal = UiTokens.SpaceMedium),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(
@@ -208,7 +209,7 @@ private fun SidebarGroupHeader(
             tint = contentColor,
             modifier = Modifier.size(19.dp)
         )
-        Spacer(modifier = Modifier.width(10.dp))
+        Spacer(modifier = Modifier.width(UiTokens.SpaceSmall))
         Text(
             text = group.label,
             color = contentColor,
@@ -222,7 +223,7 @@ private fun SidebarGroupHeader(
             imageVector = if (isExpanded) IconParkIcons.ArrowDown else IconParkIcons.Right,
             contentDescription = null,
             tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (group.collapsible) 1f else 0f),
-            modifier = Modifier.size(18.dp)
+            modifier = Modifier.size(UiTokens.IconMedium)
         )
     }
 }
@@ -274,7 +275,7 @@ private fun SidebarItem(
             .hoverable(interactionSource)
             .clickable(interactionSource = interactionSource, indication = null, role = Role.Button, onClick = onClick)
             .focusable(interactionSource = interactionSource)
-            .padding(start = 20.dp, end = 10.dp),
+            .padding(start = UiTokens.SpaceXLarge, end = UiTokens.SpaceSmall),
         verticalAlignment = Alignment.CenterVertically
     ) {
         if (isSelected) {
@@ -285,9 +286,9 @@ private fun SidebarItem(
                     .clip(RoundedCornerShape(UiTokens.BadgeRadius))
                     .background(MaterialTheme.colorScheme.primary)
             )
-            Spacer(modifier = Modifier.width(10.dp))
+            Spacer(modifier = Modifier.width(UiTokens.SpaceSmall))
         } else {
-            Spacer(modifier = Modifier.width(13.dp))
+            Spacer(modifier = Modifier.width(UiTokens.SpaceMedium))
         }
 
         Icon(
@@ -297,7 +298,7 @@ private fun SidebarItem(
                 modifier = Modifier.size(UiTokens.IconMedium)
         )
 
-        Spacer(modifier = Modifier.width(10.dp))
+        Spacer(modifier = Modifier.width(UiTokens.SpaceSmall))
 
         Text(
             text = item.title,
@@ -323,7 +324,7 @@ private fun ConnectedStatusCard(
     val interactionSource = remember { MutableInteractionSource() }
     val shape = RoundedCornerShape(UiTokens.RowRadius)
     val isConnected = !selectedDevice.isNullOrBlank() && connectedDeviceCount > 0
-    val statusColor = if (isConnected) Color(0xFF2DBE60) else MaterialTheme.colorScheme.onSurfaceVariant
+    val statusColor = if (isConnected) QadbColors.success else MaterialTheme.colorScheme.onSurfaceVariant
     val noDeviceText = stringResource(Res.string.no_device)
     val selectedModel = selectedDevice
         ?.let { deviceDisplayNames[it]?.trim().orEmpty() }
@@ -361,7 +362,7 @@ private fun ConnectedStatusCard(
                     role = Role.Button
                 ) { expanded = !expanded }
                 .focusable(enabled = devices.isNotEmpty(), interactionSource = interactionSource)
-                .padding(horizontal = 10.dp, vertical = 9.dp),
+                .padding(horizontal = UiTokens.SpaceSmall, vertical = UiTokens.SpaceSmall),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
@@ -371,9 +372,9 @@ private fun ConnectedStatusCard(
                     .background(statusColor)
             )
 
-            Spacer(modifier = Modifier.width(10.dp))
+            Spacer(modifier = Modifier.width(UiTokens.SpaceSmall))
 
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceXSmall)) {
                 Text(
                     text = "$statusText · $countText",
                     style = MaterialTheme.typography.labelMedium,
@@ -405,7 +406,7 @@ private fun ConnectedStatusCard(
                 imageVector = IconParkIcons.Right,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(16.dp)
+                modifier = Modifier.size(UiTokens.IconSmall)
             )
         }
 

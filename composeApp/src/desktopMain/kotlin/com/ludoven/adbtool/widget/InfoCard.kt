@@ -51,7 +51,7 @@ fun InfoCard(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 12.dp, vertical = 8.dp),
+                .padding(horizontal = UiTokens.SpaceMedium, vertical = UiTokens.SpaceSmall),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
@@ -62,9 +62,9 @@ fun InfoCard(
                 modifier = Modifier
                     .size(30.dp)
                     .background(iconColor.copy(alpha = 0.08f), RoundedCornerShape(UiTokens.RadiusSmall))
-                    .padding(4.dp)
+                    .padding(UiTokens.SpaceXSmall)
             )
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(UiTokens.SpaceXSmall))
 
             Text(
                 text = value,
@@ -75,7 +75,7 @@ fun InfoCard(
                 overflow = TextOverflow.Ellipsis
             )
 
-            Spacer(modifier = Modifier.height(2.dp))
+            Spacer(modifier = Modifier.height(UiTokens.SpaceXSmall))
 
             Text(
                 text = title,

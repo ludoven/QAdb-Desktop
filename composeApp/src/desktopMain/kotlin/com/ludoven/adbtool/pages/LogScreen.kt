@@ -94,6 +94,8 @@ import com.ludoven.adbtool.entity.LogEntry
 import com.ludoven.adbtool.entity.LogFilter
 import com.ludoven.adbtool.entity.LogLevel
 import com.ludoven.adbtool.UiTokens
+import com.ludoven.adbtool.QadbColors
+import com.ludoven.adbtool.ui.icons.IconParkIcons
 import com.ludoven.adbtool.ui.mac.Button
 import com.ludoven.adbtool.ui.mac.ButtonDefaults
 import com.ludoven.adbtool.ui.mac.Card
@@ -189,19 +191,19 @@ fun LogScreen(
         modifier = Modifier
             .fillMaxSize()
             .padding(horizontal = UiTokens.PagePaddingCompact, vertical = UiTokens.SectionSpacingCompact),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.Top
         ) {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceXSmall)) {
                 Text(
                     text = stringResource(Res.string.log_title),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
-                    fontSize = 17.sp
+                    fontSize = UiTokens.TextSectionLarge
                 )
                 Text(
                     text = stringResource(Res.string.log_subtitle),
@@ -210,9 +212,9 @@ fun LogScreen(
                 )
             }
 
-            Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)) {
                 CaptureStatusBadge(isCapturing = isCapturing)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Row(horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall), verticalAlignment = Alignment.CenterVertically) {
                     Button(
                         onClick = {
                             if (isCapturing) {
@@ -224,20 +226,20 @@ fun LogScreen(
                         enabled = (captureDevice != null || isCapturing) && !isLoading,
                         colors = ButtonDefaults.buttonColors(
                             containerColor = MaterialTheme.colorScheme.primary,
-                            contentColor = Color.White
+                            contentColor = QadbColors.onPrimary
                         )
                     ) {
                         Icon(
                             imageVector = if (isCapturing) Icons.Default.Pause else Icons.Default.PlayArrow,
                             contentDescription = null,
-                            tint = Color.White,
+                            tint = QadbColors.onPrimary,
                             modifier = Modifier.width(16.dp)
                         )
-                        Spacer(modifier = Modifier.width(6.dp))
+                        Spacer(modifier = Modifier.width(UiTokens.SpaceSmall))
                         Text(
                             text = if (isCapturing) stringResource(Res.string.log_pause) else stringResource(Res.string.log_resume),
                             style = MaterialTheme.typography.labelLarge,
-                            color = Color.White
+                            color = QadbColors.onPrimary
                         )
                     }
 
@@ -249,7 +251,7 @@ fun LogScreen(
 
                     ToolbarButton(
                         text = stringResource(Res.string.log_export),
-                        icon = Icons.Default.FileDownload,
+                        icon = IconParkIcons.Download,
                         onClick = {
                             val dialog = FileDialog(null as Frame?, "Export Logs", FileDialog.SAVE)
                             dialog.isVisible = true
@@ -274,7 +276,7 @@ fun LogScreen(
                     Box {
                         ToolbarButton(
                             text = stringResource(Res.string.log_more),
-                            icon = Icons.Default.MoreHoriz,
+                            icon = IconParkIcons.More,
                             onClick = { showMoreMenu = true }
                         )
                         DropdownMenu(
@@ -284,7 +286,7 @@ fun LogScreen(
                             DropdownMenuItem(
                                 text = { Text(stringResource(Res.string.log_more_restart)) },
                                 leadingIcon = {
-                                    Icon(Icons.Default.Refresh, contentDescription = null)
+                                    Icon(IconParkIcons.Refresh, contentDescription = null)
                                 },
                                 enabled = captureDevice != null && !isLoading,
                                 onClick = {
@@ -300,17 +302,17 @@ fun LogScreen(
 
         Card(
             modifier = Modifier.fillMaxWidth(),
-            shape = androidx.compose.foundation.shape.RoundedCornerShape(10.dp)
+            shape = androidx.compose.foundation.shape.RoundedCornerShape(UiTokens.RadiusMedium)
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(12.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
+                    .padding(UiTokens.SpaceMedium),
+                verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     FilterInput(
@@ -320,7 +322,7 @@ fun LogScreen(
                             selectedQuickChip = null
                         },
                         placeholder = stringResource(Res.string.log_filter_keyword),
-                        leadingIcon = Icons.Default.Search,
+                        leadingIcon = IconParkIcons.Search,
                         modifier = Modifier.weight(1f)
                     )
 
@@ -391,7 +393,7 @@ fun LogScreen(
 
                 Row(
                     modifier = Modifier.horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     QuickFilterChip(
@@ -455,7 +457,7 @@ fun LogScreen(
             InlineStatusBanner(
                 text = stringResource(Res.string.log_no_device),
                 tone = InlineStatusTone.Warning,
-                icon = Icons.Default.Refresh
+                icon = IconParkIcons.Refresh
             )
         }
 
@@ -463,7 +465,7 @@ fun LogScreen(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth(),
-            shape = androidx.compose.foundation.shape.RoundedCornerShape(10.dp)
+            shape = androidx.compose.foundation.shape.RoundedCornerShape(UiTokens.RadiusMedium)
         ) {
             Column(modifier = Modifier.fillMaxSize()) {
                 LogTableHeader()
@@ -487,7 +489,7 @@ fun LogScreen(
                             LazyColumn(
                                 modifier = Modifier
                                     .fillMaxSize()
-                                    .padding(end = 10.dp),
+                                    .padding(end = UiTokens.SpaceSmall),
                                 state = listState
                             ) {
                                 itemsIndexed(filteredLogs, key = { index, item -> "${item.timestamp}_${item.pid}_${index}" }) { _, entry ->
@@ -503,8 +505,8 @@ fun LogScreen(
                             modifier = Modifier
                                 .align(Alignment.CenterEnd)
                                 .fillMaxHeight()
-                                .padding(end = 2.dp)
-                                .padding(vertical = 6.dp)
+                                .padding(end = UiTokens.SpaceXSmall)
+                                .padding(vertical = UiTokens.SpaceSmall)
                         )
                     }
                 }
@@ -516,7 +518,7 @@ fun LogScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                        .padding(horizontal = UiTokens.SpaceMedium, vertical = UiTokens.SpaceSmall),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -526,7 +528,7 @@ fun LogScreen(
                         color = MaterialTheme.colorScheme.error
                     )
                     IconButton(onClick = { viewModel.clearError() }, modifier = Modifier.width(24.dp)) {
-                        Icon(Icons.Default.Close, contentDescription = stringResource(Res.string.log_dismiss))
+                        Icon(IconParkIcons.Close, contentDescription = stringResource(Res.string.log_dismiss))
                     }
                 }
             }
@@ -536,15 +538,15 @@ fun LogScreen(
 
 @Composable
 private fun CaptureStatusBadge(isCapturing: Boolean) {
-    val background = if (isCapturing) Color(0xFFEAF4FF) else Color(0xFFF2F4F7)
-    val textColor = if (isCapturing) Color(0xFF2563EB) else MaterialTheme.colorScheme.onSurfaceVariant
+    val background = if (isCapturing) QadbColors.primaryContainer else QadbColors.surfaceVariant
+    val textColor = if (isCapturing) QadbColors.primary else MaterialTheme.colorScheme.onSurfaceVariant
 
     Box(
         modifier = Modifier
-            .clip(androidx.compose.foundation.shape.RoundedCornerShape(999.dp))
+            .clip(androidx.compose.foundation.shape.RoundedCornerShape(UiTokens.BadgeRadius))
             .background(background)
-            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, androidx.compose.foundation.shape.RoundedCornerShape(999.dp))
-            .padding(horizontal = 9.dp, vertical = 4.dp)
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, androidx.compose.foundation.shape.RoundedCornerShape(UiTokens.BadgeRadius))
+            .padding(horizontal = UiTokens.SpaceSmall, vertical = UiTokens.SpaceXSmall)
     ) {
         Text(
             text = if (isCapturing) stringResource(Res.string.log_capture_running) else stringResource(Res.string.log_capture_paused),
@@ -573,7 +575,7 @@ private fun ToolbarButton(
         modifier = Modifier.height(32.dp)
     ) {
         Icon(icon, contentDescription = null, modifier = Modifier.width(13.dp))
-        Spacer(modifier = Modifier.width(5.dp))
+        Spacer(modifier = Modifier.width(UiTokens.SpaceSmall))
         Text(text = text, style = MaterialTheme.typography.bodySmall)
     }
 }
@@ -583,11 +585,11 @@ private fun FilterSelect(text: String, onClick: () -> Unit, modifier: Modifier =
     Row(
         modifier = modifier
             .height(36.dp)
-            .clip(androidx.compose.foundation.shape.RoundedCornerShape(10.dp))
+            .clip(androidx.compose.foundation.shape.RoundedCornerShape(UiTokens.RadiusMedium))
             .background(MaterialTheme.colorScheme.surface)
-            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, androidx.compose.foundation.shape.RoundedCornerShape(10.dp))
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, androidx.compose.foundation.shape.RoundedCornerShape(UiTokens.RadiusMedium))
             .clickable { onClick() }
-            .padding(horizontal = 10.dp),
+            .padding(horizontal = UiTokens.SpaceSmall),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
@@ -598,7 +600,7 @@ private fun FilterSelect(text: String, onClick: () -> Unit, modifier: Modifier =
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f)
         )
-        Icon(Icons.Default.ArrowDropDown, contentDescription = null)
+        Icon(IconParkIcons.ArrowDown, contentDescription = null)
     }
 }
 
@@ -613,10 +615,10 @@ private fun FilterInput(
     Box(
         modifier = modifier
             .height(36.dp)
-            .clip(androidx.compose.foundation.shape.RoundedCornerShape(10.dp))
+            .clip(androidx.compose.foundation.shape.RoundedCornerShape(UiTokens.RadiusMedium))
             .background(MaterialTheme.colorScheme.surface)
-            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, androidx.compose.foundation.shape.RoundedCornerShape(10.dp))
-            .padding(horizontal = 10.dp),
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, androidx.compose.foundation.shape.RoundedCornerShape(UiTokens.RadiusMedium))
+            .padding(horizontal = UiTokens.SpaceSmall),
         contentAlignment = Alignment.CenterStart
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -627,7 +629,7 @@ private fun FilterInput(
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.width(14.dp)
                 )
-                Spacer(modifier = Modifier.width(6.dp))
+                Spacer(modifier = Modifier.width(UiTokens.SpaceSmall))
             }
             BasicTextField(
                 value = value,
@@ -662,24 +664,24 @@ private fun QuickFilterChip(
 ) {
     Box(
         modifier = Modifier
-            .clip(androidx.compose.foundation.shape.RoundedCornerShape(999.dp))
+            .clip(androidx.compose.foundation.shape.RoundedCornerShape(UiTokens.BadgeRadius))
             .background(
                 if (active) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f)
                 else MaterialTheme.colorScheme.surfaceVariant
             )
             .border(
                 1.dp,
-                if (active) Color(0xFFC8DBFF) else MaterialTheme.colorScheme.outlineVariant,
-                androidx.compose.foundation.shape.RoundedCornerShape(999.dp)
+                if (active) QadbColors.selectedBorder else MaterialTheme.colorScheme.outlineVariant,
+                androidx.compose.foundation.shape.RoundedCornerShape(UiTokens.BadgeRadius)
             )
             .clickable(enabled = enabled) { onClick() }
-            .padding(horizontal = 10.dp, vertical = 5.dp)
+            .padding(horizontal = UiTokens.SpaceSmall, vertical = UiTokens.SpaceSmall)
     ) {
         Text(
             text = text,
             style = MaterialTheme.typography.labelSmall,
             color = if (enabled) {
-                if (active) Color(0xFF1D4ED8) else MaterialTheme.colorScheme.onSurfaceVariant
+                if (active) QadbColors.primary else MaterialTheme.colorScheme.onSurfaceVariant
             } else {
                 MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
             }
@@ -693,7 +695,7 @@ private fun LogTableHeader() {
         modifier = Modifier
             .fillMaxWidth()
             .background(MaterialTheme.colorScheme.surfaceVariant)
-            .padding(horizontal = 10.dp, vertical = 8.dp),
+            .padding(horizontal = UiTokens.SpaceSmall, vertical = UiTokens.SpaceSmall),
         verticalAlignment = Alignment.CenterVertically
     ) {
         HeaderCell(text = stringResource(Res.string.log_header_time), width = 108.dp)
@@ -726,9 +728,9 @@ private fun LogTableRow(
     val interactionSource = remember { MutableInteractionSource() }
     val hovered by interactionSource.collectIsHoveredAsState()
     val baseColor = when {
-        entry.level == LogLevel.ERROR || entry.level == LogLevel.FATAL -> Color(0xFFFFF5F5)
-        entry.level == LogLevel.WARN -> Color(0xFFFFF9F1)
-        hovered -> Color(0xFFF8FAFC)
+        entry.level == LogLevel.ERROR || entry.level == LogLevel.FATAL -> QadbColors.errorSurface
+        entry.level == LogLevel.WARN -> QadbColors.warningSurface
+        hovered -> QadbColors.surfaceHover
         else -> Color.Transparent
     }
 
@@ -737,7 +739,7 @@ private fun LogTableRow(
             .fillMaxWidth()
             .background(baseColor)
             .hoverable(interactionSource = interactionSource)
-            .padding(horizontal = 10.dp, vertical = 6.dp),
+            .padding(horizontal = UiTokens.SpaceSmall, vertical = UiTokens.SpaceSmall),
         verticalAlignment = Alignment.Top
     ) {
         TableCell(
@@ -768,7 +770,7 @@ private fun TableCell(
     val resolved = if (width != null) modifier.width(width) else modifier
     Text(
         text = text,
-        modifier = resolved.padding(end = 8.dp),
+        modifier = resolved.padding(end = UiTokens.SpaceSmall),
         style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.6.sp),
         fontFamily = if (mono) FontFamily.Monospace else null,
         color = MaterialTheme.colorScheme.onSurface,
@@ -791,9 +793,9 @@ private fun LevelBadge(level: LogLevel, modifier: Modifier = Modifier) {
     Box(modifier = modifier, contentAlignment = Alignment.CenterStart) {
         Box(
             modifier = Modifier
-                .clip(androidx.compose.foundation.shape.RoundedCornerShape(6.dp))
+                .clip(androidx.compose.foundation.shape.RoundedCornerShape(UiTokens.RadiusSmall))
                 .background(colors.first)
-                .padding(horizontal = 6.dp, vertical = 2.dp)
+                .padding(horizontal = UiTokens.SpaceSmall, vertical = UiTokens.SpaceXSmall)
         ) {
             Text(
                 text = level.displayName,

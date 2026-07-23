@@ -59,6 +59,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.geometry.RoundRect
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
@@ -85,7 +90,12 @@ private const val GITHUB_URL = "https://github.com/ludoven/QADB"
 private const val FEEDBACK_URL = "https://github.com/ludoven/QADB/issues"
 
 fun main() = application {
+    val isMacOs = System.getProperty("os.name").contains("mac", ignoreCase = true)
     val isWindows = System.getProperty("os.name").contains("windows", ignoreCase = true)
+    val baseAppIcon = painterResource(Res.drawable.ic_logo)
+    val appIcon = remember(baseAppIcon, isMacOs) {
+        if (isMacOs) RoundedMacDockIconPainter(baseAppIcon) else baseAppIcon
+    }
     val windowState = rememberWindowState(
         width = 1200.dp,
         height = 800.dp,
@@ -103,7 +113,7 @@ fun main() = application {
         onCloseRequest = shutdownAndExit,
         state = windowState,
         title = "QADB",
-        icon = painterResource(Res.drawable.ic_logo),
+        icon = appIcon,
         alwaysOnTop = alwaysOnTop
     ) {
         if (!isWindows) {
@@ -133,6 +143,21 @@ fun main() = application {
             }
         }
         App()
+    }
+}
+
+private class RoundedMacDockIconPainter(
+    private val delegate: Painter
+) : Painter() {
+    override val intrinsicSize = delegate.intrinsicSize
+
+    override fun DrawScope.onDraw() {
+        val radius = size.minDimension * 0.22f
+        clipPath(Path().apply {
+            addRoundRect(RoundRect(0f, 0f, size.width, size.height, radius, radius))
+        }) {
+            with(delegate) { draw(size) }
+        }
     }
 }
 

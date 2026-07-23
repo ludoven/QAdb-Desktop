@@ -13,7 +13,10 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.ludoven.adbtool.UiTokens
 import com.ludoven.adbtool.viewmodel.DeviceMirrorViewModel
 import com.ludoven.adbtool.viewmodel.KeyEventViewModel
@@ -49,16 +52,19 @@ fun DeviceControlScreen(
             val stacked = maxWidth < 1180.dp
             Column(
                 modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium)
             ) {
                 PageHeader(
                     title = l10n("设备控制", "Device Control"),
-                    subtitle = l10n("镜像、文本输入、方向键和常用系统按键", "Mirror, text input, directional pad and common system keys")
+                    subtitle = l10n("镜像、文本输入、方向键和常用系统按键", "Mirror, text input, directional pad and common system keys"),
+                    titleFontFamily = FontFamily.Serif,
+                    titleFontSize = 28.sp,
+                    titleFontWeight = FontWeight.Bold
                 )
                 if (stacked) {
                     Column(
                         modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                        verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium)
                     ) {
                         DeviceMirrorScreen(
                             viewModel = mirrorViewModel,
@@ -83,7 +89,7 @@ fun DeviceControlScreen(
                 } else {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium)
                     ) {
                         DeviceMirrorScreen(
                             viewModel = mirrorViewModel,

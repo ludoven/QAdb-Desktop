@@ -43,7 +43,7 @@ fun <T> ProductTabBar(
 ) {
     Row(
         modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall),
         verticalAlignment = Alignment.CenterVertically
     ) {
         tabs.forEach { tab ->
@@ -82,7 +82,7 @@ fun <T> ProductTabBar(
                 Row(
                     modifier = Modifier
                         .height(UiTokens.ToolbarHeight)
-                        .padding(horizontal = 13.dp),
+                        .padding(horizontal = UiTokens.SpaceMedium),
                     horizontalArrangement = Arrangement.Center,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -91,7 +91,7 @@ fun <T> ProductTabBar(
                         contentDescription = null,
                         modifier = Modifier.size(UiTokens.IconSmall)
                     )
-                    Spacer(modifier = Modifier.width(7.dp))
+                    Spacer(modifier = Modifier.width(UiTokens.SpaceSmall))
                     Text(
                         text = tab.label,
                         style = MaterialTheme.typography.labelLarge,

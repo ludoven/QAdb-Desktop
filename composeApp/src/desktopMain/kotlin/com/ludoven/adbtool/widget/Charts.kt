@@ -1,5 +1,7 @@
 package com.ludoven.adbtool.widget
 
+import com.ludoven.adbtool.UiTokens
+
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
@@ -66,7 +68,7 @@ fun RealtimeLineChart(
     val textMeasurer = rememberTextMeasurer()
     val labelTextStyle = MaterialTheme.typography.bodySmall.copy(
         color = textColor,
-        fontSize = 10.sp
+        fontSize = UiTokens.TextMicro
     )
 
     Box(modifier = modifier.height(chartHeight)) {
@@ -147,7 +149,7 @@ fun RealtimeLineChart(
                 text = label,
                 modifier = Modifier
                     .align(Alignment.TopEnd)
-                    .padding(top = 4.dp, end = 4.dp),
+                    .padding(top = UiTokens.SpaceXSmall, end = UiTokens.SpaceXSmall),
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.SemiBold,
                 color = lineColor
@@ -170,7 +172,7 @@ fun MultiRealtimeLineChart(
 
     Column(
         modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
+        verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
     ) {
         Canvas(
             modifier = Modifier
@@ -224,18 +226,18 @@ fun MultiRealtimeLineChart(
 
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+            horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium)
         ) {
             visibleSeries.forEach { currentSeries ->
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
                 ) {
                     Box(
                         modifier = Modifier
                             .width(12.dp)
                             .height(12.dp)
-                            .background(currentSeries.lineColor, RoundedCornerShape(999.dp))
+                            .background(currentSeries.lineColor, RoundedCornerShape(UiTokens.BadgeRadius))
                     )
                     Text(
                         text = currentSeries.label,
@@ -287,7 +289,7 @@ fun HorizontalBarChart(
 
     Column(
         modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(6.dp)
+        verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
     ) {
         displayItems.forEach { item ->
             val animatedProgress by animateFloatAsState(
@@ -315,14 +317,14 @@ fun HorizontalBarChart(
                         .height(16.dp)
                         .background(
                             MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                            RoundedCornerShape(4.dp)
+                            RoundedCornerShape(UiTokens.SpaceXSmall)
                         )
                 ) {
                     Box(
                         modifier = Modifier
                             .fillMaxHeight()
                             .fillMaxWidth(animatedProgress)
-                            .background(barColor.copy(alpha = 0.7f), RoundedCornerShape(4.dp))
+                            .background(barColor.copy(alpha = 0.7f), RoundedCornerShape(UiTokens.SpaceXSmall))
                     )
                 }
 

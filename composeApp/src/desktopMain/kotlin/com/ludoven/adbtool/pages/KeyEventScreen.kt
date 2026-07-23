@@ -126,6 +126,9 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ludoven.adbtool.UiTokens
+import com.ludoven.adbtool.QadbColors
+import com.ludoven.adbtool.QadbPalette
+import com.ludoven.adbtool.ui.icons.IconParkIcons
 import com.ludoven.adbtool.viewmodel.KeyEventRecord
 import com.ludoven.adbtool.viewmodel.KeyEventViewModel
 import com.ludoven.adbtool.widget.InlineStatusBanner
@@ -161,7 +164,7 @@ private data class KeyAction(
     val titleRes: StringResource,
     val commandName: String,
     val icon: ImageVector,
-    val tint: Color = Color(0xFF2F6BFF)
+    val tint: Color = QadbPalette.Blue
 )
 
 @Composable
@@ -298,16 +301,16 @@ fun KeyEventScreen(
         if (showToast) {
             toastMsg?.let { msg ->
                 Surface(
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(UiTokens.RadiusLarge),
                     color = MaterialTheme.colorScheme.inverseSurface,
                     shadowElevation = 6.dp,
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
-                        .padding(bottom = 24.dp)
+                        .padding(bottom = UiTokens.SpaceXXLarge)
                 ) {
                     Text(
                         text = msg,
-                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
+                        modifier = Modifier.padding(horizontal = UiTokens.SpaceXLarge, vertical = UiTokens.SpaceMedium),
                         color = MaterialTheme.colorScheme.inverseOnSurface,
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Medium
@@ -323,7 +326,7 @@ fun KeyEventScreen(
             onDismissRequest = { showLongPress = false },
             title = { Text(stringResource(Res.string.key_long_press_title)) },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)) {
                     Text(l10n("按键: $lpName", "Key: $lpName"))
                     OutlinedTextField(
                         value = duration,
@@ -338,13 +341,13 @@ fun KeyEventScreen(
             },
             confirmButton = {
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(8.dp),
+                    modifier = Modifier.fillMaxWidth().padding(UiTokens.SpaceSmall),
                     horizontalArrangement = Arrangement.End
                 ) {
                     TextButton(onClick = { showLongPress = false }) {
                         Text(stringResource(Res.string.cancel))
                     }
-                    Spacer(Modifier.width(8.dp))
+                    Spacer(Modifier.width(UiTokens.SpaceSmall))
                     Button(
                         onClick = {
                             showLongPress = false
@@ -399,7 +402,7 @@ private fun KeyEventContent(
             InlineStatusBanner(
                 text = l10n("当前没有选择设备。按键面板可预览命令，发送前需要先连接并选择设备。", "No device is selected. The key panel can preview commands, but sending needs a connected selected device."),
                 tone = InlineStatusTone.Warning,
-                icon = Icons.Default.Info
+                icon = IconParkIcons.Info
             )
         }
 
@@ -413,12 +416,12 @@ private fun KeyEventContent(
 
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium),
             verticalAlignment = Alignment.Top
         ) {
             Column(
                 modifier = Modifier.weight(1.05f),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
+                verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
             ) {
                 VisualKeyPanel(
                     showAdbCommand = showAdbCommand,
@@ -428,7 +431,7 @@ private fun KeyEventContent(
 
             Column(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
+                verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
             ) {
                 CustomKeyCodePanel(
                     customCode = customCode,
@@ -463,13 +466,13 @@ private fun DeviceTextInputPanel(
 ) {
     SectionSurface(
         title = l10n("发送文本", "Send text"),
-        icon = Icons.AutoMirrored.Filled.Send,
+        icon = IconParkIcons.Send,
         modifier = Modifier.fillMaxWidth()
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 OutlinedTextField(
@@ -478,7 +481,7 @@ private fun DeviceTextInputPanel(
                     enabled = !isSending,
                     singleLine = true,
                     placeholder = { Text(l10n("输入要发送到设备的文本", "Text to send to device")) },
-                    modifier = Modifier.weight(1f).height(UiTokens.ControlHeight),
+                    modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(UiTokens.RadiusMedium)
                 )
                 Button(
@@ -487,8 +490,8 @@ private fun DeviceTextInputPanel(
                     modifier = Modifier.height(UiTokens.ControlHeight),
                     shape = RoundedCornerShape(UiTokens.RadiusMedium)
                 ) {
-                    Icon(Icons.AutoMirrored.Filled.Send, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(Modifier.width(6.dp))
+                    Icon(IconParkIcons.Send, contentDescription = null, modifier = Modifier.size(UiTokens.IconSmall))
+                    Spacer(Modifier.width(UiTokens.SpaceSmall))
                     Text(if (isSending) l10n("发送中", "Sending") else l10n("发送", "Send"))
                 }
             }
@@ -502,7 +505,7 @@ private fun DeviceTextInputPanel(
 @Composable
 private fun Header(connectedText: String, connected: Boolean) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 2.dp, vertical = 4.dp),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = UiTokens.SpaceXSmall, vertical = UiTokens.SpaceXSmall),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(
@@ -511,8 +514,8 @@ private fun Header(connectedText: String, connected: Boolean) {
             tint = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.size(28.dp)
         )
-        Spacer(Modifier.width(16.dp))
-        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Spacer(Modifier.width(UiTokens.SpaceLarge))
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceXSmall)) {
             Text(
                 text = stringResource(Res.string.key_event_title),
                 style = MaterialTheme.typography.headlineSmall,
@@ -526,20 +529,20 @@ private fun Header(connectedText: String, connected: Boolean) {
             )
         }
         Surface(
-            shape = RoundedCornerShape(12.dp),
+            shape = RoundedCornerShape(UiTokens.RadiusLarge),
             color = MaterialTheme.colorScheme.surface,
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.65f))
         ) {
             Row(
-                modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                modifier = Modifier.padding(horizontal = UiTokens.SpaceMedium, vertical = UiTokens.SpaceSmall),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
             ) {
                 Box(
                     modifier = Modifier
                         .size(12.dp)
                         .clip(CircleShape)
-                        .background(if (connected) Color(0xFF2DBE60) else MaterialTheme.colorScheme.outline)
+                        .background(if (connected) QadbColors.success else MaterialTheme.colorScheme.outline)
                 )
                 Text(
                     text = connectedText,
@@ -565,11 +568,11 @@ private fun VisualKeyPanel(
         Column(
             modifier = Modifier.fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium)
         ) {
             DPad(onAction = onAction)
 
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+            Column(verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall), modifier = Modifier.fillMaxWidth()) {
                 listOf(
                     listOf(navAction(), homeAction(), recentAction(), menuAction()),
                     listOf(powerAction(), volumeUpAction(), volumeDownAction(), muteAction()),
@@ -577,7 +580,7 @@ private fun VisualKeyPanel(
                 ).forEach { row ->
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
                     ) {
                         row.forEach { action ->
                             LargeKeyButton(
@@ -597,14 +600,14 @@ private fun VisualKeyPanel(
 @Composable
 private fun DPad(onAction: (KeyAction) -> Unit) {
     val up = KeyAction(KC.DPAD_UP, Res.string.key_up, "KEYCODE_DPAD_UP", Icons.Default.KeyboardArrowUp)
-    val down = KeyAction(KC.DPAD_DOWN, Res.string.key_down, "KEYCODE_DPAD_DOWN", Icons.Default.KeyboardArrowDown)
+    val down = KeyAction(KC.DPAD_DOWN, Res.string.key_down, "KEYCODE_DPAD_DOWN", IconParkIcons.ArrowDown)
     val left = KeyAction(KC.DPAD_LEFT, Res.string.key_left, "KEYCODE_DPAD_LEFT", Icons.AutoMirrored.Filled.KeyboardArrowLeft)
-    val right = KeyAction(KC.DPAD_RIGHT, Res.string.key_right, "KEYCODE_DPAD_RIGHT", Icons.AutoMirrored.Filled.KeyboardArrowRight)
-    val ok = KeyAction(KC.DPAD_OK, Res.string.confirm, "KEYCODE_DPAD_CENTER", Icons.Default.CheckCircle)
+    val right = KeyAction(KC.DPAD_RIGHT, Res.string.key_right, "KEYCODE_DPAD_RIGHT", IconParkIcons.Right)
+    val ok = KeyAction(KC.DPAD_OK, Res.string.confirm, "KEYCODE_DPAD_CENTER", IconParkIcons.CheckCircle)
 
-    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceXSmall)) {
         DirectionButton(action = up, width = 64.dp, height = 54.dp) { onAction(up) }
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall), verticalAlignment = Alignment.CenterVertically) {
             DirectionButton(action = left, width = 68.dp, height = 56.dp) { onAction(left) }
             OkButton { onAction(ok) }
             DirectionButton(action = right, width = 68.dp, height = 56.dp) { onAction(right) }
@@ -631,10 +634,10 @@ private fun DirectionButton(
             Icon(
                 imageVector = action.icon,
                 contentDescription = label,
-                tint = if (hovered) MaterialTheme.colorScheme.primary else Color(0xFF3578FF),
-                modifier = Modifier.size(22.dp)
+                tint = if (hovered) MaterialTheme.colorScheme.primary else QadbColors.primary,
+                modifier = Modifier.size(UiTokens.IconLarge)
             )
-            Text(label, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface)
+            Text(label, fontSize = UiTokens.TextCaption, color = MaterialTheme.colorScheme.onSurface)
         }
     }
 }
@@ -649,9 +652,9 @@ private fun OkButton(onClick: () -> Unit) {
     ) { hovered ->
         Text(
             text = "OK",
-            color = if (hovered) MaterialTheme.colorScheme.primary else Color(0xFF3578FF),
+            color = if (hovered) MaterialTheme.colorScheme.primary else QadbColors.primary,
             fontWeight = FontWeight.Bold,
-            fontSize = 16.sp
+            fontSize = UiTokens.TextSection
         )
     }
 }
@@ -677,7 +680,7 @@ private fun LargeKeyButton(
                 tint = if (hovered) MaterialTheme.colorScheme.primary else action.tint,
                 modifier = Modifier.size(20.dp)
             )
-            Spacer(Modifier.height(4.dp))
+            Spacer(Modifier.height(UiTokens.SpaceXSmall))
             Text(
                 text = if (showAdbCommand) action.code.toString() else label,
                 style = MaterialTheme.typography.bodySmall,
@@ -703,10 +706,10 @@ private fun CustomKeyCodePanel(
 ) {
     SectionSurface(
         title = stringResource(Res.string.key_custom_keycode),
-        icon = Icons.Default.Code,
+        icon = IconParkIcons.Code,
         modifier = Modifier.fillMaxWidth()
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium)) {
             OutlinedTextField(
                 value = customCode,
                 onValueChange = onCustomCodeChange,
@@ -714,7 +717,7 @@ private fun CustomKeyCodePanel(
                 placeholder = { Text(stringResource(Res.string.custom_keycode_hint)) },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                shape = RoundedCornerShape(8.dp),
+                shape = RoundedCornerShape(UiTokens.RadiusMedium),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = MaterialTheme.colorScheme.primary,
                     unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
@@ -722,29 +725,29 @@ private fun CustomKeyCodePanel(
                     unfocusedContainerColor = MaterialTheme.colorScheme.surface
                 )
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+            Row(horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium), modifier = Modifier.fillMaxWidth()) {
                 Button(
                     onClick = onSend,
                     enabled = customCode.isNotBlank(),
-                    modifier = Modifier.weight(1f).height(44.dp),
-                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.weight(1f).height(UiTokens.ListRowHeight),
+                    shape = RoundedCornerShape(UiTokens.RadiusMedium),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.primary,
                         contentColor = MaterialTheme.colorScheme.onPrimary
                     )
                 ) {
-                    Icon(Icons.AutoMirrored.Filled.Send, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(8.dp))
+                    Icon(IconParkIcons.Send, contentDescription = null, modifier = Modifier.size(UiTokens.IconMedium))
+                    Spacer(Modifier.width(UiTokens.SpaceSmall))
                     Text(stringResource(Res.string.key_send), fontWeight = FontWeight.SemiBold)
                 }
                 OutlinedButton(
                     onClick = onClear,
-                    modifier = Modifier.weight(1f).height(44.dp),
-                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.weight(1f).height(UiTokens.ListRowHeight),
+                    shape = RoundedCornerShape(UiTokens.RadiusMedium),
                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                 ) {
-                    Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(8.dp))
+                    Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(UiTokens.IconMedium))
+                    Spacer(Modifier.width(UiTokens.SpaceSmall))
                     Text(stringResource(Res.string.key_clear))
                 }
             }
@@ -755,10 +758,10 @@ private fun CustomKeyCodePanel(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                Icon(Icons.Default.Info, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 4.dp).size(16.dp))
+                Icon(IconParkIcons.Info, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = UiTokens.SpaceXSmall).size(UiTokens.IconSmall))
                 Spacer(Modifier.weight(1f))
                 Switch(checked = showAdbCommand, onCheckedChange = onShowAdbCommandChange)
-                Spacer(Modifier.width(8.dp))
+                Spacer(Modifier.width(UiTokens.SpaceSmall))
                 Text(
                     text = stringResource(Res.string.key_show_adb_command),
                     style = MaterialTheme.typography.bodyMedium,
@@ -774,38 +777,38 @@ private fun CustomKeyCodePanel(
 private fun CommandPreview(record: KeyEventRecord, onCopy: () -> Unit) {
     SectionSurface(
         title = stringResource(Res.string.key_command_preview),
-        icon = Icons.Default.Code,
+        icon = IconParkIcons.Code,
         modifier = Modifier.fillMaxWidth()
     ) {
         Surface(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(8.dp),
+            shape = RoundedCornerShape(UiTokens.RadiusMedium),
             color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.30f),
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.70f))
         ) {
             Row(
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 9.dp),
+                modifier = Modifier.padding(horizontal = UiTokens.SpaceLarge, vertical = UiTokens.SpaceSmall),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
                     text = record.adbCommand,
                     modifier = Modifier.weight(1f),
                     color = MaterialTheme.colorScheme.onSurface,
-                    fontSize = 15.sp,
+                    fontSize = UiTokens.TextAction,
                     fontWeight = FontWeight.Medium
                 )
                 OutlinedButton(
                     onClick = onCopy,
-                    shape = RoundedCornerShape(8.dp),
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
+                    shape = RoundedCornerShape(UiTokens.RadiusMedium),
+                    contentPadding = PaddingValues(horizontal = UiTokens.SpaceMedium, vertical = UiTokens.SpaceSmall)
                 ) {
-                    Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(8.dp))
+                    Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(UiTokens.IconMedium))
+                    Spacer(Modifier.width(UiTokens.SpaceSmall))
                     Text(stringResource(Res.string.key_copy))
                 }
             }
         }
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(UiTokens.SpaceSmall))
         Text(
             text = stringResource(Res.string.key_command_preview_hint),
             style = MaterialTheme.typography.bodySmall,
@@ -818,30 +821,30 @@ private fun CommandPreview(record: KeyEventRecord, onCopy: () -> Unit) {
 private fun RecentSentPanel(records: List<KeyEventRecord>, onClear: () -> Unit) {
     SectionSurface(
         title = stringResource(Res.string.key_recent_sent),
-        icon = Icons.Default.Schedule,
+        icon = IconParkIcons.Schedule,
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {
             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Spacer(Modifier.weight(1f))
                 if (records.isNotEmpty()) {
-                    TextButton(onClick = onClear, contentPadding = PaddingValues(horizontal = 8.dp)) {
-                        Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text(stringResource(Res.string.key_clear_records), fontSize = 12.sp)
+                    TextButton(onClick = onClear, contentPadding = PaddingValues(horizontal = UiTokens.SpaceSmall)) {
+                        Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(UiTokens.IconSmall))
+                        Spacer(Modifier.width(UiTokens.SpaceSmall))
+                        Text(stringResource(Res.string.key_clear_records), fontSize = UiTokens.TextCaption)
                     }
                 }
             }
             Surface(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(8.dp),
+                shape = RoundedCornerShape(UiTokens.RadiusMedium),
                 color = MaterialTheme.colorScheme.surface,
                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.75f))
             ) {
                 if (records.isEmpty()) {
                     Text(
                         text = l10n("暂无发送记录", "No send history"),
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 16.dp),
+                        modifier = Modifier.padding(horizontal = UiTokens.SpaceMedium, vertical = UiTokens.SpaceLarge),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -863,16 +866,16 @@ private fun RecentSentPanel(records: List<KeyEventRecord>, onClear: () -> Unit) 
 @Composable
 private fun RecentRecordRow(record: KeyEventRecord) {
     Row(
-        modifier = Modifier.fillMaxWidth().height(40.dp).padding(horizontal = 14.dp),
+        modifier = Modifier.fillMaxWidth().height(UiTokens.ControlHeight).padding(horizontal = UiTokens.SpaceMedium),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(
             imageVector = iconForCode(record.code),
             contentDescription = null,
-            tint = if (record.code == KC.POWER) Color(0xFFFF4D4F) else MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(18.dp)
+            tint = if (record.code == KC.POWER) QadbColors.danger else MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(UiTokens.IconMedium)
         )
-        Spacer(Modifier.width(10.dp))
+        Spacer(Modifier.width(UiTokens.SpaceSmall))
         Text(
             text = record.displayText,
             modifier = Modifier.weight(1f),
@@ -891,7 +894,7 @@ private fun RecentRecordRow(record: KeyEventRecord) {
 }
 
 private fun iconForCode(code: Int): ImageVector = when (code) {
-    KC.HOME -> Icons.Default.Home
+    KC.HOME -> IconParkIcons.Home
     KC.BACK -> Icons.AutoMirrored.Filled.ArrowBack
     KC.POWER -> Icons.Default.PowerSettingsNew
     KC.VOL_UP -> Icons.AutoMirrored.Filled.VolumeUp
@@ -913,7 +916,7 @@ private fun SectionSurface(
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.72f))
     ) {
         Column(
-            modifier = Modifier.fillMaxWidth().padding(16.dp)
+            modifier = Modifier.fillMaxWidth().padding(UiTokens.SpaceLarge)
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
@@ -922,7 +925,7 @@ private fun SectionSurface(
                     tint = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.size(19.dp)
                 )
-                Spacer(Modifier.width(12.dp))
+                Spacer(Modifier.width(UiTokens.SpaceMedium))
                 Text(
                     text = title,
                     style = MaterialTheme.typography.titleMedium,
@@ -930,7 +933,7 @@ private fun SectionSurface(
                     fontWeight = FontWeight.Bold
                 )
             }
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(UiTokens.SpaceLarge))
             content()
         }
     }
@@ -966,18 +969,18 @@ private fun PressableSurface(
     }
 }
 
-private fun navAction() = KeyAction(KC.BACK, Res.string.key_back, "KEYCODE_BACK", Icons.AutoMirrored.Filled.ArrowBack, Color(0xFF111827))
-private fun homeAction() = KeyAction(KC.HOME, Res.string.key_home, "KEYCODE_HOME", Icons.Default.Home, Color(0xFF111827))
-private fun recentAction() = KeyAction(KC.RECENT, Res.string.key_recent, "KEYCODE_APP_SWITCH", Icons.Default.ContentCopy, Color(0xFF111827))
-private fun menuAction() = KeyAction(KC.MENU, Res.string.key_menu, "KEYCODE_MENU", Icons.Default.Menu, Color(0xFF111827))
-private fun powerAction() = KeyAction(KC.POWER, Res.string.key_power, "KEYCODE_POWER", Icons.Default.PowerSettingsNew, Color(0xFFFF4D4F))
-private fun volumeUpAction() = KeyAction(KC.VOL_UP, Res.string.key_volume_up, "KEYCODE_VOLUME_UP", Icons.AutoMirrored.Filled.VolumeUp, Color(0xFF2F7DFF))
-private fun volumeDownAction() = KeyAction(KC.VOL_DOWN, Res.string.key_volume_down, "KEYCODE_VOLUME_DOWN", Icons.AutoMirrored.Filled.VolumeDown, Color(0xFF2F7DFF))
-private fun muteAction() = KeyAction(KC.VOL_MUTE, Res.string.key_volume_mute, "KEYCODE_VOLUME_MUTE", Icons.AutoMirrored.Filled.VolumeMute, Color(0xFF2F7DFF))
-private fun notificationAction() = KeyAction(KC.NOTIFICATION, Res.string.key_status_bar, "KEYCODE_NOTIFICATION", Icons.Default.Bookmark, Color(0xFF9A5BFF))
-private fun quickSettingsAction() = KeyAction(KC.SETTINGS, Res.string.key_quick_settings, "KEYCODE_SETTINGS", Icons.Default.Settings, Color(0xFF2F7DFF))
-private fun screenToggleAction() = KeyAction(KC.WAKEUP, Res.string.key_screen_toggle, "KEYCODE_WAKEUP", Icons.Default.WbSunny, Color(0xFFFF9F1A))
-private fun screenshotAction() = KeyAction(KC.SYSRQ, Res.string.key_screenshot_short, "KEYCODE_SYSRQ", Icons.Default.CropFree, Color(0xFF23B45D))
+private fun navAction() = KeyAction(KC.BACK, Res.string.key_back, "KEYCODE_BACK", Icons.AutoMirrored.Filled.ArrowBack, QadbPalette.Slate)
+private fun homeAction() = KeyAction(KC.HOME, Res.string.key_home, "KEYCODE_HOME", IconParkIcons.Home, QadbPalette.Slate)
+private fun recentAction() = KeyAction(KC.RECENT, Res.string.key_recent, "KEYCODE_APP_SWITCH", Icons.Default.ContentCopy, QadbPalette.Slate)
+private fun menuAction() = KeyAction(KC.MENU, Res.string.key_menu, "KEYCODE_MENU", Icons.Default.Menu, QadbPalette.Slate)
+private fun powerAction() = KeyAction(KC.POWER, Res.string.key_power, "KEYCODE_POWER", Icons.Default.PowerSettingsNew, QadbPalette.Orange)
+private fun volumeUpAction() = KeyAction(KC.VOL_UP, Res.string.key_volume_up, "KEYCODE_VOLUME_UP", Icons.AutoMirrored.Filled.VolumeUp, QadbPalette.Blue)
+private fun volumeDownAction() = KeyAction(KC.VOL_DOWN, Res.string.key_volume_down, "KEYCODE_VOLUME_DOWN", Icons.AutoMirrored.Filled.VolumeDown, QadbPalette.Blue)
+private fun muteAction() = KeyAction(KC.VOL_MUTE, Res.string.key_volume_mute, "KEYCODE_VOLUME_MUTE", Icons.AutoMirrored.Filled.VolumeMute, QadbPalette.Blue)
+private fun notificationAction() = KeyAction(KC.NOTIFICATION, Res.string.key_status_bar, "KEYCODE_NOTIFICATION", Icons.Default.Bookmark, QadbPalette.Purple)
+private fun quickSettingsAction() = KeyAction(KC.SETTINGS, Res.string.key_quick_settings, "KEYCODE_SETTINGS", IconParkIcons.Setting, QadbPalette.Blue)
+private fun screenToggleAction() = KeyAction(KC.WAKEUP, Res.string.key_screen_toggle, "KEYCODE_WAKEUP", Icons.Default.WbSunny, QadbPalette.Orange)
+private fun screenshotAction() = KeyAction(KC.SYSRQ, Res.string.key_screenshot_short, "KEYCODE_SYSRQ", Icons.Default.CropFree, QadbPalette.Green)
 
 private fun copyToClipboard(text: String) {
     runCatching {

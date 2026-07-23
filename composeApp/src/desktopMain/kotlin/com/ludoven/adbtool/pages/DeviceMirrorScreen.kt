@@ -51,6 +51,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.ludoven.adbtool.entity.DeviceMirrorSettings
+import com.ludoven.adbtool.QadbColors
+import com.ludoven.adbtool.UiTokens
+import com.ludoven.adbtool.ui.icons.IconParkIcons
 import com.ludoven.adbtool.entity.MirrorLaunchProfile
 import com.ludoven.adbtool.entity.MsgContent
 import com.ludoven.adbtool.ui.icons.CompatIconVectors
@@ -101,17 +104,17 @@ private data class MirrorColorsData(
 
 @Composable
 private fun mirrorColors() = MirrorColorsData(
-    PageBackground = MaterialTheme.colorScheme.surface,
-    ContentBackground = Color.White,
-    PrimaryText = Color(0xFF111827),
-    SecondaryText = Color(0xFF6B7280),
-    Divider = Color(0xFFE5E7EB),
-    Primary = Color(0xFF0A84FF),
-    SelectedBackground = Color(0xFFEAF3FF),
-    DisabledText = Color(0xFF9CA3AF),
-    DisabledBackground = Color(0xFFF9FAFB),
-    Danger = Color(0xFFDC2626),
-    Success = Color(0xFF16A34A)
+    PageBackground = QadbColors.background,
+    ContentBackground = QadbColors.surface,
+    PrimaryText = QadbColors.textPrimary,
+    SecondaryText = QadbColors.textSecondary,
+    Divider = QadbColors.divider,
+    Primary = QadbColors.primary,
+    SelectedBackground = QadbColors.surfaceSelected,
+    DisabledText = QadbColors.textDisabled,
+    DisabledBackground = QadbColors.disabledSurface,
+    Danger = QadbColors.danger,
+    Success = QadbColors.success
 )
 
 private data class IntOption(
@@ -221,8 +224,8 @@ fun DeviceMirrorScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 2.dp),
-                verticalArrangement = Arrangement.spacedBy(24.dp)
+                    .padding(horizontal = UiTokens.SpaceXSmall),
+                verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceXXLarge)
             ) {
                 if (collapseSettings) {
                     MirrorStatusSettingsPanel(
@@ -265,7 +268,7 @@ fun DeviceMirrorScreen(
                         text = mirrorErrorText,
                         color = MirrorColors.Danger,
                         style = MaterialTheme.typography.bodyMedium,
-                        fontSize = 13.sp
+                        fontSize = UiTokens.TextBody
                     )
                 } else if (!hasDevice) {
                     Text(
@@ -275,7 +278,7 @@ fun DeviceMirrorScreen(
                         ),
                         color = MirrorColors.SecondaryText,
                         style = MaterialTheme.typography.bodyMedium,
-                        fontSize = 13.sp
+                        fontSize = UiTokens.TextBody
                     )
                 }
 
@@ -302,7 +305,7 @@ fun DeviceMirrorScreen(
                                 ),
                                 color = MirrorColors.Danger,
                                 style = MaterialTheme.typography.bodyMedium,
-                                fontSize = 13.sp
+                                fontSize = UiTokens.TextBody
                             )
                         } else {
                             RuntimeControls(
@@ -320,7 +323,7 @@ fun DeviceMirrorScreen(
                         ),
                         color = MirrorColors.SecondaryText,
                         style = MaterialTheme.typography.bodySmall,
-                        fontSize = 12.sp
+                        fontSize = UiTokens.TextCaption
                     )
                 }
 
@@ -356,7 +359,7 @@ private fun MirrorSettingsSections(
     Section(title = l10n("镜像模式", "Mirror Mode")) {
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
         ) {
             MirrorModeSegment(
                 modifier = Modifier.weight(1f),
@@ -388,7 +391,7 @@ private fun MirrorSettingsSections(
             text = profileHint(settings.launchProfile),
             color = MirrorColors.SecondaryText,
             style = MaterialTheme.typography.bodyMedium,
-            fontSize = 13.sp
+            fontSize = UiTokens.TextBody
         )
 
         if (settings.launchProfile == MirrorLaunchProfile.CUSTOM) {
@@ -483,32 +486,32 @@ private fun MirrorStatusSettingsPanel(
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = 172.dp)
-            .background(MirrorColors.ContentBackground, RoundedCornerShape(10.dp))
-            .border(1.dp, MirrorColors.Divider, RoundedCornerShape(10.dp))
-            .padding(horizontal = 16.dp, vertical = 14.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
+            .background(MirrorColors.ContentBackground, RoundedCornerShape(UiTokens.RadiusMedium))
+            .border(1.dp, MirrorColors.Divider, RoundedCornerShape(UiTokens.RadiusMedium))
+            .padding(horizontal = UiTokens.SpaceLarge, vertical = UiTokens.SpaceMedium),
+        verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+            horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium)
         ) {
             Column(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
+                verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceXSmall)
             ) {
                 Text(
                     text = l10n("镜像状态", "Mirror status"),
                     color = MirrorColors.PrimaryText,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
-                    fontSize = 15.sp
+                    fontSize = UiTokens.TextAction
                 )
                 Text(
                     text = currentDevice ?: l10n("未选择设备", "No device selected"),
                     color = MirrorColors.SecondaryText,
                     style = MaterialTheme.typography.bodySmall,
-                    fontSize = 12.sp,
+                    fontSize = UiTokens.TextCaption,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -518,10 +521,10 @@ private fun MirrorStatusSettingsPanel(
             Button(
                 onClick = onPrimaryAction,
                 enabled = buttonEnabled,
-                shape = RoundedCornerShape(8.dp),
+                shape = RoundedCornerShape(UiTokens.RadiusMedium),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = if (mirrorRunning) MirrorColors.Danger else MirrorColors.Primary,
-                    contentColor = Color.White,
+                    contentColor = QadbColors.onPrimary,
                     disabledContainerColor = MirrorColors.DisabledBackground,
                     disabledContentColor = MirrorColors.DisabledText
                 )
@@ -529,32 +532,32 @@ private fun MirrorStatusSettingsPanel(
                 Icon(
                     imageVector = if (mirrorRunning) Icons.Default.Stop else Icons.Default.PlayArrow,
                     contentDescription = null,
-                    tint = if (buttonEnabled) Color.White else MirrorColors.DisabledText,
-                    modifier = Modifier.size(16.dp)
+                    tint = if (buttonEnabled) QadbColors.onPrimary else MirrorColors.DisabledText,
+                    modifier = Modifier.size(UiTokens.IconSmall)
                 )
-                Spacer(Modifier.width(8.dp))
+                Spacer(Modifier.width(UiTokens.SpaceSmall))
                 Text(
                     text = when {
                         mirrorRunning -> l10n("停止镜像", "Stop Mirror")
                         hasDevice -> l10n("打开镜像", "Open Mirror")
                         else -> l10n("请选择设备", "Select device")
                     },
-                    color = if (buttonEnabled) Color.White else MirrorColors.DisabledText,
+                    color = if (buttonEnabled) QadbColors.onPrimary else MirrorColors.DisabledText,
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.SemiBold,
-                    fontSize = 13.sp
+                    fontSize = UiTokens.TextBody
                 )
             }
         }
 
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(18.dp),
+            horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceLarge),
             verticalAlignment = Alignment.Top
         ) {
             Column(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
+                verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
             ) {
                 StatusLine(
                     label = l10n("连接方式", "Connection"),
@@ -573,7 +576,7 @@ private fun MirrorStatusSettingsPanel(
             }
             Column(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
+                verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
             ) {
                 StatusLine(
                     label = l10n("窗口状态", "Window"),
@@ -591,49 +594,49 @@ private fun MirrorStatusSettingsPanel(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(MirrorColors.SelectedBackground.copy(alpha = 0.65f), RoundedCornerShape(10.dp))
-                .border(1.dp, Color(0xFFBBD7FF), RoundedCornerShape(10.dp))
-                .padding(horizontal = 12.dp, vertical = 11.dp),
+                .background(MirrorColors.SelectedBackground.copy(alpha = 0.65f), RoundedCornerShape(UiTokens.RadiusMedium))
+                .border(1.dp, QadbColors.selectedBorder, RoundedCornerShape(UiTokens.RadiusMedium))
+                .padding(horizontal = UiTokens.SpaceMedium, vertical = UiTokens.SpaceMedium),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+            horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium)
         ) {
             Box(
                 modifier = Modifier
                     .size(34.dp)
-                    .background(Color.White, RoundedCornerShape(9.dp)),
+                    .background(QadbColors.surface, RoundedCornerShape(UiTokens.RadiusMedium)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    imageVector = Icons.Default.Settings,
+                    imageVector = IconParkIcons.Setting,
                     contentDescription = null,
                     tint = MirrorColors.Primary,
-                    modifier = Modifier.size(18.dp)
+                    modifier = Modifier.size(UiTokens.IconMedium)
                 )
             }
             Column(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(3.dp)
+                verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceXSmall)
             ) {
                 Text(
                     text = l10n("镜像设置", "Mirror settings"),
                     color = MirrorColors.PrimaryText,
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.SemiBold,
-                    fontSize = 13.sp
+                    fontSize = UiTokens.TextBody
                 )
                 Text(
                     text = mirrorSettingsSummary(settings),
                     color = MirrorColors.SecondaryText,
                     style = MaterialTheme.typography.bodySmall,
-                    fontSize = 12.sp,
+                    fontSize = UiTokens.TextCaption,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
             }
             OutlinedButton(
                 onClick = onOpenSettings,
-                shape = RoundedCornerShape(8.dp),
-                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFBBD7FF)),
+                shape = RoundedCornerShape(UiTokens.RadiusMedium),
+                border = androidx.compose.foundation.BorderStroke(1.dp, QadbColors.selectedBorder),
                 colors = ButtonDefaults.outlinedButtonColors(
                     containerColor = MirrorColors.ContentBackground,
                     contentColor = MirrorColors.Primary
@@ -643,7 +646,7 @@ private fun MirrorStatusSettingsPanel(
                     text = l10n("选项", "Options"),
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.SemiBold,
-                    fontSize = 13.sp
+                    fontSize = UiTokens.TextBody
                 )
             }
         }
@@ -672,31 +675,31 @@ private fun MirrorSettingsDialog(
             modifier = Modifier
                 .width(580.dp)
                 .height(560.dp),
-            shape = RoundedCornerShape(14.dp),
+            shape = RoundedCornerShape(UiTokens.RadiusLarge),
             color = MaterialTheme.colorScheme.surface,
             border = androidx.compose.foundation.BorderStroke(1.dp, MirrorColors.Divider)
         ) {
             Column(modifier = Modifier.fillMaxSize()) {
                 Text(
                     text = l10n("镜像设置", "Mirror settings"),
-                    modifier = Modifier.padding(start = 24.dp, top = 22.dp, end = 24.dp, bottom = 10.dp),
+                    modifier = Modifier.padding(start = UiTokens.SpaceXXLarge, top = UiTokens.SpaceXXLarge, end = UiTokens.SpaceXXLarge, bottom = UiTokens.SpaceSmall),
                     style = MaterialTheme.typography.titleMedium,
                     color = MirrorColors.PrimaryText,
                     fontWeight = FontWeight.SemiBold,
-                    fontSize = 15.sp
+                    fontSize = UiTokens.TextAction
                 )
 
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f)
-                        .padding(horizontal = 24.dp)
+                        .padding(horizontal = UiTokens.SpaceXXLarge)
                 ) {
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
                             .verticalScroll(dialogScrollState),
-                        verticalArrangement = Arrangement.spacedBy(18.dp)
+                        verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceLarge)
                     ) {
                         MirrorSettingsSections(
                             settings = settings,
@@ -712,7 +715,7 @@ private fun MirrorSettingsDialog(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 18.dp, vertical = 12.dp),
+                        .padding(horizontal = UiTokens.SpaceLarge, vertical = UiTokens.SpaceMedium),
                     horizontalArrangement = Arrangement.End,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -764,13 +767,13 @@ private fun HeaderSection(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)) {
             Text(
                 text = l10n("设备镜像", "Device Mirror"),
                 style = MaterialTheme.typography.headlineSmall,
                 color = MirrorColors.PrimaryText,
                 fontWeight = FontWeight.SemiBold,
-                fontSize = 22.sp
+                fontSize = UiTokens.TextPageTitle
             )
             Text(
                 text = l10n(
@@ -779,22 +782,22 @@ private fun HeaderSection(
                 ),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MirrorColors.SecondaryText,
-                fontSize = 13.sp
+                fontSize = UiTokens.TextBody
             )
         }
 
         Surface(
-            shape = RoundedCornerShape(999.dp),
-            color = if (connected) MirrorColors.SelectedBackground else Color(0xFFF3F4F6),
+            shape = RoundedCornerShape(UiTokens.BadgeRadius),
+            color = if (connected) MirrorColors.SelectedBackground else QadbColors.surfaceVariant,
             border = androidx.compose.foundation.BorderStroke(1.dp, MirrorColors.Divider)
         ) {
             Text(
                 text = if (connected) l10n("已连接 · $connectionType", "Connected · $connectionType")
                 else l10n("未连接", "Disconnected"),
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                modifier = Modifier.padding(horizontal = UiTokens.SpaceMedium, vertical = UiTokens.SpaceSmall),
                 style = MaterialTheme.typography.bodyMedium,
-                color = if (connected) Color(0xFF1D4ED8) else MirrorColors.SecondaryText,
-                fontSize = 13.sp
+                color = if (connected) MirrorColors.Primary else MirrorColors.SecondaryText,
+                fontSize = UiTokens.TextBody
             )
         }
     }
@@ -815,15 +818,15 @@ private fun MirrorStatusPanel(
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = 104.dp)
-            .background(MirrorColors.ContentBackground, RoundedCornerShape(10.dp))
-            .border(1.dp, MirrorColors.Divider, RoundedCornerShape(10.dp))
-            .padding(horizontal = 16.dp, vertical = 13.dp),
+            .background(MirrorColors.ContentBackground, RoundedCornerShape(UiTokens.RadiusMedium))
+            .border(1.dp, MirrorColors.Divider, RoundedCornerShape(UiTokens.RadiusMedium))
+            .padding(horizontal = UiTokens.SpaceLarge, vertical = UiTokens.SpaceMedium),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(16.dp)
+        horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceLarge)
     ) {
         Column(
             modifier = Modifier.weight(1.35f),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+            verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
         ) {
             StatusLine(
                 label = l10n("当前设备", "Current device"),
@@ -848,7 +851,7 @@ private fun MirrorStatusPanel(
 
         Column(
             modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+            verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
         ) {
             StatusLine(
                 label = l10n("镜像窗口状态", "Mirror status"),
@@ -866,10 +869,10 @@ private fun MirrorStatusPanel(
         Button(
             onClick = onPrimaryAction,
             enabled = buttonEnabled,
-            shape = RoundedCornerShape(8.dp),
+            shape = RoundedCornerShape(UiTokens.RadiusMedium),
             colors = ButtonDefaults.buttonColors(
                 containerColor = if (mirrorRunning) MirrorColors.Danger else MirrorColors.Primary,
-                contentColor = Color.White,
+                contentColor = QadbColors.onPrimary,
                 disabledContainerColor = MirrorColors.DisabledBackground,
                 disabledContentColor = MirrorColors.DisabledText
             )
@@ -877,20 +880,20 @@ private fun MirrorStatusPanel(
             Icon(
                 imageVector = if (mirrorRunning) Icons.Default.Stop else Icons.Default.PlayArrow,
                 contentDescription = null,
-                tint = if (buttonEnabled) Color.White else MirrorColors.DisabledText,
-                modifier = Modifier.size(16.dp)
+                tint = if (buttonEnabled) QadbColors.onPrimary else MirrorColors.DisabledText,
+                modifier = Modifier.size(UiTokens.IconSmall)
             )
-            Spacer(Modifier.width(8.dp))
+            Spacer(Modifier.width(UiTokens.SpaceSmall))
             Text(
                 text = when {
                     mirrorRunning -> l10n("停止镜像", "Stop Mirror")
                     hasDevice -> l10n("打开镜像", "Open Mirror")
                     else -> l10n("请选择设备", "Select device")
                 },
-                color = if (buttonEnabled) Color.White else MirrorColors.DisabledText,
+                color = if (buttonEnabled) QadbColors.onPrimary else MirrorColors.DisabledText,
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.SemiBold,
-                fontSize = 13.sp
+                fontSize = UiTokens.TextBody
             )
         }
     }
@@ -915,17 +918,17 @@ private fun StatusLine(
             text = label,
             style = MaterialTheme.typography.bodyMedium,
             color = MirrorColors.SecondaryText,
-            fontSize = 12.sp
+            fontSize = UiTokens.TextCaption
         )
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
+            horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
         ) {
             if (withStatusDot) {
                 Box(
                     modifier = Modifier
                         .size(8.dp)
-                        .background(resolvedStatusColor, RoundedCornerShape(999.dp))
+                        .background(resolvedStatusColor, RoundedCornerShape(UiTokens.BadgeRadius))
                 )
             }
             if (ellipsize) {
@@ -936,7 +939,7 @@ private fun StatusLine(
                     style = MaterialTheme.typography.bodyMedium,
                     color = resolvedStatusColor,
                     fontWeight = FontWeight.Medium,
-                    fontSize = 13.sp
+                    fontSize = UiTokens.TextBody
                 )
             }
         }
@@ -949,13 +952,13 @@ private fun Section(
     content: @Composable ColumnScope.() -> Unit
 ) {
     var MirrorColors = mirrorColors()
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium)) {
         Text(
             text = title,
             style = MaterialTheme.typography.titleMedium,
             color = MirrorColors.PrimaryText,
             fontWeight = FontWeight.SemiBold,
-            fontSize = 15.sp
+            fontSize = UiTokens.TextAction
         )
         content()
     }
@@ -972,10 +975,10 @@ private fun MirrorModeSegment(
     OutlinedButton(
         modifier = modifier.heightIn(min = 36.dp, max = 36.dp),
         onClick = onClick,
-        shape = RoundedCornerShape(8.dp),
+        shape = RoundedCornerShape(UiTokens.RadiusMedium),
         border = androidx.compose.foundation.BorderStroke(
             width = 1.dp,
-            color = if (selected) Color(0xFFBBD7FF) else MirrorColors.Divider
+            color = if (selected) QadbColors.selectedBorder else MirrorColors.Divider
         ),
         colors = ButtonDefaults.outlinedButtonColors(
             containerColor = if (selected) MirrorColors.SelectedBackground else MirrorColors.ContentBackground,
@@ -986,7 +989,7 @@ private fun MirrorModeSegment(
             text = label,
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-            fontSize = 13.sp
+            fontSize = UiTokens.TextBody
         )
     }
 }
@@ -1004,7 +1007,7 @@ private fun CustomAdvancedParameters(
     onBitRateSelected: (String) -> Unit
 ) {
     var MirrorColors = mirrorColors()
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium)) {
         Text(
             text = l10n("高级参数", "Advanced Parameters"),
             style = MaterialTheme.typography.titleMedium,
@@ -1014,7 +1017,7 @@ private fun CustomAdvancedParameters(
 
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(14.dp)
+            horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium)
         ) {
             IntSelectField(
                 modifier = Modifier.weight(1f),
@@ -1046,7 +1049,7 @@ private fun CustomAdvancedParameters(
             ),
             color = MirrorColors.SecondaryText,
             style = MaterialTheme.typography.bodyMedium,
-            fontSize = 13.sp
+            fontSize = UiTokens.TextBody
         )
     }
 }
@@ -1064,17 +1067,17 @@ private fun RuntimeControls(
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(min = 44.dp)
-                .background(MirrorColors.DisabledBackground, RoundedCornerShape(8.dp))
-                .border(1.dp, MirrorColors.Divider, RoundedCornerShape(8.dp))
-                .padding(horizontal = 12.dp, vertical = 10.dp),
+                .background(MirrorColors.DisabledBackground, RoundedCornerShape(UiTokens.RadiusMedium))
+                .border(1.dp, MirrorColors.Divider, RoundedCornerShape(UiTokens.RadiusMedium))
+                .padding(horizontal = UiTokens.SpaceMedium, vertical = UiTokens.SpaceSmall),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
         ) {
             Icon(
                 imageVector = Icons.Default.PlayArrow,
                 contentDescription = null,
                 tint = MirrorColors.DisabledText,
-                modifier = Modifier.size(16.dp)
+                modifier = Modifier.size(UiTokens.IconSmall)
             )
             Text(
                 text = l10n(
@@ -1083,7 +1086,7 @@ private fun RuntimeControls(
                 ),
                 color = MirrorColors.SecondaryText,
                 style = MaterialTheme.typography.bodySmall,
-                fontSize = 12.sp,
+                fontSize = UiTokens.TextCaption,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis
             )
@@ -1091,15 +1094,15 @@ private fun RuntimeControls(
         return
     }
 
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
+            horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
         ) {
             MirrorControlButton(modifier = Modifier.weight(1f), icon = Icons.AutoMirrored.Filled.ArrowBack, label = l10n("返回", "Back"), enabled = enabled) {
                 viewModel.sendKeyEvent(selectedDevice, MirrorKeyCode.BACK)
             }
-            MirrorControlButton(modifier = Modifier.weight(1f), icon = Icons.Default.Home, label = l10n("主页", "Home"), enabled = enabled) {
+            MirrorControlButton(modifier = Modifier.weight(1f), icon = IconParkIcons.Home, label = l10n("主页", "Home"), enabled = enabled) {
                 viewModel.sendKeyEvent(selectedDevice, MirrorKeyCode.HOME)
             }
             MirrorControlButton(modifier = Modifier.weight(1f), icon = Icons.Default.ViewAgenda, label = l10n("多任务", "Recent"), enabled = enabled) {
@@ -1111,7 +1114,7 @@ private fun RuntimeControls(
         }
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
+            horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
         ) {
             MirrorControlButton(modifier = Modifier.weight(1f), icon = Icons.AutoMirrored.Filled.VolumeDown, label = l10n("音量减", "Vol -"), enabled = enabled) {
                 viewModel.sendKeyEvent(selectedDevice, MirrorKeyCode.VOLUME_DOWN)
@@ -1119,7 +1122,7 @@ private fun RuntimeControls(
             MirrorControlButton(modifier = Modifier.weight(1f), icon = Icons.AutoMirrored.Filled.VolumeUp, label = l10n("音量加", "Vol +"), enabled = enabled) {
                 viewModel.sendKeyEvent(selectedDevice, MirrorKeyCode.VOLUME_UP)
             }
-            MirrorControlButton(modifier = Modifier.weight(1f), icon = Icons.Default.CameraAlt, label = l10n("截图", "Screenshot"), enabled = enabled) {
+            MirrorControlButton(modifier = Modifier.weight(1f), icon = IconParkIcons.Camera, label = l10n("截图", "Screenshot"), enabled = enabled) {
                 viewModel.takeScreenSnapshot(selectedDevice)
             }
             MirrorControlButton(modifier = Modifier.weight(1f), icon = Icons.Default.ScreenRotation, label = l10n("旋转屏幕", "Rotate"), enabled = enabled) {
@@ -1143,15 +1146,15 @@ private fun MirrorControlButton(
         tooltip = {
             Surface(
                 color = MirrorColors.ContentBackground,
-                shape = RoundedCornerShape(8.dp),
+                shape = RoundedCornerShape(UiTokens.RadiusMedium),
                 border = androidx.compose.foundation.BorderStroke(1.dp, MirrorColors.Divider)
             ) {
                 Text(
                     text = label,
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                    modifier = Modifier.padding(horizontal = UiTokens.SpaceSmall, vertical = UiTokens.SpaceSmall),
                     style = MaterialTheme.typography.bodySmall,
                     color = MirrorColors.PrimaryText,
-                    fontSize = 12.sp
+                    fontSize = UiTokens.TextCaption
                 )
             }
         }
@@ -1161,10 +1164,10 @@ private fun MirrorControlButton(
             enabled = enabled,
             modifier = modifier
                 .heightIn(min = 36.dp)
-                .border(1.dp, MirrorColors.Divider, RoundedCornerShape(8.dp))
+                .border(1.dp, MirrorColors.Divider, RoundedCornerShape(UiTokens.RadiusMedium))
                 .background(
                     color = if (enabled) MirrorColors.ContentBackground else MaterialTheme.colorScheme.surfaceVariant,
-                    shape = RoundedCornerShape(8.dp)
+                    shape = RoundedCornerShape(UiTokens.RadiusMedium)
                 )
         ) {
             Icon(
@@ -1197,7 +1200,7 @@ private fun MirrorSwitchPairRow(
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(min = 48.dp),
-            horizontalArrangement = Arrangement.spacedBy(24.dp),
+            horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceXXLarge),
             verticalAlignment = Alignment.CenterVertically
         ) {
             MirrorSwitchCell(
@@ -1238,21 +1241,21 @@ private fun MirrorSwitchCell(
     ) {
         Column(
             modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(2.dp)
+            verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceXSmall)
         ) {
             Text(
                 text = title,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MirrorColors.PrimaryText,
                 fontWeight = FontWeight.Normal,
-                fontSize = 13.sp
+                fontSize = UiTokens.TextBody
             )
             if (!description.isNullOrBlank()) {
                 Text(
                     text = description,
                     style = MaterialTheme.typography.bodySmall,
                     color = MirrorColors.SecondaryText,
-                    fontSize = 12.sp
+                    fontSize = UiTokens.TextCaption
                 )
             }
         }
@@ -1270,13 +1273,13 @@ private fun IntSelectField(
 ) {
     var MirrorColors = mirrorColors()
     var expanded by remember { mutableStateOf(false) }
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)) {
         FieldLabel(label)
         Box {
             OutlinedButton(
                 onClick = { expanded = true },
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(9.dp),
+                shape = RoundedCornerShape(UiTokens.RadiusMedium),
                 colors = ButtonDefaults.outlinedButtonColors(
                     containerColor = MirrorColors.ContentBackground,
                     contentColor = MirrorColors.PrimaryText
@@ -1290,7 +1293,7 @@ private fun IntSelectField(
                     Text(
                         text = options.find { it.value == value }?.label ?: l10n("不限制", "No limit"),
                         style = MaterialTheme.typography.bodyMedium,
-                        fontSize = 13.sp,
+                        fontSize = UiTokens.TextBody,
                         color = MirrorColors.PrimaryText
                     )
                     Icon(
@@ -1304,7 +1307,7 @@ private fun IntSelectField(
             DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
                 options.forEach { option ->
                     DropdownMenuItem(
-                        text = { Text(option.label, fontSize = 13.sp) },
+                        text = { Text(option.label, fontSize = UiTokens.TextBody) },
                         onClick = {
                             expanded = false
                             onSelected(option.value)
@@ -1326,13 +1329,13 @@ private fun StringSelectField(
 ) {
     var MirrorColors = mirrorColors()
     var expanded by remember { mutableStateOf(false) }
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)) {
         FieldLabel(label)
         Box {
             OutlinedButton(
                 onClick = { expanded = true },
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(9.dp),
+                shape = RoundedCornerShape(UiTokens.RadiusMedium),
                 colors = ButtonDefaults.outlinedButtonColors(
                     containerColor = MirrorColors.ContentBackground,
                     contentColor = MirrorColors.PrimaryText
@@ -1346,7 +1349,7 @@ private fun StringSelectField(
                     Text(
                         text = options.find { it.value == value }?.label ?: value,
                         style = MaterialTheme.typography.bodyMedium,
-                        fontSize = 13.sp,
+                        fontSize = UiTokens.TextBody,
                         color = MirrorColors.PrimaryText
                     )
                     Icon(
@@ -1360,7 +1363,7 @@ private fun StringSelectField(
             DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
                 options.forEach { option ->
                     DropdownMenuItem(
-                        text = { Text(option.label, fontSize = 13.sp) },
+                        text = { Text(option.label, fontSize = UiTokens.TextBody) },
                         onClick = {
                             expanded = false
                             onSelected(option.value)
@@ -1379,7 +1382,7 @@ private fun FieldLabel(text: String) {
         text = text,
         style = MaterialTheme.typography.bodyMedium,
         color = MirrorColors.SecondaryText,
-        fontSize = 13.sp
+        fontSize = UiTokens.TextBody
     )
 }
 
@@ -1395,15 +1398,15 @@ private fun DeviceValueText(
         tooltip = {
             Surface(
                 color = MirrorColors.ContentBackground,
-                shape = RoundedCornerShape(8.dp),
+                shape = RoundedCornerShape(UiTokens.RadiusMedium),
                 border = androidx.compose.foundation.BorderStroke(1.dp, MirrorColors.Divider)
             ) {
                 Text(
                     text = value,
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                    modifier = Modifier.padding(horizontal = UiTokens.SpaceSmall, vertical = UiTokens.SpaceSmall),
                     style = MaterialTheme.typography.bodySmall,
                     color = MirrorColors.PrimaryText,
-                    fontSize = 12.sp
+                    fontSize = UiTokens.TextCaption
                 )
             }
         }
@@ -1415,7 +1418,7 @@ private fun DeviceValueText(
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             fontWeight = FontWeight.Medium,
-            fontSize = 13.sp,
+            fontSize = UiTokens.TextBody,
             modifier = Modifier.width(220.dp)
         )
     }
@@ -1488,18 +1491,18 @@ private fun MirrorToast(
 
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
         Surface(
-            shape = RoundedCornerShape(10.dp),
+            shape = RoundedCornerShape(UiTokens.RadiusMedium),
             color = MaterialTheme.colorScheme.inverseSurface,
             shadowElevation = 0.dp,
             border = androidx.compose.foundation.BorderStroke(1.dp, MirrorColors.Divider),
-            modifier = Modifier.padding(bottom = 24.dp)
+            modifier = Modifier.padding(bottom = UiTokens.SpaceXXLarge)
         ) {
             Text(
                 text = text,
-                modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp),
+                modifier = Modifier.padding(horizontal = UiTokens.SpaceLarge, vertical = UiTokens.SpaceSmall),
                 color = MaterialTheme.colorScheme.inverseOnSurface,
                 style = MaterialTheme.typography.bodyMedium,
-                fontSize = 13.sp
+                fontSize = UiTokens.TextBody
             )
         }
     }

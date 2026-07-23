@@ -48,27 +48,28 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.ludoven.adbtool.UiTokens
+import com.ludoven.adbtool.QadbColors
 
 @Composable
-fun StatusBadge(
+fun ConnectionStatusBadge(
     text: String,
     modifier: Modifier = Modifier,
     active: Boolean = true
 ) {
-    val accent = if (active) Color(0xFF2DBE60) else MaterialTheme.colorScheme.onSurfaceVariant
-    val background = if (active) Color(0xFFE9F9EF) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f)
+    val accent = if (active) QadbColors.success else MaterialTheme.colorScheme.onSurfaceVariant
+    val background = if (active) QadbColors.successSurface else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f)
 
     Row(
         modifier = modifier
-            .background(background, RoundedCornerShape(999.dp))
-            .padding(horizontal = 10.dp, vertical = 5.dp),
+            .background(background, RoundedCornerShape(UiTokens.BadgeRadius))
+            .padding(horizontal = UiTokens.ItemSpacingCompact, vertical = UiTokens.SpaceXSmall),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
+        horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceXSmall)
     ) {
         Box(
             modifier = Modifier
-                .size(10.dp)
-                .background(accent, RoundedCornerShape(999.dp))
+                .size(UiTokens.SpaceSmall)
+                .background(accent, RoundedCornerShape(UiTokens.BadgeRadius))
         )
         Text(
             text = text,
@@ -91,11 +92,11 @@ fun OutlineActionButton(
 ) {
     if (noRipple) {
         val interactionSource = remember { MutableInteractionSource() }
-        val shape = RoundedCornerShape(16.dp)
+        val shape = RoundedCornerShape(UiTokens.RadiusFeature)
         val effectiveTint = if (enabled) tint else tint.copy(alpha = 0.45f)
         Row(
             modifier = modifier
-                .height(40.dp)
+                .height(UiTokens.ControlHeight)
                 .background(tint.copy(alpha = if (enabled) 0.075f else 0.04f), shape)
                 .border(1.dp, tint.copy(alpha = if (enabled) 0.18f else 0.12f), shape)
                 .clickable(
@@ -104,11 +105,11 @@ fun OutlineActionButton(
                     indication = null,
                     onClick = onClick
                 )
-                .padding(horizontal = 12.dp),
+                .padding(horizontal = UiTokens.SpaceMedium),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
+            horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
         ) {
-            Icon(imageVector = icon, contentDescription = text, tint = effectiveTint, modifier = Modifier.size(16.dp))
+            Icon(imageVector = icon, contentDescription = text, tint = effectiveTint, modifier = Modifier.size(UiTokens.IconSmall))
             Text(
                 text = text,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = if (enabled) 1f else 0.45f),
@@ -119,22 +120,22 @@ fun OutlineActionButton(
     } else {
         OutlinedButton(
             onClick = onClick,
-            modifier = modifier.height(40.dp),
+            modifier = modifier.height(UiTokens.ControlHeight),
             enabled = enabled,
-            shape = RoundedCornerShape(16.dp),
+            shape = RoundedCornerShape(UiTokens.RadiusFeature),
             border = BorderStroke(1.dp, tint.copy(alpha = if (enabled) 0.18f else 0.12f)),
             colors = ButtonDefaults.outlinedButtonColors(
                 containerColor = tint.copy(alpha = if (enabled) 0.075f else 0.04f),
                 contentColor = tint,
                 disabledContentColor = tint.copy(alpha = 0.45f)
             ),
-            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
+            contentPadding = PaddingValues(horizontal = UiTokens.SpaceMedium, vertical = 0.dp)
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
             ) {
-                Icon(imageVector = icon, contentDescription = text, modifier = Modifier.size(16.dp))
+                Icon(imageVector = icon, contentDescription = text, modifier = Modifier.size(UiTokens.IconSmall))
                 Text(
                     text = text,
                     fontWeight = FontWeight.SemiBold,
@@ -158,24 +159,24 @@ fun DashboardMetricCard(
 ) {
     GlassCard(
         modifier = modifier,
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(UiTokens.RadiusFeature),
         borderStroke = BorderStroke(1.dp, accentColor.copy(alpha = 0.12f))
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .defaultMinSize(minHeight = 112.dp)
-                .padding(horizontal = 14.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+                .padding(horizontal = UiTokens.SpaceMedium, vertical = UiTokens.SpaceMedium),
+            verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
             ) {
                 Box(
                     modifier = Modifier
                         .size(30.dp)
-                        .background(accentColor.copy(alpha = 0.16f), RoundedCornerShape(12.dp)),
+                        .background(accentColor.copy(alpha = 0.16f), RoundedCornerShape(UiTokens.RadiusLarge)),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
@@ -257,14 +258,14 @@ private fun MetricLinearBar(
             .height(5.dp)
             .background(
                 MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.9f),
-                RoundedCornerShape(999.dp)
+                RoundedCornerShape(UiTokens.BadgeRadius)
             )
     ) {
         Box(
             modifier = Modifier
                 .fillMaxWidth(safeProgress)
                 .height(5.dp)
-                .background(accentColor, RoundedCornerShape(999.dp))
+                .background(accentColor, RoundedCornerShape(UiTokens.BadgeRadius))
         )
     }
 }
@@ -279,13 +280,13 @@ fun DeviceMetaChip(
     Row(
         modifier = modifier,
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(7.dp)
+        horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
     ) {
         Icon(
             imageVector = icon,
             contentDescription = null,
             tint = tint,
-            modifier = Modifier.size(16.dp)
+            modifier = Modifier.size(UiTokens.IconSmall)
         )
         Text(
             text = text,
@@ -307,12 +308,12 @@ fun HomeToolbarActionButton(
     enabled: Boolean = true
 ) {
     val interactionSource = remember { MutableInteractionSource() }
-    val shape = RoundedCornerShape(16.dp)
+    val shape = RoundedCornerShape(UiTokens.RadiusFeature)
     val effectiveTint = if (enabled) tint else tint.copy(alpha = 0.45f)
 
     Row(
         modifier = modifier
-            .height(42.dp)
+            .height(UiTokens.ControlHeight)
             .background(tint.copy(alpha = if (enabled) 0.075f else 0.04f), shape)
             .border(1.dp, tint.copy(alpha = if (enabled) 0.16f else 0.10f), shape)
             .clickable(
@@ -321,17 +322,17 @@ fun HomeToolbarActionButton(
                 indication = null,
                 onClick = onClick
             )
-            .padding(horizontal = 12.dp),
+            .padding(horizontal = UiTokens.SpaceMedium),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally)
+        horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall, Alignment.CenterHorizontally)
     ) {
         Box(
             modifier = Modifier
                 .size(28.dp)
-                .background(effectiveTint.copy(alpha = if (enabled) 0.16f else 0.08f), RoundedCornerShape(10.dp)),
+                .background(effectiveTint.copy(alpha = if (enabled) 0.16f else 0.08f), RoundedCornerShape(UiTokens.RadiusMedium)),
             contentAlignment = Alignment.Center
         ) {
-            Icon(imageVector = icon, contentDescription = text, tint = effectiveTint, modifier = Modifier.size(16.dp))
+            Icon(imageVector = icon, contentDescription = text, tint = effectiveTint, modifier = Modifier.size(UiTokens.IconSmall))
         }
         Text(
             text = text,
@@ -349,12 +350,12 @@ fun DashboardPanel(
     title: String,
     icon: ImageVector,
     modifier: Modifier = Modifier,
-    contentPadding: PaddingValues = PaddingValues(16.dp),
+    contentPadding: PaddingValues = PaddingValues(UiTokens.SpaceLarge),
     content: @Composable ColumnScope.() -> Unit
 ) {
     GlassCard(
         modifier = modifier,
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(UiTokens.RadiusFeature),
         borderStroke = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f))
     ) {
         Column(
@@ -364,14 +365,14 @@ fun DashboardPanel(
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
             ) {
                 Box(
                     modifier = Modifier
                         .size(26.dp)
                         .background(
                             MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.9f),
-                            RoundedCornerShape(11.dp)
+                            RoundedCornerShape(UiTokens.RadiusLarge)
                         ),
                     contentAlignment = Alignment.Center
                 ) {
@@ -391,7 +392,7 @@ fun DashboardPanel(
                 )
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(UiTokens.SpaceMedium))
             content()
         }
     }
@@ -426,7 +427,7 @@ fun QuickActionTile(
                 indication = null,
                 onClick = onClick
             ),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(UiTokens.RadiusFeature),
         colors = CardDefaults.cardColors(containerColor = backgroundColor),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         border = BorderStroke(
@@ -455,7 +456,7 @@ fun QuickActionTile(
                     modifier = Modifier.size(if (compact) 18.dp else 20.dp)
                 )
             }
-            Spacer(modifier = Modifier.height(if (compact) 7.dp else 10.dp))
+            Spacer(modifier = Modifier.height(if (compact) UiTokens.SpaceSmall else UiTokens.SpaceSmall))
             Text(
                 text = title,
                 color = MaterialTheme.colorScheme.onSurface,
@@ -480,24 +481,24 @@ fun RecentActivityRow(
     Row(
         modifier = modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp)
+        horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
     ) {
         Box(
             modifier = Modifier
                 .size(28.dp)
-                .background(accentColor.copy(alpha = 0.12f), RoundedCornerShape(8.dp)),
+                .background(accentColor.copy(alpha = 0.12f), RoundedCornerShape(UiTokens.RadiusMedium)),
             contentAlignment = Alignment.Center
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = title,
                 tint = accentColor,
-                modifier = Modifier.size(16.dp)
+                modifier = Modifier.size(UiTokens.IconSmall)
             )
         }
         Column(
             modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(2.dp)
+            verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceXSmall)
         ) {
             Text(
                 text = title,
@@ -538,32 +539,32 @@ fun DiagnosticAlertRow(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .background(accentColor.copy(alpha = 0.10f), RoundedCornerShape(16.dp))
+            .background(accentColor.copy(alpha = 0.10f), RoundedCornerShape(UiTokens.RadiusFeature))
             .clickable(
                 interactionSource = interactionSource,
                 indication = null,
                 onClick = onClick
             )
-            .padding(horizontal = 12.dp, vertical = 11.dp),
+            .padding(horizontal = UiTokens.SpaceMedium, vertical = UiTokens.SpaceMedium),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp)
+        horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
     ) {
         Box(
             modifier = Modifier
                 .size(26.dp)
-                .background(accentColor.copy(alpha = 0.18f), RoundedCornerShape(999.dp)),
+                .background(accentColor.copy(alpha = 0.18f), RoundedCornerShape(UiTokens.BadgeRadius)),
             contentAlignment = Alignment.Center
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = title,
                 tint = accentColor,
-                modifier = Modifier.size(16.dp)
+                modifier = Modifier.size(UiTokens.IconSmall)
             )
         }
         Column(
             modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(2.dp)
+            verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceXSmall)
         ) {
             Text(
                 text = title,
@@ -602,25 +603,25 @@ fun DeviceInfoCell(
     Row(
         modifier = modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
+        horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium)
     ) {
         if (icon != null && tint != null) {
             Box(
                 modifier = Modifier
                     .size(36.dp)
-                    .background(tint.copy(alpha = 0.12f), RoundedCornerShape(10.dp)),
+                    .background(tint.copy(alpha = 0.12f), RoundedCornerShape(UiTokens.RadiusMedium)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = icon,
                     contentDescription = label,
                     tint = tint,
-                    modifier = Modifier.size(18.dp)
+                    modifier = Modifier.size(UiTokens.IconMedium)
                 )
             }
         }
 
-        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)) {
             Text(
                 text = label,
                 style = MaterialTheme.typography.bodySmall,
@@ -660,8 +661,8 @@ fun LabeledValueRow(
         if (pillColor != null) {
             Box(
                 modifier = Modifier
-                    .background(pillColor.copy(alpha = 0.12f), RoundedCornerShape(999.dp))
-                    .padding(horizontal = 10.dp, vertical = 5.dp)
+                    .background(pillColor.copy(alpha = 0.12f), RoundedCornerShape(UiTokens.BadgeRadius))
+                    .padding(horizontal = UiTokens.SpaceSmall, vertical = UiTokens.SpaceSmall)
             ) {
                 Text(
                     text = value,
@@ -714,7 +715,7 @@ fun QuickActionCard(
                     Modifier
                 }
             ),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(UiTokens.RadiusFeature),
         colors = CardDefaults.cardColors(containerColor = backgroundColor),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         border = BorderStroke(
@@ -726,16 +727,16 @@ fun QuickActionCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .defaultMinSize(minHeight = 44.dp)
-                .padding(vertical = 10.dp, horizontal = 12.dp),
+                .padding(vertical = UiTokens.SpaceSmall, horizontal = UiTokens.SpaceMedium),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
         ) {
             Box(
                 modifier = Modifier
-                    .size(22.dp)
+                    .size(UiTokens.IconLarge)
                     .background(
                         accentColor.copy(alpha = 0.12f),
-                        RoundedCornerShape(10.dp)
+                        RoundedCornerShape(UiTokens.RadiusMedium)
                     ),
                 contentAlignment = Alignment.Center
             ) {

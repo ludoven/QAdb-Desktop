@@ -1,6 +1,8 @@
 package com.ludoven.adbtool.pages
 
 import com.ludoven.adbtool.UiTokens
+import com.ludoven.adbtool.QadbColors
+import com.ludoven.adbtool.ui.icons.IconParkIcons
 
 import adbtool_desktop.composeapp.generated.resources.*
 import androidx.compose.foundation.*
@@ -128,18 +130,18 @@ internal enum class AppListEmptyReason {
 }
 
 private object AppVisualTokens {
-    val Primary = Color(0xFF0A84FF)
-    val Text = Color(0xFF111827)
-    val Muted = Color(0xFF6B7280)
-    val Border = Color(0xFFE5E7EB)
-    val BorderStrong = Color(0xFFDDE3EA)
-    val Divider = Color(0xFFEEF0F3)
-    val Surface = Color(0xFFFFFFFF)
-    val Soft = Color(0xFFF3F4F6)
-    val Selected = Color(0xFFEAF3FF)
-    val Success = Color(0xFF16A34A)
-    val Warning = Color(0xFFF97316)
-    val Danger = Color(0xFFE53935)
+    val Primary: Color @Composable get() = QadbColors.primary
+    val Text: Color @Composable get() = QadbColors.textPrimary
+    val Muted: Color @Composable get() = QadbColors.textSecondary
+    val Border: Color @Composable get() = QadbColors.border
+    val BorderStrong: Color @Composable get() = QadbColors.borderStrong
+    val Divider: Color @Composable get() = QadbColors.divider
+    val Surface: Color @Composable get() = QadbColors.surface
+    val Soft: Color @Composable get() = QadbColors.surfaceVariant
+    val Selected: Color @Composable get() = QadbColors.surfaceSelected
+    val Success: Color @Composable get() = QadbColors.success
+    val Warning: Color @Composable get() = QadbColors.warning
+    val Danger: Color @Composable get() = QadbColors.danger
 }
 
 internal fun appListEmptyReason(
@@ -197,7 +199,7 @@ private fun AppAvatar(app: AppInfo, icon: ImageBitmap?, size: Int = 44) {
             ) {
                 Text(
                     text = app.appName.take(1).uppercase(),
-                    color = Color(0xFF475569),
+                    color = QadbColors.textSecondary,
                     fontWeight = FontWeight.SemiBold,
                     fontSize = (size * 0.34).sp
                 )
@@ -212,7 +214,7 @@ private fun AppSearchField(
     onValueChange: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val shape = RoundedCornerShape(8.dp)
+    val shape = RoundedCornerShape(UiTokens.RadiusMedium)
     val interactionSource = remember { MutableInteractionSource() }
     val isFocused by interactionSource.collectIsFocusedAsState()
 
@@ -223,7 +225,7 @@ private fun AppSearchField(
         textStyle = MaterialTheme.typography.bodySmall.copy(color = AppVisualTokens.Text),
         interactionSource = interactionSource,
         modifier = modifier
-            .height(40.dp)
+            .height(UiTokens.ControlHeight)
             .clip(shape)
             .background(AppVisualTokens.Surface)
             .border(
@@ -235,16 +237,16 @@ private fun AppSearchField(
             Row(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(horizontal = 12.dp),
+                    .padding(horizontal = UiTokens.SpaceMedium),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Icon(
-                    Icons.Default.Search,
+                    IconParkIcons.Search,
                     contentDescription = null,
                     tint = AppVisualTokens.Muted,
-                    modifier = Modifier.size(16.dp)
+                    modifier = Modifier.size(UiTokens.IconSmall)
                 )
-                Spacer(Modifier.width(8.dp))
+                Spacer(Modifier.width(UiTokens.SpaceSmall))
                 Box(
                     modifier = Modifier.weight(1f),
                     contentAlignment = Alignment.CenterStart
@@ -333,7 +335,7 @@ fun AppScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(paddingValues)
-                    .padding(20.dp)
+                    .padding(UiTokens.PagePaddingCompact)
             )
             if (showDialog) {
                 dialogMessage?.let {
@@ -353,7 +355,7 @@ fun AppScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
                 .padding(horizontal = UiTokens.PagePadding, vertical = UiTokens.PagePaddingCompact),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceLarge)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -361,7 +363,7 @@ fun AppScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     OutlinedButton(
@@ -369,18 +371,18 @@ fun AppScreen(
                             viewModel.getAppList(selectedDevice, forceRefresh = true)
                         },
                         enabled = hasSelectedDevice,
-                        shape = RoundedCornerShape(8.dp),
+                        shape = RoundedCornerShape(UiTokens.RadiusMedium),
                         border = BorderStroke(1.dp, AppVisualTokens.BorderStrong),
                         colors = ButtonDefaults.outlinedButtonColors(
                             containerColor = AppVisualTokens.Surface,
                             contentColor = AppVisualTokens.Text,
                             disabledContentColor = AppVisualTokens.Muted.copy(alpha = 0.45f)
                         ),
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
+                        contentPadding = PaddingValues(horizontal = UiTokens.SpaceMedium, vertical = 0.dp),
                         modifier = Modifier.height(36.dp)
                     ) {
-                        Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(Modifier.width(6.dp))
+                        Icon(IconParkIcons.Refresh, contentDescription = null, modifier = Modifier.size(UiTokens.IconSmall))
+                        Spacer(Modifier.width(UiTokens.SpaceSmall))
                         Text(
                             text = l10n("刷新", "Refresh"),
                             style = MaterialTheme.typography.bodySmall,
@@ -401,23 +403,23 @@ fun AppScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)) {
                     items(tabs, key = { it.key }) { tab ->
                         val selected = selectedFilter == tab
                         Surface(
-                            shape = RoundedCornerShape(8.dp),
+                            shape = RoundedCornerShape(UiTokens.RadiusMedium),
                             color = if (selected) AppVisualTokens.Selected else AppVisualTokens.Surface,
                             border = BorderStroke(
                                 1.dp,
-                                if (selected) Color(0xFFBBD7FF) else AppVisualTokens.Border
+                                if (selected) QadbColors.selectedBorder else AppVisualTokens.Border
                             ),
                             modifier = Modifier.clickable { viewModel.setSelectedTab(tab.key) }
                         ) {
                             Text(
                                 text = "${appTabLabel(tab)} ${tabCountMap[tab] ?: 0}",
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+                                modifier = Modifier.padding(horizontal = UiTokens.SpaceMedium, vertical = UiTokens.SpaceSmall),
                                 style = MaterialTheme.typography.bodySmall,
-                                color = if (selected) AppVisualTokens.Primary else Color(0xFF374151),
+                                color = if (selected) AppVisualTokens.Primary else QadbColors.textSecondary,
                                 fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium
                             )
                         }
@@ -425,30 +427,30 @@ fun AppScreen(
                 }
 
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Box {
                         OutlinedButton(
                             onClick = { sortMenuExpanded = true },
-                            shape = RoundedCornerShape(8.dp),
+                            shape = RoundedCornerShape(UiTokens.RadiusMedium),
                             border = BorderStroke(1.dp, AppVisualTokens.Border),
                             colors = ButtonDefaults.outlinedButtonColors(
                                 containerColor = AppVisualTokens.Surface,
                                 contentColor = AppVisualTokens.Text
                             ),
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
+                            contentPadding = PaddingValues(horizontal = UiTokens.SpaceMedium, vertical = 0.dp),
                             modifier = Modifier.height(32.dp)
                         ) {
-                            Icon(Icons.AutoMirrored.Filled.Sort, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(Modifier.width(6.dp))
+                            Icon(Icons.AutoMirrored.Filled.Sort, contentDescription = null, modifier = Modifier.size(UiTokens.IconSmall))
+                            Spacer(Modifier.width(UiTokens.SpaceSmall))
                             Text(
                                 text = appSortModeLabel(sortMode),
                                 style = MaterialTheme.typography.bodySmall,
                                 fontWeight = FontWeight.Medium
                             )
-                            Spacer(Modifier.width(2.dp))
-                            Icon(Icons.Default.ExpandMore, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(UiTokens.SpaceXSmall))
+                            Icon(IconParkIcons.ArrowDown, contentDescription = null, modifier = Modifier.size(UiTokens.IconSmall))
                         }
                         DropdownMenu(
                             expanded = sortMenuExpanded,
@@ -466,11 +468,11 @@ fun AppScreen(
                         }
                     }
                     Surface(
-                        shape = RoundedCornerShape(8.dp),
+                        shape = RoundedCornerShape(UiTokens.RadiusMedium),
                         border = BorderStroke(1.dp, AppVisualTokens.Border),
                         color = AppVisualTokens.Surface
                     ) {
-                        Row(modifier = Modifier.padding(3.dp)) {
+                        Row(modifier = Modifier.padding(UiTokens.SpaceXSmall)) {
                             ViewToggleButton(
                                 icon = Icons.Default.GridView,
                                 selected = isGridView,
@@ -488,7 +490,7 @@ fun AppScreen(
 
             Surface(
                 modifier = Modifier.weight(1f).fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
+                shape = RoundedCornerShape(UiTokens.RadiusLarge),
                 color = AppVisualTokens.Surface,
                 border = BorderStroke(1.dp, AppVisualTokens.Border)
             ) {
@@ -499,7 +501,7 @@ fun AppScreen(
                     ) {
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                            verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
                         ) {
                             CircularProgressIndicator()
                             Text(
@@ -522,7 +524,7 @@ fun AppScreen(
                             AppListEmptyReason.NO_RESULTS -> l10n("调整搜索词、筛选条件或刷新应用列表后再试。", "Adjust search, filters, or refresh the app list.")
                             null -> ""
                         },
-                        icon = Icons.Default.Apps,
+                        icon = IconParkIcons.Application,
                         modifier = Modifier.fillMaxSize(),
                         actionLabel = when (emptyReason) {
                             AppListEmptyReason.NO_DEVICE -> null
@@ -545,12 +547,12 @@ fun AppScreen(
                             viewModel.ensureAppAssetsVisible(visiblePackages)
                         }
                     }
-                    Column(modifier = Modifier.fillMaxSize().padding(14.dp)) {
+                    Column(modifier = Modifier.fillMaxSize().padding(UiTokens.SpaceMedium)) {
                         LazyVerticalGrid(
                             columns = GridCells.Adaptive(152.dp),
                             state = gridState,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                            horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium),
+                            verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium),
                             modifier = Modifier.weight(1f)
                         ) {
                             items(displayedList, key = { it.packageName }) { app ->
@@ -579,7 +581,7 @@ fun AppScreen(
                             viewModel.ensureAppAssetsVisible(visiblePackages)
                         }
                     }
-                    Column(modifier = Modifier.fillMaxSize().padding(horizontal = 14.dp, vertical = 10.dp)) {
+                    Column(modifier = Modifier.fillMaxSize().padding(horizontal = UiTokens.SpaceMedium, vertical = UiTokens.SpaceSmall)) {
                         AppListColumnHeader()
                         Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
                             LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
@@ -595,7 +597,7 @@ fun AppScreen(
                                             confirmActionMessage = message
                                         }
                                     )
-                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Spacer(modifier = Modifier.height(UiTokens.SpaceXSmall))
                                 }
                             }
                             VerticalScrollbar(
@@ -680,13 +682,13 @@ private fun AppStatBadge(
     val valueColor = if (emphasize) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
 
     Surface(
-        shape = RoundedCornerShape(10.dp),
+        shape = RoundedCornerShape(UiTokens.RadiusMedium),
         color = bgColor,
         border = BorderStroke(1.dp, borderColor)
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(horizontal = UiTokens.SpaceMedium, vertical = UiTokens.SpaceSmall),
+            horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
@@ -710,7 +712,7 @@ private fun AppTypeTag(
     accent: Color = MaterialTheme.colorScheme.onSurfaceVariant
 ) {
     Surface(
-        shape = RoundedCornerShape(6.dp),
+        shape = RoundedCornerShape(UiTokens.RadiusSmall),
         color = accent.copy(alpha = 0.1f)
     ) {
         Text(
@@ -718,7 +720,7 @@ private fun AppTypeTag(
             style = MaterialTheme.typography.labelSmall,
             color = accent,
             fontWeight = FontWeight.Medium,
-            modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
+            modifier = Modifier.padding(horizontal = UiTokens.SpaceSmall, vertical = UiTokens.SpaceXSmall)
         )
     }
 }
@@ -732,7 +734,7 @@ private fun ViewToggleButton(
     Box(
         modifier = Modifier
             .size(30.dp)
-            .clip(RoundedCornerShape(7.dp))
+            .clip(RoundedCornerShape(UiTokens.RadiusMedium))
             .background(if (selected) AppVisualTokens.Selected else Color.Transparent)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
@@ -741,7 +743,7 @@ private fun ViewToggleButton(
             imageVector = icon,
             contentDescription = null,
             tint = if (selected) AppVisualTokens.Primary else AppVisualTokens.Muted,
-            modifier = Modifier.size(16.dp)
+            modifier = Modifier.size(UiTokens.IconSmall)
         )
     }
 }
@@ -752,7 +754,7 @@ private fun AppListColumnHeader() {
         modifier = Modifier
             .fillMaxWidth()
             .height(32.dp)
-            .padding(horizontal = 10.dp),
+            .padding(horizontal = UiTokens.SpaceSmall),
         verticalAlignment = Alignment.CenterVertically
     ) {
         AppColumnHeaderText(l10n("应用", "App"), Modifier.weight(2.25f))
@@ -789,13 +791,13 @@ private fun AppTableHeader(
     onToggleNameDisplay: () -> Unit
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 8.dp),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = UiTokens.SpaceSmall, vertical = UiTokens.SpaceSmall),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Row(
             modifier = Modifier.weight(2.6f),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
+            horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceXSmall)
         ) {
             Text(
                 text = if (showPackageName) l10n("包名", "Package") else l10n("应用名称", "App name"),
@@ -808,9 +810,9 @@ private fun AppTableHeader(
                 tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                 modifier = Modifier
                     .size(14.dp)
-                    .clip(RoundedCornerShape(4.dp))
+                    .clip(RoundedCornerShape(UiTokens.SpaceXSmall))
                     .clickable(onClick = onToggleNameDisplay)
-                    .padding(1.dp)
+                    .padding(UiTokens.SpaceXSmall)
             )
         }
         Text(
@@ -854,10 +856,10 @@ private fun SortableHeaderLabel(
 
     Row(
         modifier = modifier
-            .clip(RoundedCornerShape(6.dp))
+            .clip(RoundedCornerShape(UiTokens.RadiusSmall))
             .hoverable(interactionSource)
             .clickable(onClick = onClick)
-            .padding(horizontal = 4.dp, vertical = 2.dp),
+            .padding(horizontal = UiTokens.SpaceXSmall, vertical = UiTokens.SpaceXSmall),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
@@ -865,9 +867,9 @@ private fun SortableHeaderLabel(
             style = MaterialTheme.typography.labelLarge,
             color = if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
         )
-        Spacer(modifier = Modifier.width(4.dp))
+        Spacer(modifier = Modifier.width(UiTokens.SpaceXSmall))
         Icon(
-            imageVector = if (ascending) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+            imageVector = if (ascending) Icons.Default.KeyboardArrowUp else IconParkIcons.ArrowDown,
             contentDescription = null,
             tint = if (active) MaterialTheme.colorScheme.primary
             else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (isHovered) 0.9f else 0.5f),
@@ -895,7 +897,7 @@ private fun AppListRow(
     Box(
         modifier = Modifier
             .hoverable(rowInteraction)
-            .clip(RoundedCornerShape(8.dp))
+            .clip(RoundedCornerShape(UiTokens.RadiusMedium))
             .background(if (isRowHovered) AppVisualTokens.Soft else Color.Transparent)
             .pointerInput(app.packageName) {
                 awaitPointerEventScope {
@@ -916,7 +918,7 @@ private fun AppListRow(
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(min = 64.dp)
-                .padding(horizontal = 10.dp, vertical = 7.dp),
+                .padding(horizontal = UiTokens.SpaceSmall, vertical = UiTokens.SpaceSmall),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Row(
@@ -924,8 +926,8 @@ private fun AppListRow(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 AppAvatar(app = app, icon = icon, size = 32)
-                Spacer(Modifier.width(10.dp))
-                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Spacer(Modifier.width(UiTokens.SpaceSmall))
+                Column(verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceXSmall)) {
                     Text(
                         text = appName,
                         style = MaterialTheme.typography.bodyMedium,
@@ -946,7 +948,7 @@ private fun AppListRow(
 
             Row(
                 modifier = Modifier.weight(1.25f),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 AppTypeTag(text = if (app.isSystemApp) l10n("系统应用", "System") else l10n("用户应用", "User"))
@@ -959,7 +961,7 @@ private fun AppListRow(
                 text = app.versionName.takeUnless { it.isBlank() || it == "-" } ?: l10n("待读取", "On demand"),
                 modifier = Modifier
                     .weight(0.85f)
-                    .padding(end = 8.dp),
+                    .padding(end = UiTokens.SpaceSmall),
                 style = MaterialTheme.typography.bodySmall,
                 color = AppVisualTokens.Text,
                 maxLines = 1,
@@ -982,20 +984,20 @@ private fun AppListRow(
                     else -> l10n("未运行", "Stopped")
                 }
                 val statusColor = when {
-                    app.isDisabled -> Color(0xFF9CA3AF)
+                    app.isDisabled -> QadbColors.textDisabled
                     app.isRunning -> AppVisualTokens.Success
                     else -> AppVisualTokens.Muted
                 }
                 Surface(
                     color = statusColor.copy(alpha = if (app.isRunning) 0.14f else 0.1f),
-                    shape = RoundedCornerShape(999.dp)
+                    shape = RoundedCornerShape(UiTokens.BadgeRadius)
                 ) {
                     Text(
                         text = statusText,
                         color = statusColor,
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Medium,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        modifier = Modifier.padding(horizontal = UiTokens.SpaceSmall, vertical = UiTokens.SpaceXSmall)
                     )
                 }
             }
@@ -1022,13 +1024,13 @@ private fun AppListRow(
                     .width(180.dp)
                     .background(
                         MaterialTheme.colorScheme.surface,
-                        RoundedCornerShape(12.dp)
+                        RoundedCornerShape(UiTokens.RadiusLarge)
                     )
                     .border(
                         BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)),
-                        RoundedCornerShape(12.dp)
+                        RoundedCornerShape(UiTokens.RadiusLarge)
                     )
-                    .padding(vertical = 4.dp)
+                    .padding(vertical = UiTokens.SpaceXSmall)
             ) {
             AppActionMenuItem(
                 icon = Icons.Default.ContentCopy,
@@ -1039,7 +1041,7 @@ private fun AppListRow(
                 onCopyPackageName()
             }
             AppActionMenuItem(
-                icon = Icons.Default.ChevronRight,
+                icon = IconParkIcons.Right,
                 text = l10n("打开详情", "Open details"),
                 iconTint = MaterialTheme.colorScheme.primary
             ) {
@@ -1059,7 +1061,7 @@ private fun AppListRow(
                 )
             }
             AppActionMenuItem(
-                icon = Icons.Default.Download,
+                icon = IconParkIcons.Download,
                 text = l10n("导出 APK", "Export APK"),
                 iconTint = AppVisualTokens.Success
             ) {
@@ -1075,7 +1077,7 @@ private fun AppListRow(
                 onAction(AdbFunctionType.APP_INFO)
             }
             HorizontalDivider(
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                modifier = Modifier.padding(horizontal = UiTokens.SpaceMedium, vertical = UiTokens.SpaceXSmall),
                 color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f)
             )
             AppActionMenuItem(
@@ -1108,7 +1110,7 @@ private fun RowActionButton(
     OutlinedButton(
         onClick = onClick,
         enabled = enabled,
-        shape = RoundedCornerShape(10.dp),
+        shape = RoundedCornerShape(UiTokens.RadiusMedium),
         contentPadding = PaddingValues(0.dp),
         modifier = Modifier.size(28.dp).graphicsLayer { this.alpha = alpha },
         border = BorderStroke(1.dp, tint.copy(alpha = if (enabled) 0.3f else 0.1f))
@@ -1130,7 +1132,7 @@ private fun AppActionMenu(
 
     Box {
         Surface(
-            shape = RoundedCornerShape(8.dp),
+            shape = RoundedCornerShape(UiTokens.RadiusMedium),
             border = BorderStroke(1.dp, AppVisualTokens.Border),
             color = AppVisualTokens.Surface,
             modifier = Modifier
@@ -1140,10 +1142,10 @@ private fun AppActionMenu(
         ) {
             Box(contentAlignment = Alignment.Center) {
                 Icon(
-                    imageVector = Icons.Default.MoreHoriz,
+                    imageVector = IconParkIcons.More,
                     contentDescription = l10n("更多操作", "More actions"),
                     tint = AppVisualTokens.Muted,
-                    modifier = Modifier.size(16.dp)
+                    modifier = Modifier.size(UiTokens.IconSmall)
                 )
             }
         }
@@ -1155,13 +1157,13 @@ private fun AppActionMenu(
                 .width(180.dp)
                 .background(
                     MaterialTheme.colorScheme.surface,
-                    RoundedCornerShape(12.dp)
+                    RoundedCornerShape(UiTokens.RadiusLarge)
                 )
                 .border(
                     BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)),
-                    RoundedCornerShape(12.dp)
+                    RoundedCornerShape(UiTokens.RadiusLarge)
                 )
-                .padding(vertical = 4.dp)
+                .padding(vertical = UiTokens.SpaceXSmall)
         ) {
             AppActionMenuItem(
                 icon = Icons.Default.ContentCopy,
@@ -1172,7 +1174,7 @@ private fun AppActionMenu(
                 onCopyPackageName()
             }
             AppActionMenuItem(
-                icon = Icons.Default.ChevronRight,
+                icon = IconParkIcons.Right,
                 text = l10n("打开详情", "Open details"),
                 iconTint = MaterialTheme.colorScheme.primary
             ) {
@@ -1208,7 +1210,7 @@ private fun AppActionMenu(
                 )
             }
             AppActionMenuItem(
-                icon = Icons.Default.Download,
+                icon = IconParkIcons.Download,
                 text = l10n("导出 APK", "Export APK"),
                 iconTint = AppVisualTokens.Success
             ) {
@@ -1224,7 +1226,7 @@ private fun AppActionMenu(
                 onAction(AdbFunctionType.APP_INFO)
             }
             HorizontalDivider(
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                modifier = Modifier.padding(horizontal = UiTokens.SpaceMedium, vertical = UiTokens.SpaceXSmall),
                 color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f)
             )
             AppActionMenuItem(
@@ -1264,16 +1266,16 @@ private fun AppActionMenuItem(
         onClick = onClick,
         leadingIcon = {
             Surface(
-                shape = RoundedCornerShape(8.dp),
+                shape = RoundedCornerShape(UiTokens.RadiusMedium),
                 color = iconTint.copy(alpha = 0.1f),
                 modifier = Modifier.size(28.dp)
             ) {
                 Box(contentAlignment = Alignment.Center) {
-                    Icon(icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(16.dp))
+                    Icon(icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(UiTokens.IconSmall))
                 }
             }
         },
-        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+        contentPadding = PaddingValues(horizontal = UiTokens.SpaceMedium, vertical = UiTokens.SpaceSmall)
     )
 }
 
@@ -1307,7 +1309,7 @@ private fun AppGridCard(
         }
     ) {
         Surface(
-            shape = RoundedCornerShape(10.dp),
+            shape = RoundedCornerShape(UiTokens.RadiusMedium),
             color = AppVisualTokens.Surface,
             border = BorderStroke(1.dp, AppVisualTokens.Border)
         ) {
@@ -1315,8 +1317,8 @@ private fun AppGridCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .defaultMinSize(minHeight = 128.dp)
-                .padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+                .padding(UiTokens.SpaceMedium),
+            verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -1350,7 +1352,7 @@ private fun AppGridCard(
                 overflow = TextOverflow.Ellipsis
             )
 
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(UiTokens.SpaceXSmall))
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -1373,13 +1375,13 @@ private fun AppGridCard(
                     .width(180.dp)
                     .background(
                         MaterialTheme.colorScheme.surface,
-                        RoundedCornerShape(12.dp)
+                        RoundedCornerShape(UiTokens.RadiusLarge)
                     )
                     .border(
                         BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)),
-                        RoundedCornerShape(12.dp)
+                        RoundedCornerShape(UiTokens.RadiusLarge)
                     )
-                    .padding(vertical = 4.dp)
+                    .padding(vertical = UiTokens.SpaceXSmall)
             ) {
             AppActionMenuItem(
                 icon = Icons.Default.ContentCopy,
@@ -1390,11 +1392,11 @@ private fun AppGridCard(
                 onCopyPackageName()
             }
             HorizontalDivider(
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                modifier = Modifier.padding(horizontal = UiTokens.SpaceMedium, vertical = UiTokens.SpaceXSmall),
                 color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f)
             )
             AppActionMenuItem(
-                icon = Icons.Default.Info,
+                icon = IconParkIcons.Info,
                 text = l10n("应用详情", "App details"),
                 iconTint = AppVisualTokens.Primary
             ) {
@@ -1434,7 +1436,7 @@ private fun AppGridCard(
                 )
             }
             AppActionMenuItem(
-                icon = Icons.Default.Download,
+                icon = IconParkIcons.Download,
                 text = l10n("导出 APK", "Export APK"),
                 iconTint = AppVisualTokens.Success
             ) {
@@ -1442,7 +1444,7 @@ private fun AppGridCard(
                 onAction(AdbFunctionType.EXPORT_APK)
             }
             HorizontalDivider(
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                modifier = Modifier.padding(horizontal = UiTokens.SpaceMedium, vertical = UiTokens.SpaceXSmall),
                 color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f)
             )
             AppActionMenuItem(
@@ -1466,7 +1468,7 @@ private fun AppGridCard(
 @Composable
 private fun AppListFooter(count: Int) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(top = 10.dp, start = 2.dp, end = 6.dp),
+        modifier = Modifier.fillMaxWidth().padding(top = UiTokens.SpaceSmall, start = UiTokens.SpaceXSmall, end = UiTokens.SpaceSmall),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -1510,12 +1512,12 @@ private fun AppDetailPage(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(scrollState)
-                .padding(end = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+                .padding(end = UiTokens.SpaceMedium),
+            verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceLarge)
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
             ) {
                 IconButton(onClick = onBack, modifier = Modifier.size(34.dp)) {
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = l10n("返回", "Back"), tint = MaterialTheme.colorScheme.onSurface)
@@ -1542,7 +1544,7 @@ private fun AppDetailPage(
             ) {
                 LazyRow(
                     state = tabListState,
-                    horizontalArrangement = Arrangement.spacedBy(18.dp),
+                    horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceLarge),
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.fillMaxWidth()
                 ) {
@@ -1592,22 +1594,22 @@ private fun DetailHeaderCard(
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(UiTokens.RadiusLarge),
         color = AppVisualTokens.Surface,
         border = BorderStroke(1.dp, AppVisualTokens.Border)
     ) {
         Column(
-            modifier = Modifier.fillMaxWidth().padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            modifier = Modifier.fillMaxWidth().padding(UiTokens.SpaceLarge),
+            verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceLarge)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceLarge),
                 verticalAlignment = Alignment.Top
             ) {
                 Row(
                     modifier = Modifier.weight(1f),
-                    horizontalArrangement = Arrangement.spacedBy(20.dp),
+                    horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceXLarge),
                     verticalAlignment = Alignment.Top
                 ) {
                     AppAvatar(
@@ -1617,11 +1619,11 @@ private fun DetailHeaderCard(
                     )
                     Column(
                         modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(7.dp)
+                        verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
                         ) {
                             Text(
                                 text = appInfo.appName.ifBlank { appInfo.packageName },
@@ -1688,7 +1690,7 @@ private fun HeaderStorageUsageCard(
 ) {
     Column(
         modifier = modifier,
-        verticalArrangement = Arrangement.spacedBy(10.dp)
+        verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
     ) {
         Text(
             text = l10n("存储占用", "Storage"),
@@ -1698,13 +1700,13 @@ private fun HeaderStorageUsageCard(
         )
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium),
             verticalAlignment = Alignment.CenterVertically
         ) {
             StorageRing(total = appInfo.totalSize, size = 72.dp, innerSize = 50.dp)
             Column(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
+                verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
             ) {
                 StorageLegend(AppVisualTokens.Primary, l10n("应用大小", "App size"), appInfo.appSize)
                 StorageLegend(AppVisualTokens.Muted, l10n("应用数据", "App data"), appInfo.dataSize)
@@ -1741,19 +1743,19 @@ private fun DetailActionsPanel(
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(10.dp)
+        horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
     ) {
         DetailActionButton(
             icon = if (appInfo.isRunning) Icons.Default.Stop else Icons.Default.PlayArrow,
             text = if (appInfo.isRunning) l10n("停止应用", "Stop app") else l10n("启动应用", "Launch app"),
-            tint = Color.White,
+            tint = QadbColors.onPrimary,
             bgColor = AppVisualTokens.Primary,
             modifier = Modifier.width(140.dp)
         ) {
             onAction(if (appInfo.isRunning) AdbFunctionType.FORCE_STOP else AdbFunctionType.LAUNCH)
         }
         DetailActionButton(
-            icon = Icons.Default.Refresh,
+            icon = IconParkIcons.Refresh,
             text = l10n("刷新", "Refresh"),
             tint = AppVisualTokens.Text,
             bgColor = AppVisualTokens.Surface,
@@ -1767,15 +1769,15 @@ private fun DetailActionsPanel(
 private fun StatusPill(isRunning: Boolean) {
     val color = if (isRunning) AppVisualTokens.Success else AppVisualTokens.Muted
     Surface(
-        color = if (isRunning) Color(0xFFE9F9EF) else color.copy(alpha = 0.12f),
-        shape = RoundedCornerShape(999.dp)
+        color = if (isRunning) QadbColors.successSurface else color.copy(alpha = 0.12f),
+        shape = RoundedCornerShape(UiTokens.BadgeRadius)
     ) {
         Text(
             text = if (isRunning) l10n("运行中", "Running") else l10n("未运行", "Stopped"),
             color = color,
             style = MaterialTheme.typography.labelSmall,
             fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+            modifier = Modifier.padding(horizontal = UiTokens.SpaceSmall, vertical = UiTokens.SpaceXSmall)
         )
     }
 }
@@ -1793,8 +1795,8 @@ private fun DetailActionButton(
     Surface(
         onClick = onClick,
         enabled = enabled,
-        modifier = modifier.height(40.dp),
-        shape = RoundedCornerShape(8.dp),
+        modifier = modifier.height(UiTokens.ControlHeight),
+        shape = RoundedCornerShape(UiTokens.RadiusMedium),
         color = if (enabled) bgColor else AppVisualTokens.Soft,
         border = BorderStroke(
             1.dp,
@@ -1803,7 +1805,7 @@ private fun DetailActionButton(
         )
     ) {
         Row(
-            modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp),
+            modifier = Modifier.fillMaxSize().padding(horizontal = UiTokens.SpaceMedium),
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -1811,9 +1813,9 @@ private fun DetailActionButton(
                 icon,
                 contentDescription = text,
                 tint = if (enabled) tint else AppVisualTokens.Muted.copy(alpha = 0.5f),
-                modifier = Modifier.size(16.dp)
+                modifier = Modifier.size(UiTokens.IconSmall)
             )
-            Spacer(Modifier.width(6.dp))
+            Spacer(Modifier.width(UiTokens.SpaceSmall))
             Text(
                 text,
                 color = if (enabled) tint else AppVisualTokens.Muted.copy(alpha = 0.5f),
@@ -1832,7 +1834,7 @@ private fun DetailMoreActionMenu(
     var expanded by remember { mutableStateOf(false) }
     Box {
         DetailActionButton(
-            icon = Icons.Default.MoreHoriz,
+            icon = IconParkIcons.More,
             text = l10n("更多操作", "More"),
             tint = AppVisualTokens.Text,
             bgColor = AppVisualTokens.Surface,
@@ -1844,8 +1846,8 @@ private fun DetailMoreActionMenu(
             onDismissRequest = { expanded = false },
             modifier = Modifier
                 .width(190.dp)
-                .background(AppVisualTokens.Surface, RoundedCornerShape(10.dp))
-                .border(BorderStroke(1.dp, AppVisualTokens.Border), RoundedCornerShape(10.dp))
+                .background(AppVisualTokens.Surface, RoundedCornerShape(UiTokens.RadiusMedium))
+                .border(BorderStroke(1.dp, AppVisualTokens.Border), RoundedCornerShape(UiTokens.RadiusMedium))
         ) {
             AppActionMenuItem(
                 icon = Icons.Default.DeleteSweep,
@@ -1860,12 +1862,12 @@ private fun DetailMoreActionMenu(
                 )
             }
             AppActionMenuItem(
-                icon = Icons.Default.Download,
+                icon = IconParkIcons.Download,
                 text = l10n("导出 APK", "Export APK"),
                 iconTint = AppVisualTokens.Muted
             ) { expanded = false; onAction(AdbFunctionType.EXPORT_APK) }
             HorizontalDivider(
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                modifier = Modifier.padding(horizontal = UiTokens.SpaceMedium, vertical = UiTokens.SpaceXSmall),
                 color = AppVisualTokens.Divider
             )
             AppActionMenuItem(
@@ -1909,7 +1911,7 @@ private fun DetailTabItem(
             style = MaterialTheme.typography.bodySmall,
             fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
             maxLines = 1,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 10.dp)
+            modifier = Modifier.padding(horizontal = UiTokens.SpaceSmall, vertical = UiTokens.SpaceSmall)
         )
         Box(
             modifier = Modifier
@@ -1924,19 +1926,19 @@ private fun DetailTabItem(
 private fun AppInfoDetailContent(appInfo: AppInfoData) {
     BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
         if (maxWidth < 980.dp) {
-            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceLarge)) {
                 BasicInfoCard(appInfo)
                 ProcessInfoCard(appInfo)
                 PermissionSummaryCard(appInfo)
                 OperationLogCard(appInfo)
             }
         } else {
-            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceLarge)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceLarge)) {
                     BasicInfoCard(appInfo, Modifier.weight(1.05f))
                     ProcessInfoCard(appInfo, Modifier.weight(1f))
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceLarge)) {
                     PermissionSummaryCard(appInfo, Modifier.weight(1f))
                     OperationLogCard(appInfo, Modifier.weight(1f))
                 }
@@ -1953,13 +1955,13 @@ private fun DetailSectionCard(
 ) {
     Surface(
         modifier = modifier,
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(UiTokens.RadiusLarge),
         color = AppVisualTokens.Surface,
         border = BorderStroke(1.dp, AppVisualTokens.Border)
     ) {
         Column(
-            modifier = Modifier.fillMaxWidth().padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
+            modifier = Modifier.fillMaxWidth().padding(UiTokens.SpaceLarge),
+            verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium)
         ) {
             Text(
                 text = title,
@@ -1999,7 +2001,7 @@ private fun DetailInfoGrid(items: List<Pair<String, String>>) {
         rows.forEachIndexed { index, row ->
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(20.dp)
+                horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceXLarge)
             ) {
                 row.forEach { (label, value) ->
                     DetailInfoGridCell(
@@ -2028,8 +2030,8 @@ private fun DetailInfoGridCell(
     Column(
         modifier = modifier
             .heightIn(min = 42.dp)
-            .padding(vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(3.dp)
+            .padding(vertical = UiTokens.SpaceSmall),
+        verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceXSmall)
     ) {
         Text(
             text = label,
@@ -2058,8 +2060,8 @@ private fun StorageInfoCard(appInfo: AppInfoData, modifier: Modifier = Modifier)
         ) {
             StorageRing(total = appInfo.totalSize)
             Column(
-                modifier = Modifier.weight(1f).padding(start = 20.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
+                modifier = Modifier.weight(1f).padding(start = UiTokens.SpaceXLarge),
+                verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
             ) {
                 StorageLegend(AppVisualTokens.Primary, l10n("应用大小", "App size"), appInfo.appSize)
                 StorageLegend(AppVisualTokens.Success, l10n("应用数据", "App data"), appInfo.dataSize)
@@ -2134,7 +2136,7 @@ private fun StorageLegend(color: Color, label: String, value: String) {
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(modifier = Modifier.size(7.dp).background(color, CircleShape))
-            Spacer(Modifier.width(8.dp))
+            Spacer(Modifier.width(UiTokens.SpaceSmall))
             Text(label, style = MaterialTheme.typography.bodySmall, color = AppVisualTokens.Muted)
         }
         Text(value, style = MaterialTheme.typography.bodySmall, color = AppVisualTokens.Text)
@@ -2157,12 +2159,12 @@ private fun PermissionSummaryCard(appInfo: AppInfoData, modifier: Modifier = Mod
     DetailSectionCard(title = l10n("权限统计", "Permission summary"), modifier = modifier) {
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+            horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium)
         ) {
             PermissionTile(l10n("危险权限", "Dangerous"), appInfo.dangerousPermissionCount, Icons.Default.GppMaybe, AppVisualTokens.Danger, Modifier.weight(1f))
             PermissionTile(l10n("隐私权限", "Privacy"), appInfo.privacyPermissionCount, Icons.Default.Lock, AppVisualTokens.Primary, Modifier.weight(1f))
-            PermissionTile(l10n("普通权限", "Normal"), appInfo.normalPermissionCount, Icons.Default.Info, AppVisualTokens.Muted, Modifier.weight(1f))
-            PermissionTile(l10n("全部权限", "All"), appInfo.totalPermissionCount, Icons.Default.Apps, AppVisualTokens.Muted, Modifier.weight(1f))
+            PermissionTile(l10n("普通权限", "Normal"), appInfo.normalPermissionCount, IconParkIcons.Info, AppVisualTokens.Muted, Modifier.weight(1f))
+            PermissionTile(l10n("全部权限", "All"), appInfo.totalPermissionCount, IconParkIcons.Application, AppVisualTokens.Muted, Modifier.weight(1f))
         }
     }
 }
@@ -2177,14 +2179,14 @@ private fun PermissionTile(
 ) {
     Surface(
         modifier = modifier.height(76.dp),
-        shape = RoundedCornerShape(8.dp),
+        shape = RoundedCornerShape(UiTokens.RadiusMedium),
         color = AppVisualTokens.Surface,
         border = BorderStroke(1.dp, AppVisualTokens.Border)
     ) {
         Column(
-            modifier = Modifier.fillMaxSize().padding(horizontal = 10.dp, vertical = 9.dp),
+            modifier = Modifier.fillMaxSize().padding(horizontal = UiTokens.SpaceSmall, vertical = UiTokens.SpaceSmall),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterVertically)
+            verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceXSmall, Alignment.CenterVertically)
         ) {
             Icon(
                 icon,
@@ -2229,7 +2231,7 @@ private fun OperationRow(action: String, time: String) {
 private fun DetailInfoRow(label: String, value: String) {
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall),
         verticalAlignment = Alignment.Top
     ) {
         Text(
@@ -2284,24 +2286,24 @@ private fun PermissionDetailContent(appInfo: AppInfoData) {
             style = MaterialTheme.typography.bodySmall,
             color = AppVisualTokens.Muted
         )
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium)) {
             PermissionTile(l10n("危险权限", "Dangerous"), appInfo.dangerousPermissionCount, Icons.Default.GppMaybe, AppVisualTokens.Danger, Modifier.width(132.dp))
             PermissionTile(l10n("隐私权限", "Privacy"), appInfo.privacyPermissionCount, Icons.Default.Lock, AppVisualTokens.Primary, Modifier.width(132.dp))
-            PermissionTile(l10n("普通权限", "Normal"), appInfo.normalPermissionCount, Icons.Default.Info, AppVisualTokens.Muted, Modifier.width(132.dp))
+            PermissionTile(l10n("普通权限", "Normal"), appInfo.normalPermissionCount, IconParkIcons.Info, AppVisualTokens.Muted, Modifier.width(132.dp))
         }
 
         Row(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall),
             modifier = Modifier.fillMaxWidth()
         ) {
             listOf("全部", "危险权限", "隐私权限", "普通权限").forEach { filter ->
                 val selected = selectedFilter == filter
                 Surface(
-                    shape = RoundedCornerShape(8.dp),
+                    shape = RoundedCornerShape(UiTokens.RadiusMedium),
                     color = if (selected) AppVisualTokens.Selected else AppVisualTokens.Surface,
                     border = BorderStroke(
                         1.dp,
-                        if (selected) Color(0xFFBBD7FF) else AppVisualTokens.Border
+                        if (selected) QadbColors.selectedBorder else AppVisualTokens.Border
                     ),
                     modifier = Modifier.clickable { selectedFilter = filter }
                 ) {
@@ -2313,7 +2315,7 @@ private fun PermissionDetailContent(appInfo: AppInfoData) {
                             "普通权限" -> l10n("普通权限", "Normal")
                             else -> filter
                         },
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                        modifier = Modifier.padding(horizontal = UiTokens.SpaceMedium, vertical = UiTokens.SpaceSmall),
                         style = MaterialTheme.typography.bodySmall,
                         color = if (selected) AppVisualTokens.Primary else AppVisualTokens.Muted,
                         fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium
@@ -2403,7 +2405,7 @@ private fun DetailItemList(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 16.dp),
+                .padding(vertical = UiTokens.SpaceLarge),
             contentAlignment = Alignment.CenterStart
         ) {
             Text(
@@ -2414,14 +2416,14 @@ private fun DetailItemList(
         }
     } else {
         Surface(
-            shape = RoundedCornerShape(8.dp),
+            shape = RoundedCornerShape(UiTokens.RadiusMedium),
             color = AppVisualTokens.Surface,
             border = BorderStroke(1.dp, AppVisualTokens.Border)
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 6.dp)
+                    .padding(horizontal = UiTokens.SpaceMedium, vertical = UiTokens.SpaceSmall)
             ) {
                 items.forEachIndexed { index, item ->
                     SelectionContainer {
@@ -2429,7 +2431,7 @@ private fun DetailItemList(
                             text = item,
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(vertical = 8.dp),
+                                .padding(vertical = UiTokens.SpaceSmall),
                             style = MaterialTheme.typography.bodySmall,
                             color = AppVisualTokens.Text,
                             maxLines = maxLines,

@@ -21,11 +21,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ludoven.adbtool.UiTokens
+import com.ludoven.adbtool.QadbColors
 
 enum class InlineStatusTone {
     Info,
@@ -39,6 +41,9 @@ fun PageHeader(
     title: String,
     subtitle: String,
     modifier: Modifier = Modifier,
+    titleFontFamily: FontFamily? = null,
+    titleFontSize: androidx.compose.ui.unit.TextUnit = UiTokens.TextPageTitle,
+    titleFontWeight: FontWeight = FontWeight.SemiBold,
     trailing: @Composable (() -> Unit)? = null
 ) {
     Row(
@@ -48,13 +53,14 @@ fun PageHeader(
     ) {
         Column(
             modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
+            verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceXSmall)
         ) {
             Text(
                 text = title,
                 style = MaterialTheme.typography.titleLarge,
-                fontSize = 22.sp,
-                fontWeight = FontWeight.SemiBold,
+                fontFamily = titleFontFamily,
+                fontSize = titleFontSize,
+                fontWeight = titleFontWeight,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -67,7 +73,7 @@ fun PageHeader(
             )
         }
         if (trailing != null) {
-            Spacer(modifier = Modifier.width(16.dp))
+            Spacer(modifier = Modifier.width(UiTokens.SpaceLarge))
             trailing()
         }
     }
@@ -88,8 +94,8 @@ fun EmptyStatePanel(
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-            modifier = Modifier.padding(24.dp)
+            verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall),
+            modifier = Modifier.padding(UiTokens.SpaceXXLarge)
         ) {
             if (icon != null) {
                 Box(
@@ -153,9 +159,9 @@ fun InlineStatusBanner(
         modifier = modifier
             .fillMaxWidth()
             .background(background, RoundedCornerShape(UiTokens.RadiusMedium))
-            .padding(horizontal = 12.dp, vertical = 10.dp),
+            .padding(horizontal = UiTokens.SpaceMedium, vertical = UiTokens.SpaceSmall),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
+        horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
     ) {
         if (icon != null) {
             Icon(
@@ -196,7 +202,7 @@ fun StatusBadge(
     Box(
         modifier = modifier
             .background(background, RoundedCornerShape(UiTokens.BadgeRadius))
-            .padding(horizontal = 9.dp, vertical = 4.dp),
+            .padding(horizontal = UiTokens.SpaceSmall, vertical = UiTokens.SpaceXSmall),
         contentAlignment = Alignment.Center
     ) {
         Text(
@@ -225,8 +231,8 @@ fun DesktopToolbar(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(UiTokens.ToolbarHeight)
-                .padding(horizontal = 6.dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                .padding(horizontal = UiTokens.SpaceSmall),
+            horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall),
             verticalAlignment = Alignment.CenterVertically,
             content = content
         )
@@ -249,28 +255,28 @@ fun ActionProgressButton(
         modifier = modifier.height(UiTokens.ControlHeight),
         colors = ButtonDefaults.buttonColors(
             containerColor = MaterialTheme.colorScheme.primary,
-            contentColor = Color.White
+            contentColor = QadbColors.onPrimary
         ),
-        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 0.dp)
+        contentPadding = PaddingValues(horizontal = UiTokens.SpaceMedium, vertical = 0.dp)
     ) {
         if (isBusy) {
             CircularProgressIndicator(
                 modifier = Modifier.size(14.dp),
-                color = Color.White,
+                color = QadbColors.onPrimary,
                 strokeWidth = 2.dp
             )
         } else if (icon != null) {
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                tint = Color.White,
+                tint = QadbColors.onPrimary,
                 modifier = Modifier.size(UiTokens.IconSmall)
             )
         }
-        Spacer(modifier = Modifier.width(7.dp))
+        Spacer(modifier = Modifier.width(UiTokens.SpaceSmall))
         Text(
             text = if (isBusy) busyText else text,
-            color = Color.White,
+            color = QadbColors.onPrimary,
             style = MaterialTheme.typography.labelLarge,
             fontWeight = FontWeight.SemiBold,
             maxLines = 1,

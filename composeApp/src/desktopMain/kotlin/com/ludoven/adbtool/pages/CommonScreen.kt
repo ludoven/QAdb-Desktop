@@ -1,6 +1,9 @@
 package com.ludoven.adbtool.pages
 
 import com.ludoven.adbtool.UiTokens
+import com.ludoven.adbtool.QadbColors
+import com.ludoven.adbtool.QadbPalette
+import com.ludoven.adbtool.ui.icons.IconParkIcons
 
 import com.ludoven.adbtool.ui.mac.*
 
@@ -175,14 +178,14 @@ fun CommonScreen(
         listOf(
             CommandCategoryUi("all", l10n("全部", "All"), Icons.Default.Tune),
             CommandCategoryUi("favorites", l10n("收藏", "Favorites"), Icons.Default.Bookmark),
-            CommandCategoryUi("device", l10n("设备", "Device"), Icons.Default.Home),
+            CommandCategoryUi("device", l10n("设备", "Device"), IconParkIcons.Home),
             CommandCategoryUi("app", l10n("应用管理", "Apps"), Icons.Default.InstallMobile),
-            CommandCategoryUi("file", l10n("文件操作", "Files"), Icons.Default.Folder),
+            CommandCategoryUi("file", l10n("文件操作", "Files"), IconParkIcons.Folder),
             CommandCategoryUi("input", l10n("输入控制", "Input"), Icons.Default.Edit),
-            CommandCategoryUi("screen", l10n("截图录屏", "Screen"), Icons.Default.PhotoCamera),
-            CommandCategoryUi("network", l10n("网络调试", "Network"), Icons.Default.Wifi),
+            CommandCategoryUi("screen", l10n("截图录屏", "Screen"), IconParkIcons.Camera),
+            CommandCategoryUi("network", l10n("网络调试", "Network"), IconParkIcons.Wifi),
             CommandCategoryUi("log", l10n("日志", "Logs"), Icons.Default.Memory),
-            CommandCategoryUi("tv", l10n("TV盒子", "TV"), Icons.Default.ScreenSearchDesktop)
+            CommandCategoryUi("tv", l10n("TV盒子", "TV"), IconParkIcons.CastScreen)
         )
     }
 
@@ -197,8 +200,8 @@ fun CommonScreen(
                 description = cmd.description,
                 commandPreview = cmd.commandPreview,
                 categoryKey = cmd.categoryKey,
-                icon = Icons.Default.Code,
-                iconTint = Color(0xFF3D73FF),
+                icon = IconParkIcons.Code,
+                iconTint = QadbPalette.Blue,
                 trigger = if (cmd.shellCommand.isNotBlank()) CommandTrigger.SHELL_INPUT else CommandTrigger.DIRECT,
                 actionType = null,
                 shellCommand = cmd.shellCommand.takeIf { it.isNotBlank() },
@@ -456,7 +459,7 @@ fun CommonScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(horizontal = UiTokens.PagePaddingCompact, vertical = UiTokens.SectionSpacingCompact),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium)
         ) {
             CommandCenterHeader(
                 searchKeyword = searchKeyword,
@@ -471,13 +474,13 @@ fun CommonScreen(
                 InlineStatusBanner(
                     text = l10n("当前没有选择设备。命令可以浏览和复制，但执行前需要先连接并选择设备。", "No device is selected. Commands can be browsed and copied, but running them needs a connected selected device."),
                     tone = InlineStatusTone.Warning,
-                    icon = Icons.Default.Info
+                    icon = IconParkIcons.Info
                 )
             }
 
             Row(
                 modifier = Modifier.fillMaxSize(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium)
             ) {
                 CommandLibraryPanel(
                     commands = filteredCommands,
@@ -620,14 +623,14 @@ fun CommonScreen(
                     contentAlignment = Alignment.BottomCenter
                 ) {
                     Surface(
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(UiTokens.RadiusLarge),
                         color = MaterialTheme.colorScheme.inverseSurface,
                         shadowElevation = 6.dp,
-                        modifier = Modifier.padding(bottom = 24.dp)
+                        modifier = Modifier.padding(bottom = UiTokens.SpaceXXLarge)
                     ) {
                         Text(
                             text = dialogText,
-                            modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
+                            modifier = Modifier.padding(horizontal = UiTokens.SpaceXLarge, vertical = UiTokens.SpaceMedium),
                             color = MaterialTheme.colorScheme.inverseOnSurface,
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.Medium
@@ -694,7 +697,7 @@ private fun loadCommandLibraryFromConfig(): List<CommandItemUi> {
 }
 
 private fun parseColor(raw: String?): Color {
-    if (raw.isNullOrBlank()) return Color(0xFF3D73FF)
+    if (raw.isNullOrBlank()) return QadbPalette.Blue
     return runCatching {
         val hex = raw.removePrefix("#")
         val value = when (hex.length) {
@@ -703,7 +706,7 @@ private fun parseColor(raw: String?): Color {
             else -> 0xFF3D73FF
         }
         Color(value)
-    }.getOrDefault(Color(0xFF3D73FF))
+    }.getOrDefault(QadbPalette.Blue)
 }
 
 private fun resolveIcon(iconKey: String): ImageVector = when (iconKey) {
@@ -712,29 +715,29 @@ private fun resolveIcon(iconKey: String): ImageVector = when (iconKey) {
     "play" -> Icons.Default.PlayArrow
     "stop" -> Icons.Default.Stop
     "delete" -> Icons.Default.DeleteSweep
-    "code" -> Icons.Default.Code
+    "code" -> IconParkIcons.Code
     "edit" -> Icons.Default.Edit
-    "back" -> Icons.Default.Close
-    "home" -> Icons.Default.Home
-    "camera" -> Icons.Default.PhotoCamera
-    "screen" -> Icons.Default.ScreenSearchDesktop
+    "back" -> IconParkIcons.Close
+    "home" -> IconParkIcons.Home
+    "camera" -> IconParkIcons.Camera
+    "screen" -> IconParkIcons.CastScreen
     "log" -> Icons.Default.Memory
-    "folder" -> Icons.Default.Folder
-    "wifi" -> Icons.Default.Wifi
+    "folder" -> IconParkIcons.Folder
+    "wifi" -> IconParkIcons.Wifi
     "reboot" -> Icons.Default.RestartAlt
-    else -> Icons.Default.Info
+    else -> IconParkIcons.Info
 }
 
 private fun categoryIconFor(categoryKey: String): ImageVector = when (categoryKey) {
-    "device" -> Icons.Default.Home
+    "device" -> IconParkIcons.Home
     "app" -> Icons.Default.InstallMobile
-    "file" -> Icons.Default.Folder
+    "file" -> IconParkIcons.Folder
     "input" -> Icons.Default.Edit
-    "screen" -> Icons.Default.PhotoCamera
-    "network" -> Icons.Default.Wifi
+    "screen" -> IconParkIcons.Camera
+    "network" -> IconParkIcons.Wifi
     "log" -> Icons.Default.Memory
-    "tv" -> Icons.Default.ScreenSearchDesktop
-    else -> Icons.Default.Info
+    "tv" -> IconParkIcons.CastScreen
+    else -> IconParkIcons.Info
 }
 
 private fun deviceDisplayLabel(selectedDevice: String?): String {
@@ -814,7 +817,12 @@ private fun tokenizeCommandLine(input: String): List<String> {
         .toList()
 }
 
-private fun commandItemAccentColor(@Suppress("UNUSED_PARAMETER") index: Int): Color = Color(0xFF3D73FF)
+private fun commandItemAccentColor(index: Int): Color = listOf(
+    QadbPalette.Blue,
+    QadbPalette.Purple,
+    QadbPalette.Orange,
+    QadbPalette.Green
+)[index.mod(4)]
 
 private fun fallbackCommands(): List<CommandItemUi> = listOf(
     CommandItemUi(
@@ -823,8 +831,8 @@ private fun fallbackCommands(): List<CommandItemUi> = listOf(
         description = l10n("配置文件读取失败时的回退命令", "Fallback command when config loading fails"),
         commandPreview = "adb shell getprop",
         categoryKey = "device",
-        icon = Icons.Default.Code,
-        iconTint = Color(0xFF3D73FF),
+        icon = IconParkIcons.Code,
+        iconTint = QadbPalette.Blue,
         trigger = CommandTrigger.SHELL_INPUT,
         actionType = AdbFunctionType.OPEN_SHELL
     )
@@ -841,16 +849,16 @@ private fun CommandCenterHeader(
 ) {
     Column(
         modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
+        verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(3.dp)
+                verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceXSmall)
             ) {
                 Text(
                     text = l10n("命令中心", "Command Center"),
@@ -870,17 +878,17 @@ private fun CommandCenterHeader(
                 onValueChange = onSearchKeywordChange,
                 leadingIcon = {
                     Icon(
-                        imageVector = Icons.Default.Search,
+                        imageVector = IconParkIcons.Search,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(UiTokens.IconMedium)
                     )
                 },
                 trailingIcon = {
                     Box(
                         modifier = Modifier
-                            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(6.dp))
-                            .padding(horizontal = 7.dp, vertical = 3.dp)
+                            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(UiTokens.RadiusSmall))
+                            .padding(horizontal = UiTokens.SpaceSmall, vertical = UiTokens.SpaceXSmall)
                     ) {
                         Text(
                             text = "⌘K",
@@ -893,7 +901,7 @@ private fun CommandCenterHeader(
                 singleLine = true,
                 placeholder = { Text(l10n("搜索命令、分类、包名或参数", "Search commands, categories, packages or args")) },
                 textStyle = MaterialTheme.typography.bodyMedium,
-                shape = RoundedCornerShape(8.dp),
+                shape = RoundedCornerShape(UiTokens.RadiusMedium),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
                     unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
@@ -936,8 +944,8 @@ private fun CategoryTabs(
 ) {
     FlowRow(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(18.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceLarge),
+        verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall),
         maxItemsInEachRow = Int.MAX_VALUE
     ) {
         categories.forEach { category ->
@@ -955,14 +963,14 @@ private fun CategoryTabs(
 
             Row(
                 modifier = Modifier
-                    .background(chipBg, RoundedCornerShape(9.dp))
+                    .background(chipBg, RoundedCornerShape(UiTokens.RadiusMedium))
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null
                     ) { onCategorySelected(category.key) }
-                    .padding(horizontal = 13.dp, vertical = 8.dp),
+                    .padding(horizontal = UiTokens.SpaceMedium, vertical = UiTokens.SpaceSmall),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
             ) {
                 Text(
                     text = category.label,
@@ -992,8 +1000,8 @@ private fun CommandLibraryPanel(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(start = 2.dp, top = 4.dp, end = 14.dp, bottom = 4.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+                .padding(start = UiTokens.SpaceXSmall, top = UiTokens.SpaceXSmall, end = UiTokens.SpaceMedium, bottom = UiTokens.SpaceXSmall),
+            verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
         ) {
             Box(modifier = Modifier.weight(1f)) {
                 val listState = rememberLazyListState()
@@ -1011,9 +1019,9 @@ private fun CommandLibraryPanel(
                 } else {
                     LazyColumn(
                         state = listState,
-                        verticalArrangement = Arrangement.spacedBy(6.dp),
-                        contentPadding = PaddingValues(bottom = 4.dp),
-                        modifier = Modifier.fillMaxSize().padding(end = 8.dp)
+                        verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall),
+                        contentPadding = PaddingValues(bottom = UiTokens.SpaceXSmall),
+                        modifier = Modifier.fillMaxSize().padding(end = UiTokens.SpaceSmall)
                     ) {
                         itemsIndexed(commands, key = { _, item -> item.id }) { index, command ->
                             CommandListItem(
@@ -1045,7 +1053,7 @@ private fun CommandLibraryPanel(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 4.dp),
+                    .padding(horizontal = UiTokens.SpaceXSmall),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -1101,33 +1109,33 @@ private fun CommandListItem(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(containerColor, RoundedCornerShape(8.dp))
-                .border(1.dp, borderColor, RoundedCornerShape(8.dp))
+                .background(containerColor, RoundedCornerShape(UiTokens.RadiusMedium))
+                .border(1.dp, borderColor, RoundedCornerShape(UiTokens.RadiusMedium))
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null
                 ) { onSelect() }
-                .padding(horizontal = 9.dp, vertical = 7.dp),
+                .padding(horizontal = UiTokens.SpaceSmall, vertical = UiTokens.SpaceSmall),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
         ) {
             Box(
                 modifier = Modifier
                     .size(30.dp)
-                    .background(Brush.linearGradient(listOf(accent, accent.copy(alpha = 0.82f))), RoundedCornerShape(7.dp)),
+                    .background(Brush.linearGradient(listOf(accent, accent.copy(alpha = 0.82f))), RoundedCornerShape(UiTokens.RadiusMedium)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = command.icon,
                     contentDescription = command.title,
-                    tint = Color.White,
+                    tint = QadbColors.onPrimary,
                     modifier = Modifier.size(17.dp)
                 )
             }
 
             Column(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(2.dp)
+                verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceXSmall)
             ) {
                 Text(
                     text = displayCommandTitle(command),
@@ -1167,7 +1175,7 @@ private fun CommandListItem(
                         imageVector = Icons.Default.Edit,
                         contentDescription = l10n("更多操作", "More actions"),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                        modifier = Modifier.size(16.dp)
+                        modifier = Modifier.size(UiTokens.IconSmall)
                     )
                 }
             }
@@ -1189,7 +1197,7 @@ private fun CommandListItem(
                             imageVector = Icons.Default.Edit,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.size(16.dp)
+                            modifier = Modifier.size(UiTokens.IconSmall)
                         )
                     }
                 )
@@ -1206,7 +1214,7 @@ private fun CommandListItem(
                             imageVector = Icons.Default.Delete,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.error,
-                            modifier = Modifier.size(16.dp)
+                            modifier = Modifier.size(UiTokens.IconSmall)
                         )
                     }
                 )
@@ -1235,13 +1243,13 @@ private fun CommandDetailPanel(
 ) {
     Column(
         modifier = modifier.fillMaxHeight(),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
+        verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(start = 4.dp, top = 4.dp, end = 2.dp, bottom = 4.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
+                .padding(start = UiTokens.SpaceXSmall, top = UiTokens.SpaceXSmall, end = UiTokens.SpaceXSmall, bottom = UiTokens.SpaceXSmall),
+            verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -1254,7 +1262,7 @@ private fun CommandDetailPanel(
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)) {
                     CommandActionButton(
                         text = l10n("复制", "Copy"),
                         icon = Icons.Default.ContentCopy,
@@ -1273,13 +1281,13 @@ private fun CommandDetailPanel(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 2.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
+                    .padding(vertical = UiTokens.SpaceXSmall),
+                verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(14.dp)
+                    horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium)
                 ) {
                     Box(
                         modifier = Modifier
@@ -1288,21 +1296,21 @@ private fun CommandDetailPanel(
                                 Brush.linearGradient(
                                     listOf(selectedCommand.iconTint, selectedCommand.iconTint.copy(alpha = 0.8f))
                                 ),
-                                RoundedCornerShape(8.dp)
+                                RoundedCornerShape(UiTokens.RadiusMedium)
                             ),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             imageVector = selectedCommand.icon,
                             contentDescription = selectedCommand.title,
-                            tint = Color.White,
-                            modifier = Modifier.size(22.dp)
+                            tint = QadbColors.onPrimary,
+                            modifier = Modifier.size(UiTokens.IconLarge)
                         )
                     }
 
                     Column(
                         modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                        verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceXSmall)
                     ) {
                         Text(
                             text = displayCommandTitle(selectedCommand),
@@ -1330,7 +1338,7 @@ private fun CommandDetailPanel(
                 )
             }
 
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)) {
                 Text(
                     text = l10n("完整命令预览", "Full command preview"),
                     style = MaterialTheme.typography.titleSmall,
@@ -1340,18 +1348,18 @@ private fun CommandDetailPanel(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.58f), RoundedCornerShape(8.dp))
-                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(8.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.58f), RoundedCornerShape(UiTokens.RadiusMedium))
+                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(UiTokens.RadiusMedium))
                         .clickable(
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null
                         ) { onCopyCommand(resolvedCommandPreview) }
-                        .padding(horizontal = 10.dp, vertical = 7.dp)
+                        .padding(horizontal = UiTokens.SpaceSmall, vertical = UiTokens.SpaceSmall)
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
                     ) {
                         Text(
                             text = "adb",
@@ -1373,7 +1381,7 @@ private fun CommandDetailPanel(
                             imageVector = Icons.Default.ContentCopy,
                             contentDescription = l10n("复制命令", "Copy command"),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(18.dp)
+                            modifier = Modifier.size(UiTokens.IconMedium)
                         )
                     }
                 }
@@ -1381,11 +1389,11 @@ private fun CommandDetailPanel(
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
+                horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceLarge)
             ) {
                 Column(
                     modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                    verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
                 ) {
                     Text(
                         text = when (selectedCommand.trigger) {
@@ -1408,7 +1416,7 @@ private fun CommandDetailPanel(
                                 onValueChange = onPackageNameInputChange,
                                 singleLine = true,
                                 placeholder = { Text("com.example.app") },
-                                shape = RoundedCornerShape(8.dp),
+                                shape = RoundedCornerShape(UiTokens.RadiusMedium),
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .heightIn(min = 44.dp)
@@ -1421,7 +1429,7 @@ private fun CommandDetailPanel(
                                 onValueChange = onShellCommandInputChange,
                                 singleLine = true,
                                 placeholder = { Text("getprop") },
-                                shape = RoundedCornerShape(8.dp),
+                                shape = RoundedCornerShape(UiTokens.RadiusMedium),
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .heightIn(min = 44.dp)
@@ -1435,7 +1443,7 @@ private fun CommandDetailPanel(
                                     onValueChange = onTextInputChange,
                                     singleLine = true,
                                     placeholder = { Text("hello") },
-                                    shape = RoundedCornerShape(8.dp),
+                                    shape = RoundedCornerShape(UiTokens.RadiusMedium),
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .heightIn(min = 44.dp)
@@ -1444,10 +1452,10 @@ private fun CommandDetailPanel(
                                 Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .height(44.dp)
-                                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
-                                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(8.dp))
-                                        .padding(horizontal = 12.dp),
+                                        .height(UiTokens.ListRowHeight)
+                                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), RoundedCornerShape(UiTokens.RadiusMedium))
+                                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(UiTokens.RadiusMedium))
+                                        .padding(horizontal = UiTokens.SpaceMedium),
                                     contentAlignment = Alignment.CenterStart
                                 ) {
                                     Text(
@@ -1463,7 +1471,7 @@ private fun CommandDetailPanel(
 
                 Column(
                     modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                    verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
                 ) {
                     Text(
                         text = l10n("目标设备", "Target device"),
@@ -1473,23 +1481,23 @@ private fun CommandDetailPanel(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(44.dp)
-                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
-                            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(8.dp))
-                            .padding(horizontal = 12.dp),
+                            .height(UiTokens.ListRowHeight)
+                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), RoundedCornerShape(UiTokens.RadiusMedium))
+                            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(UiTokens.RadiusMedium))
+                            .padding(horizontal = UiTokens.SpaceMedium),
                         contentAlignment = Alignment.CenterStart
                     ) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
                         ) {
                             Box(
                                 modifier = Modifier
                                     .size(9.dp)
                                     .background(
-                                        if (canRunCommand) Color(0xFF34C759) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f),
-                                        RoundedCornerShape(99.dp)
+                                        if (canRunCommand) QadbColors.success else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f),
+                                        RoundedCornerShape(UiTokens.BadgeRadius)
                                     )
                             )
                             Text(
@@ -1501,10 +1509,10 @@ private fun CommandDetailPanel(
                                 overflow = TextOverflow.Ellipsis
                             )
                             Icon(
-                                imageVector = Icons.Default.KeyboardArrowDown,
+                                imageVector = IconParkIcons.ArrowDown,
                                 contentDescription = null,
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(18.dp)
+                                modifier = Modifier.size(UiTokens.IconMedium)
                             )
                         }
                     }
@@ -1513,7 +1521,7 @@ private fun CommandDetailPanel(
 
             Column(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
+                verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
             ) {
                 Text(
                     text = l10n("执行结果", "Execution result"),
@@ -1522,10 +1530,10 @@ private fun CommandDetailPanel(
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Card(
-                    shape = RoundedCornerShape(8.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFF111827)),
+                    shape = RoundedCornerShape(UiTokens.RadiusMedium),
+                    colors = CardDefaults.cardColors(containerColor = QadbPalette.TerminalBackground),
                     elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-                    border = BorderStroke(1.dp, Color(0xFF1F2937)),
+                    border = BorderStroke(1.dp, QadbPalette.TerminalBorder),
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f)
@@ -1534,8 +1542,8 @@ private fun CommandDetailPanel(
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(12.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                            .padding(UiTokens.SpaceMedium),
+                        verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
                     ) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -1544,21 +1552,21 @@ private fun CommandDetailPanel(
                             Row(
                                 modifier = Modifier.weight(1f),
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
                             ) {
                                 Box(
                                     modifier = Modifier
                                         .size(10.dp)
-                                        .background(Color(0xFF34C759), RoundedCornerShape(99.dp))
+                                        .background(QadbPalette.Green, RoundedCornerShape(UiTokens.BadgeRadius))
                                 )
                                 Text(
                                     text = l10n("执行状态", "Status"),
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = Color(0xFF86EFAC),
+                                    color = QadbPalette.TerminalSuccess,
                                     fontWeight = FontWeight.SemiBold
                                 )
                             }
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)) {
                                 TerminalActionButton(l10n("清空", "Clear"), Icons.Default.Delete, onClearResult)
                                 TerminalActionButton(l10n("复制", "Copy"), Icons.Default.ContentCopy) {
                                     onCopyCommand(executionResult)
@@ -1569,7 +1577,7 @@ private fun CommandDetailPanel(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(1.dp)
-                                .background(Color.White.copy(alpha = 0.08f))
+                                .background(QadbPalette.TerminalText.copy(alpha = 0.08f))
                         )
                         val resultScroll = rememberScrollState()
                         Box(
@@ -1580,14 +1588,14 @@ private fun CommandDetailPanel(
                             Box(
                                 modifier = Modifier
                                     .fillMaxSize()
-                                    .padding(end = 10.dp)
+                                    .padding(end = UiTokens.SpaceSmall)
                                     .verticalScroll(resultScroll)
                             ) {
                                 SelectionContainer {
                                     Text(
                                         text = terminalResultText(resolvedCommandPreview, executionResult),
                                         style = MaterialTheme.typography.bodySmall,
-                                        color = Color(0xFFE5E7EB),
+                                        color = QadbPalette.TerminalText,
                                         fontFamily = FontFamily.Monospace
                                     )
                                 }
@@ -1610,17 +1618,17 @@ private fun terminalResultText(
     commandPreview: String,
     executionResult: String
 ): AnnotatedString = buildAnnotatedString {
-    appendStyledLine("${'$'} $commandPreview", Color(0xFF93C5FD), FontWeight.SemiBold)
+    appendStyledLine("${'$'} $commandPreview", QadbPalette.TerminalBlue, FontWeight.SemiBold)
     executionResult.lines().forEachIndexed { index, line ->
         if (index > 0) append('\n')
         val color = when {
-            line.contains("执行成功") || line.contains("Success", ignoreCase = true) -> Color(0xFF86EFAC)
+            line.contains("执行成功") || line.contains("Success", ignoreCase = true) -> QadbPalette.TerminalSuccess
             line.contains("执行失败") ||
                 line.contains("执行异常") ||
                 line.contains("Failed", ignoreCase = true) ||
-                line.contains("Error", ignoreCase = true) -> Color(0xFFFCA5A5)
-            line.contains("执行中") || line.contains("Running", ignoreCase = true) -> Color(0xFFFDE68A)
-            else -> Color(0xFFE5E7EB)
+                line.contains("Error", ignoreCase = true) -> QadbPalette.TerminalError
+            line.contains("执行中") || line.contains("Running", ignoreCase = true) -> QadbPalette.TerminalWarning
+            else -> QadbPalette.TerminalText
         }
         appendStyled(line, color)
     }
@@ -1656,21 +1664,21 @@ private fun TerminalActionButton(
         modifier = Modifier
             .height(28.dp)
             .widthIn(min = 58.dp),
-        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+        contentPadding = PaddingValues(horizontal = UiTokens.SpaceSmall, vertical = 0.dp)
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
+            horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceXSmall)
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = text,
-                tint = Color.White.copy(alpha = 0.9f),
+                tint = QadbPalette.TerminalText.copy(alpha = 0.9f),
                 modifier = Modifier.size(15.dp)
             )
             Text(
                 text = text,
-                color = Color.White.copy(alpha = 0.9f),
+                color = QadbPalette.TerminalText.copy(alpha = 0.9f),
                 style = MaterialTheme.typography.bodySmall,
                 fontWeight = FontWeight.SemiBold
             )
@@ -1708,13 +1716,13 @@ private fun CommandActionButton(
         enabled = enabled,
         modifier = modifier
             .height(32.dp)
-            .background(backgroundColor, RoundedCornerShape(10.dp))
-            .border(BorderStroke(1.dp, borderColor), RoundedCornerShape(10.dp))
-            .padding(horizontal = 10.dp, vertical = 0.dp)
+            .background(backgroundColor, RoundedCornerShape(UiTokens.RadiusMedium))
+            .border(BorderStroke(1.dp, borderColor), RoundedCornerShape(UiTokens.RadiusMedium))
+            .padding(horizontal = UiTokens.SpaceSmall, vertical = 0.dp)
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
+            horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
         ) {
             Icon(
                 imageVector = icon,
@@ -1776,26 +1784,26 @@ private fun CustomCommandDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)) {
                 Row(
                     modifier = Modifier.widthIn(min = 520.dp, max = 560.dp),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
                 ) {
                     Box(
                         modifier = Modifier
                             .size(32.dp)
-                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f), RoundedCornerShape(8.dp)),
+                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f), RoundedCornerShape(UiTokens.RadiusMedium)),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             imageVector = Icons.Default.Add,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(18.dp)
+                            modifier = Modifier.size(UiTokens.IconMedium)
                         )
                     }
-                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Column(verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceXSmall)) {
                         Text(
                             text = if (isEditing) l10n("编辑自定义命令", "Edit Custom Command")
                             else l10n("添加自定义命令", "Add Custom Command"),
@@ -1823,7 +1831,7 @@ private fun CustomCommandDialog(
                 modifier = Modifier
                     .widthIn(min = 520.dp, max = 560.dp)
                     .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium)
             ) {
                 CustomCommandDialogField(
                     label = l10n("命令标题", "Command title"),
@@ -1843,7 +1851,7 @@ private fun CustomCommandDialog(
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium)
                 ) {
                     CustomCommandDialogField(
                         label = l10n("Shell 命令", "Shell command"),
@@ -1855,7 +1863,7 @@ private fun CustomCommandDialog(
 
                     Column(
                         modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                        verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
                     ) {
                         Text(
                             text = l10n("分类", "Category"),
@@ -1872,7 +1880,7 @@ private fun CustomCommandDialog(
                                 trailingIcon = {
                                     ExposedDropdownMenuDefaults.TrailingIcon(expanded = categoryExpanded)
                                 },
-                                shape = RoundedCornerShape(8.dp),
+                                shape = RoundedCornerShape(UiTokens.RadiusMedium),
                                 textStyle = MaterialTheme.typography.bodySmall.copy(
                                     color = MaterialTheme.colorScheme.onSurface
                                 ),
@@ -1945,7 +1953,7 @@ private fun CustomCommandDialog(
             TextButton(
                 onClick = onDismiss,
                 modifier = Modifier.height(32.dp),
-                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
+                contentPadding = PaddingValues(horizontal = UiTokens.SpaceMedium, vertical = 0.dp)
             ) {
                 Text(l10n("取消", "Cancel"))
             }
@@ -1965,9 +1973,9 @@ private fun CustomCommandDialogField(
 ) {
     Column(
         modifier = modifier,
-        verticalArrangement = Arrangement.spacedBy(6.dp)
+        verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
     ) {
-        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceXSmall)) {
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelMedium,
@@ -1997,7 +2005,7 @@ private fun CustomCommandDialogField(
             textStyle = MaterialTheme.typography.bodySmall.copy(
                 color = MaterialTheme.colorScheme.onSurface
             ),
-            shape = RoundedCornerShape(8.dp),
+            shape = RoundedCornerShape(UiTokens.RadiusMedium),
             colors = OutlinedTextFieldDefaults.colors(
                 focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
                 unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant

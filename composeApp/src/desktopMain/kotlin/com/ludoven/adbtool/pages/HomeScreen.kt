@@ -1,6 +1,9 @@
 package com.ludoven.adbtool.pages
 
 import com.ludoven.adbtool.ui.mac.*
+import com.ludoven.adbtool.QadbColors
+import com.ludoven.adbtool.QadbPalette
+import com.ludoven.adbtool.UiTokens
 import com.ludoven.adbtool.entity.MsgContent
 
 import adbtool_desktop.composeapp.generated.resources.Res
@@ -127,7 +130,7 @@ import com.ludoven.adbtool.widget.LabeledValueRow
 import com.ludoven.adbtool.widget.OutlineActionButton
 import com.ludoven.adbtool.widget.QuickActionTile
 import com.ludoven.adbtool.widget.QuickActionCard
-import com.ludoven.adbtool.widget.StatusBadge
+import com.ludoven.adbtool.widget.ConnectionStatusBadge
 import java.time.Duration
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
@@ -141,18 +144,18 @@ internal fun homeDeviceConnected(selectedDevice: String?): Boolean =
     !selectedDevice.isNullOrBlank()
 
 private object HomeVisualTokens {
-    val Primary = Color(0xFF0A84FF)
-    val Text = Color(0xFF111827)
-    val Muted = Color(0xFF6B7280)
-    val Border = Color(0xFFE5E7EB)
-    val Soft = Color(0xFFF3F4F6)
-    val Divider = Color(0xFFE7EAF0)
-    val Success = Color(0xFF16A34A)
-    val Warning = Color(0xFFF97316)
-    val Danger = Color(0xFFEF4444)
-    val Purple = Color(0xFF7C3AED)
-    val Teal = Color(0xFF0F766E)
-    val Cyan = Color(0xFF0891B2)
+    val Primary: Color @Composable get() = QadbColors.primary
+    val Text: Color @Composable get() = QadbColors.textPrimary
+    val Muted: Color @Composable get() = QadbColors.textSecondary
+    val Border: Color @Composable get() = QadbColors.border
+    val Soft: Color @Composable get() = QadbColors.surfaceVariant
+    val Divider: Color @Composable get() = QadbColors.divider
+    val Success: Color @Composable get() = QadbColors.success
+    val Warning: Color @Composable get() = QadbColors.warning
+    val Danger: Color @Composable get() = QadbColors.danger
+    val Purple: Color @Composable get() = QadbColors.purple
+    val Teal: Color @Composable get() = QadbColors.teal
+    val Cyan: Color @Composable get() = QadbColors.cyan
 }
 
 @Composable
@@ -340,10 +343,10 @@ fun HomeScreen(
         val horizontalPadding = when {
             compactLayout -> 14.dp
             mediumLayout -> 16.dp
-            else -> 20.dp
+            else -> 16.dp
         }
         val verticalPadding = if (mediumLayout) 12.dp else 18.dp
-        val scrollBarEndPadding = if (compactLayout) 8.dp else 10.dp
+        val scrollBarEndPadding = 0.dp
         val scrollContentEndPadding = if (compactLayout) 22.dp else 28.dp
 
         if (!isConnected) {
@@ -373,7 +376,7 @@ fun HomeScreen(
                         adapter = rememberScrollbarAdapter(scrollState),
                         modifier = Modifier
                             .align(Alignment.CenterEnd)
-                            .padding(end = scrollBarEndPadding, top = 8.dp, bottom = 8.dp)
+                            .padding(end = scrollBarEndPadding, top = UiTokens.SpaceSmall, bottom = UiTokens.SpaceSmall)
                             .width(8.dp)
                             .fillMaxHeight()
                     )
@@ -394,7 +397,7 @@ fun HomeScreen(
                         modifier = Modifier
                             .fillMaxSize()
                             .padding(
-                                start = if (compactLayout) 4.dp else 8.dp,
+                                start = 0.dp,
                                 end = scrollContentEndPadding
                             )
                             .padding(top = verticalPadding, bottom = spacing)
@@ -502,7 +505,7 @@ fun HomeScreen(
                             adapter = rememberScrollbarAdapter(scrollState),
                             modifier = Modifier
                                 .align(Alignment.CenterEnd)
-                                .padding(end = scrollBarEndPadding, top = 8.dp, bottom = 8.dp)
+                                .padding(end = scrollBarEndPadding, top = UiTokens.SpaceSmall, bottom = UiTokens.SpaceSmall)
                                 .width(8.dp)
                                 .fillMaxHeight()
                         )
@@ -535,7 +538,7 @@ private fun EmptyDeviceStatePanel(
         modifier = Modifier
             .fillMaxWidth()
             .height(if (compactLayout) 500.dp else 520.dp),
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(UiTokens.RadiusLarge),
         borderStroke = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f))
     ) {
         Box(
@@ -548,7 +551,7 @@ private fun EmptyDeviceStatePanel(
                 Column(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(18.dp)
+                    verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceLarge)
                 ) {
                     EmptyDeviceHero(
                         compactLayout = true,
@@ -565,7 +568,7 @@ private fun EmptyDeviceStatePanel(
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(42.dp)
+                    horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceXXXLarge)
                 ) {
                     EmptyDeviceHero(
                         modifier = Modifier.weight(1f),
@@ -595,7 +598,7 @@ private fun EmptyDeviceHero(
     Column(
         modifier = modifier,
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(18.dp)
+        verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceLarge)
     ) {
         EmptyDeviceIllustration()
         EmptyDeviceIdentity(relativeUpdated = relativeUpdated)
@@ -615,11 +618,11 @@ private fun EmptyDeviceIdentity(
     Column(
         modifier = modifier,
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(10.dp)
+        verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
+            horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
         ) {
             Text(
                 text = stringResource(Res.string.no_device),
@@ -629,7 +632,7 @@ private fun EmptyDeviceIdentity(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
-            StatusBadge(
+            ConnectionStatusBadge(
                 text = stringResource(Res.string.disconnected),
                 active = false
             )
@@ -650,8 +653,8 @@ private fun EmptyDeviceIdentity(
 
 @Composable
 private fun EmptyDeviceIllustration() {
-    val outerShape = RoundedCornerShape(12.dp)
-    val innerShape = RoundedCornerShape(10.dp)
+    val outerShape = RoundedCornerShape(UiTokens.RadiusLarge)
+    val innerShape = RoundedCornerShape(UiTokens.RadiusMedium)
     Box(
         modifier = Modifier
             .size(92.dp)
@@ -678,7 +681,7 @@ private fun EmptyDeviceActions(
     onRefresh: () -> Unit
 ) {
     if (compactLayout) {
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)) {
             EmptyDeviceActionButton(
                 text = stringResource(Res.string.refresh),
                 icon = IconParkIcons.Refresh,
@@ -689,7 +692,7 @@ private fun EmptyDeviceActions(
             )
         }
     } else {
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium)) {
             EmptyDeviceActionButton(
                 text = stringResource(Res.string.refresh),
                 icon = IconParkIcons.Refresh,
@@ -721,16 +724,16 @@ private fun EmptyDeviceActionButton(
     } else {
         MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.62f)
     }
-    val contentColor = if (primary) Color.White else MaterialTheme.colorScheme.onSurface
-    val iconColor = if (primary) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
+    val contentColor = if (primary) QadbColors.onPrimary else MaterialTheme.colorScheme.onSurface
+    val iconColor = if (primary) QadbColors.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
 
     Row(
         modifier = modifier
-            .height(42.dp)
-            .background(containerColor, RoundedCornerShape(12.dp))
-            .border(1.dp, borderColor, RoundedCornerShape(12.dp))
+            .height(UiTokens.ControlHeight)
+            .background(containerColor, RoundedCornerShape(UiTokens.RadiusLarge))
+            .border(1.dp, borderColor, RoundedCornerShape(UiTokens.RadiusLarge))
             .homeNoRippleClickable(enabled = enabled, onClick = onClick)
-            .padding(horizontal = 18.dp),
+            .padding(horizontal = UiTokens.SpaceLarge),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center
     ) {
@@ -738,9 +741,9 @@ private fun EmptyDeviceActionButton(
             imageVector = icon,
             contentDescription = text,
             tint = iconColor,
-            modifier = Modifier.size(16.dp)
+            modifier = Modifier.size(UiTokens.IconSmall)
         )
-        Spacer(modifier = Modifier.width(8.dp))
+        Spacer(modifier = Modifier.width(UiTokens.SpaceSmall))
         Text(
             text = text,
             color = contentColor,
@@ -759,20 +762,20 @@ private fun EmptyConnectGuidePanel(
 ) {
     Column(
         modifier = modifier
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.28f), RoundedCornerShape(14.dp))
-            .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f), RoundedCornerShape(14.dp))
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.28f), RoundedCornerShape(UiTokens.RadiusLarge))
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f), RoundedCornerShape(UiTokens.RadiusLarge))
+            .padding(UiTokens.SpaceLarge),
+        verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium)
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
+            horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
         ) {
             Box(
                 modifier = Modifier
                     .size(26.dp)
-                    .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(8.dp))
-                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f), RoundedCornerShape(8.dp)),
+                    .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(UiTokens.RadiusMedium))
+                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f), RoundedCornerShape(UiTokens.RadiusMedium)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
@@ -819,13 +822,13 @@ private fun EmptyConnectStep(
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.Top,
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
+        horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium)
     ) {
         Box(
             modifier = Modifier
-                .size(22.dp)
-                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(999.dp))
-                .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f), RoundedCornerShape(999.dp)),
+                .size(UiTokens.IconLarge)
+                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(UiTokens.BadgeRadius))
+                .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f), RoundedCornerShape(UiTokens.BadgeRadius)),
             contentAlignment = Alignment.Center
         ) {
             Text(
@@ -837,7 +840,7 @@ private fun EmptyConnectStep(
         }
         Column(
             modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(3.dp)
+            verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceXSmall)
         ) {
             Text(
                 text = title,
@@ -865,12 +868,12 @@ private fun EmptyDeviceRefreshHint(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(12.dp))
-            .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f), RoundedCornerShape(12.dp))
+            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(UiTokens.RadiusLarge))
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f), RoundedCornerShape(UiTokens.RadiusLarge))
             .homeNoRippleClickable(onClick = onRefresh)
-            .padding(horizontal = 12.dp, vertical = 10.dp),
+            .padding(horizontal = UiTokens.SpaceMedium, vertical = UiTokens.SpaceSmall),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
+        horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
     ) {
         Icon(
             imageVector = IconParkIcons.Refresh,
@@ -915,19 +918,16 @@ private fun HomeTopCommandPanel(
     onRefresh: () -> Unit,
     onDisconnect: () -> Unit
 ) {
-    val panelShape = RoundedCornerShape(16.dp)
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surface, panelShape)
-            .border(1.dp, HomeVisualTokens.Border, panelShape)
-            .padding(horizontal = if (compactLayout) 14.dp else 16.dp, vertical = if (denseLayout) 14.dp else 16.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
+            .padding(vertical = if (denseLayout) 14.dp else 16.dp),
+        verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium)
     ) {
         if (compactLayout) {
             Column(
                 modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
+                verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium)
             ) {
                 HomeHeaderDeviceIdentity(
                     compactLayout = true,
@@ -994,7 +994,7 @@ private fun HomeHeaderDeviceActions(
 ) {
     Row(
         modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall),
         verticalAlignment = Alignment.CenterVertically
     ) {
         HomeHeaderActionButton(
@@ -1023,10 +1023,10 @@ private fun HomeHeaderActionButton(
     onClick: () -> Unit
 ) {
     val effectiveTint = if (enabled) tint else HomeVisualTokens.Muted.copy(alpha = 0.45f)
-    val shape = RoundedCornerShape(10.dp)
+    val shape = RoundedCornerShape(UiTokens.RadiusMedium)
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(4.dp)
+        verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceXSmall)
     ) {
         Box(
             modifier = Modifier
@@ -1044,7 +1044,7 @@ private fun HomeHeaderActionButton(
                 imageVector = icon,
                 contentDescription = label,
                 tint = effectiveTint,
-                modifier = Modifier.size(16.dp)
+                modifier = Modifier.size(UiTokens.IconSmall)
             )
         }
         Text(
@@ -1088,7 +1088,7 @@ private fun HomeHeaderDeviceIdentity(
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
                 ) {
                     Text(
                         text = deviceName,
@@ -1098,7 +1098,7 @@ private fun HomeHeaderDeviceIdentity(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
-                    StatusBadge(
+                    ConnectionStatusBadge(
                         text = stringResource(if (isConnected) Res.string.connected else Res.string.disconnected),
                         active = isConnected
                     )
@@ -1166,16 +1166,16 @@ private fun HomeHeaderMetaLine(
 ) {
     val visibleItems = items.filter { it.text.isNotBlank() && it.text != "--" }
     if (compactLayout) {
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceXSmall)) {
             visibleItems.chunked(2).forEach { rowItems ->
-                Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium)) {
                     rowItems.forEach { item -> HomeHeaderMetaItem(item) }
                 }
             }
         }
     } else {
         Row(
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceLarge),
             verticalAlignment = Alignment.CenterVertically
         ) {
             visibleItems.forEach { item -> HomeHeaderMetaItem(item) }
@@ -1187,12 +1187,12 @@ private fun HomeHeaderMetaLine(
 private fun HomeHeaderMetaItem(item: HomeHeaderMeta) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(5.dp)
+        horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
     ) {
         Icon(
             imageVector = item.icon,
             contentDescription = null,
-            tint = Color(0xFF6B7280),
+            tint = QadbColors.textSecondary,
             modifier = Modifier.size(14.dp)
         )
         Text(
@@ -1235,12 +1235,12 @@ private fun HomeCommandEntry(
     Row(
         modifier = modifier
             .height(if (compactLayout) 52.dp else 64.dp)
-            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(12.dp))
-            .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f), RoundedCornerShape(12.dp))
+            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(UiTokens.RadiusLarge))
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f), RoundedCornerShape(UiTokens.RadiusLarge))
             .homeNoRippleClickable(onClick = onClick)
-            .padding(horizontal = 16.dp),
+            .padding(horizontal = UiTokens.SpaceLarge),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp)
+        horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
     ) {
         Icon(
             imageVector = IconParkIcons.Search,
@@ -1258,8 +1258,8 @@ private fun HomeCommandEntry(
         )
         Box(
             modifier = Modifier
-                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f), RoundedCornerShape(10.dp))
-                .padding(horizontal = 7.dp, vertical = 4.dp),
+                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f), RoundedCornerShape(UiTokens.RadiusMedium))
+                .padding(horizontal = UiTokens.SpaceSmall, vertical = UiTokens.SpaceXSmall),
             contentAlignment = Alignment.Center
         ) {
             Text(
@@ -1288,7 +1288,7 @@ private fun HomeStatusOverviewPanel(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = if (compactLayout) 14.dp else 16.dp, vertical = 14.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium)
         ) {
             HomeSectionTitle(text = stringResource(Res.string.home_device_summary))
 
@@ -1317,7 +1317,7 @@ private fun HomeStatusOverviewPanel(
             )
 
             if (compactLayout) {
-                Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)) {
                     (leftRows + rightRows).forEach { row ->
                         HomeCompactInfoRow(label = row.first, value = row.second)
                     }
@@ -1325,7 +1325,7 @@ private fun HomeStatusOverviewPanel(
             } else {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(22.dp),
+                    horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceXXLarge),
                     verticalAlignment = Alignment.Top
                 ) {
                     HomeInfoColumn(
@@ -1365,7 +1365,7 @@ private fun HomeForegroundAppSection(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = if (compactLayout) 14.dp else 16.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -1399,13 +1399,13 @@ private fun HomeForegroundAppSection(
                 Box(
                     modifier = Modifier
                         .size(if (compactLayout) 54.dp else 50.dp)
-                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f), RoundedCornerShape(12.dp)),
+                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f), RoundedCornerShape(UiTokens.RadiusLarge)),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = IconParkIcons.Application,
                         contentDescription = null,
-                        tint = Color(0xFF9CA3AF),
+                        tint = QadbColors.textDisabled,
                         modifier = Modifier.size(if (compactLayout) 26.dp else 24.dp)
                     )
                 }
@@ -1415,7 +1415,7 @@ private fun HomeForegroundAppSection(
                 ) {
                     Column(
                         modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                        verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
                     ) {
                         val title = when {
                             isLoading -> l10n("正在读取当前应用", "Reading current app")
@@ -1464,8 +1464,8 @@ private fun HomeForegroundAppSection(
                         contentDescription = null,
                         tint = HomeVisualTokens.Muted,
                         modifier = Modifier
-                            .padding(top = 3.dp)
-                            .size(16.dp)
+                            .padding(top = UiTokens.SpaceXSmall)
+                            .size(UiTokens.IconSmall)
                     )
                 }
             }
@@ -1492,8 +1492,8 @@ private fun HomeRefreshIconButton(
     Box(
         modifier = Modifier
             .size(32.dp)
-            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(8.dp))
-            .border(1.dp, Color(0xFFE1E5EC), RoundedCornerShape(8.dp))
+            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(UiTokens.RadiusMedium))
+            .border(1.dp, QadbColors.border, RoundedCornerShape(UiTokens.RadiusMedium))
             .homeNoRippleClickable(enabled = enabled, onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
@@ -1502,7 +1502,7 @@ private fun HomeRefreshIconButton(
             contentDescription = stringResource(Res.string.refresh),
             tint = if (enabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f),
             modifier = Modifier
-                .size(16.dp)
+                .size(UiTokens.IconSmall)
                 .rotate(iconRotation)
         )
     }
@@ -1517,9 +1517,9 @@ private fun PrimaryHomeButton(
     Box(
         modifier = modifier
             .height(38.dp)
-            .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(8.dp))
+            .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(UiTokens.RadiusMedium))
             .homeNoRippleClickable(onClick = onClick)
-            .padding(horizontal = 8.dp),
+            .padding(horizontal = UiTokens.SpaceSmall),
         contentAlignment = Alignment.Center
     ) {
         Text(
@@ -1542,10 +1542,10 @@ private fun SecondaryHomeButton(
     Box(
         modifier = modifier
             .height(38.dp)
-            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(8.dp))
-            .border(1.dp, Color(0xFFE1E5EC), RoundedCornerShape(8.dp))
+            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(UiTokens.RadiusMedium))
+            .border(1.dp, QadbColors.border, RoundedCornerShape(UiTokens.RadiusMedium))
             .homeNoRippleClickable(onClick = onClick)
-            .padding(horizontal = 8.dp),
+            .padding(horizontal = UiTokens.SpaceSmall),
         contentAlignment = Alignment.Center
     ) {
         Text(
@@ -1565,19 +1565,19 @@ private fun HomeStatusCardsSection(
     compactLayout: Boolean,
     denseLayout: Boolean
 ) {
-    HomePlainSection(modifier = Modifier.fillMaxWidth()) {
+    Box(modifier = Modifier.fillMaxWidth()) {
         if (compactLayout) {
             val rows = cards.chunked(2)
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
+                    .padding(vertical = UiTokens.SpaceMedium),
+                verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
             ) {
                 rows.forEach { rowCards ->
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
                     ) {
                         rowCards.forEach { card ->
                             HomeStatusCard(
@@ -1594,7 +1594,7 @@ private fun HomeStatusCardsSection(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = if (denseLayout) 10.dp else 12.dp, vertical = 12.dp),
+                    .padding(vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(if (denseLayout) 10.dp else 12.dp)
             ) {
@@ -1616,7 +1616,7 @@ private fun HomeStatusCard(
     denseLayout: Boolean,
     modifier: Modifier = Modifier
 ) {
-    val cardShape = RoundedCornerShape(12.dp)
+    val cardShape = RoundedCornerShape(UiTokens.RadiusLarge)
     Row(
         modifier = modifier
             .height(if (denseLayout) 86.dp else 92.dp)
@@ -1629,7 +1629,7 @@ private fun HomeStatusCard(
         Box(
             modifier = Modifier
                 .size(if (denseLayout) 32.dp else 34.dp)
-                .background(HomeVisualTokens.Soft, RoundedCornerShape(8.dp)),
+                .background(HomeVisualTokens.Soft, RoundedCornerShape(UiTokens.RadiusMedium)),
             contentAlignment = Alignment.Center
         ) {
             Icon(
@@ -1641,7 +1641,7 @@ private fun HomeStatusCard(
         }
         Column(
             modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(5.dp)
+            verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
         ) {
             Text(
                 text = card.title,
@@ -1681,6 +1681,7 @@ private fun HomeStatusUsageChart(
     chartSize: Dp
 ) {
     val normalizedProgress = progress?.coerceIn(0f, 1f)
+    val trackColor = HomeVisualTokens.Soft
     val animatedProgress by animateFloatAsState(
         targetValue = normalizedProgress ?: 0f,
         animationSpec = tween(durationMillis = 520, easing = FastOutSlowInEasing)
@@ -1701,7 +1702,7 @@ private fun HomeStatusUsageChart(
                 height = size.height - strokeWidth
             )
             drawArc(
-                color = HomeVisualTokens.Soft,
+                color = trackColor,
                 startAngle = -90f,
                 sweepAngle = 360f,
                 useCenter = false,
@@ -1740,7 +1741,7 @@ private fun HomeMetricsStripPanel(
             .fillMaxWidth()
             .background(MaterialTheme.colorScheme.surface)
     ) {
-        Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(Color(0xFFE7EAF0)))
+        Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(QadbColors.divider))
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -1754,7 +1755,7 @@ private fun HomeMetricsStripPanel(
                 compactLayout = compactLayout
             )
         }
-        Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(Color(0xFFE7EAF0)))
+        Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(QadbColors.divider))
     }
 }
 
@@ -1764,11 +1765,11 @@ private fun HomeMetricOverviewRow(
     compactLayout: Boolean
 ) {
     if (compactLayout) {
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)) {
             items.chunked(2).forEach { rowItems ->
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
                 ) {
                     rowItems.forEach { item ->
                         HomeMetricOverviewCell(
@@ -1783,7 +1784,7 @@ private fun HomeMetricOverviewRow(
     } else {
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(18.dp),
+            horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceLarge),
             verticalAlignment = Alignment.CenterVertically
         ) {
             items.forEachIndexed { index, item ->
@@ -1811,21 +1812,21 @@ private fun HomeMetricOverviewCell(
 ) {
     Column(
         modifier = modifier,
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+        verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
+            horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
         ) {
             Box(
                 modifier = Modifier
-                    .size(18.dp),
+                    .size(UiTokens.IconMedium),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = item.icon,
                     contentDescription = null,
-                    tint = Color(0xFF6B7280),
+                    tint = QadbColors.textSecondary,
                     modifier = Modifier.size(14.dp)
                 )
             }
@@ -1865,7 +1866,7 @@ private fun HomePlainSection(
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit
 ) {
-    val sectionShape = RoundedCornerShape(12.dp)
+    val sectionShape = RoundedCornerShape(UiTokens.RadiusLarge)
     Box(
         modifier = modifier
             .background(MaterialTheme.colorScheme.surface, sectionShape)
@@ -1894,7 +1895,7 @@ private fun HomeInfoColumn(
 ) {
     Column(
         modifier = modifier,
-        verticalArrangement = Arrangement.spacedBy(7.dp)
+        verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
     ) {
         rows.forEach { row ->
             HomeCompactInfoRow(label = row.first, value = row.second)
@@ -1909,7 +1910,7 @@ private fun HomeCompactInfoRow(
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium),
         verticalAlignment = Alignment.Top
     ) {
         Text(
@@ -1961,24 +1962,24 @@ private fun DeviceHeroPanel(
 ) {
     GlassCard(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
-        borderStroke = BorderStroke(1.dp, Color(0xFFD9E4F7))
+        shape = RoundedCornerShape(UiTokens.RadiusLarge),
+        borderStroke = BorderStroke(1.dp, QadbColors.selectedBorder)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(
                     horizontal = when {
-                        compactLayout -> 16.dp
-                        denseLayout -> 18.dp
-                        else -> 20.dp
+                        compactLayout -> UiTokens.SpaceLarge
+                        denseLayout -> UiTokens.SpaceLarge
+                        else -> UiTokens.SpaceXLarge
                     },
                     vertical = if (denseLayout) 14.dp else 18.dp
                 ),
             verticalArrangement = Arrangement.spacedBy(if (denseLayout) 12.dp else 16.dp)
         ) {
             if (compactLayout) {
-                Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium)) {
                     DeviceHeroIdentity(
                         compactLayout = compactLayout,
                         denseLayout = denseLayout,
@@ -2002,7 +2003,7 @@ private fun DeviceHeroPanel(
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(22.dp)
+                    horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceXXLarge)
                 ) {
                     DeviceHeroIdentity(
                         modifier = Modifier.weight(1f),
@@ -2030,15 +2031,15 @@ private fun DeviceHeroPanel(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(Color.Transparent, RoundedCornerShape(10.dp))
+                        .background(Color.Transparent, RoundedCornerShape(UiTokens.RadiusMedium))
                         .homeNoRippleClickable(enabled = devices.isNotEmpty()) { onSelectorExpandedChange(!selectorExpanded) }
                         .padding(horizontal = if (compactLayout) 2.dp else if (denseLayout) 96.dp else 116.dp, vertical = 0.dp),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium)
                 ) {
                     Column(
                         modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                        verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceXSmall)
                     ) {
                         Text(
                             text = selectedDeviceAddress,
@@ -2063,8 +2064,8 @@ private fun DeviceHeroPanel(
                         modifier = Modifier
                             .size(8.dp)
                             .background(
-                                if (isConnected) Color(0xFF22C55E) else MaterialTheme.colorScheme.outlineVariant,
-                                RoundedCornerShape(999.dp)
+                                if (isConnected) QadbColors.success else MaterialTheme.colorScheme.outlineVariant,
+                                RoundedCornerShape(UiTokens.BadgeRadius)
                             )
                     )
                     Icon(
@@ -2141,7 +2142,7 @@ private fun DeviceHeroIdentity(
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
             ) {
                 Text(
                     text = deviceName,
@@ -2151,21 +2152,21 @@ private fun DeviceHeroIdentity(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-                StatusBadge(
+                ConnectionStatusBadge(
                     text = stringResource(if (isConnected) Res.string.connected else Res.string.disconnected),
                     active = isConnected
                 )
             }
             val chips = listOf<@Composable () -> Unit>(
                 { DeviceMetaChip(text = connectionType, icon = IconParkIcons.Link) },
-                { DeviceMetaChip(text = androidVersion, icon = IconParkIcons.Phone, tint = Color(0xFF22C55E)) },
+                { DeviceMetaChip(text = androidVersion, icon = IconParkIcons.Phone, tint = QadbColors.success) },
                 { DeviceMetaChip(text = screenResolution, icon = IconParkIcons.HardDisk) },
-                { DeviceMetaChip(text = batteryInfo, icon = IconParkIcons.BatteryFull, tint = Color(0xFF4B5563)) }
+                { DeviceMetaChip(text = batteryInfo, icon = IconParkIcons.BatteryFull, tint = QadbColors.textSecondary) }
             )
             if (compactLayout) {
-                Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)) {
                     chips.chunked(2).forEach { rowItems ->
-                        Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium)) {
                             rowItems.forEach { chip -> chip() }
                         }
                     }
@@ -2200,11 +2201,11 @@ private fun HomeToolbarActions(
     )
 
     if (compactLayout) {
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)) {
             actions.chunked(2).forEach { rowItems ->
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
                 ) {
                     rowItems.forEach { action ->
                         HomeToolbarActionButton(
@@ -2223,7 +2224,7 @@ private fun HomeToolbarActions(
     } else {
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(14.dp)
+            horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium)
         ) {
             actions.forEach { action ->
                 HomeToolbarActionButton(
@@ -2243,15 +2244,15 @@ private fun HomeToolbarActions(
 private fun NoDevicePanel() {
     GlassCard(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(UiTokens.RadiusLarge),
         borderStroke = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 42.dp),
+                .padding(vertical = UiTokens.SpaceXXXLarge),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium)
         ) {
             Icon(
                 imageVector = IconParkIcons.Phone,
@@ -2315,7 +2316,7 @@ private fun DeviceSummaryPanel(
             }
         }
 
-        Spacer(modifier = Modifier.height(if (denseLayout) 8.dp else 12.dp))
+        Spacer(modifier = Modifier.height(if (denseLayout) UiTokens.SpaceSmall else UiTokens.SpaceMedium))
         Text(
             text = stringResource(Res.string.home_view_details),
             color = MaterialTheme.colorScheme.primary,
@@ -2348,7 +2349,7 @@ private fun HomeQuickActionsSection(
         HomeToolbarAction(
             stringResource(Res.string.key_screenshot_short),
             IconParkIcons.Camera,
-            HomeVisualTokens.Primary,
+            HomeVisualTokens.Cyan,
             onScreenshot,
             stringResource(Res.string.screenshot_desc)
         ),
@@ -2362,40 +2363,34 @@ private fun HomeQuickActionsSection(
         HomeToolbarAction(
             stringResource(Res.string.file_manager),
             IconParkIcons.Folder,
-            HomeVisualTokens.Primary,
+            HomeVisualTokens.Teal,
             onOpenFileManager,
             stringResource(Res.string.file_manager_desc)
         ),
         HomeToolbarAction(
             stringResource(Res.string.app),
             IconParkIcons.Application,
-            HomeVisualTokens.Primary,
+            HomeVisualTokens.Purple,
             onOpenAppManager,
             l10n("查看应用", "View apps")
         ),
         HomeToolbarAction(
             l10n("投屏控制", "Mirror Control"),
             IconParkIcons.CastScreen,
-            HomeVisualTokens.Primary,
+            HomeVisualTokens.Success,
             onMirrorDevice,
             l10n("投屏到电脑", "Mirror to desktop")
         )
     )
 
-    HomePlainSection(modifier = modifier.fillMaxWidth()) {
+    Box(modifier = modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = if (compactLayout) 14.dp else 16.dp, vertical = 14.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+                .padding(vertical = 14.dp),
+            verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
         ) {
             HomeSectionTitle(text = l10n("常用操作", "Common Actions"))
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(1.dp)
-                    .background(HomeVisualTokens.Divider)
-            )
 
             actions.chunked(3).forEach { rowItems ->
                 Row(
@@ -2481,7 +2476,7 @@ private fun HomeDeviceInfoSummarySection(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = if (compactLayout) 14.dp else 16.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
         ) {
             HomeSectionTitle(text = stringResource(Res.string.device_info))
             Box(
@@ -2539,12 +2534,12 @@ private fun HomeDeviceInfoSummaryRow(row: HomeInfoSummaryRow) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = if (stacked) Alignment.Top else Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
+        horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium)
     ) {
         if (stacked) {
             Column(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(3.dp)
+                verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceXSmall)
             ) {
                 Text(
                     text = row.label,
@@ -2589,33 +2584,33 @@ private fun HomeCompactActionCell(
     action: HomeToolbarAction,
     modifier: Modifier = Modifier
 ) {
-    val cellShape = RoundedCornerShape(10.dp)
+    val cellShape = RoundedCornerShape(UiTokens.RadiusMedium)
     Row(
         modifier = modifier
-            .height(64.dp)
+            .height(72.dp)
             .background(MaterialTheme.colorScheme.surface, cellShape)
             .border(1.dp, HomeVisualTokens.Border, cellShape)
             .homeNoRippleClickable(onClick = action.onClick)
-            .padding(horizontal = 10.dp),
+            .padding(horizontal = UiTokens.SpaceSmall),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp)
+        horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
     ) {
         Box(
             modifier = Modifier
-                .size(30.dp)
-                .background(action.tint.copy(alpha = 0.10f), RoundedCornerShape(8.dp)),
+                .size(32.dp)
+                .background(action.tint.copy(alpha = 0.10f), RoundedCornerShape(UiTokens.RadiusMedium)),
             contentAlignment = Alignment.Center
         ) {
             Icon(
                 imageVector = action.icon,
                 contentDescription = action.title,
                 tint = action.tint,
-                modifier = Modifier.size(17.dp)
+                modifier = Modifier.size(18.dp)
             )
         }
         Column(
             modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(2.dp)
+            verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceXSmall)
         ) {
             Text(
                 text = action.title,
@@ -2647,16 +2642,16 @@ private fun HomeBottomStatusBar(
 ) {
     Column(
         modifier = modifier
-            .height(44.dp)
+            .height(UiTokens.ListRowHeight)
             .background(MaterialTheme.colorScheme.surface)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
-                .padding(horizontal = 10.dp, vertical = 6.dp),
+                .padding(horizontal = UiTokens.SpaceSmall, vertical = UiTokens.SpaceSmall),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(14.dp)
+            horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium)
         ) {
             HomeBottomStatusItem(
                 icon = IconParkIcons.Wifi,
@@ -2687,14 +2682,14 @@ private fun HomeBottomStatusBar(
             Box(
                 modifier = Modifier
                     .size(30.dp)
-                    .background(HomeVisualTokens.Primary.copy(alpha = 0.08f), RoundedCornerShape(8.dp)),
+                    .background(HomeVisualTokens.Primary.copy(alpha = 0.08f), RoundedCornerShape(UiTokens.RadiusMedium)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = IconParkIcons.Refresh,
                     contentDescription = stringResource(Res.string.refresh),
                     tint = HomeVisualTokens.Primary,
-                    modifier = Modifier.size(16.dp)
+                    modifier = Modifier.size(UiTokens.IconSmall)
                 )
             }
         }
@@ -2709,9 +2704,9 @@ private fun HomeBottomStatusItem(
 ) {
     Row(
         modifier = Modifier
-            .padding(horizontal = 2.dp, vertical = 4.dp),
+            .padding(horizontal = UiTokens.SpaceXSmall, vertical = UiTokens.SpaceXSmall),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(5.dp)
+        horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
     ) {
         Icon(
             imageVector = icon,
@@ -2756,7 +2751,7 @@ private fun DiagnosticsPanel(
                     message = stringResource(Res.string.home_no_device_alert_desc),
                     actionText = stringResource(Res.string.refresh),
                     icon = IconParkIcons.Phone,
-                    accentColor = Color(0xFF64748B),
+                    accentColor = QadbPalette.Slate,
                     onClick = onRefresh
                 )
                 HomeDiagnosticCode.STORAGE_LOW -> HomeDiagnosticUiModel(
@@ -2764,7 +2759,7 @@ private fun DiagnosticsPanel(
                     message = stringResource(Res.string.home_storage_low_desc),
                     actionText = stringResource(Res.string.home_view_details),
                     icon = IconParkIcons.StorageCard,
-                    accentColor = Color(0xFF2563EB),
+                    accentColor = QadbPalette.Blue,
                     onClick = onOpenFileManager
                 )
                 HomeDiagnosticCode.LATENCY_HIGH -> HomeDiagnosticUiModel(
@@ -2772,7 +2767,7 @@ private fun DiagnosticsPanel(
                     message = stringResource(Res.string.home_latency_high_desc),
                     actionText = stringResource(Res.string.home_view_details),
                     icon = IconParkIcons.Speed,
-                    accentColor = Color(0xFFF97316),
+                    accentColor = QadbPalette.Orange,
                     onClick = onOpenLogcat
                 )
                 HomeDiagnosticCode.BATTERY_LOW -> HomeDiagnosticUiModel(
@@ -2780,7 +2775,7 @@ private fun DiagnosticsPanel(
                     message = stringResource(Res.string.home_battery_low_desc),
                     actionText = stringResource(Res.string.refresh),
                     icon = IconParkIcons.BatteryFull,
-                    accentColor = Color(0xFFD97706),
+                    accentColor = QadbPalette.Orange,
                     onClick = onRefresh
                 )
                 HomeDiagnosticCode.HEALTHY -> HomeDiagnosticUiModel(
@@ -2788,14 +2783,14 @@ private fun DiagnosticsPanel(
                     message = stringResource(Res.string.home_device_healthy_desc),
                     actionText = stringResource(Res.string.home_view_details),
                     icon = IconParkIcons.CheckCircle,
-                    accentColor = Color(0xFF16A34A),
+                    accentColor = QadbPalette.Green,
                     onClick = onRefresh
                 )
             }
         }
 
         if (compactLayout) {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)) {
                 models.forEach { model ->
                     DiagnosticAlertRow(
                         title = model.title,
@@ -2808,11 +2803,11 @@ private fun DiagnosticsPanel(
                 }
             }
         } else {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)) {
                 models.chunked(2).forEach { rowModels ->
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium)
                     ) {
                         rowModels.forEach { model ->
                             DiagnosticAlertRow(
@@ -2856,17 +2851,17 @@ private fun DeviceControlPanel(
 ) {
     GlassCard(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(UiTokens.RadiusLarge),
         borderStroke = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f))
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 14.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+                .padding(horizontal = UiTokens.SpaceLarge, vertical = UiTokens.SpaceMedium),
+            verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium)
         ) {
             if (compactLayout) {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium)) {
                     DeviceHeadline(
                         deviceName = deviceName,
                         androidVersion = androidVersion,
@@ -2886,7 +2881,7 @@ private fun DeviceControlPanel(
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(20.dp)
+                    horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceXLarge)
                 ) {
                     DeviceHeadline(
                         modifier = Modifier.weight(1f),
@@ -2930,7 +2925,7 @@ private fun DeviceControlActions(
     onRefresh: () -> Unit,
     onDisconnect: () -> Unit
 ) {
-    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+    Row(horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)) {
         OutlineActionButton(
             modifier = if (compactLayout) Modifier.weight(1f) else Modifier,
             text = stringResource(Res.string.refresh),
@@ -2963,11 +2958,11 @@ private fun DeviceHeadline(
 ) {
     Column(
         modifier = modifier,
-        verticalArrangement = Arrangement.spacedBy(4.dp)
+        verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceXSmall)
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
+            horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
         ) {
             Icon(
                 imageVector = IconParkIcons.Phone,
@@ -2983,7 +2978,7 @@ private fun DeviceHeadline(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
-            StatusBadge(
+            ConnectionStatusBadge(
                 text = stringResource(if (isConnected) Res.string.connected else Res.string.disconnected),
                 active = isConnected
             )
@@ -3019,7 +3014,7 @@ private fun DeviceSelectorCard(
 ) {
     Column(
         modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+        verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
     ) {
         Text(
             text = stringResource(Res.string.select_device),
@@ -3034,22 +3029,22 @@ private fun DeviceSelectorCard(
                     .fillMaxWidth()
                     .background(
                         MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f),
-                        RoundedCornerShape(10.dp)
+                        RoundedCornerShape(UiTokens.RadiusMedium)
                     )
                     .homeNoRippleClickable(
                         enabled = devices.isNotEmpty(),
                         onClick = { onExpandedChange(!expanded) }
                     )
-                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                    .padding(horizontal = UiTokens.SpaceMedium, vertical = UiTokens.SpaceSmall),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
             ) {
                 Box(
                     modifier = Modifier
                         .size(28.dp)
                         .background(
                             MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
-                            RoundedCornerShape(8.dp)
+                            RoundedCornerShape(UiTokens.RadiusMedium)
                         ),
                     contentAlignment = Alignment.Center
                 ) {
@@ -3057,13 +3052,13 @@ private fun DeviceSelectorCard(
                         imageVector = IconParkIcons.Phone,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(16.dp)
+                        modifier = Modifier.size(UiTokens.IconSmall)
                     )
                 }
 
                 Column(
                     modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                    verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceXSmall)
                 ) {
                     Text(
                         text = selectedDeviceLabel,
@@ -3091,7 +3086,7 @@ private fun DeviceSelectorCard(
 
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
                 ) {
                     Icon(
                         imageVector = IconParkIcons.ArrowDown,
@@ -3102,8 +3097,8 @@ private fun DeviceSelectorCard(
                         modifier = Modifier
                             .size(7.dp)
                             .background(
-                                if (isConnected) Color(0xFF2DBE60) else MaterialTheme.colorScheme.outlineVariant,
-                                RoundedCornerShape(999.dp)
+                                if (isConnected) QadbColors.success else MaterialTheme.colorScheme.outlineVariant,
+                                RoundedCornerShape(UiTokens.BadgeRadius)
                             )
                     )
                 }
@@ -3170,7 +3165,7 @@ private fun DeviceInfoPanel(
             deviceInfo.screenResolution.orDash()
         ).joinToString(" · ")
 
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceXSmall)) {
             Text(
                 text = headlineModel,
                 style = MaterialTheme.typography.headlineSmall,
@@ -3183,7 +3178,7 @@ private fun DeviceInfoPanel(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
-        Spacer(modifier = Modifier.height(18.dp))
+        Spacer(modifier = Modifier.height(UiTokens.SpaceLarge))
 
         DeviceInfoRow(
             left = DeviceInfoEntry(
@@ -3196,7 +3191,7 @@ private fun DeviceInfoPanel(
             ),
             cellModifier = cellModifier
         )
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(UiTokens.SpaceLarge))
 
         DeviceInfoRow(
             left = DeviceInfoEntry(
@@ -3209,7 +3204,7 @@ private fun DeviceInfoPanel(
             ),
             cellModifier = cellModifier
         )
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(UiTokens.SpaceLarge))
 
         DeviceInfoRow(
             left = DeviceInfoEntry(
@@ -3222,7 +3217,7 @@ private fun DeviceInfoPanel(
             ),
             cellModifier = cellModifier
         )
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(UiTokens.SpaceLarge))
 
         DeviceInfoRow(
             left = DeviceInfoEntry(
@@ -3236,7 +3231,7 @@ private fun DeviceInfoPanel(
             cellModifier = cellModifier
         )
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(UiTokens.SpaceLarge))
 
         SelectionContainer {
             Column(
@@ -3244,10 +3239,10 @@ private fun DeviceInfoPanel(
                     .fillMaxWidth()
                     .background(
                         MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.34f),
-                        RoundedCornerShape(14.dp)
+                        RoundedCornerShape(UiTokens.RadiusLarge)
                     )
-                    .padding(12.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
+                    .padding(UiTokens.SpaceMedium),
+                verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
             ) {
                 Text(
                     text = stringResource(Res.string.build_fingerprint),
@@ -3280,7 +3275,7 @@ private fun ConnectionInfoPanel(
         title = stringResource(Res.string.connection_info),
         icon = IconParkIcons.Link
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium)) {
             LabeledValueRow(
                 label = stringResource(Res.string.connection_type),
                 value = connectionType,
@@ -3289,7 +3284,7 @@ private fun ConnectionInfoPanel(
             LabeledValueRow(
                 label = stringResource(Res.string.device_status),
                 value = connectionStatus,
-                pillColor = if (isConnected) Color(0xFF2DBE60) else MaterialTheme.colorScheme.onSurfaceVariant
+                pillColor = if (isConnected) QadbColors.success else MaterialTheme.colorScheme.onSurfaceVariant
             )
             LabeledValueRow(label = stringResource(Res.string.ip_address), value = ipAddress)
             LabeledValueRow(label = stringResource(Res.string.port), value = port)
@@ -3341,7 +3336,7 @@ private fun QuickActionsPanel(
         if (singleRow) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
             ) {
                 actions.forEach { action ->
                     QuickActionTile(
@@ -3387,7 +3382,7 @@ private fun DeviceInfoRow(
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
+        horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium)
     ) {
         DeviceInfoCell(
             modifier = cellModifier,
@@ -3408,11 +3403,11 @@ private fun MetricsSection(
     compactLayout: Boolean
 ) {
     if (compactLayout) {
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)) {
             items.chunked(2).forEach { rowItems ->
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
                 ) {
                     rowItems.forEach { item ->
                         DashboardMetricCard(
@@ -3435,7 +3430,7 @@ private fun MetricsSection(
     } else {
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+            horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium)
         ) {
             items.forEach { item ->
                 DashboardMetricCard(

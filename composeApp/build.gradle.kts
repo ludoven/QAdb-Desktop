@@ -77,7 +77,7 @@ plugins {
     alias(libs.plugins.composeCompiler)
 }
 
-val appVersion = "2.1.0"
+val appVersion = "2.1.1"
 val currentOsName = System.getProperty("os.name").lowercase()
 val nativeTargetFormats = when {
     currentOsName.contains("mac") -> arrayOf(TargetFormat.Dmg)

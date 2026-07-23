@@ -1,5 +1,8 @@
 package com.ludoven.adbtool.pages
 
+import com.ludoven.adbtool.UiTokens
+import com.ludoven.adbtool.ui.icons.IconParkIcons
+
 import com.ludoven.adbtool.ui.mac.*
 
 import adbtool_desktop.composeapp.generated.resources.Res
@@ -159,8 +162,8 @@ fun ProcessScreen(selectedDevice: String?) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 22.dp, vertical = 18.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+            .padding(horizontal = UiTokens.SpaceXXLarge, vertical = UiTokens.SpaceLarge),
+        verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium)
     ) {
         DiagnosticsCompactHeader(
             title = stringResource(Res.string.process_title),
@@ -176,7 +179,7 @@ fun ProcessScreen(selectedDevice: String?) {
             EmptyStatePanel(
                 title = stringResource(Res.string.process_no_device),
                 description = "连接或选择设备后即可读取进程列表。",
-                icon = Icons.Default.Refresh,
+                icon = IconParkIcons.Refresh,
                 modifier = Modifier.fillMaxSize()
             )
             return
@@ -184,19 +187,19 @@ fun ProcessScreen(selectedDevice: String?) {
 
         Card(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(10.dp)
+            shape = RoundedCornerShape(UiTokens.RadiusMedium)
         ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(12.dp),
+                    .padding(UiTokens.SpaceMedium),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium)
             ) {
                 OutlinedTextField(
                     value = keyword,
                     onValueChange = { keyword = it },
-                    modifier = Modifier.weight(1f).height(40.dp),
+                    modifier = Modifier.weight(1f).height(UiTokens.ControlHeight),
                     singleLine = true,
                     label = { Text(stringResource(Res.string.process_search_hint)) }
                 )
@@ -208,12 +211,12 @@ fun ProcessScreen(selectedDevice: String?) {
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth(),
-            shape = RoundedCornerShape(10.dp)
+            shape = RoundedCornerShape(UiTokens.RadiusMedium)
         ) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(8.dp)
+                    .padding(UiTokens.SpaceSmall)
             ) {
                 when {
                     isLoading -> {
@@ -245,9 +248,9 @@ fun ProcessScreen(selectedDevice: String?) {
                             LazyColumn(
                                 modifier = Modifier
                                     .fillMaxSize()
-                                    .padding(end = 12.dp),
+                                    .padding(end = UiTokens.SpaceMedium),
                                 state = listState,
-                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                                verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceXSmall)
                             ) {
                                 item {
                                     Row(
@@ -255,9 +258,9 @@ fun ProcessScreen(selectedDevice: String?) {
                                             .fillMaxWidth()
                                             .background(
                                                 MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.56f),
-                                                RoundedCornerShape(8.dp)
+                                                RoundedCornerShape(UiTokens.RadiusMedium)
                                             )
-                                            .padding(horizontal = 8.dp, vertical = 7.dp)
+                                            .padding(horizontal = UiTokens.SpaceSmall, vertical = UiTokens.SpaceSmall)
                                     ) {
                                         SortableColumnHeader(
                                             text = stringResource(Res.string.process_name),
@@ -332,7 +335,7 @@ fun ProcessScreen(selectedDevice: String?) {
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                                        .padding(horizontal = UiTokens.SpaceSmall, vertical = UiTokens.SpaceXSmall)
                                 ) {
                                     Text(
                                         text = item.name,
@@ -384,7 +387,7 @@ fun ProcessScreen(selectedDevice: String?) {
                             modifier = Modifier
                                 .align(Alignment.CenterEnd)
                                 .fillMaxHeight()
-                                .padding(end = 2.dp)
+                                .padding(end = UiTokens.SpaceXSmall)
                         )
                     }
                 }
@@ -408,12 +411,12 @@ private fun DiagnosticsCompactHeader(
     ) {
         Column(
             modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
+            verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceXSmall)
         ) {
             Text(
                 text = title,
                 style = MaterialTheme.typography.titleMedium,
-                fontSize = 17.sp,
+                fontSize = UiTokens.TextSectionLarge,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
@@ -426,7 +429,7 @@ private fun DiagnosticsCompactHeader(
                 overflow = TextOverflow.Ellipsis
             )
         }
-        Box(modifier = Modifier.padding(start = 12.dp)) {
+        Box(modifier = Modifier.padding(start = UiTokens.SpaceMedium)) {
             trailing()
         }
     }
@@ -437,7 +440,7 @@ private fun CompactRefreshButton(
     onClick: () -> Unit,
     enabled: Boolean
 ) {
-    val shape = RoundedCornerShape(8.dp)
+    val shape = RoundedCornerShape(UiTokens.RadiusMedium)
     IconButton(
         onClick = onClick,
         enabled = enabled,
@@ -447,9 +450,9 @@ private fun CompactRefreshButton(
             .border(1.dp, MaterialTheme.colorScheme.outlineVariant, shape)
     ) {
         Icon(
-            Icons.Default.Refresh,
+            IconParkIcons.Refresh,
             contentDescription = stringResource(Res.string.refresh),
-            modifier = Modifier.size(16.dp),
+            modifier = Modifier.size(UiTokens.IconSmall),
             tint = if (enabled) MaterialTheme.colorScheme.onSurfaceVariant
             else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)
         )
@@ -458,19 +461,19 @@ private fun CompactRefreshButton(
 
 @Composable
 private fun ProcessCountPill(count: Int) {
-    val shape = RoundedCornerShape(999.dp)
+    val shape = RoundedCornerShape(UiTokens.BadgeRadius)
     Row(
         modifier = Modifier
             .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f), shape)
             .border(1.dp, MaterialTheme.colorScheme.outlineVariant, shape)
-            .padding(horizontal = 12.dp, vertical = 7.dp),
+            .padding(horizontal = UiTokens.SpaceMedium, vertical = UiTokens.SpaceSmall),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(5.dp)
+        horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
     ) {
         Text(
             text = "$count",
             style = MaterialTheme.typography.titleMedium,
-            fontSize = 14.sp,
+            fontSize = UiTokens.TextBodyLarge,
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.primary
         )
@@ -649,9 +652,9 @@ private fun SortableColumnHeader(
         )
         if (isActive) {
             Icon(
-                imageVector = if (descending) Icons.Default.ArrowDropDown else Icons.Default.ArrowDropUp,
+                imageVector = if (descending) IconParkIcons.ArrowDown else Icons.Default.ArrowDropUp,
                 contentDescription = null,
-                modifier = Modifier.size(16.dp),
+                modifier = Modifier.size(UiTokens.IconSmall),
                 tint = MaterialTheme.colorScheme.primary
             )
         }
