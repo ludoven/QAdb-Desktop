@@ -76,10 +76,10 @@ object QadbColors {
 /** Fixed accents for charts, key groups, and terminal syntax where hue identity is semantic. */
 object QadbPalette {
     val Blue = Color(0xFF2563EB)
-    val Purple = Color(0xFF7C3AED)
-    val Orange = Color(0xFFD97706)
-    val Green = Color(0xFF16A34A)
-    val Slate = Color(0xFF64748B)
+    val Purple = Color(0xFF5645D4)
+    val Orange = Color(0xFFDD5B00)
+    val Green = Color(0xFF1AAE39)
+    val Slate = Color(0xFF5D5B54)
 
     val TerminalBackground = Color(0xFF111827)
     val TerminalBorder = Color(0xFF1F2937)

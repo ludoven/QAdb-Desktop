@@ -48,7 +48,6 @@ import androidx.compose.ui.input.key.isMetaPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
-import androidx.compose.foundation.BorderStroke
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -277,8 +276,13 @@ fun App() {
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(paddingValues)
-                    .padding(12.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    .padding(
+                        start = UiTokens.WindowPadding,
+                        top = UiTokens.SpaceSmall,
+                        end = UiTokens.WindowPadding,
+                        bottom = UiTokens.WindowPadding
+                    ),
+                horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceLarge)
             ) {
                 SidebarContainer(
                     groups = tabGroups,
@@ -296,18 +300,13 @@ fun App() {
                 ) {
                     Surface(
                         modifier = Modifier.fillMaxSize(),
-                        shape = RoundedCornerShape(if (usePlainContentContainer) 0.dp else UiTokens.RadiusLarge),
-                        color = MaterialTheme.colorScheme.surface,
-                        border = if (usePlainContentContainer) {
-                            null
-                        } else {
-                            BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
-                        }
+                        shape = RoundedCornerShape(0.dp),
+                        color = MaterialTheme.colorScheme.surface
                     ) {
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
-                                .padding(if (usePlainContentContainer) 0.dp else 8.dp)
+                            .padding(if (usePlainContentContainer) 0.dp else UiTokens.SpaceSmall)
                         ) {
                             NavHost(navController, startDestination = "home") {
                                 composable("home") {

@@ -346,6 +346,7 @@ fun HomeScreen(
             else -> 16.dp
         }
         val verticalPadding = if (mediumLayout) 12.dp else 18.dp
+        val topPadding = UiTokens.SpaceXSmall
         val scrollBarEndPadding = 0.dp
         val scrollContentEndPadding = if (compactLayout) 22.dp else 28.dp
 
@@ -357,7 +358,7 @@ fun HomeScreen(
                         .padding(
                             start = horizontalPadding,
                             end = horizontalPadding + scrollContentEndPadding,
-                            top = verticalPadding,
+                            top = topPadding,
                             bottom = verticalPadding
                         )
                         .verticalScroll(scrollState),
@@ -400,7 +401,7 @@ fun HomeScreen(
                                 start = 0.dp,
                                 end = scrollContentEndPadding
                             )
-                            .padding(top = verticalPadding, bottom = spacing)
+                            .padding(top = topPadding, bottom = spacing)
                             .verticalScroll(scrollState),
                         verticalArrangement = Arrangement.spacedBy(spacing)
                     ) {
@@ -921,7 +922,7 @@ private fun HomeTopCommandPanel(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = if (denseLayout) 14.dp else 16.dp),
+            .padding(bottom = if (denseLayout) 14.dp else 16.dp),
         verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium)
     ) {
         if (compactLayout) {

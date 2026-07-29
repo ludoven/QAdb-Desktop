@@ -160,7 +160,7 @@ fun DashboardMetricCard(
     GlassCard(
         modifier = modifier,
         shape = RoundedCornerShape(UiTokens.RadiusFeature),
-        borderStroke = BorderStroke(1.dp, accentColor.copy(alpha = 0.12f))
+        borderStroke = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     ) {
         Column(
             modifier = Modifier
@@ -308,7 +308,7 @@ fun HomeToolbarActionButton(
     enabled: Boolean = true
 ) {
     val interactionSource = remember { MutableInteractionSource() }
-    val shape = RoundedCornerShape(UiTokens.RadiusFeature)
+    val shape = RoundedCornerShape(UiTokens.RadiusMedium)
     val effectiveTint = if (enabled) tint else tint.copy(alpha = 0.45f)
 
     Row(
@@ -355,8 +355,8 @@ fun DashboardPanel(
 ) {
     GlassCard(
         modifier = modifier,
-        shape = RoundedCornerShape(UiTokens.RadiusFeature),
-        borderStroke = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f))
+        shape = RoundedCornerShape(UiTokens.RadiusLarge),
+        borderStroke = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     ) {
         Column(
             modifier = Modifier
@@ -432,7 +432,7 @@ fun QuickActionTile(
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         border = BorderStroke(
             width = 1.dp,
-            color = if (isHovered) accentColor.copy(alpha = 0.28f) else accentColor.copy(alpha = 0.10f)
+            color = if (isHovered) accentColor.copy(alpha = 0.28f) else MaterialTheme.colorScheme.outlineVariant
         )
     ) {
         Column(
@@ -720,7 +720,7 @@ fun QuickActionCard(
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         border = BorderStroke(
             width = 1.dp,
-            color = if (isHovered) accentColor.copy(alpha = 0.28f) else accentColor.copy(alpha = 0.10f)
+            color = if (isHovered) accentColor.copy(alpha = 0.28f) else MaterialTheme.colorScheme.outlineVariant
         )
     ) {
         Row(
