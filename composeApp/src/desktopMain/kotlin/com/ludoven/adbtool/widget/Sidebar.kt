@@ -16,7 +16,6 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.hoverable
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -80,19 +79,27 @@ fun Sidebar(
         modifier = modifier
             .fillMaxHeight()
             .width(UiTokens.SidebarWidth),
-        shape = RoundedCornerShape(UiTokens.RadiusSmall),
-        color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
+        shape = RoundedCornerShape(0.dp),
+        color = MaterialTheme.colorScheme.surface
     ) {
         Column(
             modifier = Modifier
                 .fillMaxHeight()
-                .padding(horizontal = UiTokens.SpaceMedium, vertical = UiTokens.SpaceLarge),
+                .padding(
+                    start = UiTokens.SpaceMedium,
+                    top = UiTokens.SpaceSmall,
+                    end = UiTokens.SpaceMedium,
+                    bottom = UiTokens.SpaceLarge
+                ),
             verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(bottom = UiTokens.SpaceLarge, start = UiTokens.SpaceSmall, top = UiTokens.SpaceXSmall)
+                modifier = Modifier.padding(
+                    bottom = UiTokens.SpaceXLarge,
+                    start = UiTokens.SpaceSmall,
+                    top = UiTokens.SpaceXSmall
+                )
             ) {
                 Image(
                     painter = painterResource(Res.drawable.ic_logo),
@@ -169,7 +176,7 @@ private fun SidebarGroupHeader(
     val shape = RoundedCornerShape(UiTokens.RowRadius)
     val backgroundColor by animateColorAsState(
         targetValue = when {
-            hasSelection -> MaterialTheme.colorScheme.primary.copy(alpha = 0.11f)
+            hasSelection -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.82f)
             isHovered -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f)
             else -> Color.Transparent
         },

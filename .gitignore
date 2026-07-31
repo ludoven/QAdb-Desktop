@@ -24,3 +24,12 @@ captures
 /docs/dev/
 /docs/superpowers/
 .worktrees/
+.codex/
+.superpowers/
+.workbuddy/
+output/
+docs/design-system/
+docs/design/notion/
+docs/implementation/desktop/
+docs/qadb-desktop-product-ui-optimization-plan.md
+docs/ux-audit/

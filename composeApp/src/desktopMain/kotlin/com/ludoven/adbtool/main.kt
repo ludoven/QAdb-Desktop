@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalMaterial3Api::class)
+@file:OptIn(ExperimentalMaterial3Api::class, ExperimentalComposeUiApi::class)
 
 package com.ludoven.adbtool
 
@@ -53,6 +53,7 @@ import adbtool_desktop.composeapp.generated.resources.menu_zoom_out
 import adbtool_desktop.composeapp.generated.resources.menu_zoom_reset
 import com.ludoven.adbtool.ui.mac.*
 import com.ludoven.adbtool.ui.mac.ExperimentalMaterial3Api
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
@@ -61,6 +62,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
@@ -72,6 +74,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.MenuBar
 import androidx.compose.ui.window.MenuBarScope
 import androidx.compose.ui.window.Window
+import androidx.compose.ui.window.WindowDecoration
 import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.WindowState
 import androidx.compose.ui.window.application
@@ -108,6 +111,11 @@ fun main() = application {
     var alwaysOnTop by remember { mutableStateOf(false) }
     val currentLanguage by LanguageManager.currentLanguage.collectAsState()
     val currentThemeMode by ThemeManager.currentThemeMode.collectAsState()
+    val useDarkTheme = when (currentThemeMode) {
+        ThemeManager.ThemeMode.SYSTEM -> isSystemInDarkTheme()
+        ThemeManager.ThemeMode.LIGHT -> false
+        ThemeManager.ThemeMode.DARK -> true
+    }
     val coroutineScope = rememberCoroutineScope()
     val shutdownAndExit = {
         AdbTool.shutdownRelatedProcesses()
@@ -120,6 +128,11 @@ fun main() = application {
         state = windowState,
         title = "QADB",
         icon = appIcon,
+        decoration = if (isWindows) {
+            WindowDecoration.Undecorated()
+        } else {
+            WindowDecoration.SystemDefault
+        },
         alwaysOnTop = alwaysOnTop
     ) {
         if (!isWindows) {
@@ -148,7 +161,15 @@ fun main() = application {
                 )
             }
         }
-        App()
+        AppWindowFrame(
+            isMacOs = isMacOs,
+            isWindows = isWindows,
+            useDarkTheme = useDarkTheme,
+            windowState = windowState,
+            onClose = shutdownAndExit
+        ) {
+            App()
+        }
     }
     }
 }

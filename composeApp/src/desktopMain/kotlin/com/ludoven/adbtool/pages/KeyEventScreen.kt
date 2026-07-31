@@ -51,6 +51,7 @@ import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
@@ -60,13 +61,17 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.material.icons.Icons
@@ -93,6 +98,7 @@ import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.WbSunny
+import androidx.compose.material.TextFieldDefaults
 import com.ludoven.adbtool.ui.mac.AlertDialog
 import com.ludoven.adbtool.ui.mac.Button
 import com.ludoven.adbtool.ui.mac.ButtonDefaults
@@ -120,6 +126,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -175,6 +182,7 @@ fun KeyEventScreen(
     modifier: Modifier = Modifier,
     embedded: Boolean = false,
     showHeader: Boolean = true,
+    showConnectionWarning: Boolean = true,
     useInternalScroll: Boolean = true
 ) {
     val showToast by viewModel.showToast.collectAsState()
@@ -201,7 +209,7 @@ fun KeyEventScreen(
     } else {
         "${stringResource(Res.string.connected)} · $deviceName"
     }
-    val contentSpacing = if (embedded) 10.dp else 12.dp
+    val contentSpacing = if (embedded) UiTokens.SpaceMedium else 12.dp
     val contentPadding = PaddingValues(if (embedded) 0.dp else 16.dp)
     val rootModifier = if (useInternalScroll) {
         modifier.fillMaxSize()
@@ -233,6 +241,7 @@ fun KeyEventScreen(
                         contentSpacing = contentSpacing,
                         selectedDevice = selectedDevice,
                         showHeader = showHeader,
+                        showConnectionWarning = showConnectionWarning,
                         connectedText = connectedText,
                         customCode = customCode,
                         onCustomCodeChange = { customCode = it.filter(Char::isDigit) },
@@ -245,7 +254,6 @@ fun KeyEventScreen(
                             dispatchKey(code, "KeyCode($code)")
                             customCode = ""
                         },
-                        onClearCustomCode = { customCode = "" },
                         previewRecord = previewRecord,
                         recentRecords = recentRecords,
                         onAction = { action -> dispatchKey(action.code, action.commandName) },
@@ -272,6 +280,7 @@ fun KeyEventScreen(
                 contentSpacing = contentSpacing,
                 selectedDevice = selectedDevice,
                 showHeader = showHeader,
+                showConnectionWarning = showConnectionWarning,
                 connectedText = connectedText,
                 customCode = customCode,
                 onCustomCodeChange = { customCode = it.filter(Char::isDigit) },
@@ -284,7 +293,6 @@ fun KeyEventScreen(
                     dispatchKey(code, "KeyCode($code)")
                     customCode = ""
                 },
-                onClearCustomCode = { customCode = "" },
                 previewRecord = previewRecord,
                 recentRecords = recentRecords,
                 onAction = { action -> dispatchKey(action.code, action.commandName) },
@@ -353,7 +361,11 @@ fun KeyEventScreen(
                             showLongPress = false
                             viewModel.sendLongPressEvent(lpCode, duration.toLongOrNull() ?: 1000L, lpName)
                         },
-                        shape = RoundedCornerShape(UiTokens.RadiusSmall)
+                        shape = RoundedCornerShape(UiTokens.RadiusSmall),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary
+                        )
                     ) {
                         Text(stringResource(Res.string.key_long_press_send))
                     }
@@ -370,6 +382,7 @@ private fun KeyEventContent(
     contentSpacing: Dp,
     selectedDevice: String?,
     showHeader: Boolean,
+    showConnectionWarning: Boolean,
     connectedText: String,
     customCode: String,
     onCustomCodeChange: (String) -> Unit,
@@ -378,7 +391,6 @@ private fun KeyEventContent(
     onLongPressModeChange: (Boolean) -> Unit,
     onShowAdbCommandChange: (Boolean) -> Unit,
     onSendCustomCode: () -> Unit,
-    onClearCustomCode: () -> Unit,
     previewRecord: KeyEventRecord,
     recentRecords: List<KeyEventRecord>,
     onAction: (KeyAction) -> Unit,
@@ -398,7 +410,7 @@ private fun KeyEventContent(
             Header(connectedText = connectedText, connected = !selectedDevice.isNullOrBlank())
         }
 
-        if (selectedDevice.isNullOrBlank()) {
+        if (showConnectionWarning && selectedDevice.isNullOrBlank()) {
             InlineStatusBanner(
                 text = l10n("当前没有选择设备。按键面板可预览命令，发送前需要先连接并选择设备。", "No device is selected. The key panel can preview commands, but sending needs a connected selected device."),
                 tone = InlineStatusTone.Warning,
@@ -406,34 +418,17 @@ private fun KeyEventContent(
             )
         }
 
-        DeviceTextInputPanel(
-            text = textInput,
-            onTextChange = onTextInputChange,
-            isSending = isSendingText,
-            message = textSendMessage,
-            onSend = onSendText
-        )
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium),
-            verticalAlignment = Alignment.Top
-        ) {
-            Column(
-                modifier = Modifier.weight(1.05f),
-                verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
-            ) {
-                VisualKeyPanel(
-                    showAdbCommand = showAdbCommand,
-                    onAction = onAction
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+            val stacked = maxWidth < 760.dp
+            val rightContent: @Composable ColumnScope.() -> Unit = {
+                DeviceTextInputPanel(
+                    text = textInput,
+                    onTextChange = onTextInputChange,
+                    isSending = isSendingText,
+                    message = textSendMessage,
+                    onSend = onSendText
                 )
-            }
-
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
-            ) {
-                CustomKeyCodePanel(
+                AdvancedOperationsPanel(
                     customCode = customCode,
                     onCustomCodeChange = onCustomCodeChange,
                     longPressMode = longPressMode,
@@ -441,21 +436,50 @@ private fun KeyEventContent(
                     onLongPressModeChange = onLongPressModeChange,
                     onShowAdbCommandChange = onShowAdbCommandChange,
                     onSend = onSendCustomCode,
-                    onClear = onClearCustomCode
-                )
-                CommandPreview(
-                    record = previewRecord,
-                    onCopy = onCopyPreview
+                    previewRecord = previewRecord,
+                    onCopyPreview = onCopyPreview
                 )
                 RecentSentPanel(
                     records = recentRecords,
                     onClear = onClearRecent
                 )
             }
+
+            if (stacked) {
+                Column(verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium)) {
+                    VisualKeyPanel(
+                        showAdbCommand = showAdbCommand,
+                        onAction = onAction
+                    )
+                    rightContent()
+                }
+            } else {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium),
+                    verticalAlignment = Alignment.Top
+                ) {
+                    Column(
+                        modifier = Modifier.weight(1.1f),
+                        verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
+                    ) {
+                        VisualKeyPanel(
+                            showAdbCommand = showAdbCommand,
+                            onAction = onAction
+                        )
+                    }
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium),
+                        content = rightContent
+                    )
+                }
+            }
         }
     }
 }
 
+@OptIn(androidx.compose.material.ExperimentalMaterialApi::class)
 @Composable
 private fun DeviceTextInputPanel(
     text: String,
@@ -466,7 +490,7 @@ private fun DeviceTextInputPanel(
 ) {
     SectionSurface(
         title = l10n("发送文本", "Send text"),
-        icon = IconParkIcons.Send,
+        icon = null,
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)) {
@@ -475,20 +499,61 @@ private fun DeviceTextInputPanel(
                 horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                OutlinedTextField(
+                val textInputInteractionSource = remember { MutableInteractionSource() }
+                val textInputColors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                    unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+                    focusedContainerColor = MaterialTheme.colorScheme.surface,
+                    unfocusedContainerColor = MaterialTheme.colorScheme.surface
+                )
+                BasicTextField(
                     value = text,
                     onValueChange = onTextChange,
                     enabled = !isSending,
+                    modifier = Modifier.weight(1f).height(UiTokens.ControlHeight),
+                    textStyle = MaterialTheme.typography.bodyMedium.copy(
+                        color = MaterialTheme.colorScheme.onSurface
+                    ),
                     singleLine = true,
-                    placeholder = { Text(l10n("输入要发送到设备的文本", "Text to send to device")) },
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(UiTokens.RadiusMedium)
+                    interactionSource = textInputInteractionSource,
+                    decorationBox = { innerTextField ->
+                        TextFieldDefaults.OutlinedTextFieldDecorationBox(
+                            value = text,
+                            visualTransformation = VisualTransformation.None,
+                            innerTextField = innerTextField,
+                            placeholder = { Text(l10n("输入要发送到设备的文本", "Text to send to device"), maxLines = 1) },
+                            singleLine = true,
+                            enabled = !isSending,
+                            isError = false,
+                            interactionSource = textInputInteractionSource,
+                            colors = textInputColors,
+                            contentPadding = PaddingValues(
+                                horizontal = UiTokens.SpaceMedium,
+                                vertical = UiTokens.SpaceSmall
+                            ),
+                            border = {
+                                TextFieldDefaults.BorderBox(
+                                    enabled = !isSending,
+                                    isError = false,
+                                    interactionSource = textInputInteractionSource,
+                                    colors = textInputColors,
+                                    shape = RoundedCornerShape(UiTokens.RadiusMedium)
+                                )
+                            }
+                        )
+                    }
                 )
                 Button(
                     onClick = onSend,
                     enabled = !isSending && text.isNotBlank(),
                     modifier = Modifier.height(UiTokens.ControlHeight),
-                    shape = RoundedCornerShape(UiTokens.RadiusMedium)
+                    shape = RoundedCornerShape(UiTokens.RadiusMedium),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary,
+                        disabledContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                        disabledContentColor = MaterialTheme.colorScheme.primary
+                    )
                 ) {
                     Icon(IconParkIcons.Send, contentDescription = null, modifier = Modifier.size(UiTokens.IconSmall))
                     Spacer(Modifier.width(UiTokens.SpaceSmall))
@@ -561,9 +626,11 @@ private fun VisualKeyPanel(
     onAction: (KeyAction) -> Unit
 ) {
     SectionSurface(
-        title = stringResource(Res.string.key_visual_panel),
-        icon = Icons.Default.CropFree,
-        modifier = Modifier.fillMaxWidth()
+        title = l10n("遥控器", "Remote control"),
+        icon = null,
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 608.dp)
     ) {
         Column(
             modifier = Modifier.fillMaxWidth(),
@@ -606,13 +673,13 @@ private fun DPad(onAction: (KeyAction) -> Unit) {
     val ok = KeyAction(KC.DPAD_OK, Res.string.confirm, "KEYCODE_DPAD_CENTER", IconParkIcons.CheckCircle)
 
     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceXSmall)) {
-        DirectionButton(action = up, width = 64.dp, height = 54.dp) { onAction(up) }
+        DirectionButton(action = up, width = 112.dp, height = 56.dp) { onAction(up) }
         Row(horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall), verticalAlignment = Alignment.CenterVertically) {
-            DirectionButton(action = left, width = 68.dp, height = 56.dp) { onAction(left) }
+            DirectionButton(action = left, width = 60.dp, height = 108.dp) { onAction(left) }
             OkButton { onAction(ok) }
-            DirectionButton(action = right, width = 68.dp, height = 56.dp) { onAction(right) }
+            DirectionButton(action = right, width = 60.dp, height = 108.dp) { onAction(right) }
         }
-        DirectionButton(action = down, width = 64.dp, height = 54.dp) { onAction(down) }
+        DirectionButton(action = down, width = 112.dp, height = 56.dp) { onAction(down) }
     }
 }
 
@@ -626,26 +693,23 @@ private fun DirectionButton(
     val label = stringResource(action.titleRes)
     PressableSurface(
         modifier = Modifier.width(width).height(height),
-        shape = RoundedCornerShape(UiTokens.RadiusMedium),
+        shape = RoundedCornerShape(50),
         borderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.20f),
         onClick = onClick
     ) { hovered ->
-        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-            Icon(
-                imageVector = action.icon,
-                contentDescription = label,
-                tint = if (hovered) MaterialTheme.colorScheme.primary else QadbColors.primary,
-                modifier = Modifier.size(UiTokens.IconLarge)
-            )
-            Text(label, fontSize = UiTokens.TextCaption, color = MaterialTheme.colorScheme.onSurface)
-        }
+        Icon(
+            imageVector = action.icon,
+            contentDescription = label,
+            tint = if (hovered) MaterialTheme.colorScheme.primary else QadbColors.primary,
+            modifier = Modifier.size(UiTokens.IconLarge)
+        )
     }
 }
 
 @Composable
 private fun OkButton(onClick: () -> Unit) {
     PressableSurface(
-        modifier = Modifier.size(72.dp),
+        modifier = Modifier.size(88.dp),
         shape = CircleShape,
         borderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.28f),
         onClick = onClick
@@ -668,7 +732,7 @@ private fun LargeKeyButton(
 ) {
     val label = stringResource(action.titleRes)
     PressableSurface(
-        modifier = modifier.height(56.dp),
+        modifier = modifier.height(76.dp),
         shape = RoundedCornerShape(UiTokens.RadiusMedium),
         borderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.70f),
         onClick = onClick
@@ -682,7 +746,7 @@ private fun LargeKeyButton(
             )
             Spacer(Modifier.height(UiTokens.SpaceXSmall))
             Text(
-                text = if (showAdbCommand) action.code.toString() else label,
+                text = if (showAdbCommand) action.code.toString() else keyActionDisplayLabel(action, label),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,
@@ -693,8 +757,9 @@ private fun LargeKeyButton(
     }
 }
 
+@OptIn(androidx.compose.material.ExperimentalMaterialApi::class)
 @Composable
-private fun CustomKeyCodePanel(
+private fun AdvancedOperationsPanel(
     customCode: String,
     onCustomCodeChange: (String) -> Unit,
     longPressMode: Boolean,
@@ -702,125 +767,185 @@ private fun CustomKeyCodePanel(
     onLongPressModeChange: (Boolean) -> Unit,
     onShowAdbCommandChange: (Boolean) -> Unit,
     onSend: () -> Unit,
-    onClear: () -> Unit
+    previewRecord: KeyEventRecord,
+    onCopyPreview: () -> Unit
 ) {
     SectionSurface(
-        title = stringResource(Res.string.key_custom_keycode),
-        icon = IconParkIcons.Code,
+        title = l10n("高级操作", "Advanced operations"),
+        icon = null,
         modifier = Modifier.fillMaxWidth()
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium)) {
-            OutlinedTextField(
-                value = customCode,
-                onValueChange = onCustomCodeChange,
+        Column(verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)) {
+            Row(
                 modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text(stringResource(Res.string.custom_keycode_hint)) },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                shape = RoundedCornerShape(UiTokens.RadiusMedium),
-                colors = OutlinedTextFieldDefaults.colors(
+                horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = stringResource(Res.string.key_custom_keycode),
+                    modifier = Modifier.wrapContentWidth(),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1
+                )
+                val customCodeInteractionSource = remember { MutableInteractionSource() }
+                val customCodeColors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = MaterialTheme.colorScheme.primary,
                     unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
                     focusedContainerColor = MaterialTheme.colorScheme.surface,
                     unfocusedContainerColor = MaterialTheme.colorScheme.surface
                 )
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium), modifier = Modifier.fillMaxWidth()) {
+                BasicTextField(
+                    value = customCode,
+                    onValueChange = onCustomCodeChange,
+                    modifier = Modifier.weight(1f).height(UiTokens.ControlHeight),
+                    textStyle = MaterialTheme.typography.bodyMedium.copy(
+                        color = MaterialTheme.colorScheme.onSurface
+                    ),
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    interactionSource = customCodeInteractionSource,
+                    decorationBox = { innerTextField ->
+                        TextFieldDefaults.OutlinedTextFieldDecorationBox(
+                            value = customCode,
+                            visualTransformation = VisualTransformation.None,
+                            innerTextField = innerTextField,
+                            placeholder = { Text(stringResource(Res.string.custom_keycode_hint), maxLines = 1) },
+                            singleLine = true,
+                            enabled = true,
+                            isError = false,
+                            interactionSource = customCodeInteractionSource,
+                            colors = customCodeColors,
+                            contentPadding = PaddingValues(
+                                horizontal = UiTokens.SpaceMedium,
+                                vertical = UiTokens.SpaceSmall
+                            ),
+                            border = {
+                                TextFieldDefaults.BorderBox(
+                                    enabled = true,
+                                    isError = false,
+                                    interactionSource = customCodeInteractionSource,
+                                    colors = customCodeColors,
+                                    shape = RoundedCornerShape(UiTokens.RadiusMedium)
+                                )
+                            }
+                        )
+                    }
+                )
                 Button(
                     onClick = onSend,
                     enabled = customCode.isNotBlank(),
-                    modifier = Modifier.weight(1f).height(UiTokens.ListRowHeight),
+                    modifier = Modifier.height(UiTokens.ControlHeight).widthIn(min = 64.dp),
                     shape = RoundedCornerShape(UiTokens.RadiusMedium),
+                    contentPadding = PaddingValues(horizontal = UiTokens.SpaceMedium, vertical = 0.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.primary,
-                        contentColor = MaterialTheme.colorScheme.onPrimary
+                        contentColor = MaterialTheme.colorScheme.onPrimary,
+                        disabledContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                        disabledContentColor = MaterialTheme.colorScheme.primary
                     )
                 ) {
                     Icon(IconParkIcons.Send, contentDescription = null, modifier = Modifier.size(UiTokens.IconMedium))
                     Spacer(Modifier.width(UiTokens.SpaceSmall))
                     Text(stringResource(Res.string.key_send), fontWeight = FontWeight.SemiBold)
                 }
-                OutlinedButton(
-                    onClick = onClear,
-                    modifier = Modifier.weight(1f).height(UiTokens.ListRowHeight),
-                    shape = RoundedCornerShape(UiTokens.RadiusMedium),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
-                ) {
-                    Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(UiTokens.IconMedium))
-                    Spacer(Modifier.width(UiTokens.SpaceSmall))
-                    Text(stringResource(Res.string.key_clear))
-                }
             }
-            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Checkbox(checked = longPressMode, onCheckedChange = onLongPressModeChange)
-                Text(
-                    text = stringResource(Res.string.key_long_press_mode),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Icon(IconParkIcons.Info, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = UiTokens.SpaceXSmall).size(UiTokens.IconSmall))
-                Spacer(Modifier.weight(1f))
-                Switch(checked = showAdbCommand, onCheckedChange = onShowAdbCommandChange)
-                Spacer(Modifier.width(UiTokens.SpaceSmall))
-                Text(
-                    text = stringResource(Res.string.key_show_adb_command),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.65f))
+            AdvancedSwitchRow(
+                label = stringResource(Res.string.key_long_press_mode),
+                checked = longPressMode,
+                onCheckedChange = onLongPressModeChange
+            )
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.65f))
+            AdvancedSwitchRow(
+                label = stringResource(Res.string.key_show_adb_command),
+                checked = showAdbCommand,
+                onCheckedChange = onShowAdbCommandChange
+            )
+
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(UiTokens.RadiusMedium),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.36f),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.65f))
+            ) {
+                Column(
+                    modifier = Modifier.padding(UiTokens.SpaceMedium),
+                    verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
+                ) {
+                    Text(
+                        text = stringResource(Res.string.key_command_preview),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = previewRecord.adbCommand,
+                            modifier = Modifier.weight(1f),
+                            color = MaterialTheme.colorScheme.onSurface,
+                            fontSize = UiTokens.TextBody,
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        OutlinedButton(
+                            onClick = onCopyPreview,
+                            shape = RoundedCornerShape(UiTokens.RadiusMedium),
+                            contentPadding = PaddingValues(
+                                horizontal = UiTokens.SpaceMedium,
+                                vertical = UiTokens.SpaceSmall
+                            )
+                        ) {
+                            Icon(
+                                Icons.Default.ContentCopy,
+                                contentDescription = null,
+                                modifier = Modifier.size(UiTokens.IconSmall)
+                            )
+                            Spacer(Modifier.width(UiTokens.SpaceSmall))
+                            Text(stringResource(Res.string.key_copy))
+                        }
+                    }
+                }
             }
         }
     }
 }
 
-
 @Composable
-private fun CommandPreview(record: KeyEventRecord, onCopy: () -> Unit) {
-    SectionSurface(
-        title = stringResource(Res.string.key_command_preview),
-        icon = IconParkIcons.Code,
-        modifier = Modifier.fillMaxWidth()
+private fun AdvancedSwitchRow(
+    label: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(UiTokens.RadiusMedium),
-            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.30f),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.70f))
-        ) {
-            Row(
-                modifier = Modifier.padding(horizontal = UiTokens.SpaceLarge, vertical = UiTokens.SpaceSmall),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = record.adbCommand,
-                    modifier = Modifier.weight(1f),
-                    color = MaterialTheme.colorScheme.onSurface,
-                    fontSize = UiTokens.TextAction,
-                    fontWeight = FontWeight.Medium
-                )
-                OutlinedButton(
-                    onClick = onCopy,
-                    shape = RoundedCornerShape(UiTokens.RadiusMedium),
-                    contentPadding = PaddingValues(horizontal = UiTokens.SpaceMedium, vertical = UiTokens.SpaceSmall)
-                ) {
-                    Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(UiTokens.IconMedium))
-                    Spacer(Modifier.width(UiTokens.SpaceSmall))
-                    Text(stringResource(Res.string.key_copy))
-                }
-            }
-        }
-        Spacer(Modifier.height(UiTokens.SpaceSmall))
         Text(
-            text = stringResource(Res.string.key_command_preview_hint),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            text = label,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface
         )
+        Icon(
+            IconParkIcons.Info,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(start = UiTokens.SpaceXSmall).size(UiTokens.IconSmall)
+        )
+        Spacer(Modifier.weight(1f))
+        Switch(checked = checked, onCheckedChange = onCheckedChange)
     }
 }
 
 @Composable
 private fun RecentSentPanel(records: List<KeyEventRecord>, onClear: () -> Unit) {
     SectionSurface(
-        title = stringResource(Res.string.key_recent_sent),
+        title = l10n("最近操作", "Recent operations"),
         icon = IconParkIcons.Schedule,
         modifier = Modifier.fillMaxWidth()
     ) {
@@ -903,9 +1028,18 @@ private fun iconForCode(code: Int): ImageVector = when (code) {
 }
 
 @Composable
+private fun keyActionDisplayLabel(action: KeyAction, fallback: String): String = when (action.code) {
+    KC.MENU -> l10n("菜单", "Menu")
+    KC.POWER -> l10n("电源", "Power")
+    KC.VOL_UP -> l10n("音量+", "Volume +")
+    KC.VOL_DOWN -> l10n("音量-", "Volume -")
+    else -> fallback
+}
+
+@Composable
 private fun SectionSurface(
     title: String,
-    icon: ImageVector,
+    icon: ImageVector?,
     modifier: Modifier = Modifier,
     content: @Composable ColumnScope.() -> Unit
 ) {
@@ -913,24 +1047,28 @@ private fun SectionSurface(
         modifier = modifier,
         shape = RoundedCornerShape(UiTokens.RadiusLarge),
         color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.72f))
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.68f)),
+        shadowElevation = 0.dp
     ) {
         Column(
             modifier = Modifier.fillMaxWidth().padding(UiTokens.SpaceLarge)
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    icon,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.size(19.dp)
-                )
-                Spacer(Modifier.width(UiTokens.SpaceMedium))
+                if (icon != null) {
+                    Icon(
+                        icon,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.size(19.dp)
+                    )
+                    Spacer(Modifier.width(UiTokens.SpaceMedium))
+                }
                 Text(
                     text = title,
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurface,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp
                 )
             }
             Spacer(Modifier.height(UiTokens.SpaceLarge))

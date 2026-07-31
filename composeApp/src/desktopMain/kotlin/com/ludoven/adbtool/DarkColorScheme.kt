@@ -10,27 +10,27 @@ val DarkColorScheme: ColorScheme = darkColorScheme(
     primaryContainer = androidx.compose.ui.graphics.Color(0xFF1A3C75),
     onPrimaryContainer = androidx.compose.ui.graphics.Color(0xFFDDEBFF),
 
-    secondary = androidx.compose.ui.graphics.Color(0xFF30D158),
-    onSecondary = androidx.compose.ui.graphics.Color(0xFF093813),
+    secondary = androidx.compose.ui.graphics.Color(0xFF35C759),
+    onSecondary = androidx.compose.ui.graphics.Color(0xFF073315),
     secondaryContainer = androidx.compose.ui.graphics.Color(0xFF174F24),
-    onSecondaryContainer = androidx.compose.ui.graphics.Color(0xFFC9F4D3),
+    onSecondaryContainer = androidx.compose.ui.graphics.Color(0xFFD9F3E1),
 
-    tertiary = androidx.compose.ui.graphics.Color(0xFF64D2FF),
-    onTertiary = androidx.compose.ui.graphics.Color(0xFF00384F),
-    tertiaryContainer = androidx.compose.ui.graphics.Color(0xFF145069),
-    onTertiaryContainer = androidx.compose.ui.graphics.Color(0xFFD5F4FF),
+    tertiary = androidx.compose.ui.graphics.Color(0xFF63D1CC),
+    onTertiary = androidx.compose.ui.graphics.Color(0xFF003A38),
+    tertiaryContainer = androidx.compose.ui.graphics.Color(0xFF164C4B),
+    onTertiaryContainer = androidx.compose.ui.graphics.Color(0xFFD6F2EF),
 
-    background = androidx.compose.ui.graphics.Color(0xFF111113),
-    onBackground = androidx.compose.ui.graphics.Color(0xFFE6E6EA),
+    background = androidx.compose.ui.graphics.Color(0xFF070F24),
+    onBackground = androidx.compose.ui.graphics.Color(0xFFF5F4F2),
 
-    surface = androidx.compose.ui.graphics.Color(0xFF1B1B1F),
-    onSurface = androidx.compose.ui.graphics.Color(0xFFE6E6EA),
-    surfaceVariant = androidx.compose.ui.graphics.Color(0xFF2C2C31),
-    onSurfaceVariant = androidx.compose.ui.graphics.Color(0xFFB7B7BE),
+    surface = androidx.compose.ui.graphics.Color(0xFF0A1530),
+    onSurface = androidx.compose.ui.graphics.Color(0xFFF5F4F2),
+    surfaceVariant = androidx.compose.ui.graphics.Color(0xFF1A2A52),
+    onSurfaceVariant = androidx.compose.ui.graphics.Color(0xFFAFAAA2),
 
-    error = androidx.compose.ui.graphics.Color(0xFFFF6961),
+    error = androidx.compose.ui.graphics.Color(0xFFFF7A73),
     onError = androidx.compose.ui.graphics.Color(0xFF5F0B08),
 
-    outline = androidx.compose.ui.graphics.Color(0xFF4D4D52),
-    outlineVariant = androidx.compose.ui.graphics.Color(0xFF3A3A3F)
+    outline = androidx.compose.ui.graphics.Color(0xFF53617E),
+    outlineVariant = androidx.compose.ui.graphics.Color(0xFF293A5F)
 )

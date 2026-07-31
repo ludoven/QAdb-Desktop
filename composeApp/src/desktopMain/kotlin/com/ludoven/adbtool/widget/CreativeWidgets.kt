@@ -64,11 +64,9 @@ fun GlassCard(
     Card(
         modifier = modifier,
         shape = shape,
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f)
-        ),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = elevation),
-        border = borderStroke
+        border = borderStroke ?: BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     ) {
         content()
     }

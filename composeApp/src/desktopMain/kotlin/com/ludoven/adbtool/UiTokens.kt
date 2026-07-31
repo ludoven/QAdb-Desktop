@@ -20,22 +20,22 @@ object UiTokens {
     val ItemSpacing = 12.dp
     val ItemSpacingCompact = 8.dp
 
-    val SidebarWidth = 208.dp
+    val SidebarWidth = 216.dp
 
     val RadiusSmall = 6.dp
     val RadiusMedium = 8.dp
     val RadiusLarge = 12.dp
-    val RadiusXLarge = 12.dp
-    val RadiusFeature = 16.dp
+    val RadiusXLarge = 16.dp
+    val RadiusFeature = 12.dp
     val RowRadius = 6.dp
     val BadgeRadius = 999.dp
 
-    val InputHeight = 40.dp
+    val InputHeight = 44.dp
     val PageHeaderHeight = 60.dp
     val ToolbarHeight = 40.dp
     val ControlHeight = 40.dp
     val TableRowHeight = 42.dp
-    val ListRowHeight = 44.dp
+    val ListRowHeight = 40.dp
     val IndicatorWidth = 4.dp
 
     val IconSmall = 16.dp
