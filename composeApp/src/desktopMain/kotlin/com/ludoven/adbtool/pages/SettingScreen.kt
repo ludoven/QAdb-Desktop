@@ -5,6 +5,65 @@ import com.ludoven.adbtool.QadbColors
 import com.ludoven.adbtool.ui.icons.IconParkIcons
 
 import adbtool_desktop.composeapp.generated.resources.Res
+import adbtool_desktop.composeapp.generated.resources.ai_add_model
+import adbtool_desktop.composeapp.generated.resources.ai_api_key
+import adbtool_desktop.composeapp.generated.resources.ai_api_key_hint
+import adbtool_desktop.composeapp.generated.resources.ai_api_key_required_hint
+import adbtool_desktop.composeapp.generated.resources.ai_base_url
+import adbtool_desktop.composeapp.generated.resources.ai_base_url_hint
+import adbtool_desktop.composeapp.generated.resources.ai_clear_key
+import adbtool_desktop.composeapp.generated.resources.ai_config_saved
+import adbtool_desktop.composeapp.generated.resources.ai_context_window
+import adbtool_desktop.composeapp.generated.resources.ai_context_window_hint
+import adbtool_desktop.composeapp.generated.resources.ai_edit_model
+import adbtool_desktop.composeapp.generated.resources.ai_hide_key
+import adbtool_desktop.composeapp.generated.resources.ai_key_cleared
+import adbtool_desktop.composeapp.generated.resources.ai_model_configured
+import adbtool_desktop.composeapp.generated.resources.ai_model_configured_desc
+import adbtool_desktop.composeapp.generated.resources.ai_model_name
+import adbtool_desktop.composeapp.generated.resources.ai_model_name_hint
+import adbtool_desktop.composeapp.generated.resources.ai_model_not_configured
+import adbtool_desktop.composeapp.generated.resources.ai_model_not_configured_desc
+import adbtool_desktop.composeapp.generated.resources.ai_model_settings
+import adbtool_desktop.composeapp.generated.resources.ai_memory_clear
+import adbtool_desktop.composeapp.generated.resources.ai_memory_clear_desc
+import adbtool_desktop.composeapp.generated.resources.ai_memory_clear_title
+import adbtool_desktop.composeapp.generated.resources.ai_memory_content
+import adbtool_desktop.composeapp.generated.resources.ai_memory_delete
+import adbtool_desktop.composeapp.generated.resources.ai_memory_disabled_desc
+import adbtool_desktop.composeapp.generated.resources.ai_memory_edit
+import adbtool_desktop.composeapp.generated.resources.ai_memory_edit_title
+import adbtool_desktop.composeapp.generated.resources.ai_memory_empty
+import adbtool_desktop.composeapp.generated.resources.ai_memory_enabled_desc
+import adbtool_desktop.composeapp.generated.resources.ai_memory_keywords
+import adbtool_desktop.composeapp.generated.resources.ai_memory_manage
+import adbtool_desktop.composeapp.generated.resources.ai_memory_manage_title
+import adbtool_desktop.composeapp.generated.resources.ai_memory_privacy
+import adbtool_desktop.composeapp.generated.resources.ai_memory_settings
+import adbtool_desktop.composeapp.generated.resources.ai_memory_stats
+import adbtool_desktop.composeapp.generated.resources.ai_memory_title
+import adbtool_desktop.composeapp.generated.resources.ai_input_helper_install
+import adbtool_desktop.composeapp.generated.resources.ai_input_helper_installed
+import adbtool_desktop.composeapp.generated.resources.ai_input_helper_missing
+import adbtool_desktop.composeapp.generated.resources.ai_input_helper_no_device
+import adbtool_desktop.composeapp.generated.resources.ai_input_helper_settings
+import adbtool_desktop.composeapp.generated.resources.ai_input_helper_test
+import adbtool_desktop.composeapp.generated.resources.ai_input_helper_title
+import adbtool_desktop.composeapp.generated.resources.ai_input_helper_uninstall
+import adbtool_desktop.composeapp.generated.resources.agent_memory_consent_desc
+import adbtool_desktop.composeapp.generated.resources.agent_memory_consent_title
+import adbtool_desktop.composeapp.generated.resources.agent_memory_enable
+import adbtool_desktop.composeapp.generated.resources.agent_memory_not_now
+import adbtool_desktop.composeapp.generated.resources.ai_openai_compatible_badge
+import adbtool_desktop.composeapp.generated.resources.ai_privacy_notice
+import adbtool_desktop.composeapp.generated.resources.ai_save_config
+import adbtool_desktop.composeapp.generated.resources.ai_show_key
+import adbtool_desktop.composeapp.generated.resources.ai_test_connection
+import adbtool_desktop.composeapp.generated.resources.ai_test_success
+import adbtool_desktop.composeapp.generated.resources.ai_vision_auto
+import adbtool_desktop.composeapp.generated.resources.ai_vision_disabled
+import adbtool_desktop.composeapp.generated.resources.ai_vision_enabled
+import adbtool_desktop.composeapp.generated.resources.ai_vision_mode
 import adbtool_desktop.composeapp.generated.resources.adb_auto_detect
 import adbtool_desktop.composeapp.generated.resources.adb_current_using
 import adbtool_desktop.composeapp.generated.resources.adb_environment_checking
@@ -20,6 +79,7 @@ import adbtool_desktop.composeapp.generated.resources.adb_source_custom
 import adbtool_desktop.composeapp.generated.resources.adb_source_none
 import adbtool_desktop.composeapp.generated.resources.adb_source_system
 import adbtool_desktop.composeapp.generated.resources.adb_version_label
+import adbtool_desktop.composeapp.generated.resources.cancel
 import adbtool_desktop.composeapp.generated.resources.check_update
 import adbtool_desktop.composeapp.generated.resources.current_version
 import adbtool_desktop.composeapp.generated.resources.download_and_install
@@ -28,7 +88,6 @@ import adbtool_desktop.composeapp.generated.resources.language_changed
 import adbtool_desktop.composeapp.generated.resources.not_set
 import adbtool_desktop.composeapp.generated.resources.open_release_page
 import adbtool_desktop.composeapp.generated.resources.preferences_setting
-import adbtool_desktop.composeapp.generated.resources.restart_required
 import adbtool_desktop.composeapp.generated.resources.select_language
 import adbtool_desktop.composeapp.generated.resources.select_theme
 import adbtool_desktop.composeapp.generated.resources.settings_adb_path_desc
@@ -60,6 +119,7 @@ import adbtool_desktop.composeapp.generated.resources.update_section_title
 import adbtool_desktop.composeapp.generated.resources.update_up_to_date
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -71,11 +131,15 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -87,6 +151,7 @@ import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -95,13 +160,28 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import com.ludoven.adbtool.AppVersion
+import com.ludoven.adbtool.agent.AiConfiguration
+import com.ludoven.adbtool.agent.AiModelConfig
+import com.ludoven.adbtool.agent.AgentInputHelper
+import com.ludoven.adbtool.agent.AgentInputHelperStatus
+import com.ludoven.adbtool.agent.AgentMemory
+import com.ludoven.adbtool.agent.AgentMemoryRuntime
+import com.ludoven.adbtool.agent.AgentMemoryStats
+import com.ludoven.adbtool.agent.OpenAiCompatibleClient
+import com.ludoven.adbtool.agent.VisionMode
+import com.ludoven.adbtool.ui.icons.CompatIconVectors
+import com.ludoven.adbtool.ui.mac.AlertDialog
 import com.ludoven.adbtool.ui.mac.Button
 import com.ludoven.adbtool.ui.mac.ButtonDefaults
 import com.ludoven.adbtool.ui.mac.CircularProgressIndicator
@@ -111,9 +191,11 @@ import com.ludoven.adbtool.ui.mac.HorizontalDivider
 import com.ludoven.adbtool.ui.mac.Icon
 import com.ludoven.adbtool.ui.mac.MaterialTheme
 import com.ludoven.adbtool.ui.mac.OutlinedButton
+import com.ludoven.adbtool.ui.mac.OutlinedTextField
 import com.ludoven.adbtool.ui.mac.Surface
 import com.ludoven.adbtool.ui.mac.Switch
 import com.ludoven.adbtool.ui.mac.Text
+import com.ludoven.adbtool.ui.mac.TextButton
 import com.ludoven.adbtool.ui.mac.bodyLarge
 import com.ludoven.adbtool.ui.mac.bodyMedium
 import com.ludoven.adbtool.ui.mac.bodySmall
@@ -238,7 +320,7 @@ private fun SettingActionButton(
 }
 
 @Composable
-fun SettingScreen() {
+fun SettingScreen(selectedDeviceId: String? = null) {
     val notSetText = stringResource(Res.string.not_set)
     val adbEnvironment by AdbPathManager.adbEnvironment.collectAsState()
     var showLanguageDialog by remember { mutableStateOf(false) }
@@ -299,6 +381,12 @@ fun SettingScreen() {
                 title = stringResource(Res.string.set),
                 subtitle = stringResource(Res.string.settings_subtitle)
             )
+
+            AiModelSettingsSection()
+
+            AiMemorySettingsSection()
+
+            AgentInputHelperSettingsSection(selectedDeviceId)
 
             SettingsSection(title = stringResource(Res.string.adb_path_setting)) {
                 val sourceText = settingAdbSourceText(adbEnvironment.source)
@@ -557,11 +645,1050 @@ fun SettingScreen() {
     }
 
     if (showLanguageDialog) {
-        TipDialog(stringResource(Res.string.language_changed) + "\n" + stringResource(Res.string.restart_required)) {
+        TipDialog(stringResource(Res.string.language_changed)) {
             showLanguageDialog = false
         }
     }
 }
+
+@Composable
+private fun AiMemorySettingsSection() {
+    val preferences = remember { AgentMemoryRuntime.preferences }
+    val enabled by preferences.enabled.collectAsState()
+    val coroutineScope = rememberCoroutineScope()
+    var stats by remember { mutableStateOf(AgentMemoryStats()) }
+    var memories by remember { mutableStateOf(emptyList<AgentMemory>()) }
+    var showConsent by remember { mutableStateOf(false) }
+    var showManager by remember { mutableStateOf(false) }
+    var showClearConfirmation by remember { mutableStateOf(false) }
+    var editingMemory by remember { mutableStateOf<AgentMemory?>(null) }
+    var statusMessage by remember { mutableStateOf<String?>(null) }
+
+    fun reload() {
+        coroutineScope.launch {
+            runCatching {
+                stats = AgentMemoryRuntime.store.stats()
+                memories = AgentMemoryRuntime.store.listActive()
+            }.onFailure { statusMessage = it.message }
+        }
+    }
+
+    LaunchedEffect(enabled, showManager) {
+        if (!preferences.needsConsent || enabled) reload()
+    }
+
+    SettingsSection(title = stringResource(Res.string.ai_memory_settings)) {
+        SettingSwitchRow(
+            title = stringResource(Res.string.ai_memory_title),
+            description = stringResource(
+                if (enabled) Res.string.ai_memory_enabled_desc else Res.string.ai_memory_disabled_desc
+            ),
+            checked = enabled,
+            onCheckedChange = { checked ->
+                if (checked && preferences.needsConsent) {
+                    showConsent = true
+                } else {
+                    preferences.setEnabled(checked)
+                }
+            }
+        )
+        SectionDivider()
+        SettingValueRow(
+            title = stringResource(Res.string.ai_memory_manage),
+            description = stringResource(Res.string.ai_memory_privacy),
+            value = stringResource(
+                Res.string.ai_memory_stats,
+                stats.activeCount,
+                stats.archivedCount,
+                stats.taskSummaryCount
+            )
+        )
+        ActionButtonRow {
+            SettingActionButton(
+                text = stringResource(Res.string.ai_memory_manage),
+                icon = CompatIconVectors.Edit,
+                onClick = {
+                    reload()
+                    showManager = true
+                }
+            )
+            SettingActionButton(
+                text = stringResource(Res.string.ai_memory_clear),
+                icon = CompatIconVectors.Delete,
+                onClick = { showClearConfirmation = true },
+                enabled = stats.activeCount + stats.archivedCount > 0
+            )
+        }
+        statusMessage?.let {
+            Text(
+                text = it,
+                modifier = Modifier.padding(horizontal = UiTokens.SpaceLarge),
+                color = SettingColors.Danger,
+                fontSize = UiTokens.TextBody
+            )
+        }
+    }
+
+    if (showConsent) {
+        AlertDialog(
+            onDismissRequest = { showConsent = false },
+            title = { Text(stringResource(Res.string.agent_memory_consent_title)) },
+            text = { Text(stringResource(Res.string.agent_memory_consent_desc)) },
+            confirmButton = {
+                Button(onClick = {
+                    preferences.acceptConsent()
+                    showConsent = false
+                    reload()
+                }) {
+                    Text(stringResource(Res.string.agent_memory_enable))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    preferences.declineConsent()
+                    showConsent = false
+                }) {
+                    Text(stringResource(Res.string.agent_memory_not_now))
+                }
+            }
+        )
+    }
+
+    if (showClearConfirmation) {
+        AlertDialog(
+            onDismissRequest = { showClearConfirmation = false },
+            title = { Text(stringResource(Res.string.ai_memory_clear_title)) },
+            text = { Text(stringResource(Res.string.ai_memory_clear_desc)) },
+            confirmButton = {
+                Button(onClick = {
+                    coroutineScope.launch {
+                        runCatching { AgentMemoryRuntime.store.clear() }
+                            .onFailure { statusMessage = it.message }
+                        showClearConfirmation = false
+                        reload()
+                    }
+                }) {
+                    Text(stringResource(Res.string.ai_memory_clear))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showClearConfirmation = false }) {
+                    Text(stringResource(Res.string.cancel))
+                }
+            }
+        )
+    }
+
+    if (showManager) {
+        Dialog(onDismissRequest = { showManager = false }) {
+            Surface(
+                modifier = Modifier.width(680.dp).heightIn(max = 600.dp),
+                shape = RoundedCornerShape(UiTokens.RadiusLarge),
+                color = SettingColors.Surface,
+                border = BorderStroke(1.dp, SettingColors.Border)
+            ) {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    DialogHeader(
+                        title = stringResource(Res.string.ai_memory_manage_title),
+                        onDismiss = { showManager = false }
+                    )
+                    HorizontalDivider(color = SettingColors.Divider)
+                    if (memories.isEmpty()) {
+                        Box(
+                            modifier = Modifier.fillMaxWidth().height(180.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                stringResource(Res.string.ai_memory_empty),
+                                color = SettingColors.Muted,
+                                fontSize = UiTokens.TextBody
+                            )
+                        }
+                    } else {
+                        LazyColumn(
+                            modifier = Modifier.fillMaxWidth().heightIn(max = 500.dp),
+                            contentPadding = PaddingValues(vertical = UiTokens.SpaceSmall)
+                        ) {
+                            items(memories, key = { it.id }) { memory ->
+                                MemoryRow(
+                                    memory = memory,
+                                    onEdit = { editingMemory = memory },
+                                    onDelete = {
+                                        coroutineScope.launch {
+                                            runCatching { AgentMemoryRuntime.store.delete(memory.id) }
+                                                .onFailure { statusMessage = it.message }
+                                            reload()
+                                        }
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    editingMemory?.let { memory ->
+        MemoryEditorDialog(
+            memory = memory,
+            onDismiss = { editingMemory = null },
+            onSave = { updated ->
+                coroutineScope.launch {
+                    runCatching { AgentMemoryRuntime.store.update(updated) }
+                        .onSuccess {
+                            editingMemory = null
+                            reload()
+                        }
+                        .onFailure { statusMessage = it.message }
+                }
+            }
+        )
+    }
+}
+
+@Composable
+private fun DialogHeader(title: String, onDismiss: () -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(UiTokens.SpaceLarge),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            title,
+            modifier = Modifier.weight(1f),
+            color = SettingColors.Text,
+            fontWeight = FontWeight.SemiBold,
+            fontSize = UiTokens.TextSection
+        )
+        Box(
+            modifier = Modifier.size(28.dp).clip(CircleShape).clickable(onClick = onDismiss),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                IconParkIcons.Close,
+                contentDescription = stringResource(Res.string.cancel),
+                modifier = Modifier.size(UiTokens.IconSmall),
+                tint = SettingColors.Muted
+            )
+        }
+    }
+}
+
+@Composable
+private fun MemoryRow(
+    memory: AgentMemory,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(
+            horizontal = UiTokens.SpaceLarge,
+            vertical = UiTokens.SpaceMedium
+        ),
+        horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium),
+        verticalAlignment = Alignment.Top
+    ) {
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceXSmall)
+        ) {
+            Text(
+                "${memory.kind.name.lowercase().replace('_', ' ')} · ${memory.scope.type.name.lowercase()}",
+                color = SettingColors.Primary,
+                fontSize = UiTokens.TextCaption,
+                fontWeight = FontWeight.Medium
+            )
+            Text(
+                memory.content,
+                color = SettingColors.Text,
+                fontSize = UiTokens.TextBody,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis
+            )
+            if (memory.keywords.isNotBlank()) {
+                Text(
+                    memory.keywords,
+                    color = SettingColors.Muted,
+                    fontSize = UiTokens.TextCaption,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+        OutlinedButton(
+            onClick = onEdit,
+            modifier = Modifier.height(32.dp),
+            contentPadding = PaddingValues(horizontal = UiTokens.SpaceSmall)
+        ) {
+            Text(stringResource(Res.string.ai_memory_edit), fontSize = UiTokens.TextCaption)
+        }
+        OutlinedButton(
+            onClick = onDelete,
+            modifier = Modifier.height(32.dp),
+            contentPadding = PaddingValues(horizontal = UiTokens.SpaceSmall)
+        ) {
+            Text(
+                stringResource(Res.string.ai_memory_delete),
+                color = SettingColors.Danger,
+                fontSize = UiTokens.TextCaption
+            )
+        }
+    }
+    SectionDivider()
+}
+
+@Composable
+private fun MemoryEditorDialog(
+    memory: AgentMemory,
+    onDismiss: () -> Unit,
+    onSave: (AgentMemory) -> Unit
+) {
+    var content by remember(memory.id) { mutableStateOf(memory.content) }
+    var keywords by remember(memory.id) { mutableStateOf(memory.keywords) }
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            modifier = Modifier.width(520.dp),
+            shape = RoundedCornerShape(UiTokens.RadiusLarge),
+            color = SettingColors.Surface,
+            border = BorderStroke(1.dp, SettingColors.Border)
+        ) {
+            Column {
+                DialogHeader(stringResource(Res.string.ai_memory_edit_title), onDismiss)
+                HorizontalDivider(color = SettingColors.Divider)
+                Column(
+                    modifier = Modifier.padding(UiTokens.SpaceLarge),
+                    verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium)
+                ) {
+                    AiDialogTextField(
+                        label = stringResource(Res.string.ai_memory_content),
+                        value = content,
+                        onValueChange = { content = it.take(600) },
+                        placeholder = ""
+                    )
+                    AiDialogTextField(
+                        label = stringResource(Res.string.ai_memory_keywords),
+                        value = keywords,
+                        onValueChange = { keywords = it.take(200) },
+                        placeholder = ""
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        OutlinedButton(onClick = onDismiss) {
+                            Text(stringResource(Res.string.cancel))
+                        }
+                        Spacer(Modifier.width(UiTokens.SpaceSmall))
+                        Button(
+                            onClick = { onSave(memory.copy(content = content, keywords = keywords)) },
+                            enabled = content.trim().length >= 3
+                        ) {
+                            Text(stringResource(Res.string.ai_save_config))
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AgentInputHelperSettingsSection(selectedDeviceId: String?) {
+    val helper = remember { AgentInputHelper() }
+    val coroutineScope = rememberCoroutineScope()
+    var status by remember(selectedDeviceId) { mutableStateOf<AgentInputHelperStatus?>(null) }
+    var statusMessage by remember { mutableStateOf<String?>(null) }
+    var isBusy by remember { mutableStateOf(false) }
+
+    fun refresh() {
+        val deviceId = selectedDeviceId ?: return
+        coroutineScope.launch {
+            status = runCatching { helper.status(deviceId) }
+                .onFailure { statusMessage = it.message }
+                .getOrNull()
+        }
+    }
+
+    LaunchedEffect(selectedDeviceId) {
+        if (selectedDeviceId != null) refresh()
+    }
+
+    val description = when {
+        selectedDeviceId == null -> stringResource(Res.string.ai_input_helper_no_device)
+        status?.installed == true -> stringResource(Res.string.ai_input_helper_installed)
+        else -> stringResource(Res.string.ai_input_helper_missing)
+    }
+    SettingsSection(title = stringResource(Res.string.ai_input_helper_settings)) {
+        SettingValueRow(
+            title = stringResource(Res.string.ai_input_helper_title),
+            description = description,
+            value = if (status?.installed == true) {
+                stringResource(Res.string.set)
+            } else {
+                stringResource(Res.string.not_set)
+            },
+            valueColor = if (status?.installed == true) SettingColors.Success else SettingColors.Muted
+        )
+        ActionButtonRow {
+            SettingActionButton(
+                text = stringResource(Res.string.ai_input_helper_install),
+                icon = CompatIconVectors.Keyboard,
+                onClick = {
+                    val deviceId = selectedDeviceId ?: return@SettingActionButton
+                    coroutineScope.launch {
+                        isBusy = true
+                        val result = helper.install(deviceId)
+                        statusMessage = result.output
+                        isBusy = false
+                        refresh()
+                    }
+                },
+                enabled = selectedDeviceId != null && !isBusy,
+                loading = isBusy
+            )
+            SettingActionButton(
+                text = stringResource(Res.string.ai_input_helper_test),
+                icon = Icons.AutoMirrored.Filled.OpenInNew,
+                onClick = {
+                    val deviceId = selectedDeviceId ?: return@SettingActionButton
+                    coroutineScope.launch { statusMessage = helper.openTestScreen(deviceId).output }
+                },
+                enabled = selectedDeviceId != null && status?.installed == true && !isBusy
+            )
+            SettingActionButton(
+                text = stringResource(Res.string.ai_input_helper_uninstall),
+                icon = CompatIconVectors.Delete,
+                onClick = {
+                    val deviceId = selectedDeviceId ?: return@SettingActionButton
+                    coroutineScope.launch {
+                        isBusy = true
+                        statusMessage = helper.uninstall(deviceId).output
+                        isBusy = false
+                        refresh()
+                    }
+                },
+                enabled = selectedDeviceId != null && status?.installed == true && !isBusy
+            )
+        }
+        statusMessage?.let {
+            Text(
+                text = it,
+                modifier = Modifier.padding(horizontal = UiTokens.SpaceLarge),
+                color = SettingColors.SecondaryText,
+                fontSize = UiTokens.TextBody
+            )
+        }
+    }
+}
+
+@Composable
+private fun AiModelSettingsSection() {
+    val repository = remember { AiConfiguration.repository }
+    val savedConfig by repository.config.collectAsState()
+    val hasSavedKey by repository.hasApiKeyState.collectAsState()
+    var showModelDialog by remember { mutableStateOf(false) }
+    var statusMessage by remember { mutableStateOf<String?>(null) }
+    var statusIsError by remember { mutableStateOf(false) }
+    val configSavedText = stringResource(Res.string.ai_config_saved)
+    val keyClearedText = stringResource(Res.string.ai_key_cleared)
+
+    LaunchedEffect(Unit) {
+        repository.hasApiKey()
+    }
+
+    val isConfigured = savedConfig.model.isNotBlank() && hasSavedKey
+    val summaryTitle = if (isConfigured) {
+        savedConfig.model
+    } else {
+        stringResource(Res.string.ai_model_not_configured)
+    }
+    val summaryDescription = if (isConfigured) {
+        stringResource(
+            Res.string.ai_model_configured_desc,
+            visionModeText(savedConfig.visionMode)
+        )
+    } else {
+        stringResource(Res.string.ai_model_not_configured_desc)
+    }
+
+    SettingsSection(title = stringResource(Res.string.ai_model_settings)) {
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(UiTokens.RadiusLarge),
+            color = SettingColors.SoftSurface,
+            tonalElevation = 0.dp,
+            shadowElevation = 0.dp
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = UiTokens.SpaceLarge, vertical = UiTokens.SpaceMedium),
+                horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Surface(
+                    modifier = Modifier.size(38.dp),
+                    shape = CircleShape,
+                    color = SettingColors.PrimarySoft,
+                    border = BorderStroke(1.dp, SettingColors.PrimaryBorder)
+                ) {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = IconParkIcons.Setting,
+                            contentDescription = null,
+                            modifier = Modifier.size(UiTokens.IconMedium),
+                            tint = SettingColors.Primary
+                        )
+                    }
+                }
+
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceXSmall)
+                ) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = summaryTitle,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = SettingColors.Text,
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = UiTokens.TextBodyLarge,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        if (isConfigured) {
+                            StatusPill(
+                                statusText = stringResource(Res.string.ai_model_configured),
+                                tone = StatusTone.Positive
+                            )
+                        }
+                    }
+                    Text(
+                        text = summaryDescription,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = SettingColors.Muted,
+                        fontSize = UiTokens.TextCaption,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+
+                SettingActionButton(
+                    text = stringResource(
+                        if (isConfigured) Res.string.ai_edit_model else Res.string.ai_add_model
+                    ),
+                    icon = if (isConfigured) CompatIconVectors.Edit else CompatIconVectors.Add,
+                    onClick = {
+                        statusMessage = null
+                        showModelDialog = true
+                    },
+                    primary = true
+                )
+            }
+        }
+
+        statusMessage?.let { message ->
+            Text(
+                text = message,
+                modifier = Modifier.padding(horizontal = UiTokens.SpaceLarge),
+                color = if (statusIsError) SettingColors.Danger else SettingColors.Success,
+                fontSize = UiTokens.TextBody
+            )
+        }
+    }
+
+    if (showModelDialog) {
+        AiModelConfigDialog(
+            initialConfig = savedConfig,
+            hasSavedKey = hasSavedKey,
+            onSaved = {
+                statusIsError = false
+                statusMessage = configSavedText
+                showModelDialog = false
+            },
+            onKeyCleared = {
+                statusIsError = false
+                statusMessage = keyClearedText
+            },
+            onDismiss = { showModelDialog = false }
+        )
+    }
+}
+
+@Composable
+internal fun AiModelConfigDialog(
+    initialConfig: AiModelConfig,
+    hasSavedKey: Boolean,
+    onSaved: () -> Unit,
+    onKeyCleared: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val repository = remember { AiConfiguration.repository }
+    val coroutineScope = rememberCoroutineScope()
+    var baseUrl by remember(initialConfig.baseUrl) { mutableStateOf(initialConfig.baseUrl) }
+    var model by remember(initialConfig.model) { mutableStateOf(initialConfig.model) }
+    var apiKey by remember { mutableStateOf("") }
+    var visionMode by remember(initialConfig.visionMode) { mutableStateOf(initialConfig.visionMode) }
+    var contextWindow by remember(initialConfig.contextWindowTokens) {
+        mutableStateOf(initialConfig.contextWindowTokens?.toString().orEmpty())
+    }
+    var keyAvailable by remember(hasSavedKey) { mutableStateOf(hasSavedKey) }
+    var showVisionDropdown by remember { mutableStateOf(false) }
+    var showApiKey by remember { mutableStateOf(false) }
+    var isSaving by remember { mutableStateOf(false) }
+    var isTesting by remember { mutableStateOf(false) }
+    var statusMessage by remember { mutableStateOf<String?>(null) }
+    var statusIsError by remember { mutableStateOf(false) }
+    val testSuccessText = stringResource(Res.string.ai_test_success)
+    val keyClearedText = stringResource(Res.string.ai_key_cleared)
+    val isBusy = isSaving || isTesting
+
+    fun currentConfig() = AiModelConfig(
+        baseUrl = baseUrl,
+        model = model,
+        visionMode = visionMode,
+        contextWindowTokens = contextWindow.trim().takeIf { it.isNotEmpty() }?.toIntOrNull()
+            ?: if (contextWindow.isBlank()) null else 0
+    )
+
+    Dialog(onDismissRequest = { if (!isBusy) onDismiss() }) {
+        Surface(
+            modifier = Modifier.width(560.dp),
+            shape = RoundedCornerShape(UiTokens.RadiusLarge),
+            color = SettingColors.Surface,
+            border = BorderStroke(1.dp, SettingColors.Border),
+            tonalElevation = 0.dp,
+            shadowElevation = 0.dp
+        ) {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(
+                            start = UiTokens.SpaceLarge,
+                            top = UiTokens.SpaceMedium,
+                            end = UiTokens.SpaceMedium,
+                            bottom = UiTokens.SpaceMedium
+                        ),
+                    horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = stringResource(
+                            if (hasSavedKey || initialConfig.model.isNotBlank()) {
+                                Res.string.ai_edit_model
+                            } else {
+                                Res.string.ai_add_model
+                            }
+                        ),
+                        style = MaterialTheme.typography.titleMedium,
+                        color = SettingColors.Text,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = UiTokens.TextSection
+                    )
+                    Surface(
+                        shape = RoundedCornerShape(UiTokens.BadgeRadius),
+                        color = SettingColors.SoftSurface
+                    ) {
+                        Text(
+                            text = stringResource(Res.string.ai_openai_compatible_badge),
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                            color = SettingColors.SecondaryText,
+                            fontSize = UiTokens.TextCaption
+                        )
+                    }
+                    Spacer(Modifier.weight(1f))
+                    Box(
+                        modifier = Modifier
+                            .size(28.dp)
+                            .clip(CircleShape)
+                            .clickable(enabled = !isBusy, onClick = onDismiss),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = IconParkIcons.Close,
+                            contentDescription = stringResource(Res.string.cancel),
+                            modifier = Modifier.size(UiTokens.IconSmall),
+                            tint = SettingColors.Muted
+                        )
+                    }
+                }
+
+                HorizontalDivider(color = SettingColors.Divider)
+
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = UiTokens.SpaceLarge, vertical = UiTokens.SpaceMedium),
+                    verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium)
+                ) {
+                    AiDialogTextField(
+                        label = stringResource(Res.string.ai_base_url),
+                        value = baseUrl,
+                        onValueChange = {
+                            baseUrl = it
+                            statusMessage = null
+                        },
+                        placeholder = stringResource(Res.string.ai_base_url_hint)
+                    )
+
+                    AiDialogTextField(
+                        label = stringResource(Res.string.ai_api_key),
+                        value = apiKey,
+                        onValueChange = {
+                            apiKey = it
+                            statusMessage = null
+                        },
+                        placeholder = stringResource(
+                            if (keyAvailable) {
+                                Res.string.ai_api_key_hint
+                            } else {
+                                Res.string.ai_api_key_required_hint
+                            }
+                        ),
+                        visualTransformation = if (showApiKey) {
+                            VisualTransformation.None
+                        } else {
+                            PasswordVisualTransformation()
+                        },
+                        trailingContent = {
+                            Box(
+                                modifier = Modifier
+                                    .size(32.dp)
+                                    .clip(CircleShape)
+                                    .clickable { showApiKey = !showApiKey },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = if (showApiKey) {
+                                        CompatIconVectors.EyeOff
+                                    } else {
+                                        CompatIconVectors.Eye
+                                    },
+                                    contentDescription = stringResource(
+                                        if (showApiKey) Res.string.ai_hide_key else Res.string.ai_show_key
+                                    ),
+                                    modifier = Modifier.size(UiTokens.IconSmall),
+                                    tint = SettingColors.Muted
+                                )
+                            }
+                        }
+                    )
+
+                    AiDialogTextField(
+                        label = stringResource(Res.string.ai_model_name),
+                        value = model,
+                        onValueChange = {
+                            model = it
+                            statusMessage = null
+                        },
+                        placeholder = stringResource(Res.string.ai_model_name_hint)
+                    )
+
+                    AiDialogSelectField(
+                        label = stringResource(Res.string.ai_vision_mode),
+                        value = visionModeText(visionMode),
+                        expanded = showVisionDropdown,
+                        onExpandedChange = { showVisionDropdown = it }
+                    ) {
+                        VisionMode.entries.forEach { mode ->
+                            DropdownMenuItem(
+                                text = { Text(visionModeText(mode)) },
+                                onClick = {
+                                    visionMode = mode
+                                    showVisionDropdown = false
+                                    statusMessage = null
+                                }
+                            )
+                        }
+                    }
+
+                    AiDialogTextField(
+                        label = stringResource(Res.string.ai_context_window),
+                        value = contextWindow,
+                        onValueChange = {
+                            contextWindow = it.filter(Char::isDigit).take(7)
+                            statusMessage = null
+                        },
+                        placeholder = stringResource(Res.string.ai_context_window_hint)
+                    )
+
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(UiTokens.RadiusMedium),
+                        color = SettingColors.SoftSurface,
+                        tonalElevation = 0.dp,
+                        shadowElevation = 0.dp
+                    ) {
+                        Text(
+                            text = stringResource(Res.string.ai_privacy_notice),
+                            modifier = Modifier.padding(UiTokens.SpaceMedium),
+                            color = SettingColors.SecondaryText,
+                            fontSize = UiTokens.TextCaption
+                        )
+                    }
+
+                    statusMessage?.let { message ->
+                        Text(
+                            text = message,
+                            color = if (statusIsError) SettingColors.Danger else SettingColors.Success,
+                            fontSize = UiTokens.TextBody
+                        )
+                    }
+                }
+
+                HorizontalDivider(color = SettingColors.Divider)
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = UiTokens.SpaceLarge, vertical = UiTokens.SpaceMedium),
+                    horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (keyAvailable) {
+                        OutlinedButton(
+                            onClick = {
+                                coroutineScope.launch {
+                                    val result = repository.clearApiKey()
+                                    statusIsError = result.isFailure
+                                    statusMessage = result.exceptionOrNull()?.message ?: keyClearedText
+                                    if (result.isSuccess) {
+                                        apiKey = ""
+                                        keyAvailable = false
+                                        onKeyCleared()
+                                    }
+                                }
+                            },
+                            modifier = Modifier.height(36.dp),
+                            enabled = !isBusy,
+                            shape = RoundedCornerShape(UiTokens.RadiusMedium),
+                            border = BorderStroke(1.dp, SettingColors.Border),
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                containerColor = SettingColors.Surface,
+                                contentColor = SettingColors.Danger
+                            ),
+                            contentPadding = PaddingValues(horizontal = UiTokens.SpaceMedium, vertical = 0.dp)
+                        ) {
+                            Text(
+                                text = stringResource(Res.string.ai_clear_key),
+                                color = SettingColors.Danger,
+                                fontSize = UiTokens.TextBody
+                            )
+                        }
+                    }
+
+                    Spacer(Modifier.weight(1f))
+
+                    OutlinedButton(
+                        onClick = {
+                            coroutineScope.launch {
+                                isTesting = true
+                                val key = apiKey.trim().ifBlank { repository.loadApiKey().orEmpty() }
+                                val result = runCatching {
+                                    require(key.isNotBlank()) { "API Key is required" }
+                                    OpenAiCompatibleClient().testConnection(currentConfig(), key)
+                                }
+                                statusIsError = result.isFailure
+                                statusMessage = result.exceptionOrNull()?.message ?: testSuccessText
+                                isTesting = false
+                            }
+                        },
+                        modifier = Modifier.height(36.dp),
+                        enabled = !isBusy && (apiKey.isNotBlank() || keyAvailable),
+                        shape = RoundedCornerShape(UiTokens.RadiusMedium),
+                        border = BorderStroke(1.dp, SettingColors.Border),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            containerColor = SettingColors.Surface,
+                            contentColor = SettingColors.Text
+                        ),
+                        contentPadding = PaddingValues(horizontal = UiTokens.SpaceMedium, vertical = 0.dp)
+                    ) {
+                        if (isTesting) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(14.dp),
+                                strokeWidth = 2.dp,
+                                color = SettingColors.Primary
+                            )
+                            Spacer(Modifier.width(UiTokens.SpaceSmall))
+                        }
+                        Text(
+                            text = stringResource(Res.string.ai_test_connection),
+                            color = if (isBusy && !isTesting) SettingColors.Muted else SettingColors.Text,
+                            fontSize = UiTokens.TextBody
+                        )
+                    }
+
+                    OutlinedButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.height(36.dp),
+                        enabled = !isBusy,
+                        shape = RoundedCornerShape(UiTokens.RadiusMedium),
+                        border = BorderStroke(1.dp, SettingColors.Border),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            containerColor = SettingColors.Surface,
+                            contentColor = SettingColors.Text
+                        ),
+                        contentPadding = PaddingValues(horizontal = UiTokens.SpaceMedium, vertical = 0.dp)
+                    ) {
+                        Text(
+                            text = stringResource(Res.string.cancel),
+                            color = SettingColors.Text,
+                            fontSize = UiTokens.TextBody
+                        )
+                    }
+
+                    Button(
+                        onClick = {
+                            coroutineScope.launch {
+                                isSaving = true
+                                val result = repository.save(currentConfig(), apiKey)
+                                statusIsError = result.isFailure
+                                statusMessage = result.exceptionOrNull()?.message
+                                if (result.isSuccess) {
+                                    onSaved()
+                                }
+                                isSaving = false
+                            }
+                        },
+                        modifier = Modifier.height(36.dp),
+                        enabled = !isBusy,
+                        shape = RoundedCornerShape(UiTokens.RadiusMedium),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = SettingColors.Primary,
+                            contentColor = QadbColors.onPrimary,
+                            disabledContainerColor = SettingColors.ControlBackground,
+                            disabledContentColor = SettingColors.Muted
+                        ),
+                        contentPadding = PaddingValues(horizontal = UiTokens.SpaceLarge, vertical = 0.dp)
+                    ) {
+                        if (isSaving) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(14.dp),
+                                strokeWidth = 2.dp,
+                                color = QadbColors.onPrimary
+                            )
+                            Spacer(Modifier.width(UiTokens.SpaceSmall))
+                        }
+                        Text(
+                            text = stringResource(Res.string.ai_save_config),
+                            color = if (isBusy && !isSaving) SettingColors.Muted else QadbColors.onPrimary,
+                            fontSize = UiTokens.TextBody,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AiDialogTextField(
+    label: String,
+    value: String,
+    onValueChange: (String) -> Unit,
+    placeholder: String,
+    visualTransformation: VisualTransformation = VisualTransformation.None,
+    trailingContent: (@Composable () -> Unit)? = null
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyMedium,
+            color = SettingColors.Text,
+            fontWeight = FontWeight.Medium,
+            fontSize = UiTokens.TextBody
+        )
+        OutlinedTextField(
+            value = value,
+            onValueChange = onValueChange,
+            modifier = Modifier.fillMaxWidth(),
+            placeholder = {
+                Text(
+                    text = placeholder,
+                    color = SettingColors.Muted,
+                    fontSize = UiTokens.TextBody
+                )
+            },
+            trailingIcon = trailingContent,
+            visualTransformation = visualTransformation,
+            singleLine = true,
+            shape = RoundedCornerShape(UiTokens.RadiusMedium)
+        )
+    }
+}
+
+@Composable
+private fun AiDialogSelectField(
+    label: String,
+    value: String,
+    expanded: Boolean,
+    onExpandedChange: (Boolean) -> Unit,
+    menuContent: @Composable ColumnScope.() -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyMedium,
+            color = SettingColors.Text,
+            fontWeight = FontWeight.Medium,
+            fontSize = UiTokens.TextBody
+        )
+        Box(modifier = Modifier.fillMaxWidth()) {
+            Surface(
+                onClick = { onExpandedChange(!expanded) },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(UiTokens.RadiusMedium),
+                color = SettingColors.Surface,
+                border = BorderStroke(1.dp, SettingColors.Border),
+                tonalElevation = 0.dp,
+                shadowElevation = 0.dp
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(UiTokens.ControlHeight)
+                        .padding(horizontal = UiTokens.SpaceMedium),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = value,
+                        color = SettingColors.Text,
+                        fontSize = UiTokens.TextBody
+                    )
+                    Icon(
+                        imageVector = IconParkIcons.ArrowDown,
+                        contentDescription = null,
+                        modifier = Modifier.size(UiTokens.IconSmall),
+                        tint = SettingColors.Muted
+                    )
+                }
+            }
+            DropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { onExpandedChange(false) },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.surface),
+                content = menuContent
+            )
+        }
+    }
+}
+
+@Composable
+private fun visionModeText(mode: VisionMode): String = stringResource(
+    when (mode) {
+        VisionMode.AUTO -> Res.string.ai_vision_auto
+        VisionMode.ENABLED -> Res.string.ai_vision_enabled
+        VisionMode.DISABLED -> Res.string.ai_vision_disabled
+    }
+)
 
 @Composable
 private fun SettingsSection(

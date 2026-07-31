@@ -22,6 +22,7 @@ import com.ludoven.adbtool.pages.AppInfo
 import com.ludoven.adbtool.util.AdbPathManager
 import com.ludoven.adbtool.util.AdbTool
 import com.ludoven.adbtool.util.FileUtils
+import com.ludoven.adbtool.util.l10n
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -1016,12 +1017,12 @@ class AppViewModel : BaseViewModel() {
                     isRunning = isRunning,
                     apkPath = packagePath,
                     dataDir = "/data/user/0/$packageName",
-                    installLocation = if (isSystemApp) "系统分区" else "内部存储",
+                    installLocation = if (isSystemApp) l10n("系统分区", "System partition") else l10n("内部存储", "Internal storage"),
                     appSize = sizeText,
                     totalSize = sizeText,
                     processId = processId,
-                    memoryUsage = if (isRunning) "运行中" else "-",
-                    startTime = if (isRunning) "已启动" else "-",
+                    memoryUsage = if (isRunning) l10n("运行中", "Running") else "-",
+                    startTime = if (isRunning) l10n("已启动", "Started") else "-",
                     dangerousPermissionCount = permissionStats.dangerous,
                     privacyPermissionCount = permissionStats.privacy,
                     normalPermissionCount = permissionStats.normal,
@@ -1267,7 +1268,7 @@ class AppViewModel : BaseViewModel() {
             false
         }
         showTipDialog(
-            MsgContent.Text(if (copied) "已复制到剪贴板" else "复制失败"),
+            MsgContent.Text(if (copied) l10n("已复制到剪贴板", "Copied to clipboard") else l10n("复制失败", "Copy failed")),
             autoDismiss = copied
         )
     }

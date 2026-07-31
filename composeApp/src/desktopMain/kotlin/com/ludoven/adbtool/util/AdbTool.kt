@@ -341,6 +341,10 @@ object AdbTool {
         return executeCommand(*args)
     }
 
+    suspend fun execAdbWithTimeoutAsync(timeoutMillis: Long, vararg args: String): AdbResult {
+        return executeCommandWithTimeout(timeoutMillis, *args)
+    }
+
     suspend fun execAdbOutputAsync(vararg args: String): String {
         return outputText(execAdbAsync(*args))
     }

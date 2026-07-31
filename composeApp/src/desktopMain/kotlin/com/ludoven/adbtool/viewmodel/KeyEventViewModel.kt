@@ -5,6 +5,7 @@ import adbtool_desktop.composeapp.generated.resources.no_device_available
 import androidx.lifecycle.viewModelScope
 import com.ludoven.adbtool.entity.MsgContent
 import com.ludoven.adbtool.util.AdbTool
+import com.ludoven.adbtool.util.l10n
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -56,8 +57,8 @@ class KeyEventViewModel : BaseViewModel() {
     fun sendText(deviceId: String?) {
         val text = _textInput.value.trim()
         when {
-            deviceId.isNullOrBlank() -> _textSendMessage.value = "没有连接设备"
-            text.isBlank() -> _textSendMessage.value = "输入文本不能为空"
+            deviceId.isNullOrBlank() -> _textSendMessage.value = l10n("没有连接设备", "No device connected")
+            text.isBlank() -> _textSendMessage.value = l10n("输入文本不能为空", "Text cannot be empty")
             else -> viewModelScope.launch {
                 _isSendingText.value = true
                 val result = withContext(Dispatchers.IO) {
@@ -65,9 +66,9 @@ class KeyEventViewModel : BaseViewModel() {
                 }
                 _textSendMessage.value = if (result.success) {
                     _textInput.value = ""
-                    "文本已发送到设备"
+                    l10n("文本已发送到设备", "Text sent to device")
                 } else {
-                    result.errorMessage ?: result.output.ifBlank { "发送失败" }
+                    result.errorMessage ?: result.output.ifBlank { l10n("发送失败", "Send failed") }
                 }
                 _isSendingText.value = false
             }
@@ -103,9 +104,9 @@ class KeyEventViewModel : BaseViewModel() {
                     AdbTool.execShell("input keyevent $keyCode")
                 }
                 recordKeyEvent(keyCode, keyName)
-                showToastMessage("已发送: $keyName")
+                showToastMessage(l10n("已发送: $keyName", "Sent: $keyName"))
             } catch (e: Exception) {
-                showToastMessage("发送失败: ${e.message}")
+                showToastMessage(l10n("发送失败: ${e.message}", "Send failed: ${e.message}"))
             }
         }
     }
@@ -119,7 +120,7 @@ class KeyEventViewModel : BaseViewModel() {
     fun sendLongPressEvent(keyCode: Int, durationMs: Long, keyName: String = keyCode.toString()) {
         if (!ensureDeviceSelected()) return
         if (durationMs <= 0) {
-            showToastMessage("长按时长必须大于 0")
+            showToastMessage(l10n("长按时长必须大于 0", "Long-press duration must be greater than 0"))
             return
         }
         viewModelScope.launch {
@@ -127,10 +128,10 @@ class KeyEventViewModel : BaseViewModel() {
                 withContext(Dispatchers.IO) {
                     AdbTool.execShell("input keyevent --longpress $keyCode")
                 }
-                recordKeyEvent(keyCode, "$keyName (长按${durationMs}ms)")
-                showToastMessage("已发送: $keyName (长按${durationMs}ms)")
+                recordKeyEvent(keyCode, l10n("$keyName (长按${durationMs}ms)", "$keyName (long press ${durationMs}ms)"))
+                showToastMessage(l10n("已发送: $keyName (长按${durationMs}ms)", "Sent: $keyName (long press ${durationMs}ms)"))
             } catch (e: Exception) {
-                showToastMessage("发送失败: ${e.message}")
+                showToastMessage(l10n("发送失败: ${e.message}", "Send failed: ${e.message}"))
             }
         }
     }
@@ -142,7 +143,7 @@ class KeyEventViewModel : BaseViewModel() {
     fun sendCustomKeyEvent(keyCodeStr: String) {
         val keyCode = keyCodeStr.trim().toIntOrNull()
         if (keyCode == null) {
-            showToastMessage("请输入有效的数字 KeyCode")
+            showToastMessage(l10n("请输入有效的数字 KeyCode", "Enter a valid numeric KeyCode"))
             return
         }
         sendKeyEvent(keyCode, "KeyCode($keyCode)")

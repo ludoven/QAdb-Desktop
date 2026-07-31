@@ -124,6 +124,13 @@ private enum class AppSortMode {
     Recent
 }
 
+private enum class PermissionFilter {
+    ALL,
+    DANGEROUS,
+    PRIVACY,
+    NORMAL
+}
+
 internal enum class AppListEmptyReason {
     NO_DEVICE,
     NO_RESULTS
@@ -2254,7 +2261,7 @@ private fun DetailInfoRow(label: String, value: String) {
 
 @Composable
 private fun PermissionDetailContent(appInfo: AppInfoData) {
-    var selectedFilter by remember { mutableStateOf("全部") }
+    var selectedFilter by remember { mutableStateOf(PermissionFilter.ALL) }
 
     val dangerousKeywords = listOf(
         "CAMERA", "LOCATION", "RECORD_AUDIO", "CONTACTS", "SMS", "PHONE",
@@ -2264,16 +2271,16 @@ private fun PermissionDetailContent(appInfo: AppInfoData) {
 
     val filteredPermissions = remember(appInfo.permissionDetails, selectedFilter) {
         when (selectedFilter) {
-            "危险权限" -> appInfo.permissionDetails.filter { permission ->
+            PermissionFilter.DANGEROUS -> appInfo.permissionDetails.filter { permission ->
                 dangerousKeywords.any { keyword -> permission.contains(keyword) }
             }
-            "隐私权限" -> appInfo.permissionDetails.filter { permission ->
+            PermissionFilter.PRIVACY -> appInfo.permissionDetails.filter { permission ->
                 privacyKeywords.any { keyword -> permission.contains(keyword) }
             }
-            "普通权限" -> appInfo.permissionDetails.filter { permission ->
+            PermissionFilter.NORMAL -> appInfo.permissionDetails.filter { permission ->
                 dangerousKeywords.none { keyword -> permission.contains(keyword) }
             }
-            else -> appInfo.permissionDetails
+            PermissionFilter.ALL -> appInfo.permissionDetails
         }
     }
 
@@ -2296,7 +2303,7 @@ private fun PermissionDetailContent(appInfo: AppInfoData) {
             horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall),
             modifier = Modifier.fillMaxWidth()
         ) {
-            listOf("全部", "危险权限", "隐私权限", "普通权限").forEach { filter ->
+            PermissionFilter.entries.forEach { filter ->
                 val selected = selectedFilter == filter
                 Surface(
                     shape = RoundedCornerShape(UiTokens.RadiusMedium),
@@ -2309,11 +2316,10 @@ private fun PermissionDetailContent(appInfo: AppInfoData) {
                 ) {
                     Text(
                         text = when (filter) {
-                            "全部" -> l10n("全部", "All")
-                            "危险权限" -> l10n("危险权限", "Dangerous")
-                            "隐私权限" -> l10n("隐私权限", "Privacy")
-                            "普通权限" -> l10n("普通权限", "Normal")
-                            else -> filter
+                            PermissionFilter.ALL -> l10n("全部", "All")
+                            PermissionFilter.DANGEROUS -> l10n("危险权限", "Dangerous")
+                            PermissionFilter.PRIVACY -> l10n("隐私权限", "Privacy")
+                            PermissionFilter.NORMAL -> l10n("普通权限", "Normal")
                         },
                         modifier = Modifier.padding(horizontal = UiTokens.SpaceMedium, vertical = UiTokens.SpaceSmall),
                         style = MaterialTheme.typography.bodySmall,

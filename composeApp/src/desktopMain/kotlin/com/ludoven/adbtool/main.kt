@@ -21,6 +21,7 @@ import adbtool_desktop.composeapp.generated.resources.menu_feedback
 import adbtool_desktop.composeapp.generated.resources.menu_file
 import adbtool_desktop.composeapp.generated.resources.menu_github
 import adbtool_desktop.composeapp.generated.resources.menu_go_app
+import adbtool_desktop.composeapp.generated.resources.menu_go_device
 import adbtool_desktop.composeapp.generated.resources.menu_go_file
 import adbtool_desktop.composeapp.generated.resources.menu_go_home
 import adbtool_desktop.composeapp.generated.resources.menu_go_setting
@@ -53,6 +54,7 @@ import adbtool_desktop.composeapp.generated.resources.menu_zoom_reset
 import com.ludoven.adbtool.ui.mac.*
 import com.ludoven.adbtool.ui.mac.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -80,6 +82,8 @@ import java.net.URI
 import javax.swing.JOptionPane
 import kotlinx.coroutines.launch
 import com.ludoven.adbtool.util.AdbTool
+import com.ludoven.adbtool.util.LanguageManager
+import com.ludoven.adbtool.util.LocalAppLanguage
 import com.ludoven.adbtool.util.ThemeManager
 import com.ludoven.adbtool.util.l10n
 import org.jetbrains.compose.resources.painterResource
@@ -102,6 +106,7 @@ fun main() = application {
         position = WindowPosition(Alignment.Center)
     )
     var alwaysOnTop by remember { mutableStateOf(false) }
+    val currentLanguage by LanguageManager.currentLanguage.collectAsState()
     val currentThemeMode by ThemeManager.currentThemeMode.collectAsState()
     val coroutineScope = rememberCoroutineScope()
     val shutdownAndExit = {
@@ -109,6 +114,7 @@ fun main() = application {
         exitApplication()
     }
 
+    CompositionLocalProvider(LocalAppLanguage provides currentLanguage) {
     Window(
         onCloseRequest = shutdownAndExit,
         state = windowState,
@@ -143,6 +149,7 @@ fun main() = application {
             }
         }
         App()
+    }
     }
 }
 
@@ -238,6 +245,7 @@ private fun MenuBarScope.AppMenuBar(
     Menu(menuView) {
         Menu(stringResource(Res.string.menu_page_navigation)) {
             Item(stringResource(Res.string.menu_go_home)) { AppMenuCommandBus.dispatch(AppMenuCommand.Navigate("home")) }
+            Item(stringResource(Res.string.menu_go_device)) { AppMenuCommandBus.dispatch(AppMenuCommand.Navigate("home")) }
             Item(l10n("前往设备控制", "Go to Device Control")) { AppMenuCommandBus.dispatch(AppMenuCommand.Navigate("device-control")) }
             Item(stringResource(Res.string.menu_go_app)) { AppMenuCommandBus.dispatch(AppMenuCommand.Navigate("app")) }
             Item(stringResource(Res.string.menu_go_file)) { AppMenuCommandBus.dispatch(AppMenuCommand.Navigate("filebrowser")) }

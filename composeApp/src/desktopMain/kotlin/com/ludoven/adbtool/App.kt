@@ -30,6 +30,7 @@ import com.ludoven.adbtool.ui.mac.ExperimentalMaterial3Api
 import com.ludoven.adbtool.ui.mac.MaterialTheme
 import com.ludoven.adbtool.ui.mac.Scaffold
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -60,6 +61,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import com.ludoven.adbtool.pages.AppScreen
+import com.ludoven.adbtool.pages.AiAgentScreen
 import com.ludoven.adbtool.pages.CommonScreen
 import com.ludoven.adbtool.pages.DeviceControlScreen
 import com.ludoven.adbtool.pages.DeviceControlTab
@@ -72,12 +74,14 @@ import com.ludoven.adbtool.pages.SettingScreen
 import com.ludoven.adbtool.pages.TerminalScreen
 import com.ludoven.adbtool.util.AdbPathManager
 import com.ludoven.adbtool.util.LanguageManager
+import com.ludoven.adbtool.util.LocalAppLanguage
 import com.ludoven.adbtool.util.ThemeManager
 import com.ludoven.adbtool.entity.AdbFunctionType
 import com.ludoven.adbtool.entity.MsgContent
 import com.ludoven.adbtool.util.AdbTool
 import com.ludoven.adbtool.util.l10n
 import com.ludoven.adbtool.viewmodel.AppViewModel
+import com.ludoven.adbtool.viewmodel.AiAgentViewModel
 import com.ludoven.adbtool.viewmodel.CommonModel
 import com.ludoven.adbtool.viewmodel.DeviceMirrorViewModel
 import com.ludoven.adbtool.viewmodel.DevicesViewModel
@@ -98,6 +102,7 @@ import org.jetbrains.compose.ui.tooling.preview.Preview
 @Preview
 fun App() {
     val devicesViewModel: DevicesViewModel = viewModel()
+    val aiAgentViewModel: AiAgentViewModel = viewModel()
     val appViewModel: AppViewModel = viewModel()
     val commonModel: CommonModel = viewModel()
     val deviceMirrorViewModel: DeviceMirrorViewModel = viewModel()
@@ -105,12 +110,14 @@ fun App() {
     val logViewModel: LogViewModel = viewModel()
     val terminalViewModel: TerminalViewModel = viewModel()
     val fileBrowserViewModel: FileBrowserViewModel = viewModel()
+    val currentLanguage by LanguageManager.currentLanguage.collectAsState()
     LaunchedEffect(Unit) {
         LanguageManager.initialize()
         ThemeManager.initialize()
         AdbPathManager.getAdbPath()
     }
 
+    CompositionLocalProvider(LocalAppLanguage provides currentLanguage) {
     val tabGroups = listOf(
         SidebarGroup(
             id = "home",
@@ -118,6 +125,14 @@ fun App() {
             icon = IconParkIcons.Home,
             defaultRoute = "home",
             items = listOf(TabItem(stringResource(Res.string.home), IconParkIcons.Home, "home")),
+            collapsible = false
+        ),
+        SidebarGroup(
+            id = "ai",
+            label = l10n("AI", "AI"),
+            icon = IconParkIcons.Command,
+            defaultRoute = "ai",
+            items = listOf(TabItem(l10n("AI", "AI"), IconParkIcons.Command, "ai")),
             collapsible = false
         ),
         SidebarGroup(
@@ -207,14 +222,19 @@ fun App() {
     }
 
     fun handleGlobalShortcut(key: Key): Boolean {
+        fun navigatePrimary(index: Int): Boolean {
+            navigateToRoute(PRIMARY_SHORTCUT_ROUTES.getValue(index))
+            return true
+        }
         return when (key) {
-            Key.One -> { navigateToRoute("home"); true }
-            Key.Two -> { navigateToRoute("common"); true }
-            Key.Three -> { navigateToRoute("device-control"); true }
-            Key.Four -> { navigateToRoute("app"); true }
-            Key.Five -> { navigateToRoute("filebrowser"); true }
-            Key.Six -> { navigateToRoute("diagnostics"); true }
-            Key.Seven -> { navigateToRoute("terminal"); true }
+            Key.One -> navigatePrimary(1)
+            Key.Two -> navigatePrimary(2)
+            Key.Three -> navigatePrimary(3)
+            Key.Four -> navigatePrimary(4)
+            Key.Five -> navigatePrimary(5)
+            Key.Six -> navigatePrimary(6)
+            Key.Seven -> navigatePrimary(7)
+            Key.Eight -> navigatePrimary(8)
             Key.Zero -> { navigateToRoute("setting"); true }
             Key.Comma -> { navigateToRoute("setting"); true }
             Key.K -> { navigateToRoute("common"); true }
@@ -340,6 +360,16 @@ fun App() {
                                         }
                                     }
                                 }
+                                composable("ai") {
+                                    stateHolder.SaveableStateProvider("ai") {
+                                        AiAgentScreen(
+                                            viewModel = aiAgentViewModel,
+                                            devicesViewModel = devicesViewModel,
+                                            onOpenDevices = { navigateToRoute("home") },
+                                            onOpenSettings = { navigateToRoute("setting") }
+                                        )
+                                    }
+                                }
                                 composable("device-control") {
                                     stateHolder.SaveableStateProvider("device-control") {
                                         DeviceControlRoute(
@@ -418,7 +448,8 @@ fun App() {
                                 }
                                 composable("setting") {
                                     stateHolder.SaveableStateProvider("setting") {
-                                        SettingScreen()
+                                        val selectedDevice by devicesViewModel.selectedDevice.collectAsState()
+                                        SettingScreen(selectedDeviceId = selectedDevice)
                                     }
                                 }
                                 composable("diagnostics") {
@@ -497,6 +528,7 @@ fun App() {
                 showScreenRecordDialog = false
             }
         )
+    }
     }
 }
 
@@ -1139,7 +1171,18 @@ private fun formatScreenRecordDuration(totalSeconds: Long): String {
     return "${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}"
 }
 
-private fun normalizeRouteForPrimaryNavigation(route: String): String = when (route) {
+internal val PRIMARY_SHORTCUT_ROUTES = mapOf(
+    1 to "home",
+    2 to "ai",
+    3 to "common",
+    4 to "device-control",
+    5 to "app",
+    6 to "filebrowser",
+    7 to "diagnostics",
+    8 to "terminal"
+)
+
+internal fun normalizeRouteForPrimaryNavigation(route: String): String = when (route) {
     "mirror", "keyevent", "device-control" -> "device-control"
     "log", "process", "diagnostics" -> "diagnostics"
     else -> route

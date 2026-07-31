@@ -11,6 +11,7 @@ import com.ludoven.adbtool.entity.MirrorLaunchProfile
 import com.ludoven.adbtool.entity.MsgContent
 import com.ludoven.adbtool.util.AdbTool
 import com.ludoven.adbtool.util.ScrcpyPathManager
+import com.ludoven.adbtool.util.l10n
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -65,7 +66,7 @@ class DeviceMirrorViewModel : BaseViewModel() {
     }
 
     fun notifyCommandCopied() {
-        showTipDialog(MsgContent.Text("命令已复制到剪贴板"), autoDismiss = true)
+        showTipDialog(MsgContent.Text(l10n("命令已复制到剪贴板", "Command copied to clipboard")), autoDismiss = true)
     }
 
     fun buildCommandPreview(deviceId: String?): String {
@@ -132,7 +133,7 @@ class DeviceMirrorViewModel : BaseViewModel() {
                 _mirrorStartedAt.value = null
                 stopMirrorStateWatcher()
                 _mirrorErrorMessage.value = null
-                MsgContent.Text("已停止设备镜像窗口")
+                MsgContent.Text(l10n("已停止设备镜像窗口", "Device mirror window stopped"))
             } else {
                 MsgContent.Resource(
                     Res.string.device_mirror_failed,
@@ -159,7 +160,7 @@ class DeviceMirrorViewModel : BaseViewModel() {
             if (!precheck.success || deviceState != "device") {
                 showTipDialog(
                     MsgContent.Text(
-                        "设备不可操作（$targetDeviceId）：${formatAdbError(precheck, if (deviceState.isNotBlank()) deviceState else "unknown")}"
+                        l10n("设备不可操作（$targetDeviceId）：${formatAdbError(precheck, if (deviceState.isNotBlank()) deviceState else "未知")}", "Device is unavailable ($targetDeviceId): ${formatAdbError(precheck, if (deviceState.isNotBlank()) deviceState else "unknown")}")
                     ),
                     autoDismiss = true
                 )
@@ -172,13 +173,13 @@ class DeviceMirrorViewModel : BaseViewModel() {
                 if (isInputInjectionSecurityError(result)) {
                     _inputInjectionBlocked.value = true
                     showTipDialog(
-                        MsgContent.Text("系统拒绝输入注入：请在开发者选项开启 USB 调试（安全设置）后重试。"),
+                        MsgContent.Text(l10n("系统拒绝输入注入：请在开发者选项开启 USB 调试（安全设置）后重试。", "Input injection was denied. Enable USB debugging (Security settings) in Developer options and try again.")),
                         autoDismiss = true
                     )
                     return@launch
                 }
                 showTipDialog(
-                    MsgContent.Text("快捷控制失败（$targetDeviceId）：${formatAdbError(result, "执行失败")}"),
+                    MsgContent.Text(l10n("快捷控制失败（$targetDeviceId）：${formatAdbError(result, "执行失败")}", "Quick control failed ($targetDeviceId): ${formatAdbError(result, "Action failed")}")),
                     autoDismiss = true
                 )
             } else {
@@ -201,7 +202,7 @@ class DeviceMirrorViewModel : BaseViewModel() {
             if (!precheck.success || deviceState != "device") {
                 showTipDialog(
                     MsgContent.Text(
-                        "设备不可操作（$targetDeviceId）：${formatAdbError(precheck, if (deviceState.isNotBlank()) deviceState else "unknown")}"
+                        l10n("设备不可操作（$targetDeviceId）：${formatAdbError(precheck, if (deviceState.isNotBlank()) deviceState else "未知")}", "Device is unavailable ($targetDeviceId): ${formatAdbError(precheck, if (deviceState.isNotBlank()) deviceState else "unknown")}")
                     ),
                     autoDismiss = true
                 )
@@ -214,13 +215,13 @@ class DeviceMirrorViewModel : BaseViewModel() {
                 if (isInputInjectionSecurityError(disableResult)) {
                     _inputInjectionBlocked.value = true
                     showTipDialog(
-                        MsgContent.Text("系统拒绝输入注入：请在开发者选项开启 USB 调试（安全设置）后重试。"),
+                        MsgContent.Text(l10n("系统拒绝输入注入：请在开发者选项开启 USB 调试（安全设置）后重试。", "Input injection was denied. Enable USB debugging (Security settings) in Developer options and try again.")),
                         autoDismiss = true
                     )
                     return@launch
                 }
                 showTipDialog(
-                    MsgContent.Text("旋转屏幕失败（$targetDeviceId）：${formatAdbError(disableResult, "执行失败")}"),
+                    MsgContent.Text(l10n("旋转屏幕失败（$targetDeviceId）：${formatAdbError(disableResult, "执行失败")}", "Failed to rotate screen ($targetDeviceId): ${formatAdbError(disableResult, "Action failed")}")),
                     autoDismiss = true
                 )
                 return@launch
@@ -230,7 +231,7 @@ class DeviceMirrorViewModel : BaseViewModel() {
             }
             if (!currentRotationResult.success) {
                 showTipDialog(
-                    MsgContent.Text("读取屏幕方向失败（$targetDeviceId）：${formatAdbError(currentRotationResult, "执行失败")}"),
+                    MsgContent.Text(l10n("读取屏幕方向失败（$targetDeviceId）：${formatAdbError(currentRotationResult, "执行失败")}", "Failed to read screen rotation ($targetDeviceId): ${formatAdbError(currentRotationResult, "Action failed")}")),
                     autoDismiss = true
                 )
                 return@launch
@@ -244,13 +245,13 @@ class DeviceMirrorViewModel : BaseViewModel() {
                 if (isInputInjectionSecurityError(rotateResult)) {
                     _inputInjectionBlocked.value = true
                     showTipDialog(
-                        MsgContent.Text("系统拒绝输入注入：请在开发者选项开启 USB 调试（安全设置）后重试。"),
+                        MsgContent.Text(l10n("系统拒绝输入注入：请在开发者选项开启 USB 调试（安全设置）后重试。", "Input injection was denied. Enable USB debugging (Security settings) in Developer options and try again.")),
                         autoDismiss = true
                     )
                     return@launch
                 }
                 showTipDialog(
-                    MsgContent.Text("旋转屏幕失败（$targetDeviceId）：${formatAdbError(rotateResult, "执行失败")}"),
+                    MsgContent.Text(l10n("旋转屏幕失败（$targetDeviceId）：${formatAdbError(rotateResult, "执行失败")}", "Failed to rotate screen ($targetDeviceId): ${formatAdbError(rotateResult, "Action failed")}")),
                     autoDismiss = true
                 )
             } else {
@@ -273,7 +274,7 @@ class DeviceMirrorViewModel : BaseViewModel() {
             if (!precheck.success || deviceState != "device") {
                 showTipDialog(
                     MsgContent.Text(
-                        "设备不可操作（$targetDeviceId）：${formatAdbError(precheck, if (deviceState.isNotBlank()) deviceState else "unknown")}"
+                        l10n("设备不可操作（$targetDeviceId）：${formatAdbError(precheck, if (deviceState.isNotBlank()) deviceState else "未知")}", "Device is unavailable ($targetDeviceId): ${formatAdbError(precheck, if (deviceState.isNotBlank()) deviceState else "unknown")}")
                     ),
                     autoDismiss = true
                 )
@@ -286,13 +287,13 @@ class DeviceMirrorViewModel : BaseViewModel() {
                 if (isInputInjectionSecurityError(result)) {
                     _inputInjectionBlocked.value = true
                     showTipDialog(
-                        MsgContent.Text("系统拒绝输入注入：请在开发者选项开启 USB 调试（安全设置）后重试。"),
+                        MsgContent.Text(l10n("系统拒绝输入注入：请在开发者选项开启 USB 调试（安全设置）后重试。", "Input injection was denied. Enable USB debugging (Security settings) in Developer options and try again.")),
                         autoDismiss = true
                     )
                     return@launch
                 }
                 showTipDialog(
-                    MsgContent.Text("截图操作失败（$targetDeviceId）：${formatAdbError(result, "执行失败")}"),
+                    MsgContent.Text(l10n("截图操作失败（$targetDeviceId）：${formatAdbError(result, "执行失败")}", "Screenshot failed ($targetDeviceId): ${formatAdbError(result, "Action failed")}")),
                     autoDismiss = true
                 )
             } else {
@@ -313,7 +314,7 @@ class DeviceMirrorViewModel : BaseViewModel() {
                     _activeDeviceId.value = null
                     _mirrorStartedAt.value = null
                     _mirrorErrorMessage.value = null
-                    showTipDialog(MsgContent.Text("镜像窗口已关闭"), autoDismiss = true)
+                    showTipDialog(MsgContent.Text(l10n("镜像窗口已关闭", "Device mirror window closed")), autoDismiss = true)
                     break
                 }
             }

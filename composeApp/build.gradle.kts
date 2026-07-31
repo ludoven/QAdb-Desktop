@@ -7,6 +7,7 @@ import org.gradle.api.tasks.Internal
 import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.OutputFile
 import org.gradle.api.tasks.TaskAction
+import org.gradle.api.tasks.testing.Test
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
@@ -87,6 +88,14 @@ val nativeTargetFormats = when {
 }
 val generatedVersionSourceDir = layout.buildDirectory.dir("generated/source/appVersion/desktopMain/kotlin")
 val generatedIconHelperResourcesDir = layout.buildDirectory.dir("generated/resources/iconHelper")
+val generatedAgentImeResourcesDir = layout.buildDirectory.dir("generated/resources/agentIme")
+val agentImeReleaseSigningReady = listOf(
+    "QADB_HELPER_KEYSTORE",
+    "QADB_HELPER_STORE_PASSWORD",
+    "QADB_HELPER_KEY_PASSWORD",
+    "QADB_HELPER_KEY_ALIAS"
+).all { !System.getenv(it).isNullOrBlank() }
+val agentImeVariant = if (agentImeReleaseSigningReady) "release" else "debug"
 val generateDesktopAppVersion = tasks.register<GenerateAppVersionTask>("generateDesktopAppVersion") {
     versionName.set(appVersion)
     outputFile.set(generatedVersionSourceDir.map { it.file("com/ludoven/adbtool/AppVersion.kt") })
@@ -97,6 +106,18 @@ val syncIconHelperResource = tasks.register<Copy>("syncIconHelperResource") {
     dependsOn(":qadb-icon-helper:assembleIconHelperDex")
     from(project(":qadb-icon-helper").layout.buildDirectory.file("outputs/qadb-icon-helper.jar"))
     into(generatedIconHelperResourcesDir.map { it.dir("qadb") })
+}
+val syncAgentImeResource = tasks.register<Copy>("syncAgentImeResource") {
+    group = "build"
+    description = "Copies the QADB Unicode input helper APK into desktop runtime resources."
+    dependsOn(":qadb-agent-ime:assemble${agentImeVariant.replaceFirstChar { it.uppercase() }}")
+    from(
+        project(":qadb-agent-ime").layout.buildDirectory.file(
+            "outputs/apk/$agentImeVariant/qadb-agent-ime-$agentImeVariant.apk"
+        )
+    )
+    into(generatedAgentImeResourcesDir.map { it.dir("qadb") })
+    rename { "qadb-agent-ime.apk" }
 }
 val renameWindowsPackageFiles = tasks.register<RenameWindowsPackageFilesTask>("renameWindowsPackageFiles") {
     group = "compose desktop"
@@ -112,6 +133,7 @@ kotlin {
         val desktopMain by getting {
             kotlin.srcDir(generatedVersionSourceDir)
             resources.srcDir(generatedIconHelperResourcesDir)
+            resources.srcDir(generatedAgentImeResourcesDir)
         }
         
         commonMain.dependencies {
@@ -136,6 +158,7 @@ kotlin {
             implementation("net.java.dev.jna:jna:5.18.1")
             implementation("net.java.dev.jna:jna-platform:5.18.1")
             implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
+            implementation("org.xerial:sqlite-jdbc:3.53.1.0")
 
         }
         commonTest.dependencies {
@@ -199,8 +222,14 @@ tasks.withType<KotlinCompile>().configureEach {
         freeCompilerArgs.add("-Xnon-local-break-continue")
     }
 }
+tasks.withType<Test>().configureEach {
+    listOf("qadb.agent.device", "qadb.agent.realModelDevice").forEach { propertyName ->
+        System.getProperty(propertyName)?.let { systemProperty(propertyName, it) }
+    }
+}
 tasks.matching { it.name == "desktopProcessResources" || it.name == "processDesktopMainResources" }.configureEach {
     dependsOn(syncIconHelperResource)
+    dependsOn(syncAgentImeResource)
 }
 listOf(
     "packageMsi",

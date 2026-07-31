@@ -25,6 +25,14 @@ class SidebarNavigationStateTest {
             collapsible = false
         ),
         SidebarGroup(
+            id = "device",
+            label = "设备",
+            icon = Icons.Default.Home,
+            defaultRoute = "device",
+            items = listOf(TabItem("设备", Icons.Default.Home, "device")),
+            collapsible = false
+        ),
+        SidebarGroup(
             id = "app",
             label = "应用",
             icon = Icons.Default.Home,
@@ -103,6 +111,14 @@ class SidebarNavigationStateTest {
         assertEquals(
             emptySet(),
             visibleSidebarGroupIds(groups, selectedRoute = "device-control", expandedGroupId = null)
+        )
+    }
+
+    @Test
+    fun `device route should stay standalone`() {
+        assertEquals(
+            emptySet(),
+            visibleSidebarGroupIds(groups, selectedRoute = "device", expandedGroupId = null)
         )
     }
 }

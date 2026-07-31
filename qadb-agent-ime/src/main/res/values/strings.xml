@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">QADB 输入助手</string>
+    <string name="ime_name">QADB 安全输入</string>
+    <string name="test_title">QADB Unicode 输入测试</string>
+    <string name="test_hint">等待 QADB 输入中文、Emoji、标点和换行</string>
+</resources>

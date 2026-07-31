@@ -33,6 +33,7 @@ import java.io.InputStreamReader;
 import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.util.Comparator;
+import java.util.Collections;
 import java.util.List;
 
 public final class IconHelperMain {
@@ -48,6 +49,11 @@ public final class IconHelperMain {
         long startedAt = System.currentTimeMillis();
         if (args.length >= 1 && "clear-cache".equals(args[0])) {
             clearCache(args.length >= 2 ? args[1] : null, startedAt);
+            return;
+        }
+
+        if (args.length >= 1 && "list-labels".equals(args[0])) {
+            listLabels(startedAt);
             return;
         }
 
@@ -76,7 +82,7 @@ public final class IconHelperMain {
         }
 
         if (args.length < 2 || !"get-icon".equals(args[0])) {
-            fail(null, "usage: get-icon <packageName> [sizePx] | get-icons <sizePx> <packageName...> | serve-icons <sizePx> | clear-cache [packageName]", startedAt, null);
+            fail(null, "usage: get-icon <packageName> [sizePx] | get-icons <sizePx> <packageName...> | serve-icons <sizePx> | list-labels | clear-cache [packageName]", startedAt, null);
             return;
         }
 
@@ -124,6 +130,41 @@ public final class IconHelperMain {
                 handleGetIcon(value, sizePx, context, packageManager, System.currentTimeMillis());
                 System.out.flush();
             }
+        } catch (Throwable throwable) {
+            throwable.printStackTrace(System.err);
+            fail(null, throwable.getClass().getSimpleName() + ": " + nullToEmpty(throwable.getMessage()), startedAt, null);
+        }
+    }
+
+    private static void listLabels(long startedAt) {
+        try {
+            Context context = systemContext();
+            if (context == null) {
+                fail(null, "system context unavailable", startedAt, null);
+                return;
+            }
+            PackageManager packageManager = context.getPackageManager();
+            List<ApplicationInfo> applications = packageManager.getInstalledApplications(packageQueryFlags());
+            if (applications == null) applications = Collections.emptyList();
+            applications.sort(new Comparator<ApplicationInfo>() {
+                @Override
+                public int compare(ApplicationInfo left, ApplicationInfo right) {
+                    return left.packageName.compareToIgnoreCase(right.packageName);
+                }
+            });
+            for (ApplicationInfo info : applications) {
+                if (info == null || info.packageName == null || info.packageName.length() == 0) continue;
+                Intent launchIntent = packageManager.getLaunchIntentForPackage(info.packageName);
+                if (launchIntent == null) {
+                    launchIntent = packageManager.getLeanbackLaunchIntentForPackage(info.packageName);
+                }
+                if (launchIntent == null) continue;
+                String label = resolveLabel(packageManager, info.packageName, info);
+                System.out.println("APP package=" + info.packageName
+                    + " label64=" + base64(label)
+                    + " enabled=" + (info.enabled ? "1" : "0"));
+            }
+            System.out.println("DONE elapsedMs=" + (System.currentTimeMillis() - startedAt));
         } catch (Throwable throwable) {
             throwable.printStackTrace(System.err);
             fail(null, throwable.getClass().getSimpleName() + ": " + nullToEmpty(throwable.getMessage()), startedAt, null);

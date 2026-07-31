@@ -27,6 +27,12 @@ data class DeviceIconBatchResult(
     val failures: Map<String, String>
 )
 
+data class InstalledAppLabel(
+    val packageName: String,
+    val label: String,
+    val enabled: Boolean
+)
+
 class AppIconHelperClient(
     private val localCacheRoot: File,
     private val helperJarOverride: File? = null
@@ -131,6 +137,35 @@ class AppIconHelperClient(
         val command = helperCommand("clear-cache")
         val result = AdbTool.execShellAsync(command, deviceId)
         return if (result.success) Result.success(Unit) else Result.failure(IllegalStateException(AdbTool.outputText(result)))
+    }
+
+    suspend fun fetchInstalledAppLabels(deviceId: String?): Result<List<InstalledAppLabel>> {
+        if (deviceId.isNullOrBlank()) return Result.failure(IllegalArgumentException("Device ID is required"))
+        val helperJar = helperJarOverride ?: locateHelperJar()
+        if (!helperJar.isFile) {
+            return Result.failure(IllegalStateException("qadb-icon-helper jar not found. Run :qadb-icon-helper:assembleIconHelperDex."))
+        }
+        runCatching { pushHelperIfNeeded(helperJar, deviceId) }
+            .onFailure { return Result.failure(it) }
+        val result = AdbTool.execShellAsync(helperCommand("list-labels"), deviceId)
+        if (!result.success) return Result.failure(IllegalStateException(AdbTool.outputText(result)))
+        val labels = result.output.lineSequence().mapNotNull { line ->
+            if (!line.startsWith("APP ")) return@mapNotNull null
+            val values = line.substringAfter(' ').split(' ')
+                .mapNotNull { token ->
+                    val index = token.indexOf('=')
+                    if (index <= 0) null else token.substring(0, index) to token.substring(index + 1)
+                }
+                .toMap()
+            val packageName = values["package"].orEmpty()
+            if (packageName.isBlank()) return@mapNotNull null
+            InstalledAppLabel(
+                packageName = packageName,
+                label = decodeBase64(values["label64"]) ?: packageName,
+                enabled = values["enabled"] != "0"
+            )
+        }.toList()
+        return Result.success(labels)
     }
 
     private suspend fun pushHelperIfNeeded(helperJar: File, deviceId: String) {

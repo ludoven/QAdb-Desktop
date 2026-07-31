@@ -1,5 +1,6 @@
 package com.ludoven.adbtool.util
 
+import androidx.compose.runtime.staticCompositionLocalOf
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -71,7 +72,9 @@ object LanguageManager {
      * 检查是否需要重启应用以应用语言更改
      */
     fun isRestartRequired(): Boolean {
-        // 在Compose Multiplatform中，语言切换通常需要重启应用
-        return true
+        return false
     }
 }
+
+/** Forces the desktop composition to refresh when the display language changes. */
+val LocalAppLanguage = staticCompositionLocalOf { LanguageManager.Language.CHINESE }

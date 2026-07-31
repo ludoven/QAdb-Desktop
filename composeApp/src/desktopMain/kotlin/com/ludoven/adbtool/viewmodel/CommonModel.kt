@@ -163,12 +163,12 @@ class CommonModel : BaseViewModel() {
                 when (type) {
                     AdbFunctionType.LAUNCH_APP_BY_PACKAGE -> {
                         val success = withContext(Dispatchers.IO) { AdbTool.startApp(normalized) }
-                        showTipDialog(MsgContent.Text(if (success) "启动成功：$normalized" else "启动失败：$normalized"), true)
+                        showTipDialog(MsgContent.Text(if (success) l10n("启动成功：$normalized", "Launched: $normalized") else l10n("启动失败：$normalized", "Failed to launch: $normalized")), true)
                     }
 
                     AdbFunctionType.STOP_APP_BY_PACKAGE -> {
                         val success = withContext(Dispatchers.IO) { AdbTool.stopApp(normalized) }
-                        showTipDialog(MsgContent.Text(if (success) "已停止：$normalized" else "停止失败：$normalized"), true)
+                        showTipDialog(MsgContent.Text(if (success) l10n("已停止：$normalized", "Stopped: $normalized") else l10n("停止失败：$normalized", "Failed to stop: $normalized")), true)
                     }
 
                     AdbFunctionType.CLEAR_CACHE_AND_RESTART -> {
@@ -181,9 +181,9 @@ class CommonModel : BaseViewModel() {
                         showTipDialog(
                             MsgContent.Text(
                                 if (clearResult && restartResult) {
-                                    "清缓存并重启成功：$normalized"
+                                    l10n("清缓存并重启成功：$normalized", "Cache cleared and restarted: $normalized")
                                 } else {
-                                    "清缓存或重启失败：$normalized"
+                                    l10n("清缓存或重启失败：$normalized", "Failed to clear cache or restart: $normalized")
                                 }
                             ),
                             true
