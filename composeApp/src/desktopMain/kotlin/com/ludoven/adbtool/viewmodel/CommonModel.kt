@@ -27,6 +27,8 @@ import com.ludoven.adbtool.entity.MsgContent
 import com.ludoven.adbtool.util.AdbPathManager
 import com.ludoven.adbtool.util.AdbTool
 import com.ludoven.adbtool.util.ChildProcessRegistry
+import com.ludoven.adbtool.util.CommandHistoryStore
+import com.ludoven.adbtool.util.CommandHistoryTask
 import com.ludoven.adbtool.util.FileUtils
 import com.ludoven.adbtool.util.ScrcpyPathManager
 import com.ludoven.adbtool.util.l10n
@@ -122,7 +124,7 @@ class CommonModel : BaseViewModel() {
                     else -> {}
                 }
             } catch (e: Exception) {
-                showTipDialog(
+                showToast(
                     MsgContent.Resource(
                         Res.string.dialog_operation_failed,
                         listOf("${e.message}")
@@ -163,12 +165,12 @@ class CommonModel : BaseViewModel() {
                 when (type) {
                     AdbFunctionType.LAUNCH_APP_BY_PACKAGE -> {
                         val success = withContext(Dispatchers.IO) { AdbTool.startApp(normalized) }
-                        showTipDialog(MsgContent.Text(if (success) l10n("启动成功：$normalized", "Launched: $normalized") else l10n("启动失败：$normalized", "Failed to launch: $normalized")), true)
+                        showToast(MsgContent.Text(if (success) l10n("启动成功：$normalized", "Launched: $normalized") else l10n("启动失败：$normalized", "Failed to launch: $normalized")))
                     }
 
                     AdbFunctionType.STOP_APP_BY_PACKAGE -> {
                         val success = withContext(Dispatchers.IO) { AdbTool.stopApp(normalized) }
-                        showTipDialog(MsgContent.Text(if (success) l10n("已停止：$normalized", "Stopped: $normalized") else l10n("停止失败：$normalized", "Failed to stop: $normalized")), true)
+                        showToast(MsgContent.Text(if (success) l10n("已停止：$normalized", "Stopped: $normalized") else l10n("停止失败：$normalized", "Failed to stop: $normalized")))
                     }
 
                     AdbFunctionType.CLEAR_CACHE_AND_RESTART -> {
@@ -178,15 +180,14 @@ class CommonModel : BaseViewModel() {
                         } else {
                             false
                         }
-                        showTipDialog(
+                        showToast(
                             MsgContent.Text(
                                 if (clearResult && restartResult) {
                                     l10n("清缓存并重启成功：$normalized", "Cache cleared and restarted: $normalized")
                                 } else {
                                     l10n("清缓存或重启失败：$normalized", "Failed to clear cache or restart: $normalized")
                                 }
-                            ),
-                            true
+                            )
                         )
                     }
 
@@ -197,7 +198,7 @@ class CommonModel : BaseViewModel() {
                     else -> Unit
                 }
             } catch (e: Exception) {
-                showTipDialog(
+                showToast(
                     MsgContent.Resource(
                         Res.string.dialog_operation_failed,
                         listOf("${e.message}")
@@ -210,45 +211,49 @@ class CommonModel : BaseViewModel() {
     private suspend fun installApp() {
         val apkPath = FileUtils.selectApkFile()
         if (apkPath != null) {
-            showTipDialog(MsgContent.Resource(Res.string.installing))
+            showToast(MsgContent.Resource(Res.string.installing))
             withContext(Dispatchers.IO) {
                 val success = AdbTool.installApk(apkPath) // 执行安装
+                CommandHistoryStore.record(
+                    task = CommandHistoryTask.INSTALL_APK,
+                    succeeded = success,
+                    target = File(apkPath).name
+                )
                 withContext(Dispatchers.Main) { // 切换回主线程更新 UI
                     val localizedText =
                         MsgContent.Resource(if (success) Res.string.install_success else Res.string.install_failed)
-                    showTipDialog(localizedText, true)
+                    showToast(localizedText)
                 }
             }
 
         } else {
-            showTipDialog(MsgContent.Resource(Res.string.apk_not_selected), true)
+            showToast(MsgContent.Resource(Res.string.apk_not_selected))
         }
     }
 
     private suspend fun installAndLaunch(packageName: String) {
         val apkPath = FileUtils.selectApkFile()
         if (apkPath == null) {
-            showTipDialog(MsgContent.Resource(Res.string.apk_not_selected), true)
+            showToast(MsgContent.Resource(Res.string.apk_not_selected))
             return
         }
 
-        showTipDialog(MsgContent.Resource(Res.string.installing))
+        showToast(MsgContent.Resource(Res.string.installing))
         val installSuccess = withContext(Dispatchers.IO) {
             AdbTool.installApk(apkPath)
         }
         if (!installSuccess) {
-            showTipDialog(MsgContent.Resource(Res.string.install_failed), true)
+            showToast(MsgContent.Resource(Res.string.install_failed))
             return
         }
 
         val launchSuccess = withContext(Dispatchers.IO) {
             AdbTool.startApp(packageName)
         }
-        showTipDialog(
+        showToast(
             MsgContent.Resource(
                 if (launchSuccess) Res.string.install_success else Res.string.install_success_launch_failed
-            ),
-            true
+            )
         )
     }
 
@@ -264,7 +269,7 @@ class CommonModel : BaseViewModel() {
     fun startScreenRecord(durationSeconds: Int?) {
         if (!ensureDeviceSelected(autoDismiss = true)) return
         if (_screenRecordState.value.isRecording || activeScreenRecordSession != null) {
-            showTipDialog(MsgContent.Text(l10n("已有录屏任务进行中", "A screen recording is already running")), true)
+            showToast(MsgContent.Text(l10n("已有录屏任务进行中", "A screen recording is already running")))
             return
         }
 
@@ -273,7 +278,7 @@ class CommonModel : BaseViewModel() {
             val deviceId = AdbTool.selectDeviceId.orEmpty()
             val folderPath = withContext(Dispatchers.IO) { FileUtils.selectFolder() }
             if (folderPath == null) {
-                showTipDialog(MsgContent.Resource(Res.string.folder_not_selected), true)
+                showToast(MsgContent.Resource(Res.string.folder_not_selected))
                 return@launch
             }
 
@@ -290,7 +295,7 @@ class CommonModel : BaseViewModel() {
             }
 
             if (session == null) {
-                showTipDialog(MsgContent.Resource(Res.string.recording_failed), true)
+                showToast(MsgContent.Resource(Res.string.recording_failed))
                 return@launch
             }
 
@@ -303,9 +308,9 @@ class CommonModel : BaseViewModel() {
             )
 
             if (normalizedDuration == null) {
-                showTipDialog(MsgContent.Text(l10n("录屏已开始，停止后自动保存。", "Recording started. Stop it to save automatically.")), true)
+                showToast(MsgContent.Text(l10n("录屏已开始，停止后自动保存。", "Recording started. Stop it to save automatically.")))
             } else {
-                showTipDialog(MsgContent.Text(l10n("开始录屏（${normalizedDuration}秒）...", "Recording for ${normalizedDuration}s...")))
+                showToast(MsgContent.Text(l10n("开始录屏（${normalizedDuration}秒）...", "Recording for ${normalizedDuration}s...")))
                 val completed = withContext(Dispatchers.IO) {
                     waitForFixedScreenRecordProcess(session, normalizedDuration)
                 }
@@ -343,7 +348,7 @@ class CommonModel : BaseViewModel() {
         }
 
         if (folderPath == null) {
-            showTipDialog(MsgContent.Resource(Res.string.folder_not_selected), true)
+            showToast(MsgContent.Resource(Res.string.folder_not_selected))
             return
         }
 
@@ -352,10 +357,15 @@ class CommonModel : BaseViewModel() {
         val success = withContext(Dispatchers.IO) {
             AdbTool.takeScreenshot(savePath)
         }
+        CommandHistoryStore.record(
+            task = CommandHistoryTask.SCREENSHOT,
+            succeeded = success,
+            target = File(savePath).name
+        )
 
         val localizedText =
             MsgContent.Resource(if (success) Res.string.screenshot_success else Res.string.screenshot_failed)
-        showTipDialog(localizedText, true)
+        showToast(localizedText)
     }
 
     private suspend fun createScreenRecordSession(
@@ -455,13 +465,13 @@ class CommonModel : BaseViewModel() {
         } else {
             MsgContent.Resource(Res.string.recording_failed)
         }
-        showTipDialog(message, true)
+        showToast(message)
     }
 
     private suspend fun captureLogs() {
         val folderPath = withContext(Dispatchers.IO) { FileUtils.selectFolder() }
         if (folderPath == null) {
-            showTipDialog(MsgContent.Resource(Res.string.folder_not_selected), true)
+            showToast(MsgContent.Resource(Res.string.folder_not_selected))
             return
         }
 
@@ -478,7 +488,7 @@ class CommonModel : BaseViewModel() {
         } else {
             MsgContent.Resource(Res.string.logs_failed)
         }
-        showTipDialog(localized, true)
+        showToast(localized)
     }
 
     private suspend fun viewActivity() {
@@ -510,13 +520,13 @@ class CommonModel : BaseViewModel() {
                     listOf(result.errorMessage ?: result.output)
                 )
             }
-            showTipDialog(message, autoDismiss = true)
+            showToast(message)
         }
     }
 
     private fun ensureDeviceSelected(autoDismiss: Boolean = false): Boolean {
         if (deviceActionsEnabled(AdbTool.selectDeviceId)) return true
-        showTipDialog(MsgContent.Resource(Res.string.no_device_available), autoDismiss = autoDismiss)
+        showToast(MsgContent.Resource(Res.string.no_device_available))
         return false
     }
 }

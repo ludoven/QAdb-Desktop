@@ -1507,7 +1507,7 @@ private fun DeviceValueText(
 }
 
 @Composable
-private fun resolveMessageText(message: MsgContent?): String? {
+internal fun resolveMessageText(message: MsgContent?): String? {
     if (message == null) return null
     return when (message) {
         is MsgContent.Resource -> stringResource(message.stringResource, *message.args.toTypedArray())
@@ -1563,7 +1563,7 @@ private fun rememberRuntimeText(mirrorRunning: Boolean, startedAtMillis: Long?):
 }
 
 @Composable
-private fun MirrorToast(
+internal fun MirrorToast(
     visible: Boolean,
     message: MsgContent?
 ) {

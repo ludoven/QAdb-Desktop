@@ -55,6 +55,7 @@ import com.ludoven.adbtool.entity.MsgContent
 import com.ludoven.adbtool.util.l10n
 import com.ludoven.adbtool.viewmodel.AppViewModel
 import com.ludoven.adbtool.widget.EmptyStatePanel
+import com.ludoven.adbtool.widget.FeedbackToast
 import kotlinx.coroutines.flow.distinctUntilChanged
 import org.jetbrains.compose.resources.stringResource
 
@@ -287,7 +288,10 @@ fun AppScreen(
     val appIcons by viewModel.appIcons.collectAsState()
     val dialogMessage by viewModel.dialogMessage.collectAsState()
     val showDialog by viewModel.showDialog.collectAsState()
+    val toastMessage by viewModel.feedbackToastMessage.collectAsState()
     val appInfo by viewModel.appInfo.collectAsState()
+
+    FeedbackToast(toastMessage)
 
     var sortMenuExpanded by remember { mutableStateOf(false) }
     var pendingDangerAction by remember { mutableStateOf<Pair<AdbFunctionType, AppInfo>?>(null) }

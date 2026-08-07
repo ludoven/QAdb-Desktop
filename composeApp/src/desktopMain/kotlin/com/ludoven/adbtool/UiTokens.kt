@@ -20,7 +20,7 @@ object UiTokens {
     val ItemSpacing = 12.dp
     val ItemSpacingCompact = 8.dp
 
-    val SidebarWidth = 216.dp
+    val SidebarWidth = 222.dp
 
     val RadiusSmall = 6.dp
     val RadiusMedium = 8.dp

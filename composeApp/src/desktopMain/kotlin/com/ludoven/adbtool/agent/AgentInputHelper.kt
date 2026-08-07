@@ -71,15 +71,20 @@ class AgentInputHelper {
             return directInput(deviceId, text)
         }
         var helperStatus = status(deviceId)
+        var installedForThisInput = false
         if (!helperStatus.installed) {
             if (!allowInstall) {
-                return AgentToolResult(false, INPUT_HELPER_REQUIRED_RESULT)
+                return AgentToolResult(
+                    false,
+                    "Unicode text input requires QADB's Unicode input helper. Confirm installation or enter the text manually."
+                )
             }
             val installResult = install(deviceId)
             if (!installResult.success) return installResult
+            installedForThisInput = true
             helperStatus = status(deviceId)
             if (!helperStatus.installed) {
-                return AgentToolResult(false, "QADB input helper installation could not be verified")
+                return AgentToolResult(false, "QADB Unicode input helper was installed but could not be verified")
             }
         }
 
@@ -115,9 +120,16 @@ class AgentInputHelper {
             AgentToolResult(
                 success = committed,
                 output = if (committed) {
-                    "Unicode text committed (${text.codePointCount(0, text.length)} characters)"
+                    buildString {
+                        if (installedForThisInput) append("QADB Unicode input helper installed; ")
+                        append("Unicode text committed (${text.codePointCount(0, text.length)} characters)")
+                        append("; previous input method restoration attempted")
+                    }
                 } else {
-                    broadcast.errorMessage ?: broadcast.output.ifBlank { "Unicode input was not committed" }
+                    buildString {
+                        if (installedForThisInput) append("QADB Unicode input helper installed; ")
+                        append(broadcast.errorMessage ?: broadcast.output.ifBlank { "Unicode input was not committed" })
+                    }
                 }
             )
         } finally {
@@ -166,7 +178,6 @@ class AgentInputHelper {
     }
 
     companion object {
-        const val INPUT_HELPER_REQUIRED_RESULT = "QADB_INPUT_HELPER_CONFIRMATION_REQUIRED"
         const val INPUT_HELPER_PACKAGE = "com.ludoven.qadb.agentime"
         const val INPUT_HELPER_COMPONENT =
             "com.ludoven.qadb.agentime/.QadbInputMethodService"

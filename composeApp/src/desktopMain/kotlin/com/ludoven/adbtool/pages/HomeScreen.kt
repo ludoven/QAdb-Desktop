@@ -5,6 +5,8 @@ import com.ludoven.adbtool.QadbColors
 import com.ludoven.adbtool.QadbPalette
 import com.ludoven.adbtool.UiTokens
 import com.ludoven.adbtool.entity.MsgContent
+import com.ludoven.adbtool.entity.DeviceCenterInfoData
+import com.ludoven.adbtool.widget.FeedbackToast
 
 import adbtool_desktop.composeapp.generated.resources.Res
 import adbtool_desktop.composeapp.generated.resources.*
@@ -77,6 +79,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -85,6 +88,8 @@ import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Android
 import com.ludoven.adbtool.ui.mac.DropdownMenu
 import com.ludoven.adbtool.ui.mac.DropdownMenuItem
 import com.ludoven.adbtool.ui.mac.ExperimentalMaterial3Api
@@ -116,6 +121,9 @@ import com.ludoven.adbtool.entity.DeviceInfoData
 import com.ludoven.adbtool.ui.icons.IconParkIcons
 import com.ludoven.adbtool.util.AdbTool
 import com.ludoven.adbtool.util.AdbPathManager
+import com.ludoven.adbtool.util.CommandHistoryRecord
+import com.ludoven.adbtool.util.CommandHistoryStore
+import com.ludoven.adbtool.util.CommandHistoryTask
 import com.ludoven.adbtool.util.isWirelessAdbConnection
 import com.ludoven.adbtool.util.l10n
 import com.ludoven.adbtool.viewmodel.DevicesViewModel
@@ -144,6 +152,7 @@ internal fun homeDeviceConnected(selectedDevice: String?): Boolean =
     !selectedDevice.isNullOrBlank()
 
 private object HomeVisualTokens {
+    val AndroidGreen = Color(0xFF3DDC84)
     val Primary: Color @Composable get() = QadbColors.primary
     val Text: Color @Composable get() = QadbColors.textPrimary
     val Muted: Color @Composable get() = QadbColors.textSecondary
@@ -193,6 +202,7 @@ fun HomeScreen(
     val lastRefreshTime by viewModel.lastRefreshTime.collectAsState()
     val showDialog by viewModel.showDialog.collectAsState()
     val dialogMessage by viewModel.dialogMessage.collectAsState()
+    val toastMessage by viewModel.feedbackToastMessage.collectAsState()
 
     var showDropdown by remember { mutableStateOf(false) }
     val scrollState = rememberScrollState()
@@ -200,7 +210,7 @@ fun HomeScreen(
     var foregroundApp by remember { mutableStateOf<HomeForegroundAppModel?>(null) }
     var foregroundError by remember { mutableStateOf<String?>(null) }
     var isForegroundLoading by remember { mutableStateOf(false) }
-    var foregroundUpdatedAt by remember { mutableStateOf("--") }
+    val commandHistory by CommandHistoryStore.records.collectAsState()
 
     if (showDialog) {
         dialogMessage?.let { message ->
@@ -212,6 +222,7 @@ fun HomeScreen(
             ) { viewModel.dismissTipDialog() }
         }
     }
+    FeedbackToast(toastMessage)
 
     LaunchedEffect(Unit) {
         if (devices.isEmpty()) {
@@ -240,7 +251,6 @@ fun HomeScreen(
             val parsedApp = parseForegroundAppFocus(result.output)
             foregroundApp = parsedApp
             foregroundError = if (parsedApp == null) foregroundUnavailableMessage else null
-            foregroundUpdatedAt = formatRelativeRefresh(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").format(LocalDateTime.now()))
         } else {
             foregroundApp = null
             foregroundError = result.errorMessage ?: result.output.ifBlank { foregroundUnavailableMessage }
@@ -265,7 +275,6 @@ fun HomeScreen(
         if (deviceId.isNullOrBlank()) {
             foregroundApp = null
             foregroundError = null
-            foregroundUpdatedAt = "--"
         } else {
             loadForegroundAppForDevice(deviceId)
         }
@@ -284,15 +293,15 @@ fun HomeScreen(
         ?: stringResource(Res.string.no_device)
     val androidHeadline = formatAndroidVersionWithApi(deviceInfo?.androidVersion, deviceInfo?.sdkVersion)
     val relativeUpdated = formatRelativeRefresh(lastRefreshTime)
-    val trackedOpenShell = { onOpenShell() }
-    val trackedInstallApk = { onInstallApk() }
-    val trackedScreenshot = { onScreenshot() }
-    val trackedScreenRecord = { onScreenRecord() }
-    val trackedMirrorDevice = { onMirrorDevice() }
-    val trackedOpenLogcat = { onOpenLogcat() }
-    val trackedOpenFileManager = { onOpenFileManager() }
-    val trackedOpenAppManager = { onOpenAppManager() }
-    val trackedOpenDiagnostics = { onOpenDiagnostics() }
+    val trackedOpenShell = onOpenShell
+    val trackedInstallApk = onInstallApk
+    val trackedScreenshot = onScreenshot
+    val trackedScreenRecord = onScreenRecord
+    val trackedMirrorDevice = onMirrorDevice
+    val trackedOpenLogcat = onOpenLogcat
+    val trackedOpenFileManager = onOpenFileManager
+    val trackedOpenAppManager = onOpenAppManager
+    val trackedOpenDiagnostics = onOpenDiagnostics
     val statusCards = listOf(
         HomeStatusCardModel(
             title = stringResource(Res.string.cpu_usage),
@@ -300,7 +309,8 @@ fun HomeScreen(
             supporting = l10n("当前 CPU 使用率", "Current CPU usage"),
             icon = IconParkIcons.Cpu,
             accentColor = HomeVisualTokens.Purple,
-            progress = parsePercentProgress(centerInfo?.cpuUsage)
+            progress = parsePercentProgress(centerInfo?.cpuUsage),
+            chartStyle = HomeStatusChartStyle.SPARKLINE
         ),
         HomeStatusCardModel(
             title = stringResource(Res.string.storage_usage),
@@ -316,7 +326,8 @@ fun HomeScreen(
             supporting = formatMemorySupporting(centerInfo?.memoryUsage),
             icon = IconParkIcons.StorageCard,
             accentColor = HomeVisualTokens.Cyan,
-            progress = parsePercentProgress(centerInfo?.memoryUsage)
+            progress = parsePercentProgress(centerInfo?.memoryUsage),
+            chartStyle = HomeStatusChartStyle.SPARKLINE
         ),
         HomeStatusCardModel(
             title = stringResource(Res.string.battery_status),
@@ -324,7 +335,8 @@ fun HomeScreen(
             supporting = batterySupporting.ifBlank { l10n("状态未采集", "Status not collected") },
             icon = IconParkIcons.BatteryFull,
             accentColor = batteryAccent,
-            progress = batteryProgress
+            progress = batteryProgress,
+            chartStyle = HomeStatusChartStyle.LINEAR
         )
     )
 
@@ -342,13 +354,17 @@ fun HomeScreen(
         }
         val horizontalPadding = when {
             compactLayout -> 14.dp
-            mediumLayout -> 16.dp
-            else -> 16.dp
+            mediumLayout -> 26.dp
+            else -> 28.dp
         }
         val verticalPadding = if (mediumLayout) 12.dp else 18.dp
-        val topPadding = UiTokens.SpaceXSmall
+        val topPadding = if (compactLayout) UiTokens.SpaceXSmall else 10.dp
         val scrollBarEndPadding = 0.dp
-        val scrollContentEndPadding = if (compactLayout) 22.dp else 28.dp
+        val scrollContentEndPadding = when {
+            compactLayout -> 22.dp
+            mediumLayout -> 0.dp
+            else -> 18.dp
+        }
 
         if (!isConnected) {
             Box(modifier = Modifier.fillMaxSize()) {
@@ -387,7 +403,7 @@ fun HomeScreen(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(horizontal = horizontalPadding)
+                    .padding(start = horizontalPadding)
             ) {
                 Box(
                     modifier = Modifier
@@ -399,7 +415,7 @@ fun HomeScreen(
                             .fillMaxSize()
                             .padding(
                                 start = 0.dp,
-                                end = scrollContentEndPadding
+                                end = horizontalPadding + scrollContentEndPadding
                             )
                             .padding(top = topPadding, bottom = spacing)
                             .verticalScroll(scrollState),
@@ -444,29 +460,34 @@ fun HomeScreen(
                             HomeDeviceInfoSummarySection(
                                 compactLayout = true,
                                 deviceInfo = deviceInfo,
+                                centerInfo = centerInfo,
+                                selectedDevice = selectedDevice,
                                 connectionType = connectionType,
-                                ipAddress = deviceInfo?.ipAddress.orDash()
+                                ipAddress = deviceInfo?.ipAddress.orDash(),
+                                port = extractPort(selectedDevice, deviceInfo?.ipAddress),
+                                relativeUpdated = relativeUpdated
                             )
                             HomeForegroundAppSection(
                                 compactLayout = true,
                                 foregroundApp = foregroundApp,
                                 isLoading = isForegroundLoading,
                                 errorMessage = foregroundError,
-                                lastUpdated = foregroundUpdatedAt,
                                 onRefresh = { refreshForegroundApp() },
-                                onOpenDetails = onOpenAppDetails
+                                onOpenDetails = onOpenAppDetails,
+                                onScreenshot = trackedScreenshot
                             )
+                            HomeCommandHistorySection(history = commandHistory)
                         }
                     } else {
                         Column(verticalArrangement = Arrangement.spacedBy(spacing)) {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(spacing),
+                                horizontalArrangement = Arrangement.spacedBy(if (mediumLayout) 20.dp else 16.dp),
                                 verticalAlignment = Alignment.Top
                             ) {
                                 Column(
-                                    modifier = Modifier.weight(1.36f),
-                                    verticalArrangement = Arrangement.spacedBy(spacing)
+                                    modifier = Modifier.weight(if (mediumLayout) 1.66f else 1.55f),
+                                    verticalArrangement = Arrangement.spacedBy(if (mediumLayout) 16.dp else spacing)
                                 ) {
                                     HomeQuickActionsSection(
                                         modifier = Modifier.fillMaxWidth(),
@@ -484,17 +505,24 @@ fun HomeScreen(
                                         foregroundApp = foregroundApp,
                                         isLoading = isForegroundLoading,
                                         errorMessage = foregroundError,
-                                        lastUpdated = foregroundUpdatedAt,
                                         onRefresh = { refreshForegroundApp() },
-                                        onOpenDetails = onOpenAppDetails
+                                        onOpenDetails = onOpenAppDetails,
+                                        onScreenshot = trackedScreenshot
                                     )
+                                    HomeCommandHistorySection(history = commandHistory)
                                 }
                                 HomeDeviceInfoSummarySection(
-                                    modifier = Modifier.weight(1f),
+                                    modifier = Modifier
+                                        .weight(if (mediumLayout) 0.84f else 0.9f)
+                                        .offset(y = if (mediumLayout) (-8).dp else 0.dp),
                                     compactLayout = mediumLayout,
                                     deviceInfo = deviceInfo,
+                                    centerInfo = centerInfo,
+                                    selectedDevice = selectedDevice,
                                     connectionType = connectionType,
-                                    ipAddress = deviceInfo?.ipAddress.orDash()
+                                    ipAddress = deviceInfo?.ipAddress.orDash(),
+                                    port = extractPort(selectedDevice, deviceInfo?.ipAddress),
+                                    relativeUpdated = relativeUpdated
                                 )
                             }
                         }
@@ -513,16 +541,6 @@ fun HomeScreen(
                     }
                 }
 
-                HomeBottomStatusBar(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = spacing),
-                    connectionType = connectionType,
-                    ipAddress = deviceInfo?.ipAddress.orDash(),
-                    port = extractPort(selectedDevice, deviceInfo?.ipAddress),
-                    latency = deviceInfo?.latency.orDash(),
-                    relativeUpdated = relativeUpdated
-                )
             }
         }
     }
@@ -995,7 +1013,7 @@ private fun HomeHeaderDeviceActions(
 ) {
     Row(
         modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall),
+        horizontalArrangement = Arrangement.spacedBy(18.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         HomeHeaderActionButton(
@@ -1025,33 +1043,30 @@ private fun HomeHeaderActionButton(
 ) {
     val effectiveTint = if (enabled) tint else HomeVisualTokens.Muted.copy(alpha = 0.45f)
     val shape = RoundedCornerShape(UiTokens.RadiusMedium)
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceXSmall)
-    ) {
-        Box(
-            modifier = Modifier
-            .size(36.dp)
+    Row(
+        modifier = Modifier
+            .height(40.dp)
             .background(
-                if (enabled && tint == HomeVisualTokens.Primary) HomeVisualTokens.Primary.copy(alpha = 0.08f)
-                else HomeVisualTokens.Soft,
+                if (enabled) tint.copy(alpha = 0.055f) else HomeVisualTokens.Soft,
                 shape
             )
-            .border(1.dp, HomeVisualTokens.Border, shape)
-            .homeNoRippleClickable(enabled = enabled, onClick = onClick),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = label,
-                tint = effectiveTint,
-                modifier = Modifier.size(UiTokens.IconSmall)
-            )
-        }
+            .border(1.dp, if (enabled) tint.copy(alpha = 0.28f) else HomeVisualTokens.Border, shape)
+            .homeNoRippleClickable(enabled = enabled, onClick = onClick)
+            .padding(horizontal = 24.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = label,
+            tint = effectiveTint,
+            modifier = Modifier.size(UiTokens.IconSmall)
+        )
         Text(
             text = label,
-            color = HomeVisualTokens.Text,
-            style = MaterialTheme.typography.labelSmall,
+            color = effectiveTint,
+            style = MaterialTheme.typography.bodySmall,
+            fontWeight = FontWeight.Medium,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
@@ -1093,7 +1108,7 @@ private fun HomeHeaderDeviceIdentity(
                 ) {
                     Text(
                         text = deviceName,
-                        style = if (denseLayout) MaterialTheme.typography.headlineSmall else MaterialTheme.typography.titleLarge,
+                        style = MaterialTheme.typography.headlineMedium,
                         color = MaterialTheme.colorScheme.onSurface,
                         fontWeight = FontWeight.Bold,
                         maxLines = 1,
@@ -1213,16 +1228,16 @@ private fun OpenSourceDeviceIcon(active: Boolean = true, dense: Boolean = false)
     val borderAlpha = if (active) 0.16f else 0.18f
     Box(
         modifier = Modifier
-            .size(if (dense) 48.dp else 56.dp)
-            .background(accent.copy(alpha = backgroundAlpha), RoundedCornerShape(if (dense) 16.dp else 18.dp))
-            .border(1.dp, accent.copy(alpha = borderAlpha), RoundedCornerShape(if (dense) 16.dp else 18.dp)),
+            .size(if (dense) 52.dp else 56.dp)
+            .background(accent.copy(alpha = backgroundAlpha), RoundedCornerShape(if (dense) 10.dp else 18.dp))
+            .border(1.dp, accent.copy(alpha = borderAlpha), RoundedCornerShape(if (dense) 10.dp else 18.dp)),
         contentAlignment = Alignment.Center
     ) {
         Icon(
             imageVector = IconParkIcons.Phone,
             contentDescription = null,
             tint = accent,
-            modifier = Modifier.size(if (dense) 28.dp else 32.dp)
+            modifier = Modifier.size(if (dense) 26.dp else 32.dp)
         )
     }
 }
@@ -1356,16 +1371,20 @@ private fun HomeForegroundAppSection(
     foregroundApp: HomeForegroundAppModel?,
     isLoading: Boolean,
     errorMessage: String?,
-    lastUpdated: String,
     onRefresh: () -> Unit,
-    onOpenDetails: (String) -> Unit
+    onOpenDetails: (String) -> Unit,
+    onScreenshot: () -> Unit
 ) {
     val detailsPackageName = foregroundApp?.packageName?.takeIf { it.isNotBlank() && it != "--" }
-    HomePlainSection(modifier = modifier.fillMaxWidth()) {
+    HomePlainSection(
+        modifier = modifier
+            .fillMaxWidth()
+            .heightIn(min = if (compactLayout) 120.dp else 116.dp)
+    ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = if (compactLayout) 14.dp else 16.dp, vertical = 12.dp),
+                .padding(horizontal = if (compactLayout) 14.dp else 16.dp, vertical = 10.dp),
             verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
         ) {
             Row(
@@ -1380,33 +1399,26 @@ private fun HomeForegroundAppSection(
                 )
             }
 
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(1.dp)
-                    .background(HomeVisualTokens.Divider)
-            )
-
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(if (compactLayout) 116.dp else 104.dp)
+                    .height(52.dp)
                     .homeNoRippleClickable(enabled = detailsPackageName != null) {
                         detailsPackageName?.let(onOpenDetails)
                     },
-                verticalAlignment = Alignment.Top,
-                horizontalArrangement = Arrangement.spacedBy(if (compactLayout) 12.dp else 14.dp)
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(if (compactLayout) 10.dp else 12.dp)
             ) {
                 Box(
                     modifier = Modifier
-                        .size(if (compactLayout) 54.dp else 50.dp)
-                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f), RoundedCornerShape(UiTokens.RadiusLarge)),
+                        .size(if (compactLayout) 48.dp else 44.dp)
+                        .background(HomeVisualTokens.AndroidGreen.copy(alpha = 0.12f), RoundedCornerShape(UiTokens.RadiusMedium)),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        imageVector = IconParkIcons.Application,
+                        imageVector = Icons.Filled.Android,
                         contentDescription = null,
-                        tint = QadbColors.textDisabled,
+                        tint = HomeVisualTokens.AndroidGreen,
                         modifier = Modifier.size(if (compactLayout) 26.dp else 24.dp)
                     )
                 }
@@ -1416,7 +1428,7 @@ private fun HomeForegroundAppSection(
                 ) {
                     Column(
                         modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
+                        verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceXSmall)
                     ) {
                         val title = when {
                             isLoading -> l10n("正在读取当前应用", "Reading current app")
@@ -1426,52 +1438,163 @@ private fun HomeForegroundAppSection(
                         Text(
                             text = title,
                             color = MaterialTheme.colorScheme.onSurface,
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
                         if (foregroundApp != null) {
-                            foregroundApp.rows().drop(1).take(2).forEach { (label, value) ->
-                                LabeledValueRow(
-                                    label = label,
-                                    value = value
-                                )
-                            }
+                            Text(
+                                text = foregroundApp.packageName,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                style = MaterialTheme.typography.labelSmall,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
                         } else {
                             Text(
                                 text = errorMessage ?: l10n("设备连接后会自动读取当前打开的应用。", "The current app is read once after the device connects."),
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                style = MaterialTheme.typography.bodySmall,
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-                        if (lastUpdated != "--") {
-                            Text(
-                                text = stringResource(Res.string.updated_ago, lastUpdated),
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 style = MaterialTheme.typography.labelSmall,
-                                maxLines = 1,
+                                maxLines = 2,
                                 overflow = TextOverflow.Ellipsis
                             )
                         }
                     }
                 }
 
-                if (detailsPackageName != null) {
-                    Icon(
-                        imageVector = IconParkIcons.Right,
-                        contentDescription = null,
-                        tint = HomeVisualTokens.Muted,
-                        modifier = Modifier
-                            .padding(top = UiTokens.SpaceXSmall)
-                            .size(UiTokens.IconSmall)
-                    )
+                HomeIconActionButton(
+                    text = l10n("查看应用", "View App"),
+                    icon = IconParkIcons.Application,
+                    enabled = detailsPackageName != null,
+                    onClick = { detailsPackageName?.let(onOpenDetails) }
+                )
+                HomeIconActionButton(
+                    text = l10n("抓取界面", "Capture"),
+                    icon = IconParkIcons.Camera,
+                    enabled = !isLoading,
+                    onClick = onScreenshot
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun HomeIconActionButton(
+    text: String,
+    icon: ImageVector,
+    enabled: Boolean,
+    onClick: () -> Unit
+) {
+    val tint = if (enabled) HomeVisualTokens.Primary else HomeVisualTokens.Muted.copy(alpha = 0.45f)
+    val shape = RoundedCornerShape(UiTokens.RadiusMedium)
+    Box(
+        modifier = Modifier
+            .size(32.dp)
+            .background(MaterialTheme.colorScheme.surface, shape)
+            .border(1.dp, HomeVisualTokens.Border, shape)
+            .homeNoRippleClickable(enabled = enabled, onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = text,
+            tint = tint,
+            modifier = Modifier.size(17.dp)
+        )
+    }
+}
+
+@Composable
+private fun HomeCommandHistorySection(
+    history: List<CommandHistoryRecord>,
+    modifier: Modifier = Modifier
+) {
+    HomePlainSection(
+        modifier = modifier
+            .fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 14.dp),
+            verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
+        ) {
+            Box(modifier = Modifier.padding(horizontal = 16.dp)) {
+                HomeSectionTitle(text = l10n("执行记录", "Command History"))
+            }
+            if (history.isEmpty()) {
+                Text(
+                    text = l10n("暂无执行记录", "No commands executed yet"),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = UiTokens.SpaceSmall)
+                )
+            } else {
+                history.take(3).forEach { entry ->
+                    HomeCommandHistoryRow(entry = entry)
                 }
             }
         }
     }
+}
+
+@Composable
+private fun HomeCommandHistoryRow(entry: CommandHistoryRecord) {
+    val status = if (entry.succeeded) l10n("成功", "Succeeded") else l10n("失败", "Failed")
+    val statusColor = if (entry.succeeded) HomeVisualTokens.Success else HomeVisualTokens.Danger
+    val time = DateTimeFormatter.ofPattern("HH:mm").format(
+        LocalDateTime.ofInstant(
+            java.time.Instant.ofEpochMilli(entry.occurredAtMillis),
+            java.time.ZoneId.systemDefault()
+        )
+    )
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(38.dp)
+            .padding(horizontal = 16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
+    ) {
+        Text(
+            text = "${entry.task.displayName()}: ${entry.target.ifBlank { entry.task.targetDisplayName() }}",
+            color = MaterialTheme.colorScheme.onSurface,
+            style = MaterialTheme.typography.bodySmall,
+            fontWeight = FontWeight.Medium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f)
+        )
+        Text(
+            text = status,
+            modifier = Modifier.width(64.dp),
+            color = statusColor,
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1
+        )
+        Text(
+            text = time,
+            modifier = Modifier.width(44.dp),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.labelSmall,
+            maxLines = 1
+        )
+    }
+}
+
+private fun CommandHistoryTask.displayName(): String = when (this) {
+    CommandHistoryTask.INSTALL_APK -> l10n("安装应用", "Install App")
+    CommandHistoryTask.UNINSTALL_APP -> l10n("卸载应用", "Uninstall App")
+    CommandHistoryTask.SCREENSHOT -> l10n("截图", "Screenshot")
+}
+
+private fun CommandHistoryTask.targetDisplayName(): String = when (this) {
+    CommandHistoryTask.INSTALL_APK -> l10n("已连接设备", "Connected device")
+    CommandHistoryTask.UNINSTALL_APP -> l10n("设备应用", "Device app")
+    CommandHistoryTask.SCREENSHOT -> l10n("当前屏幕", "Current screen")
 }
 
 @Composable
@@ -1595,7 +1718,7 @@ private fun HomeStatusCardsSection(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 12.dp),
+                    .padding(top = if (denseLayout) 11.dp else 18.dp, bottom = if (denseLayout) 10.dp else 3.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(if (denseLayout) 10.dp else 12.dp)
             ) {
@@ -1620,7 +1743,7 @@ private fun HomeStatusCard(
     val cardShape = RoundedCornerShape(UiTokens.RadiusLarge)
     Row(
         modifier = modifier
-            .height(if (denseLayout) 86.dp else 92.dp)
+            .height(if (denseLayout) 100.dp else 112.dp)
             .background(MaterialTheme.colorScheme.surface, cardShape)
             .border(1.dp, HomeVisualTokens.Border, cardShape)
             .padding(horizontal = if (denseLayout) 12.dp else 14.dp, vertical = 10.dp),
@@ -1629,7 +1752,7 @@ private fun HomeStatusCard(
     ) {
         Box(
             modifier = Modifier
-                .size(if (denseLayout) 32.dp else 34.dp)
+                .size(if (denseLayout) 38.dp else 34.dp)
                 .background(HomeVisualTokens.Soft, RoundedCornerShape(UiTokens.RadiusMedium)),
             contentAlignment = Alignment.Center
         ) {
@@ -1637,7 +1760,7 @@ private fun HomeStatusCard(
                 imageVector = card.icon,
                 contentDescription = card.title,
                 tint = card.accentColor,
-                modifier = Modifier.size(if (denseLayout) 18.dp else 19.dp)
+                modifier = Modifier.size(if (denseLayout) 21.dp else 19.dp)
             )
         }
         Column(
@@ -1654,7 +1777,11 @@ private fun HomeStatusCard(
             Text(
                 text = card.value,
                 color = HomeVisualTokens.Text,
-                style = MaterialTheme.typography.titleMedium,
+                style = if (denseLayout) {
+                    MaterialTheme.typography.titleLarge
+                } else {
+                    MaterialTheme.typography.titleLarge
+                },
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
@@ -1667,10 +1794,65 @@ private fun HomeStatusCard(
                 overflow = TextOverflow.Ellipsis
             )
         }
-        HomeStatusUsageChart(
-            progress = card.progress,
-            accentColor = card.accentColor,
-            chartSize = if (denseLayout) 42.dp else 46.dp
+        when (card.chartStyle) {
+            HomeStatusChartStyle.RING -> HomeStatusUsageChart(
+                progress = card.progress,
+                accentColor = card.accentColor,
+                chartSize = if (denseLayout) 42.dp else 46.dp
+            )
+            HomeStatusChartStyle.SPARKLINE -> HomeStatusSparkline(
+                progress = card.progress,
+                accentColor = card.accentColor,
+                modifier = Modifier.width(if (denseLayout) 48.dp else 58.dp)
+            )
+            HomeStatusChartStyle.LINEAR -> HomeStatusLinearChart(
+                progress = card.progress,
+                accentColor = card.accentColor,
+                modifier = Modifier.width(if (denseLayout) 54.dp else 68.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun HomeStatusSparkline(
+    progress: Float?,
+    accentColor: Color,
+    modifier: Modifier = Modifier
+) {
+    val base = progress?.coerceIn(0f, 1f) ?: 0.35f
+    val points = listOf(0.22f, 0.30f, 0.26f, 0.38f, 0.32f, base, 0.28f, 0.44f, 0.34f)
+    Canvas(modifier = modifier.height(34.dp)) {
+        val step = size.width / (points.size - 1)
+        points.zipWithNext().forEachIndexed { index, pair ->
+            drawLine(
+                color = accentColor,
+                start = Offset(step * index, size.height * (1f - pair.first.coerceIn(0.08f, 0.92f))),
+                end = Offset(step * (index + 1), size.height * (1f - pair.second.coerceIn(0.08f, 0.92f))),
+                strokeWidth = 1.7.dp.toPx(),
+                cap = StrokeCap.Round
+            )
+        }
+    }
+}
+
+@Composable
+private fun HomeStatusLinearChart(
+    progress: Float?,
+    accentColor: Color,
+    modifier: Modifier = Modifier
+) {
+    val normalized = progress?.coerceIn(0f, 1f) ?: 0f
+    Box(
+        modifier = modifier
+            .height(4.dp)
+            .background(HomeVisualTokens.Soft, RoundedCornerShape(UiTokens.BadgeRadius))
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth(normalized)
+                .fillMaxHeight()
+                .background(accentColor, RoundedCornerShape(UiTokens.BadgeRadius))
         )
     }
 }
@@ -2384,28 +2566,25 @@ private fun HomeQuickActionsSection(
         )
     )
 
-    Box(modifier = modifier.fillMaxWidth()) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 14.dp),
-            verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
-        ) {
-            HomeSectionTitle(text = l10n("常用操作", "Common Actions"))
-
-            actions.chunked(3).forEach { rowItems ->
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(if (compactLayout) 8.dp else 12.dp)
-                ) {
-                    rowItems.forEach { action ->
-                        HomeCompactActionCell(
-                            action = action,
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
-                    if (rowItems.size == 1) Spacer(modifier = Modifier.weight(1f))
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .heightIn(min = if (compactLayout) 174.dp else 186.dp),
+        verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium)
+    ) {
+        HomeSectionTitle(text = stringResource(Res.string.quick_actions))
+        actions.chunked(3).forEach { rowItems ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(if (compactLayout) 10.dp else 12.dp)
+            ) {
+                rowItems.forEach { action ->
+                    HomeCompactActionCell(
+                        action = action,
+                        modifier = Modifier.weight(1f)
+                    )
                 }
+                if (rowItems.size == 1) Spacer(modifier = Modifier.weight(1f))
             }
         }
     }
@@ -2416,8 +2595,12 @@ private fun HomeDeviceInfoSummarySection(
     modifier: Modifier = Modifier,
     compactLayout: Boolean,
     deviceInfo: DeviceInfoData?,
+    centerInfo: DeviceCenterInfoData?,
+    selectedDevice: String?,
     connectionType: String,
-    ipAddress: String
+    ipAddress: String,
+    port: String,
+    relativeUpdated: String
 ) {
     val coreRows = listOf(
         HomeInfoSummaryRow(
@@ -2429,16 +2612,16 @@ private fun HomeDeviceInfoSummarySection(
             value = deviceInfo?.manufacturer.orDash()
         ),
         HomeInfoSummaryRow(
-            label = l10n("系统版本", "System Version"),
-            value = formatAndroidVersionWithApi(deviceInfo?.androidVersion, deviceInfo?.sdkVersion)
+            label = l10n("设备序列号", "Device Serial"),
+            value = selectedDevice.orDash()
         ),
         HomeInfoSummaryRow(
             label = stringResource(Res.string.screen_resolution),
             value = deviceInfo?.screenResolution.orDash()
         ),
         HomeInfoSummaryRow(
-            label = stringResource(Res.string.font_scale),
-            value = deviceInfo?.fontScale.orDash()
+            label = l10n("连接速率", "Connection Speed"),
+            value = deviceInfo?.connectionSpeed.orDash()
         ),
         HomeInfoSummaryRow(
             label = stringResource(Res.string.connection_type),
@@ -2449,11 +2632,39 @@ private fun HomeDeviceInfoSummarySection(
             value = ipAddress
         ),
         HomeInfoSummaryRow(
+            label = stringResource(Res.string.port),
+            value = port
+        ),
+        HomeInfoSummaryRow(
             label = stringResource(Res.string.latency),
             value = deviceInfo?.latency.orDash()
+        ),
+        HomeInfoSummaryRow(
+            label = stringResource(Res.string.memory_usage),
+            value = centerInfo?.memoryUsage.orDash()
+        ),
+        HomeInfoSummaryRow(
+            label = stringResource(Res.string.storage_usage),
+            value = centerInfo?.storageUsage.orDash()
+        ),
+        HomeInfoSummaryRow(
+            label = stringResource(Res.string.battery_level),
+            value = centerInfo?.batteryLevel.orDash()
+        ),
+        HomeInfoSummaryRow(
+            label = stringResource(Res.string.last_refresh),
+            value = stringResource(Res.string.updated_ago, relativeUpdated)
         )
     )
     val detailRows = listOf(
+        HomeInfoSummaryRow(
+            label = stringResource(Res.string.android_version),
+            value = deviceInfo?.androidVersion.orDash()
+        ),
+        HomeInfoSummaryRow(
+            label = l10n("SDK / API", "SDK / API"),
+            value = deviceInfo?.sdkVersion.orDash()
+        ),
         HomeInfoSummaryRow(
             label = stringResource(Res.string.rom_version),
             value = deviceInfo?.romVersion.orDash()
@@ -2467,49 +2678,68 @@ private fun HomeDeviceInfoSummarySection(
             value = deviceInfo?.macAddress.orDash()
         ),
         HomeInfoSummaryRow(
+            label = stringResource(Res.string.font_scale),
+            value = deviceInfo?.fontScale.orDash()
+        ),
+        HomeInfoSummaryRow(
             label = stringResource(Res.string.build_fingerprint),
             value = deviceInfo?.buildFingerprint.orDash()
         )
     )
 
-    HomePlainSection(modifier = modifier.fillMaxWidth()) {
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(if (compactLayout) 12.dp else 16.dp)
+    ) {
+        HomeInfoPanel(
+            title = stringResource(Res.string.device_info),
+            minHeight = if (compactLayout) 360.dp else 430.dp
+        ) {
+            SelectionContainer {
+                Column(verticalArrangement = Arrangement.spacedBy(if (compactLayout) 7.dp else 8.dp)) {
+                    coreRows.forEach { row -> HomeDeviceInfoSummaryRow(row = row) }
+                }
+            }
+        }
+        HomeInfoPanel(
+            title = l10n("系统详情", "System Details"),
+            minHeight = if (compactLayout) 163.dp else 320.dp
+        ) {
+            SelectionContainer {
+                Column(verticalArrangement = Arrangement.spacedBy(if (compactLayout) 7.dp else 8.dp)) {
+                    val visibleRows = if (compactLayout) detailRows.take(3) else detailRows
+                    visibleRows.forEach { row -> HomeDeviceInfoSummaryRow(row = row) }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun HomeInfoPanel(
+    title: String,
+    minHeight: Dp,
+    content: @Composable () -> Unit
+) {
+    HomePlainSection(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = minHeight)
+    ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = if (compactLayout) 14.dp else 16.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium)
         ) {
-            HomeSectionTitle(text = stringResource(Res.string.device_info))
+            HomeSectionTitle(text = title)
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(1.dp)
                     .background(HomeVisualTokens.Divider)
             )
-            SelectionContainer {
-                Column(verticalArrangement = Arrangement.spacedBy(if (compactLayout) 8.dp else 9.dp)) {
-                    HomeDeviceInfoGroupHeader(
-                        text = l10n("核心信息", "Core"),
-                        highlighted = true
-                    )
-                    coreRows.forEach { row ->
-                        HomeDeviceInfoSummaryRow(row = row)
-                    }
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(1.dp)
-                            .background(HomeVisualTokens.Divider)
-                    )
-                    HomeDeviceInfoGroupHeader(
-                        text = l10n("系统详情", "System details"),
-                        highlighted = false
-                    )
-                    detailRows.forEach { row ->
-                        HomeDeviceInfoSummaryRow(row = row)
-                    }
-                }
-            }
+            content()
         }
     }
 }
@@ -2588,17 +2818,17 @@ private fun HomeCompactActionCell(
     val cellShape = RoundedCornerShape(UiTokens.RadiusMedium)
     Row(
         modifier = modifier
-            .height(72.dp)
+            .height(74.dp)
             .background(MaterialTheme.colorScheme.surface, cellShape)
             .border(1.dp, HomeVisualTokens.Border, cellShape)
             .homeNoRippleClickable(onClick = action.onClick)
-            .padding(horizontal = UiTokens.SpaceSmall),
+            .padding(horizontal = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
     ) {
         Box(
             modifier = Modifier
-                .size(32.dp)
+                .size(36.dp)
                 .background(action.tint.copy(alpha = 0.10f), RoundedCornerShape(UiTokens.RadiusMedium)),
             contentAlignment = Alignment.Center
         ) {
@@ -2606,7 +2836,7 @@ private fun HomeCompactActionCell(
                 imageVector = action.icon,
                 contentDescription = action.title,
                 tint = action.tint,
-                modifier = Modifier.size(18.dp)
+                modifier = Modifier.size(20.dp)
             )
         }
         Column(
@@ -2629,6 +2859,12 @@ private fun HomeCompactActionCell(
                 overflow = TextOverflow.Ellipsis
             )
         }
+        Icon(
+            imageVector = IconParkIcons.Right,
+            contentDescription = null,
+            tint = HomeVisualTokens.Muted,
+            modifier = Modifier.size(14.dp)
+        )
     }
 }
 
@@ -3463,8 +3699,15 @@ private data class HomeStatusCardModel(
     val supporting: String,
     val icon: ImageVector,
     val accentColor: Color,
-    val progress: Float? = null
+    val progress: Float? = null,
+    val chartStyle: HomeStatusChartStyle = HomeStatusChartStyle.RING
 )
+
+private enum class HomeStatusChartStyle {
+    RING,
+    SPARKLINE,
+    LINEAR
+}
 
 private data class HomeInfoSummaryRow(
     val label: String,

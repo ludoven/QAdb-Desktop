@@ -37,17 +37,17 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollbarAdapter
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.ArrowDropUp
-import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Search
 import com.ludoven.adbtool.ui.mac.CircularProgressIndicator
 import com.ludoven.adbtool.ui.mac.Icon
 import com.ludoven.adbtool.ui.mac.IconButton
 import com.ludoven.adbtool.ui.mac.MaterialTheme
-import com.ludoven.adbtool.ui.mac.OutlinedTextField
 import com.ludoven.adbtool.ui.mac.Text
 import com.ludoven.adbtool.widget.EmptyStatePanel
 import androidx.compose.runtime.Composable
@@ -60,6 +60,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -92,6 +95,7 @@ fun ProcessScreen(selectedDevice: String?) {
     var sortDesc by remember { mutableStateOf(true) }
     var loadedDevice by remember { mutableStateOf<String?>(null) }
     var loadJob by remember { mutableStateOf<Job?>(null) }
+    var selectedPid by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
     val listState = rememberLazyListState()
 
@@ -196,12 +200,11 @@ fun ProcessScreen(selectedDevice: String?) {
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium)
             ) {
-                OutlinedTextField(
+                ProcessSearchField(
                     value = keyword,
                     onValueChange = { keyword = it },
-                    modifier = Modifier.weight(1f).height(UiTokens.ControlHeight),
-                    singleLine = true,
-                    label = { Text(stringResource(Res.string.process_search_hint)) }
+                    placeholder = stringResource(Res.string.process_search_hint),
+                    modifier = Modifier.weight(1f)
                 )
                 ProcessCountPill(count = filteredList.size)
             }
@@ -249,30 +252,35 @@ fun ProcessScreen(selectedDevice: String?) {
                                 modifier = Modifier
                                     .fillMaxSize()
                                     .padding(end = UiTokens.SpaceMedium),
-                                state = listState,
-                                verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceXSmall)
+                                state = listState
                             ) {
                                 item {
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .background(
-                                                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.56f),
-                                                RoundedCornerShape(UiTokens.RadiusMedium)
+                                    Column(modifier = Modifier.fillMaxWidth()) {
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .background(
+                                                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.32f)
+                                                )
+                                                .padding(
+                                                    horizontal = UiTokens.SpaceMedium,
+                                                    vertical = UiTokens.SpaceSmall
+                                                ),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            // Spacer that aligns with the row's selection indicator.
+                                            Spacer(modifier = Modifier.width(UiTokens.IndicatorWidth + UiTokens.SpaceSmall))
+                                            SortableColumnHeader(
+                                                text = stringResource(Res.string.process_name),
+                                                width = 240.dp,
+                                                column = SortColumn.NAME,
+                                                currentSort = sortBy,
+                                                descending = sortDesc,
+                                                onClick = {
+                                                    if (sortBy == SortColumn.NAME) sortDesc = !sortDesc
+                                                    else { sortBy = SortColumn.NAME; sortDesc = true }
+                                                }
                                             )
-                                            .padding(horizontal = UiTokens.SpaceSmall, vertical = UiTokens.SpaceSmall)
-                                    ) {
-                                        SortableColumnHeader(
-                                            text = stringResource(Res.string.process_name),
-                                            width = 240.dp,
-                                            column = SortColumn.NAME,
-                                            currentSort = sortBy,
-                                            descending = sortDesc,
-                                            onClick = {
-                                                if (sortBy == SortColumn.NAME) sortDesc = !sortDesc
-                                                else { sortBy = SortColumn.NAME; sortDesc = true }
-                                            }
-                                        )
                                         SortableColumnHeader(
                                             text = stringResource(Res.string.process_cpu),
                                             width = 70.dp,
@@ -328,56 +336,83 @@ fun ProcessScreen(selectedDevice: String?) {
                                                 else { sortBy = SortColumn.USER; sortDesc = true }
                                             }
                                         )
+                                        }
+                                        HorizontalDivider(
+                                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.78f)
+                                        )
                                     }
                                 }
 
                             items(filteredList) { item ->
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(horizontal = UiTokens.SpaceSmall, vertical = UiTokens.SpaceXSmall)
-                                ) {
-                                    Text(
-                                        text = item.name,
-                                        modifier = Modifier.width(240.dp),
-                                        style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                    Text(
-                                        text = item.cpuPercent,
-                                        modifier = Modifier.width(70.dp),
-                                        style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                    Text(
-                                        text = item.cpuTime,
-                                        modifier = Modifier.width(100.dp),
-                                        style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                    Text(
-                                        text = item.memory,
-                                        modifier = Modifier.width(82.dp),
-                                        style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                    Text(
-                                        text = item.pid,
-                                        modifier = Modifier.width(70.dp),
-                                        style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                    Text(
-                                        text = item.user,
-                                        style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
+                                val isSelected = selectedPid == item.pid
+                                val rowBackground = when {
+                                    isSelected -> MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
+                                    else -> Color.Transparent
+                                }
+                                Column(modifier = Modifier.fillMaxWidth()) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .background(rowBackground)
+                                            .clickable { selectedPid = item.pid }
+                                            .padding(horizontal = UiTokens.SpaceMedium, vertical = UiTokens.SpaceSmall),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        if (isSelected) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .width(UiTokens.IndicatorWidth)
+                                                    .height(20.dp)
+                                                    .padding(end = UiTokens.SpaceSmall)
+                                                    .background(
+                                                        MaterialTheme.colorScheme.primary,
+                                                        RoundedCornerShape(UiTokens.RadiusSmall)
+                                                    )
+                                            )
+                                        }
+                                        Text(
+                                            text = item.name,
+                                            modifier = Modifier.width(240.dp),
+                                            style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        Text(
+                                            text = item.cpuPercent,
+                                            modifier = Modifier.width(70.dp),
+                                            style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        Text(
+                                            text = item.cpuTime,
+                                            modifier = Modifier.width(100.dp),
+                                            style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        Text(
+                                            text = item.memory,
+                                            modifier = Modifier.width(82.dp),
+                                            style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        Text(
+                                            text = item.pid,
+                                            modifier = Modifier.width(70.dp),
+                                            style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        Text(
+                                            text = item.user,
+                                            style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.62f))
                                 }
                             }
                         }
@@ -397,6 +432,53 @@ fun ProcessScreen(selectedDevice: String?) {
 }
 }
 
+
+@Composable
+private fun ProcessSearchField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    placeholder: String,
+    modifier: Modifier = Modifier
+) {
+    val shape = RoundedCornerShape(UiTokens.RadiusMedium)
+    Row(
+        modifier = modifier
+            .height(UiTokens.ControlHeight)
+            .clip(shape)
+            .background(MaterialTheme.colorScheme.surface)
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, shape)
+            .padding(horizontal = UiTokens.SpaceMedium),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
+    ) {
+        Icon(
+            imageVector = Icons.Default.Search,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(UiTokens.IconSmall)
+        )
+        BasicTextField(
+            value = value,
+            onValueChange = onValueChange,
+            modifier = Modifier.weight(1f),
+            singleLine = true,
+            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+            textStyle = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface),
+            decorationBox = { innerTextField ->
+                if (value.isBlank()) {
+                    Text(
+                        text = placeholder,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                innerTextField()
+            }
+        )
+    }
+}
 
 @Composable
 private fun DiagnosticsCompactHeader(

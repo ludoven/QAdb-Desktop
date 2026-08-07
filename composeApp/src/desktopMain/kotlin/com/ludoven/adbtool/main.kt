@@ -82,8 +82,10 @@ import androidx.compose.ui.window.rememberWindowState
 import java.awt.Desktop
 import java.io.File
 import java.net.URI
+import java.util.concurrent.atomic.AtomicBoolean
 import javax.swing.JOptionPane
 import kotlinx.coroutines.launch
+import kotlin.system.exitProcess
 import com.ludoven.adbtool.util.AdbTool
 import com.ludoven.adbtool.util.LanguageManager
 import com.ludoven.adbtool.util.LocalAppLanguage
@@ -117,60 +119,68 @@ fun main() = application {
         ThemeManager.ThemeMode.DARK -> true
     }
     val coroutineScope = rememberCoroutineScope()
-    val shutdownAndExit = {
-        AdbTool.shutdownRelatedProcesses()
-        exitApplication()
+    val isClosing = remember { AtomicBoolean(false) }
+    val shutdownAndExit: () -> Unit = shutdownAndExit@{
+        if (!isClosing.compareAndSet(false, true)) {
+            return@shutdownAndExit
+        }
+
+        try {
+            AdbTool.shutdownRelatedProcesses()
+        } finally {
+            exitProcess(0)
+        }
     }
 
     CompositionLocalProvider(LocalAppLanguage provides currentLanguage) {
-    Window(
-        onCloseRequest = shutdownAndExit,
-        state = windowState,
-        title = "QADB",
-        icon = appIcon,
-        decoration = if (isWindows) {
-            WindowDecoration.Undecorated()
-        } else {
-            WindowDecoration.SystemDefault
-        },
-        alwaysOnTop = alwaysOnTop
-    ) {
-        if (!isWindows) {
-            MenuBar {
-                AppMenuBar(
-                    alwaysOnTop = alwaysOnTop,
-                    onAlwaysOnTopToggle = { alwaysOnTop = !alwaysOnTop },
-                    onClose = shutdownAndExit,
-                    onMinimize = { windowState.isMinimized = true },
-                    onZoomIn = { resizeWindow(windowState, 1.08f) },
-                    onZoomOut = { resizeWindow(windowState, 0.92f) },
-                    onZoomReset = { windowState.size = DpSize(1200.dp, 800.dp) },
-                    onToggleTheme = {
-                        val nextMode = if (currentThemeMode == ThemeManager.ThemeMode.DARK) {
-                            ThemeManager.ThemeMode.LIGHT
-                        } else {
-                            ThemeManager.ThemeMode.DARK
+        Window(
+            onCloseRequest = shutdownAndExit,
+            state = windowState,
+            title = "QADB",
+            icon = appIcon,
+            decoration = if (isWindows) {
+                WindowDecoration.Undecorated()
+            } else {
+                WindowDecoration.SystemDefault
+            },
+            alwaysOnTop = alwaysOnTop
+        ) {
+            if (!isWindows) {
+                MenuBar {
+                    AppMenuBar(
+                        alwaysOnTop = alwaysOnTop,
+                        onAlwaysOnTopToggle = { alwaysOnTop = !alwaysOnTop },
+                        onClose = shutdownAndExit,
+                        onMinimize = { windowState.isMinimized = true },
+                        onZoomIn = { resizeWindow(windowState, 1.08f) },
+                        onZoomOut = { resizeWindow(windowState, 0.92f) },
+                        onZoomReset = { windowState.size = DpSize(1200.dp, 800.dp) },
+                        onToggleTheme = {
+                            val nextMode = if (currentThemeMode == ThemeManager.ThemeMode.DARK) {
+                                ThemeManager.ThemeMode.LIGHT
+                            } else {
+                                ThemeManager.ThemeMode.DARK
+                            }
+                            ThemeManager.setThemeMode(nextMode)
+                        },
+                        onConnectDevice = { address ->
+                            coroutineScope.launch {
+                                AppMenuCommandBus.dispatch(AppMenuCommand.ConnectDevice(address))
+                            }
                         }
-                        ThemeManager.setThemeMode(nextMode)
-                    },
-                    onConnectDevice = { address ->
-                        coroutineScope.launch {
-                            AppMenuCommandBus.dispatch(AppMenuCommand.ConnectDevice(address))
-                        }
-                    }
-                )
+                    )
+                }
+            }
+            AppWindowFrame(
+                isMacOs = isMacOs,
+                isWindows = isWindows,
+                useDarkTheme = useDarkTheme,
+                windowState = windowState,
+                onClose = shutdownAndExit
+            ) {
+                App()
             }
         }
-        AppWindowFrame(
-            isMacOs = isMacOs,
-            isWindows = isWindows,
-            useDarkTheme = useDarkTheme,
-            windowState = windowState,
-            onClose = shutdownAndExit
-        ) {
-            App()
-        }
-    }
     }
 }
 

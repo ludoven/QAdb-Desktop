@@ -4,12 +4,9 @@ import com.ludoven.adbtool.ui.mac.*
 
 import adbtool_desktop.composeapp.generated.resources.Res
 import adbtool_desktop.composeapp.generated.resources.connected
-import adbtool_desktop.composeapp.generated.resources.connected_devices_count
 import adbtool_desktop.composeapp.generated.resources.disconnected
-import adbtool_desktop.composeapp.generated.resources.ic_logo
 import adbtool_desktop.composeapp.generated.resources.no_device
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.tween
+import adbtool_desktop.composeapp.generated.resources.ic_logo_no_background
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -46,6 +43,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
@@ -57,6 +55,7 @@ import androidx.compose.ui.unit.dp
 import com.ludoven.adbtool.TabItem
 import com.ludoven.adbtool.UiTokens
 import com.ludoven.adbtool.QadbColors
+import com.ludoven.adbtool.util.l10n
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 
@@ -74,55 +73,51 @@ fun Sidebar(
 ) {
     var expandedGroupId by remember { mutableStateOf<String?>(null) }
     val visibleGroupIds = visibleSidebarGroupIds(groups, selectedRoute, expandedGroupId)
+    val sidebarBackground = if (MaterialTheme.colorScheme.surface.luminance() < 0.5f) {
+        MaterialTheme.colorScheme.surface
+    } else {
+        Color(0xFFF9F9FA)
+    }
 
     Surface(
         modifier = modifier
             .fillMaxHeight()
             .width(UiTokens.SidebarWidth),
         shape = RoundedCornerShape(0.dp),
-        color = MaterialTheme.colorScheme.surface
+        color = sidebarBackground,
+        border = null
     ) {
         Column(
             modifier = Modifier
                 .fillMaxHeight()
-                .padding(
-                    start = UiTokens.SpaceMedium,
-                    top = UiTokens.SpaceSmall,
-                    end = UiTokens.SpaceMedium,
-                    bottom = UiTokens.SpaceLarge
-                ),
-            verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
+                .padding(start = 16.dp, top = 28.dp, end = 20.dp, bottom = 32.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             Row(
+                modifier = Modifier
+                    .padding(start = 12.dp)
+                    .width(150.dp)
+                    .height(48.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.padding(
-                    bottom = UiTokens.SpaceXLarge,
-                    start = UiTokens.SpaceSmall,
-                    top = UiTokens.SpaceXSmall
-                )
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Image(
-                    painter = painterResource(Res.drawable.ic_logo),
+                    painter = painterResource(Res.drawable.ic_logo_no_background),
                     contentDescription = null,
-                    modifier = Modifier
-                        .size(34.dp)
-                        .clip(RoundedCornerShape(UiTokens.RadiusSmall))
+                    modifier = Modifier.size(48.dp)
                 )
-                Spacer(modifier = Modifier.width(UiTokens.SpaceMedium))
-                Column {
-                    Text(
-                        text = "QADB",
-                        style = MaterialTheme.typography.titleLarge,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
+                Text(
+                    text = "QADB",
+                    color = MaterialTheme.colorScheme.onSurface,
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1
+                )
             }
 
-            groups.forEachIndexed { groupIndex, group ->
-                if (groupIndex > 0) {
-                    Spacer(modifier = Modifier.height(UiTokens.SpaceSmall))
-                }
+            Spacer(modifier = Modifier.height(6.dp))
+
+            groups.forEach { group ->
                 val isExpanded = group.collapsible && group.id in visibleGroupIds
                 SidebarGroupHeader(
                     group = group,
@@ -173,29 +168,40 @@ private fun SidebarGroupHeader(
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
     var isFocused by remember { mutableStateOf(false) }
-    val shape = RoundedCornerShape(UiTokens.RowRadius)
-    val backgroundColor by animateColorAsState(
-        targetValue = when {
-            hasSelection -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.82f)
-            isHovered -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f)
-            else -> Color.Transparent
-        },
-        animationSpec = tween(if (hasSelection) UiTokens.SelectionDurationMillis else UiTokens.HoverDurationMillis)
-    )
-    val contentColor by animateColorAsState(
-        targetValue = if (hasSelection) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-        animationSpec = tween(UiTokens.SelectionDurationMillis)
-    )
+    val shape = RoundedCornerShape(UiTokens.RadiusLarge)
+    val isDark = MaterialTheme.colorScheme.surface.luminance() < 0.5f
+    val backgroundColor = when {
+        hasSelection -> if (isDark) {
+            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.58f)
+        } else {
+            Color(0xFFEAF3FF)
+        }
+        isHovered -> if (isDark) {
+            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.50f)
+        } else {
+            Color(0xFFF5F7FA)
+        }
+        else -> Color.Transparent
+    }
+    val contentColor = if (hasSelection) {
+        MaterialTheme.colorScheme.primary
+    } else {
+        MaterialTheme.colorScheme.onSurface
+    }
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(UiTokens.ListRowHeight)
+            .height(52.dp)
             .clip(shape)
             .background(backgroundColor)
             .border(
-                width = if (isFocused) 2.dp else 0.dp,
-                color = if (isFocused) MaterialTheme.colorScheme.primary else Color.Transparent,
+                width = 1.dp,
+                color = if (isFocused && !hasSelection) {
+                    MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
+                } else {
+                    Color.Transparent
+                },
                 shape = shape
             )
             .semantics {
@@ -207,16 +213,16 @@ private fun SidebarGroupHeader(
             .hoverable(interactionSource)
             .clickable(interactionSource = interactionSource, indication = null, role = Role.Button, onClick = onClick)
             .focusable(interactionSource = interactionSource)
-            .padding(horizontal = UiTokens.SpaceMedium),
+            .padding(horizontal = 24.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(
             imageVector = group.icon,
             contentDescription = group.label,
-            tint = contentColor,
-            modifier = Modifier.size(19.dp)
+            tint = if (group.id == "ai") MaterialTheme.colorScheme.primary else contentColor,
+            modifier = Modifier.size(if (group.id == "ai") UiTokens.IconLarge else 19.dp)
         )
-        Spacer(modifier = Modifier.width(UiTokens.SpaceSmall))
+        Spacer(modifier = Modifier.width(UiTokens.SpaceLarge))
         Text(
             text = group.label,
             color = contentColor,
@@ -244,24 +250,27 @@ private fun SidebarItem(
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
     var isFocused by remember { mutableStateOf(false) }
-    val shape = RoundedCornerShape(UiTokens.RowRadius)
-    val backgroundColor by animateColorAsState(
-        targetValue = when {
-            isSelected -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.62f)
-            isHovered -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f)
-            else -> Color.Transparent
-        },
-        animationSpec = tween(if (isSelected) UiTokens.SelectionDurationMillis else UiTokens.HoverDurationMillis)
-    )
-
-    val contentColor by animateColorAsState(
-        targetValue = if (isSelected) {
-            MaterialTheme.colorScheme.primary
+    val shape = RoundedCornerShape(UiTokens.RadiusLarge)
+    val isDark = MaterialTheme.colorScheme.surface.luminance() < 0.5f
+    val backgroundColor = when {
+        isSelected -> if (isDark) {
+            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.50f)
         } else {
-            MaterialTheme.colorScheme.onSurfaceVariant
-        },
-        animationSpec = tween(UiTokens.SelectionDurationMillis)
-    )
+            Color(0xFFEAF3FF)
+        }
+        isHovered -> if (isDark) {
+            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.50f)
+        } else {
+            Color(0xFFF5F7FA)
+        }
+        else -> Color.Transparent
+    }
+
+    val contentColor = if (isSelected) {
+        MaterialTheme.colorScheme.primary
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant
+    }
 
     Row(
         modifier = Modifier
@@ -270,8 +279,12 @@ private fun SidebarItem(
             .clip(shape)
             .background(backgroundColor)
             .border(
-                width = if (isFocused) 2.dp else 0.dp,
-                color = if (isFocused) MaterialTheme.colorScheme.primary else Color.Transparent,
+                width = 1.dp,
+                color = if (isFocused && !isSelected) {
+                    MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
+                } else {
+                    Color.Transparent
+                },
                 shape = shape
             )
             .semantics {
@@ -329,7 +342,7 @@ private fun ConnectedStatusCard(
     var expanded by remember { mutableStateOf(false) }
     var isFocused by remember { mutableStateOf(false) }
     val interactionSource = remember { MutableInteractionSource() }
-    val shape = RoundedCornerShape(UiTokens.RowRadius)
+    val shape = RoundedCornerShape(UiTokens.RadiusLarge)
     val isConnected = !selectedDevice.isNullOrBlank() && connectedDeviceCount > 0
     val statusColor = if (isConnected) QadbColors.success else MaterialTheme.colorScheme.onSurfaceVariant
     val noDeviceText = stringResource(Res.string.no_device)
@@ -344,17 +357,21 @@ private fun ConnectedStatusCard(
         ?.let { formatSidebarDeviceAddress(it) }
         .orEmpty()
     val statusText = stringResource(if (isConnected) Res.string.connected else Res.string.disconnected)
-    val countText = stringResource(Res.string.connected_devices_count, connectedDeviceCount)
 
     Box {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .height(90.dp)
                 .clip(shape)
-                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.22f))
+                .background(MaterialTheme.colorScheme.surface)
                 .border(
-                    width = if (isFocused) 2.dp else 0.dp,
-                    color = if (isFocused) MaterialTheme.colorScheme.primary else Color.Transparent,
+                    width = 1.dp,
+                    color = if (isFocused) {
+                        MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
+                    } else {
+                        MaterialTheme.colorScheme.outlineVariant
+                    },
                     shape = shape
                 )
                 .semantics {
@@ -369,7 +386,7 @@ private fun ConnectedStatusCard(
                     role = Role.Button
                 ) { expanded = !expanded }
                 .focusable(enabled = devices.isNotEmpty(), interactionSource = interactionSource)
-                .padding(horizontal = UiTokens.SpaceSmall, vertical = UiTokens.SpaceSmall),
+                .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
@@ -383,7 +400,7 @@ private fun ConnectedStatusCard(
 
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceXSmall)) {
                 Text(
-                    text = "$statusText · $countText",
+                    text = if (isConnected) l10n("已连接设备", "Connected device") else statusText,
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontWeight = FontWeight.Medium,

@@ -7,12 +7,15 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import com.ludoven.adbtool.UiTokens
 import com.ludoven.adbtool.ui.icons.IconParkIcons
 import com.ludoven.adbtool.util.l10n
@@ -41,25 +44,31 @@ fun DiagnosticsScreen(
         modifier = Modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.surface
     ) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            ProductTabBar(
-                tabs = tabs,
-                selected = selectedTab,
-                onSelected = { selectedTab = it },
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+            Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(
-                        horizontal = UiTokens.PagePaddingCompact,
-                        vertical = UiTokens.ItemSpacing
-                    )
-            )
-            Box(modifier = Modifier.fillMaxSize()) {
-                when (selectedTab) {
-                    DiagnosticsTab.Logs -> LogScreen(
-                        viewModel = logViewModel,
-                        selectedDevice = selectedDevice
-                    )
-                    DiagnosticsTab.Processes -> ProcessScreen(selectedDevice = selectedDevice)
+                    .widthIn(max = 1200.dp)
+                    .fillMaxSize()
+            ) {
+                ProductTabBar(
+                    tabs = tabs,
+                    selected = selectedTab,
+                    onSelected = { selectedTab = it },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(
+                            horizontal = UiTokens.PagePadding,
+                            vertical = UiTokens.SpaceLarge
+                        )
+                )
+                Box(modifier = Modifier.fillMaxSize()) {
+                    when (selectedTab) {
+                        DiagnosticsTab.Logs -> LogScreen(
+                            viewModel = logViewModel,
+                            selectedDevice = selectedDevice
+                        )
+                        DiagnosticsTab.Processes -> ProcessScreen(selectedDevice = selectedDevice)
+                    }
                 }
             }
         }

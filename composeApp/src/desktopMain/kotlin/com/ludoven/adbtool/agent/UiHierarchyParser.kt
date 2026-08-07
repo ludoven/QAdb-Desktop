@@ -55,7 +55,11 @@ class UiHierarchyParser {
                 clickable = clickable,
                 editable = editable,
                 enabled = enabled,
-                password = password
+                password = password,
+                resourceId = element.getAttribute("resource-id").cleanUiValue().take(MAX_RESOURCE_ID_CHARS),
+                role = element.agentRole(clickable, editable),
+                selected = element.booleanAttribute("selected"),
+                checked = element.booleanAttribute("checked")
             )
         }
         val compact = snapshots.joinToString("\n") { node ->
@@ -68,10 +72,14 @@ class UiHierarchyParser {
                     append(" desc=\"").append(node.contentDescription.escapeCompact()).append('"')
                 }
                 if (node.className.isNotBlank()) append(" class=").append(node.className)
+                if (node.resourceId.isNotBlank()) append(" id=").append(node.resourceId.escapeCompact())
+                if (node.role.isNotBlank()) append(" role=").append(node.role)
                 if (node.packageName.isNotBlank()) append(" package=").append(node.packageName)
                 if (node.clickable) append(" clickable")
                 if (node.editable) append(" editable")
                 if (!node.enabled) append(" disabled")
+                if (node.selected) append(" selected")
+                if (node.checked) append(" checked")
                 if (node.password) append(" password")
             }
         }.take(MAX_COMPACT_HIERARCHY_CHARS).ifBlank { "<no-actionable-nodes/>" }
@@ -95,6 +103,18 @@ private fun Element.booleanAttribute(name: String, default: Boolean = false): Bo
         }
     }
 
+private fun Element.agentRole(clickable: Boolean, editable: Boolean): String = when {
+    editable -> "text_field"
+    getAttribute("class").contains("Switch", true) -> "switch"
+    getAttribute("class").contains("CheckBox", true) -> "checkbox"
+    getAttribute("class").contains("SeekBar", true) -> "slider"
+    getAttribute("class").contains("ImageButton", true) -> "icon_button"
+    getAttribute("class").contains("Button", true) -> "button"
+    clickable && getAttribute("class").contains("Recycler", true) -> "list_item"
+    clickable -> "text_button"
+    else -> "text"
+}
+
 private fun parseBounds(value: String): UiBounds? {
     val match = BOUNDS_PATTERN.matchEntire(value.trim()) ?: return null
     val values = match.groupValues.drop(1).mapNotNull(String::toIntOrNull)
@@ -115,4 +135,5 @@ private const val MAX_UI_NODES = 200
 private const val MAX_COMPACT_HIERARCHY_CHARS = 8_000
 private const val MAX_UI_VALUE_CHARS = 160
 private const val MAX_CLASS_CHARS = 80
+private const val MAX_RESOURCE_ID_CHARS = 200
 private const val MAX_PACKAGE_CHARS = 160

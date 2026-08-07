@@ -13,6 +13,7 @@ import com.ludoven.adbtool.util.AdbTool
 import com.ludoven.adbtool.util.l10n
 import com.ludoven.adbtool.viewmodel.FileBrowserViewModel
 import com.ludoven.adbtool.widget.EmptyStatePanel
+import com.ludoven.adbtool.widget.FeedbackToast
 import com.ludoven.adbtool.widget.PageHeader
 import androidx.compose.foundation.*
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -25,7 +26,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
-import androidx.compose.material.icons.automirrored.filled.InsertDriveFile
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.*
 import androidx.compose.runtime.*
@@ -71,7 +71,10 @@ fun FileBrowserScreen(
     val clipboardFiles by viewModel.clipboardFiles.collectAsState()
     val showDialog by viewModel.showDialog.collectAsState()
     val dialogMessage by viewModel.dialogMessage.collectAsState()
+    val toastMessage by viewModel.feedbackToastMessage.collectAsState()
     val deviceActionsEnabled = fileBrowserDeviceActionsEnabled(selectedDevice)
+
+    FeedbackToast(toastMessage)
 
     val filteredFiles by remember {
         derivedStateOf {
@@ -245,7 +248,7 @@ fun FileBrowserScreen(
                     shape = RoundedCornerShape(UiTokens.RadiusMedium),
                     contentPadding = PaddingValues(horizontal = UiTokens.SpaceMedium, vertical = UiTokens.SpaceSmall)
                 ) {
-                    Icon(IconParkIcons.Folder, null, modifier = Modifier.size(UiTokens.IconSmall))
+                    Icon(IconParkIcons.FolderAdd, null, modifier = Modifier.size(UiTokens.IconSmall))
                     Spacer(Modifier.width(UiTokens.SpaceSmall))
                     Text(l10n("新建文件夹", "New folder"))
                 }
@@ -535,9 +538,8 @@ fun FileBrowserScreen(
                                     text = { Text(l10n("复制路径", "Copy path")) },
                                     onClick = {
                                         val copied = copyToClipboardText(fullPath)
-                                        viewModel.showTipDialog(
-                                            MsgContent.Text(if (copied) l10n("已复制路径", "Path copied") else l10n("复制失败", "Copy failed")),
-                                            autoDismiss = copied
+                                        viewModel.showToast(
+                                            MsgContent.Text(if (copied) l10n("已复制路径", "Path copied") else l10n("复制失败", "Copy failed"))
                                         )
                                         contextMenuExpanded = false
                                     },
@@ -642,9 +644,8 @@ fun FileBrowserScreen(
                 OutlinedButton(
                     onClick = {
                         val copied = copyToClipboardText(selectedPaths.joinToString("\n"))
-                        viewModel.showTipDialog(
-                            MsgContent.Text(if (copied) l10n("已复制 ${selectedPaths.size} 个路径", "Copied ${selectedPaths.size} paths") else l10n("复制失败", "Copy failed")),
-                            autoDismiss = copied
+                        viewModel.showToast(
+                            MsgContent.Text(if (copied) l10n("已复制 ${selectedPaths.size} 个路径", "Copied ${selectedPaths.size} paths") else l10n("复制失败", "Copy failed"))
                         )
                     },
                     shape = RoundedCornerShape(UiTokens.RadiusMedium)
@@ -852,7 +853,7 @@ private fun QuickPathBar(
                     Icon(
                         when (path) {
                             "/" -> IconParkIcons.HardDisk
-                            "/sdcard" -> IconParkIcons.Phone
+                            "/sdcard" -> IconParkIcons.HardDisk
                             "/sdcard/Download" -> IconParkIcons.Download
                             "/sdcard/DCIM" -> IconParkIcons.Camera
                             "/sdcard/Documents" -> IconParkIcons.FileText
@@ -989,7 +990,7 @@ private fun FileRow(
                         file.name.endsWith(".mp4") || file.name.endsWith(".avi") || file.name.endsWith(".mkv") -> IconParkIcons.Video
                         file.name.endsWith(".txt") || file.name.endsWith(".log") || file.name.endsWith(".json") || file.name.endsWith(".xml") -> IconParkIcons.FileText
                         file.name.endsWith(".sh") || file.name.endsWith(".py") || file.name.endsWith(".java") || file.name.endsWith(".kt") -> IconParkIcons.Code
-                        else -> Icons.AutoMirrored.Filled.InsertDriveFile
+                        else -> IconParkIcons.File
                     },
                     contentDescription = null,
                     modifier = Modifier.size(UiTokens.IconMedium),

@@ -21,6 +21,8 @@ import com.ludoven.adbtool.entity.AppInfoData
 import com.ludoven.adbtool.pages.AppInfo
 import com.ludoven.adbtool.util.AdbPathManager
 import com.ludoven.adbtool.util.AdbTool
+import com.ludoven.adbtool.util.CommandHistoryStore
+import com.ludoven.adbtool.util.CommandHistoryTask
 import com.ludoven.adbtool.util.FileUtils
 import com.ludoven.adbtool.util.l10n
 import kotlinx.coroutines.async
@@ -901,36 +903,75 @@ class AppViewModel : BaseViewModel() {
                         AdbFunctionType.UNINSTALL -> {
                             val result = AdbTool.exec(appPackageShellCommand("pm", "uninstall", packageName))
                             if (result.contains("Success")) {
+                                CommandHistoryStore.record(
+                                    task = CommandHistoryTask.UNINSTALL_APP,
+                                    succeeded = true,
+                                    target = appName
+                                )
                                 withContext(Dispatchers.Main) {
                                     getAppList(forceRefresh = true)
-                                    showTipDialog(MsgContent.Resource(Res.string.dialog_uninstall_success))
+                                    showToast(
+                                        MsgContent.Resource(
+                                            Res.string.dialog_uninstall_success,
+                                            listOf(appName)
+                                        )
+                                    )
                                 }
                             } else {
-                                showTipDialog(MsgContent.Resource(Res.string.dialog_uninstall_failed))
+                                CommandHistoryStore.record(
+                                    task = CommandHistoryTask.UNINSTALL_APP,
+                                    succeeded = false,
+                                    target = appName
+                                )
+                                showToast(MsgContent.Resource(Res.string.dialog_uninstall_failed))
                             }
                         }
                         AdbFunctionType.LAUNCH -> {
-                            AdbTool.exec(
-                                appPackageShellCommand(
-                                    "monkey",
-                                    "-p",
-                                    packageName,
-                                    "-c",
-                                    "android.intent.category.LAUNCHER",
-                                    "1"
+                            val success = AdbTool.startApp(packageName)
+                            showToast(
+                                MsgContent.Text(
+                                    if (success) {
+                                        l10n("已启动：$appName", "Launched: $appName")
+                                    } else {
+                                        l10n("启动失败：$appName", "Failed to launch: $appName")
+                                    }
                                 )
                             )
-                            _appList.value = _appList.value.map { app ->
-                                if (app.packageName == packageName) app.copy(isRunning = true) else app
+                            if (success) {
+                                _appList.value = _appList.value.map { app ->
+                                    if (app.packageName == packageName) app.copy(isRunning = true) else app
+                                }
                             }
                         }
                         AdbFunctionType.FORCE_STOP -> {
-                            AdbTool.exec(appPackageShellCommand("am", "force-stop", packageName))
-                            _appList.value = _appList.value.map { app ->
-                                if (app.packageName == packageName) app.copy(isRunning = false) else app
+                            val success = AdbTool.stopApp(packageName)
+                            showToast(
+                                MsgContent.Text(
+                                    if (success) {
+                                        l10n("已停止：$appName", "Stopped: $appName")
+                                    } else {
+                                        l10n("停止失败：$appName", "Failed to stop: $appName")
+                                    }
+                                )
+                            )
+                            if (success) {
+                                _appList.value = _appList.value.map { app ->
+                                    if (app.packageName == packageName) app.copy(isRunning = false) else app
+                                }
                             }
                         }
-                        AdbFunctionType.CLEAR_DATA -> AdbTool.exec(appPackageShellCommand("pm", "clear", packageName))
+                        AdbFunctionType.CLEAR_DATA -> {
+                            val success = AdbTool.clearAppData(packageName)
+                            showToast(
+                                MsgContent.Text(
+                                    if (success) {
+                                        l10n("已清除应用数据：$appName", "App data cleared: $appName")
+                                    } else {
+                                        l10n("清除应用数据失败：$appName", "Failed to clear app data: $appName")
+                                    }
+                                )
+                            )
+                        }
                         AdbFunctionType.EXPORT_APK -> {
                             val path = AdbTool.exec(appPackageShellCommand("pm", "path", packageName))
                                 .lineSequence()
@@ -942,19 +983,31 @@ class AppViewModel : BaseViewModel() {
                                 if (folderPath != null) {
                                     val savePath = "$folderPath/${appName}_${System.currentTimeMillis()}.apk"
                                     val success = AdbTool.pullFile(path, savePath)
-                                    showTipDialog(MsgContent.Resource(if (success) Res.string.dialog_export_success else Res.string.dialog_export_failed))
-                                } else {
-                                    showTipDialog(MsgContent.Resource(Res.string.dialog_no_export_path))
+                                    if (success) {
+                                        showToast(
+                                            MsgContent.Resource(
+                                                Res.string.dialog_export_success,
+                                                listOf(savePath)
+                                            )
+                                        )
+                                    } else {
+                                        showToast(MsgContent.Resource(Res.string.dialog_export_failed))
+                                    }
                                 }
                             } else {
-                                showTipDialog(MsgContent.Resource(Res.string.dialog_get_install_path_failed))
+                                showToast(MsgContent.Resource(Res.string.dialog_get_install_path_failed))
                             }
                         }
                         else -> {}
                     }
                 }
             } catch (e: Exception) {
-                showTipDialog(MsgContent.Resource(Res.string.dialog_operation_failed))
+                showToast(
+                    MsgContent.Resource(
+                        Res.string.dialog_operation_failed,
+                        listOf(e.message ?: l10n("未知错误", "Unknown error"))
+                    )
+                )
             }
         }
     }
@@ -1267,9 +1320,8 @@ class AppViewModel : BaseViewModel() {
         } catch (_: Exception) {
             false
         }
-        showTipDialog(
+        showToast(
             MsgContent.Text(if (copied) l10n("已复制到剪贴板", "Copied to clipboard") else l10n("复制失败", "Copy failed")),
-            autoDismiss = copied
         )
     }
 

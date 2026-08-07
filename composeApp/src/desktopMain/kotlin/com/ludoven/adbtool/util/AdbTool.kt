@@ -22,10 +22,15 @@ object AdbTool {
     private const val DEFAULT_ADB_COMMAND_TIMEOUT_MS = 120_000L
     private const val DEFAULT_SHELL_COMMAND_TIMEOUT_MS = 30_000L
     private const val OUTPUT_DRAIN_TIMEOUT_MS = 500L
+    private const val MIRROR_SETUP_OUTPUT_DRAIN_TIMEOUT_MS = 2_000L
 
     private val mirrorProcessLock = Any()
     @Volatile
     private var deviceMirrorProcess: Process? = null
+    @Volatile
+    private var deviceMirrorOutputFuture: CompletableFuture<String>? = null
+    @Volatile
+    private var deviceMirrorExitResult: DeviceMirrorExitResult? = null
 
     var selectDeviceId: String? = null
     
@@ -36,6 +41,11 @@ object AdbTool {
         val success: Boolean,
         val output: String,
         val errorMessage: String? = null
+    )
+
+    data class DeviceMirrorExitResult(
+        val exitCode: Int?,
+        val output: String
     )
 
     internal fun outputText(result: AdbResult): String {
@@ -107,7 +117,12 @@ object AdbTool {
         return outputText(runProcessCommand(adbPath, args.toList(), timeoutMillis))
     }
 
-    private fun runProcessCommand(adbPath: String, args: List<String>, timeoutMillis: Long): AdbResult {
+    private fun runProcessCommand(
+        adbPath: String,
+        args: List<String>,
+        timeoutMillis: Long,
+        outputDrainTimeoutMillis: Long = OUTPUT_DRAIN_TIMEOUT_MS
+    ): AdbResult {
         return try {
             val fullCmd = mutableListOf(adbPath).apply { addAll(args) }
             val process = ProcessBuilder(fullCmd).redirectErrorStream(true).start()
@@ -119,7 +134,7 @@ object AdbTool {
                 val completed = process.waitFor(timeoutMillis, TimeUnit.MILLISECONDS)
                 if (!completed) {
                     process.destroyForcibly()
-                    val partialOutput = drainProcessOutput(outputFuture).trim()
+                    val partialOutput = drainProcessOutput(outputFuture, outputDrainTimeoutMillis).trim()
                     return AdbResult(
                         success = false,
                         output = partialOutput,
@@ -127,7 +142,7 @@ object AdbTool {
                     )
                 }
 
-                val output = drainProcessOutput(outputFuture).trim()
+                val output = drainProcessOutput(outputFuture, outputDrainTimeoutMillis).trim()
                 val exitCode = process.exitValue()
                 if (exitCode == 0) {
                     AdbResult(true, output)
@@ -147,9 +162,12 @@ object AdbTool {
         }
     }
 
-    private fun drainProcessOutput(outputFuture: CompletableFuture<String>): String {
+    private fun drainProcessOutput(
+        outputFuture: CompletableFuture<String>,
+        timeoutMillis: Long = OUTPUT_DRAIN_TIMEOUT_MS
+    ): String {
         return runCatching {
-            outputFuture.get(OUTPUT_DRAIN_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+            outputFuture.get(timeoutMillis, TimeUnit.MILLISECONDS)
         }.getOrDefault("")
     }
 
@@ -184,6 +202,21 @@ object AdbTool {
         return listOf(scrcpyPath, "--serial", deviceId, "--window-title", windowTitle) + settings.toScrcpyArgs()
     }
 
+    internal fun buildScrcpyTcpIpCommand(
+        scrcpyPath: String,
+        endpoint: String,
+        windowTitle: String,
+        settings: DeviceMirrorSettings = DeviceMirrorSettings()
+    ): List<String> {
+        return listOf(
+            scrcpyPath,
+            "--tcpip=$endpoint",
+            "--force-adb-forward",
+            "--window-title",
+            windowTitle
+        ) + settings.toScrcpyArgs()
+    }
+
     suspend fun startDeviceMirrorAsync(
         deviceId: String? = selectDeviceId,
         windowTitle: String = "QADB Device Mirror",
@@ -203,6 +236,7 @@ object AdbTool {
             synchronized(mirrorProcessLock) {
                 val currentProcess = deviceMirrorProcess
                 if (currentProcess != null && !currentProcess.isAlive) {
+                    captureDeviceMirrorExitOutput()
                     ChildProcessRegistry.unregister(currentProcess)
                     deviceMirrorProcess = null
                 }
@@ -213,24 +247,46 @@ object AdbTool {
                     }
                     ChildProcessRegistry.unregister(runningProcess)
                     deviceMirrorProcess = null
+                    deviceMirrorOutputFuture = null
                 } else if (deviceMirrorProcess?.isAlive == true) {
                     return@synchronized AdbResult(true, DEVICE_MIRROR_ALREADY_RUNNING_MESSAGE)
                 }
 
                 try {
-                    val process = ProcessBuilder(buildScrcpyCommand(scrcpyPath, deviceId, windowTitle, settings))
+                    val tcpIpEndpoint = resolveScrcpyTcpIpEndpointForDevice(adbPath, deviceId)
+                    if (deviceId.any(Char::isWhitespace) && tcpIpEndpoint == null) {
+                        return@synchronized AdbResult(
+                            success = false,
+                            output = "",
+                            errorMessage = "Unable to resolve the Wi-Fi debugging address for this mDNS device"
+                        )
+                    }
+                    val command = tcpIpEndpoint?.let {
+                        buildScrcpyTcpIpCommand(scrcpyPath, it, windowTitle, settings)
+                    } ?: buildScrcpyCommand(scrcpyPath, deviceId, windowTitle, settings)
+                    val process = ProcessBuilder(command)
                         .apply {
                             redirectErrorStream(true)
                             environment()["ADB"] = adbPath
                         }
                         .start()
-                    val startupFailure = detectEarlyProcessExit(process, SCRCPY_STARTUP_CHECK_TIMEOUT_MS)
+                    val outputFuture = CompletableFuture.supplyAsync {
+                        process.inputStream.bufferedReader().use { it.readText() }
+                    }
+                    val startupFailure = detectEarlyProcessExit(
+                        process = process,
+                        startupCheckTimeoutMillis = SCRCPY_STARTUP_CHECK_TIMEOUT_MS,
+                        outputFuture = outputFuture
+                    )
                     if (startupFailure != null) {
                         deviceMirrorProcess = null
+                        deviceMirrorOutputFuture = null
                         ChildProcessRegistry.unregister(process)
                         return@synchronized startupFailure
                     }
                     deviceMirrorProcess = process
+                    deviceMirrorOutputFuture = outputFuture
+                    deviceMirrorExitResult = null
                     ChildProcessRegistry.register(process)
                     AdbResult(true, DEVICE_MIRROR_STARTED_MESSAGE)
                 } catch (e: Exception) {
@@ -240,11 +296,80 @@ object AdbTool {
         }
     }
 
+    /**
+     * scrcpy splits the output of `adb devices` on whitespace. Android's mDNS
+     * service name may itself contain spaces, which makes an otherwise valid
+     * ADB device ID impossible for scrcpy to select with `--serial`.
+     */
+    private fun resolveScrcpyTcpIpEndpointForDevice(adbPath: String, deviceId: String): String? {
+        if (deviceId.none(Char::isWhitespace)) return null
+
+        repeat(MIRROR_ENDPOINT_RESOLVE_ATTEMPTS) {
+            val mdnsServices = runProcessCommand(
+                adbPath,
+                listOf("mdns", "services"),
+                DEFAULT_SHELL_COMMAND_TIMEOUT_MS,
+                MIRROR_SETUP_OUTPUT_DRAIN_TIMEOUT_MS
+            )
+            if (mdnsServices.success) {
+                parseScrcpyMdnsEndpoint(mdnsServices.output, deviceId)?.let { return it }
+            }
+
+            val route = runProcessCommand(
+                adbPath,
+                listOf("-s", deviceId, "shell", "ip", "route"),
+                DEFAULT_SHELL_COMMAND_TIMEOUT_MS,
+                MIRROR_SETUP_OUTPUT_DRAIN_TIMEOUT_MS
+            )
+            val tlsPort = listOf("service.adb.tls.port", "persist.adb.tls_server.port")
+                .firstNotNullOfOrNull { propertyName ->
+                    runProcessCommand(
+                        adbPath,
+                        listOf("-s", deviceId, "shell", "getprop", propertyName),
+                        DEFAULT_SHELL_COMMAND_TIMEOUT_MS,
+                        MIRROR_SETUP_OUTPUT_DRAIN_TIMEOUT_MS
+                    ).takeIf(AdbResult::success)?.output
+                        ?.trim()
+                        ?.toIntOrNull()
+                        ?.takeIf { port -> port in 1..65535 }
+                }
+            if (route.success && tlsPort != null) {
+                parseScrcpyTcpIpEndpoint(route.output, tlsPort.toString())?.let { return it }
+            }
+        }
+        return null
+    }
+
+    internal fun parseScrcpyMdnsEndpoint(mdnsOutput: String, deviceId: String): String? {
+        val normalizedDeviceId = deviceId.trim().trimEnd('.')
+        return mdnsOutput.lineSequence()
+            .mapNotNull { line -> MDNS_CONNECT_SERVICE_REGEX.matchEntire(line.trim()) }
+            .firstOrNull { match ->
+                val serviceName = match.groupValues[1].trim()
+                val serviceType = match.groupValues[2]
+                "$serviceName.$serviceType" == normalizedDeviceId
+            }
+            ?.groupValues
+            ?.get(3)
+            ?.takeIf(::isValidTcpIpEndpoint)
+    }
+
+    internal fun parseScrcpyTcpIpEndpoint(routeOutput: String, tlsPortOutput: String): String? {
+        val ipAddress = SRC_ADDRESS_REGEX.find(routeOutput)?.groupValues?.getOrNull(1) ?: return null
+        val port = tlsPortOutput.lineSequence()
+            .map(String::trim)
+            .mapNotNull(String::toIntOrNull)
+            .firstOrNull { it in 1..65535 }
+            ?: return null
+        return "$ipAddress:$port"
+    }
+
     suspend fun stopDeviceMirrorAsync(): AdbResult {
         return withContext(Dispatchers.IO) {
             synchronized(mirrorProcessLock) {
                 val process = deviceMirrorProcess
                 if (process == null || !process.isAlive) {
+                    captureDeviceMirrorExitOutput()
                     deviceMirrorProcess = null
                     return@synchronized AdbResult(true, "Device mirror stopped")
                 }
@@ -253,6 +378,8 @@ object AdbTool {
                 if (stopped) {
                     ChildProcessRegistry.unregister(process)
                     deviceMirrorProcess = null
+                    deviceMirrorOutputFuture = null
+                    deviceMirrorExitResult = null
                     AdbResult(true, "Device mirror stopped")
                 } else {
                     AdbResult(false, "", "Failed to stop mirror process")
@@ -267,6 +394,7 @@ object AdbTool {
             return if (process?.isAlive == true) {
                 true
             } else {
+                captureDeviceMirrorExitOutput()
                 ChildProcessRegistry.unregister(process)
                 deviceMirrorProcess = null
                 false
@@ -276,7 +404,8 @@ object AdbTool {
 
     internal fun detectEarlyProcessExit(
         process: Process,
-        startupCheckTimeoutMillis: Long = SCRCPY_STARTUP_CHECK_TIMEOUT_MS
+        startupCheckTimeoutMillis: Long = SCRCPY_STARTUP_CHECK_TIMEOUT_MS,
+        outputFuture: CompletableFuture<String>? = null
     ): AdbResult? {
         val exited = runCatching {
             process.waitFor(startupCheckTimeoutMillis, TimeUnit.MILLISECONDS)
@@ -286,11 +415,31 @@ object AdbTool {
         }
 
         val exitCode = runCatching { process.exitValue() }.getOrDefault(-1)
-        val output = runCatching {
-            process.inputStream.bufferedReader().readText().trim()
-        }.getOrDefault("")
+        val output = outputFuture?.let(::drainProcessOutput)?.trim()
+            ?: runCatching { process.inputStream.bufferedReader().readText().trim() }.getOrDefault("")
         val message = output.ifBlank { "scrcpy exited immediately with exit code: $exitCode" }
         return AdbResult(false, output, message)
+    }
+
+    fun consumeDeviceMirrorExitResult(): DeviceMirrorExitResult? {
+        synchronized(mirrorProcessLock) {
+            val result = deviceMirrorExitResult
+            deviceMirrorExitResult = null
+            return result
+        }
+    }
+
+    private fun captureDeviceMirrorExitOutput() {
+        val exitCode = deviceMirrorProcess
+            ?.takeUnless(Process::isAlive)
+            ?.let { process -> runCatching(process::exitValue).getOrNull() }
+        val output = deviceMirrorOutputFuture?.let(::drainProcessOutput)
+            ?.trim()
+            .orEmpty()
+        deviceMirrorOutputFuture = null
+        if (exitCode != null || output.isNotEmpty()) {
+            deviceMirrorExitResult = DeviceMirrorExitResult(exitCode, output)
+        }
     }
 
     internal fun stopMirrorProcess(
@@ -300,9 +449,10 @@ object AdbTool {
         if (!process.isAlive) {
             return true
         }
+        val deadlineNanos = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeoutMillis.coerceAtLeast(0L))
         process.destroy()
         val stoppedGracefully = runCatching {
-            process.waitFor(timeoutMillis, TimeUnit.MILLISECONDS)
+            process.waitForRemainingTime(deadlineNanos)
         }.getOrDefault(false)
         if (stoppedGracefully || !process.isAlive) {
             return true
@@ -310,20 +460,32 @@ object AdbTool {
 
         process.destroyForcibly()
         val stoppedForcibly = runCatching {
-            process.waitFor(timeoutMillis, TimeUnit.MILLISECONDS)
+            process.waitForRemainingTime(deadlineNanos)
         }.getOrDefault(false)
         return stoppedForcibly || !process.isAlive
     }
 
     fun shutdownRelatedProcesses() {
+        val deadlineNanos = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(MIRROR_STOP_TIMEOUT_MS)
         synchronized(mirrorProcessLock) {
             deviceMirrorProcess?.let { process ->
-                stopMirrorProcess(process, MIRROR_STOP_TIMEOUT_MS)
+                stopMirrorProcess(process, remainingTimeoutMillis(deadlineNanos))
                 ChildProcessRegistry.unregister(process)
             }
             deviceMirrorProcess = null
+            deviceMirrorOutputFuture = null
+            deviceMirrorExitResult = null
         }
-        ChildProcessRegistry.terminateAll(timeoutMillis = 1_500L)
+        ChildProcessRegistry.terminateAll(timeoutMillis = remainingTimeoutMillis(deadlineNanos))
+    }
+
+    private fun Process.waitForRemainingTime(deadlineNanos: Long): Boolean {
+        val remainingNanos = deadlineNanos - System.nanoTime()
+        return remainingNanos > 0L && waitFor(remainingNanos, TimeUnit.NANOSECONDS)
+    }
+
+    private fun remainingTimeoutMillis(deadlineNanos: Long): Long {
+        return TimeUnit.NANOSECONDS.toMillis((deadlineNanos - System.nanoTime()).coerceAtLeast(0L))
     }
     
     /**
@@ -359,6 +521,18 @@ object AdbTool {
      */
     private fun buildDeviceArgs(deviceId: String?): List<String> {
         return if (!deviceId.isNullOrBlank()) listOf("-s", deviceId) else emptyList()
+    }
+
+    private val SRC_ADDRESS_REGEX = Regex("""\bsrc\s+((?:\d{1,3}\.){3}\d{1,3})\b""")
+    private val MDNS_CONNECT_SERVICE_REGEX =
+        Regex("""^(.+?)\s+(_adb-tls-connect\._tcp)\s+(\S+)$""")
+    private const val MIRROR_ENDPOINT_RESOLVE_ATTEMPTS = 2
+
+    private fun isValidTcpIpEndpoint(endpoint: String): Boolean {
+        val separatorIndex = endpoint.lastIndexOf(':')
+        if (separatorIndex <= 0 || separatorIndex == endpoint.lastIndex) return false
+        val port = endpoint.substring(separatorIndex + 1).toIntOrNull() ?: return false
+        return port in 1..65535
     }
     
     /**

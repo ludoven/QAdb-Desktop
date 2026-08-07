@@ -60,17 +60,12 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.AutoAwesomeMotion
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DeleteSweep
-import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.FilterAltOff
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -154,6 +149,7 @@ fun LogScreen(
     var autoScroll by remember { mutableStateOf(true) }
     var userPinnedToBottom by remember { mutableStateOf(true) }
     var selectedQuickChip by remember { mutableStateOf<QuickKeywordChip?>(null) }
+    var selectedLogKey by remember { mutableStateOf<String?>(null) }
 
     val filteredLogs by viewModel.filteredLogs.collectAsState()
     val likelyCurrentPackage = remember(logs) { detectLikelyPackage(logs) }
@@ -190,15 +186,17 @@ fun LogScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = UiTokens.PagePaddingCompact, vertical = UiTokens.SectionSpacingCompact),
+            .padding(horizontal = UiTokens.PagePadding, vertical = UiTokens.SectionSpacingCompact),
         verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium)
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.Top
-        ) {
-            Column(verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceXSmall)) {
+        // Header row: title/subtitle on the left, capture status badge top-right, toolbar underneath.
+        Box(modifier = Modifier.fillMaxWidth()) {
+            Column(
+                modifier = Modifier
+                    .align(Alignment.CenterStart)
+                    .padding(end = UiTokens.SpaceXXXLarge),
+                verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceXSmall)
+            ) {
                 Text(
                     text = stringResource(Res.string.log_title),
                     style = MaterialTheme.typography.titleMedium,
@@ -212,9 +210,16 @@ fun LogScreen(
                 )
             }
 
-            Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)) {
+            Column(
+                modifier = Modifier.align(Alignment.TopEnd),
+                horizontalAlignment = Alignment.End,
+                verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
+            ) {
                 CaptureStatusBadge(isCapturing = isCapturing)
-                Row(horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall), verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     Button(
                         onClick = {
                             if (isCapturing) {
@@ -381,7 +386,11 @@ fun LogScreen(
                             viewModel.updateFilter(LogFilter())
                         },
                         enabled = filter != LogFilter(),
-                        modifier = Modifier.width(34.dp)
+                        modifier = Modifier
+                            .width(34.dp)
+                            .clip(androidx.compose.foundation.shape.RoundedCornerShape(UiTokens.RadiusMedium))
+                            .background(MaterialTheme.colorScheme.surface)
+                            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, androidx.compose.foundation.shape.RoundedCornerShape(UiTokens.RadiusMedium))
                     ) {
                         Icon(
                             Icons.Default.FilterAltOff,
@@ -492,10 +501,13 @@ fun LogScreen(
                                     .padding(end = UiTokens.SpaceSmall),
                                 state = listState
                             ) {
-                                itemsIndexed(filteredLogs, key = { index, item -> "${item.timestamp}_${item.pid}_${index}" }) { _, entry ->
+                                itemsIndexed(filteredLogs, key = { index, item -> "${item.timestamp}_${item.pid}_${index}" }) { index, entry ->
+                                    val rowKey = "${entry.timestamp}_${entry.pid}_$index"
                                     LogTableRow(
                                         entry = entry,
-                                        dateFormat = dateFormat
+                                        dateFormat = dateFormat,
+                                        isSelected = selectedLogKey == rowKey,
+                                        onClick = { selectedLogKey = rowKey }
                                     )
                                 }
                             }
@@ -538,15 +550,20 @@ fun LogScreen(
 
 @Composable
 private fun CaptureStatusBadge(isCapturing: Boolean) {
-    val background = if (isCapturing) QadbColors.primaryContainer else QadbColors.surfaceVariant
+    val background = if (isCapturing) QadbColors.primaryContainer.copy(alpha = 0.62f)
+        else MaterialTheme.colorScheme.surface
     val textColor = if (isCapturing) QadbColors.primary else MaterialTheme.colorScheme.onSurfaceVariant
 
     Box(
         modifier = Modifier
             .clip(androidx.compose.foundation.shape.RoundedCornerShape(UiTokens.BadgeRadius))
             .background(background)
-            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, androidx.compose.foundation.shape.RoundedCornerShape(UiTokens.BadgeRadius))
-            .padding(horizontal = UiTokens.SpaceSmall, vertical = UiTokens.SpaceXSmall)
+            .border(
+                1.dp,
+                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f),
+                androidx.compose.foundation.shape.RoundedCornerShape(UiTokens.BadgeRadius)
+            )
+            .padding(horizontal = UiTokens.SpaceMedium, vertical = UiTokens.SpaceXSmall)
     ) {
         Text(
             text = if (isCapturing) stringResource(Res.string.log_capture_running) else stringResource(Res.string.log_capture_paused),
@@ -572,7 +589,7 @@ private fun ToolbarButton(
             containerColor = if (isActive) MaterialTheme.colorScheme.primary.copy(alpha = 0.1f) else Color.Transparent,
             contentColor = if (isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
         ),
-        modifier = Modifier.height(32.dp)
+                        modifier = Modifier.height(UiTokens.ControlHeight)
     ) {
         Icon(icon, contentDescription = null, modifier = Modifier.width(13.dp))
         Spacer(modifier = Modifier.width(UiTokens.SpaceSmall))
@@ -584,7 +601,7 @@ private fun ToolbarButton(
 private fun FilterSelect(text: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
     Row(
         modifier = modifier
-            .height(36.dp)
+            .height(UiTokens.ControlHeight)
             .clip(androidx.compose.foundation.shape.RoundedCornerShape(UiTokens.RadiusMedium))
             .background(MaterialTheme.colorScheme.surface)
             .border(1.dp, MaterialTheme.colorScheme.outlineVariant, androidx.compose.foundation.shape.RoundedCornerShape(UiTokens.RadiusMedium))
@@ -614,7 +631,7 @@ private fun FilterInput(
 ) {
     Box(
         modifier = modifier
-            .height(36.dp)
+            .height(UiTokens.ControlHeight)
             .clip(androidx.compose.foundation.shape.RoundedCornerShape(UiTokens.RadiusMedium))
             .background(MaterialTheme.colorScheme.surface)
             .border(1.dp, MaterialTheme.colorScheme.outlineVariant, androidx.compose.foundation.shape.RoundedCornerShape(UiTokens.RadiusMedium))
@@ -723,11 +740,14 @@ private fun HeaderCell(text: String, width: androidx.compose.ui.unit.Dp? = null,
 @Composable
 private fun LogTableRow(
     entry: LogEntry,
-    dateFormat: SimpleDateFormat
+    dateFormat: SimpleDateFormat,
+    isSelected: Boolean,
+    onClick: () -> Unit
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val hovered by interactionSource.collectIsHoveredAsState()
-    val baseColor = when {
+    val rowBackground = when {
+        isSelected -> MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
         entry.level == LogLevel.ERROR || entry.level == LogLevel.FATAL -> QadbColors.errorSurface
         entry.level == LogLevel.WARN -> QadbColors.warningSurface
         hovered -> QadbColors.surfaceHover
@@ -737,11 +757,24 @@ private fun LogTableRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(baseColor)
+            .background(rowBackground)
             .hoverable(interactionSource = interactionSource)
+            .clickable(onClick = onClick)
             .padding(horizontal = UiTokens.SpaceSmall, vertical = UiTokens.SpaceSmall),
         verticalAlignment = Alignment.Top
     ) {
+        if (isSelected) {
+            Box(
+                modifier = Modifier
+                    .width(UiTokens.IndicatorWidth)
+                    .fillMaxHeight()
+                    .padding(end = UiTokens.SpaceSmall)
+                    .background(
+                        MaterialTheme.colorScheme.primary,
+                        androidx.compose.foundation.shape.RoundedCornerShape(UiTokens.RadiusSmall)
+                    )
+            )
+        }
         TableCell(
             text = dateFormat.format(Date(entry.timestamp)),
             width = 108.dp,

@@ -69,6 +69,10 @@ fun DeviceControlScreen(
     val pageScrollState = rememberScrollState()
     val mirrorRunning by mirrorViewModel.mirrorRunning.collectAsState()
     val settings by mirrorViewModel.settings.collectAsState()
+    val showMirrorDialog by mirrorViewModel.showDialog.collectAsState()
+    val mirrorDialogMessage by mirrorViewModel.dialogMessage.collectAsState()
+    val mirrorErrorMessage by mirrorViewModel.mirrorErrorMessage.collectAsState()
+    val mirrorErrorText = resolveMessageText(mirrorErrorMessage)
     val hasDevice = !selectedDevice.isNullOrBlank()
     var showSettingsDialog by remember { mutableStateOf(false) }
 
@@ -94,44 +98,49 @@ fun DeviceControlScreen(
         StringOption("24M", "24M")
     )
 
-    Surface(
-        modifier = Modifier.fillMaxSize(),
-        color = MaterialTheme.colorScheme.surface
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(pageScrollState)
-                .padding(horizontal = UiTokens.PagePadding, vertical = UiTokens.ItemSpacing),
-            verticalArrangement = Arrangement.spacedBy(UiTokens.SectionSpacing)
+    Box(modifier = Modifier.fillMaxSize()) {
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            color = MaterialTheme.colorScheme.surface
         ) {
-            DeviceOverviewCard(
-                deviceDisplayName = selectedDevice?.let { deviceDisplayNames[it] },
-                deviceId = selectedDevice,
-                connectionType = resolveConnectionType(selectedDevice),
-                mirrorRunning = mirrorRunning,
-                settings = settings,
-                onOpenSettings = { showSettingsDialog = true },
-                onMirrorAction = {
-                    if (mirrorRunning) {
-                        mirrorViewModel.stopMirror()
-                    } else {
-                        mirrorViewModel.openMirror(selectedDevice)
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(pageScrollState)
+                    .padding(horizontal = UiTokens.PagePadding, vertical = UiTokens.ItemSpacing),
+                verticalArrangement = Arrangement.spacedBy(UiTokens.SectionSpacing)
+            ) {
+                DeviceOverviewCard(
+                    deviceDisplayName = selectedDevice?.let { deviceDisplayNames[it] },
+                    deviceId = selectedDevice,
+                    connectionType = resolveConnectionType(selectedDevice),
+                    mirrorRunning = mirrorRunning,
+                    settings = settings,
+                    errorMessage = mirrorErrorText,
+                    onOpenSettings = { showSettingsDialog = true },
+                    onMirrorAction = {
+                        if (mirrorRunning) {
+                            mirrorViewModel.stopMirror()
+                        } else {
+                            mirrorViewModel.openMirror(selectedDevice)
+                        }
                     }
-                }
-            )
+                )
 
-            KeyEventScreen(
-                viewModel = keyEventViewModel,
-                selectedDevice = selectedDevice,
-                deviceDisplayNames = deviceDisplayNames,
-                modifier = Modifier.fillMaxWidth(),
-                embedded = true,
-                showHeader = false,
-                showConnectionWarning = false,
-                useInternalScroll = false
-            )
+                KeyEventScreen(
+                    viewModel = keyEventViewModel,
+                    selectedDevice = selectedDevice,
+                    deviceDisplayNames = deviceDisplayNames,
+                    modifier = Modifier.fillMaxWidth(),
+                    embedded = true,
+                    showHeader = false,
+                    showConnectionWarning = false,
+                    useInternalScroll = false
+                )
+            }
         }
+
+        MirrorToast(visible = showMirrorDialog, message = mirrorDialogMessage)
     }
 
     if (showSettingsDialog) {
@@ -154,6 +163,7 @@ private fun DeviceOverviewCard(
     connectionType: String,
     mirrorRunning: Boolean,
     settings: DeviceMirrorSettings,
+    errorMessage: String?,
     onOpenSettings: () -> Unit,
     onMirrorAction: () -> Unit
 ) {
@@ -217,6 +227,15 @@ private fun DeviceOverviewCard(
                         fontSize = UiTokens.TextBody
                     )
                 }
+            }
+            if (errorMessage != null) {
+                Text(
+                    text = errorMessage,
+                    color = QadbColors.danger,
+                    style = MaterialTheme.typography.bodySmall,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
             }
 
             BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {

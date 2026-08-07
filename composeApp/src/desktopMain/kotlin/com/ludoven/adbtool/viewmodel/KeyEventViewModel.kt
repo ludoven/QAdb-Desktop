@@ -1,9 +1,6 @@
 package com.ludoven.adbtool.viewmodel
 
-import adbtool_desktop.composeapp.generated.resources.Res
-import adbtool_desktop.composeapp.generated.resources.no_device_available
 import androidx.lifecycle.viewModelScope
-import com.ludoven.adbtool.entity.MsgContent
 import com.ludoven.adbtool.util.AdbTool
 import com.ludoven.adbtool.util.l10n
 import kotlinx.coroutines.Dispatchers
@@ -151,7 +148,7 @@ class KeyEventViewModel : BaseViewModel() {
 
     private fun ensureDeviceSelected(): Boolean {
         if (keyEventDeviceActionsEnabled(AdbTool.selectDeviceId)) return true
-        showTipDialog(MsgContent.Resource(Res.string.no_device_available))
+        showToastMessage(l10n("没有连接设备", "No device connected"))
         return false
     }
 

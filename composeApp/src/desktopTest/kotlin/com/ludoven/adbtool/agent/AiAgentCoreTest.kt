@@ -142,6 +142,42 @@ class AiAgentCoreTest {
     }
 
     @Test
+    fun `structured tool call parser unwraps compatible generic wrapper without widening the action whitelist`() {
+        val client = OpenAiCompatibleClient()
+        val action = client.parseSingleAction(
+            response(
+                toolName = "tool_call",
+                arguments = """{"name":"find_app","arguments":{"query":"微信"}}"""
+            )
+        )
+        assertEquals(AgentAction.FindApp("微信"), action)
+
+        assertFailsWith<ModelProtocolException> {
+            client.parseSingleAction(
+                response(
+                    toolName = "tool_call",
+                    arguments = """{"name":"adb_shell","arguments":{"command":"input tap 1 2"}}"""
+                )
+            )
+        }
+        assertFailsWith<ModelProtocolException> {
+            client.parseSingleAction(response("tool_call", """{"name":"find_app"}"""))
+        }
+    }
+
+    @Test
+    fun `finish without observation id binds the latest runtime observation`() {
+        val client = OpenAiCompatibleClient()
+        val action = client.parseSingleAction(
+            response("finish", """{"summary":"done","outcome":"SUCCESS"}""")
+        ) as AgentAction.Finish
+
+        assertEquals("", action.observationId)
+        val bound = action.bindLatestObservation("observation-latest") as AgentAction.Finish
+        assertEquals("observation-latest", bound.observationId)
+    }
+
+    @Test
     fun `http errors and timeout become explicit failures`() = runBlocking {
         withServer(status = 401, body = """{"error":{"message":"invalid credential"}}""") { endpoint ->
             val error = runCatching {

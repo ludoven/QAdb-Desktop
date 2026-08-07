@@ -5,10 +5,17 @@ import com.ludoven.adbtool.agent.AgentModelClient
 import com.ludoven.adbtool.agent.AgentOrchestrator
 import com.ludoven.adbtool.agent.AgentTaskUiState
 import com.ludoven.adbtool.agent.AgentTaskSource
+import com.ludoven.adbtool.agent.AgentTaskLogEntry
+import com.ludoven.adbtool.agent.AgentTaskLogRuntime
 import com.ludoven.adbtool.agent.AgentMemoryPreferences
 import com.ludoven.adbtool.agent.AgentMemoryRuntime
 import com.ludoven.adbtool.agent.AiConfigRepository
 import com.ludoven.adbtool.agent.AiConfiguration
+import com.ludoven.adbtool.agent.AgentProviderRuntime
+import com.ludoven.adbtool.agent.AgentWorkflow
+import com.ludoven.adbtool.agent.AgentWorkflowRuntime
+import com.ludoven.adbtool.agent.AgentAppKnowledgeCard
+import com.ludoven.adbtool.agent.WorkflowStatus
 import com.ludoven.adbtool.agent.OpenAiCompatibleClient
 import com.ludoven.adbtool.agent.RealAgentDeviceGateway
 import com.ludoven.adbtool.util.l10n
@@ -39,12 +46,22 @@ class AiAgentViewModel(
     val memoryEnabled: StateFlow<Boolean> = memoryPreferences.enabled
     private val _memoryNeedsConsent = MutableStateFlow(memoryPreferences.needsConsent)
     val memoryNeedsConsent: StateFlow<Boolean> = _memoryNeedsConsent.asStateFlow()
+    private val _workflows = MutableStateFlow(emptyList<AgentWorkflow>())
+    val workflows: StateFlow<List<AgentWorkflow>> = _workflows.asStateFlow()
+    private val _taskLogs = MutableStateFlow(emptyList<AgentTaskLogEntry>())
+    val taskLogs: StateFlow<List<AgentTaskLogEntry>> = _taskLogs.asStateFlow()
+    private val _knowledgeCards = MutableStateFlow(emptyList<AgentAppKnowledgeCard>())
+    val knowledgeCards: StateFlow<List<AgentAppKnowledgeCard>> = _knowledgeCards.asStateFlow()
 
     private var taskJob: Job? = null
     private var pendingConfirmation: CompletableDeferred<Boolean>? = null
 
     init {
         refreshConfigurationStatus()
+        viewModelScope.launch { AgentProviderRuntime.repository.ensureMigration() }
+        refreshWorkflows()
+        refreshKnowledgeCards()
+        refreshTaskLogs()
     }
 
     fun refreshConfigurationStatus() {
@@ -105,6 +122,7 @@ class AiAgentViewModel(
             } finally {
                 pendingConfirmation = null
                 taskJob = null
+                refreshTaskLogs()
             }
         }
     }
@@ -127,5 +145,44 @@ class AiAgentViewModel(
 
     fun clearError() {
         _state.value = _state.value.copy(errorMessage = null)
+    }
+
+    fun refreshWorkflows() = viewModelScope.launch {
+        _workflows.value = runCatching { AgentWorkflowRuntime.store.list() }.getOrDefault(emptyList())
+    }
+
+    fun refreshTaskLogs() = viewModelScope.launch {
+        _taskLogs.value = runCatching { AgentTaskLogRuntime.store.recent() }.getOrDefault(emptyList())
+    }
+
+    fun refreshKnowledgeCards() = viewModelScope.launch {
+        _knowledgeCards.value = runCatching { AgentWorkflowRuntime.store.listKnowledgeCards() }.getOrDefault(emptyList())
+    }
+
+    fun setWorkflowEnabled(workflow: AgentWorkflow, enabled: Boolean) = viewModelScope.launch {
+        if (!enabled || workflow.canEnable) {
+            runCatching { AgentWorkflowRuntime.store.save(workflow.copy(status = if (enabled) WorkflowStatus.ENABLED else WorkflowStatus.DISABLED)) }
+        }
+        refreshWorkflows()
+    }
+
+    fun deleteWorkflow(workflow: AgentWorkflow) = viewModelScope.launch {
+        runCatching { AgentWorkflowRuntime.store.delete(workflow.id) }
+        refreshWorkflows()
+    }
+
+    fun saveKnowledgeCard(card: AgentAppKnowledgeCard) = viewModelScope.launch {
+        runCatching { AgentWorkflowRuntime.store.saveKnowledgeCard(card) }
+        refreshKnowledgeCards()
+    }
+
+    fun setKnowledgeCardEnabled(card: AgentAppKnowledgeCard, enabled: Boolean) = viewModelScope.launch {
+        runCatching { AgentWorkflowRuntime.store.saveKnowledgeCard(card.copy(enabled = enabled)) }
+        refreshKnowledgeCards()
+    }
+
+    fun deleteKnowledgeCard(card: AgentAppKnowledgeCard) = viewModelScope.launch {
+        runCatching { AgentWorkflowRuntime.store.deleteKnowledgeCard(card.id) }
+        refreshKnowledgeCards()
     }
 }

@@ -167,6 +167,7 @@ kotlin {
         desktopMain.dependencies {
             implementation(compose.desktop.currentOs)
             implementation(libs.kotlinx.coroutinesSwing)
+            implementation("br.com.devsrsouza.compose.icons:tabler-icons-desktop:1.1.1")
         }
     }
 }

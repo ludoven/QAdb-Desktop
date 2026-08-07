@@ -128,7 +128,7 @@ class DevicesViewModel : BaseViewModel() {
         viewModelScope.launch {
             _isLoading.value = true
             val result = withContext(Dispatchers.IO) { AdbTool.disconnectDevice(deviceId) }
-            showTipDialog(MsgContent.Text(if (result.success) result.output else (result.errorMessage ?: result.output)), autoDismiss = true)
+            showToast(MsgContent.Text(if (result.success) result.output else (result.errorMessage ?: result.output)))
             refreshDevices()
             _isLoading.value = false
         }

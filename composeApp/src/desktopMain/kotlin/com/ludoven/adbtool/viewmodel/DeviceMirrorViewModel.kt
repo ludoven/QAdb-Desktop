@@ -308,13 +308,25 @@ class DeviceMirrorViewModel : BaseViewModel() {
             while (true) {
                 delay(1000)
                 if (!_mirrorRunning.value) continue
-                val alive = withContext(Dispatchers.IO) { AdbTool.isDeviceMirrorRunning() }
+                val (alive, exitResult) = withContext(Dispatchers.IO) {
+                    if (AdbTool.isDeviceMirrorRunning()) {
+                        true to null
+                    } else {
+                        false to AdbTool.consumeDeviceMirrorExitResult()
+                    }
+                }
                 if (!alive) {
                     _mirrorRunning.value = false
                     _activeDeviceId.value = null
                     _mirrorStartedAt.value = null
-                    _mirrorErrorMessage.value = null
-                    showTipDialog(MsgContent.Text(l10n("镜像窗口已关闭", "Device mirror window closed")), autoDismiss = true)
+                    val unexpectedExit = isUnexpectedMirrorExit(exitResult?.exitCode)
+                    val message = if (unexpectedExit) {
+                        formatMirrorExitMessage(checkNotNull(exitResult))
+                    } else {
+                        MsgContent.Text(l10n("镜像窗口已关闭", "Device mirror window closed"))
+                    }
+                    _mirrorErrorMessage.value = message.takeIf { unexpectedExit }
+                    showTipDialog(message, autoDismiss = true)
                     break
                 }
             }
@@ -324,6 +336,20 @@ class DeviceMirrorViewModel : BaseViewModel() {
     private fun stopMirrorStateWatcher() {
         mirrorStateWatcherJob?.cancel()
         mirrorStateWatcherJob = null
+    }
+
+    private fun formatMirrorExitMessage(exitResult: AdbTool.DeviceMirrorExitResult): MsgContent.Text {
+        val detail = exitResult.output.lineSequence()
+            .map(String::trim)
+            .filter(String::isNotEmpty)
+            .toList()
+            .takeLast(3)
+            .joinToString(" ")
+            .take(360)
+            .ifBlank { "scrcpy exit code ${exitResult.exitCode}" }
+        return MsgContent.Text(
+            l10n("镜像窗口意外关闭：$detail", "Device mirror closed unexpectedly: $detail")
+        )
     }
 
     fun watchDeviceConnectionState(deviceId: String?) {
@@ -381,3 +407,5 @@ class DeviceMirrorViewModel : BaseViewModel() {
         deviceConnectionWatcherJob = null
     }
 }
+
+internal fun isUnexpectedMirrorExit(exitCode: Int?): Boolean = exitCode != null && exitCode != 0

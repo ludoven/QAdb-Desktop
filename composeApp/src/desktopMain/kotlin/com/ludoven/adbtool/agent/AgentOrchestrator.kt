@@ -8,9 +8,12 @@ class AgentOrchestrator(
     private val modelClient: AgentModelClient,
     private val deviceGateway: AgentDeviceGateway,
     private val maxActions: Int = DEFAULT_MAX_ACTIONS,
+    private val taskBudget: AgentBudget = AgentBudget(),
     private val riskEvaluator: AgentRiskEvaluator = AgentRiskEvaluator(),
     private val memoryPreferences: AgentMemoryPreferences = AgentMemoryRuntime.preferences,
-    private val memoryStoreProvider: () -> AgentMemoryStore = { AgentMemoryRuntime.store }
+    private val memoryStoreProvider: () -> AgentMemoryStore = { AgentMemoryRuntime.store },
+    private val taskLogStoreProvider: () -> AgentTaskLogStore = { AgentTaskLogRuntime.store },
+    private val workflowStoreProvider: () -> AgentWorkflowStore = { AgentWorkflowRuntime.store }
 ) {
     suspend fun run(
         task: String,
@@ -22,6 +25,12 @@ class AgentOrchestrator(
         onState: (AgentTaskUiState) -> Unit,
         confirmSensitiveAction: suspend (AgentStep) -> Boolean
     ): AgentTaskUiState {
+        val taskLogStore = runCatching { taskLogStoreProvider() }.getOrElse { NoopAgentTaskLogStore }
+        val taskLogRunId = newId()
+        val publishState: (AgentTaskUiState) -> Unit = { snapshot ->
+            runCatching { taskLogStore.record(taskLogRunId, snapshot) }
+            onState(snapshot)
+        }
         val memoryEnabled = memoryPreferences.enabled.value
         val contextManager = AgentContextManager(
             memoryStore = if (memoryEnabled) memoryStoreProvider() else null,
@@ -51,9 +60,104 @@ class AgentOrchestrator(
         var appScopedMemoryLoaded = false
         val loopGuard = AgentLoopGuard()
         val planExecutor = AgentPlanExecutor(deviceGateway, riskEvaluator)
-        onState(state)
+        val budgetTracker = AgentBudgetTracker(taskBudget)
+        val taskMode = task.classifyMode()
+        var missingElementRecoveryCount = 0
+        val workflowEvidence = mutableListOf<WorkflowRecordedStep>()
+        var appKnowledgeContext = ""
+        state = state.copy(budgetStatus = budgetTracker.current())
+        runCatching { taskLogStore.start(taskLogRunId, task, state) }
+        publishState(state)
 
         try {
+            if (taskMode != AgentTaskMode.INTERACTIVE) {
+                val observation = when (taskMode) {
+                    AgentTaskMode.CONVERSATIONAL -> conversationObservation()
+                    AgentTaskMode.READ_ONLY_DEVICE -> observeLightweightSafely(
+                        deviceId = deviceId,
+                        includeUiHierarchy = true
+                    ) ?: throw AgentException("Unable to read the device overview")
+                    AgentTaskMode.INTERACTIVE -> error("Interactive tasks are handled by the execution loop")
+                }
+                val deviceState = if (taskMode == AgentTaskMode.READ_ONLY_DEVICE) {
+                    PageSignatureEngine.state(observation)
+                } else {
+                    null
+                }
+                state = state.copy(
+                    observationMode = AgentObservationMode.TEXT_ONLY,
+                    phase = AgentRunPhase.THINKING,
+                    deviceState = deviceState,
+                    pageDiff = deviceState?.let { PageSignatureEngine.diff(state.deviceState, it) },
+                    budgetStatus = budgetTracker.current(),
+                    executionDetails = (
+                        state.executionDetails + when (taskMode) {
+                            AgentTaskMode.CONVERSATIONAL -> "Conversational request: device observation and screenshot skipped"
+                            AgentTaskMode.READ_ONLY_DEVICE -> "Read-only device analysis: UI hierarchy used; screenshot and device actions skipped"
+                            AgentTaskMode.INTERACTIVE -> ""
+                        }
+                    ).takeLast(40)
+                )
+                publishState(state)
+                if (!budgetTracker.canRequest(includeVision = false, isReplan = false)) {
+                    throw AgentException(budgetTracker.current().stopReason ?: "Model budget reached")
+                }
+                val decision = requestDecision(
+                    config = config,
+                    apiKey = apiKey,
+                    context = AgentModelContext(task = task, observation = observation, completedSteps = emptyList()),
+                    includeScreenshot = false,
+                    finalResponseOnly = true,
+                    onVisionFallback = {}
+                )
+                state = state.copy(
+                    usage = state.usage + decision.usage,
+                    budgetStatus = budgetTracker.record(decision.usage, usedVision = false),
+                    phase = AgentRunPhase.THINKING
+                )
+                val finish = decision.action as? AgentAction.Finish
+                    ?: throw ModelProtocolException("Read-only tasks may only return a finish result; no device action was executed")
+                if (finish.outcome == AgentFinishOutcome.BLOCKED) {
+                    val message = "Task blocked: ${finish.summary}"
+                    state = state.copy(
+                        messages = state.messages + AgentMessage(id = newId(), role = AgentMessageRole.SYSTEM, text = message),
+                        isRunning = false,
+                        phase = AgentRunPhase.FAILED,
+                        errorMessage = message
+                    )
+                } else {
+                    state = state.copy(
+                        messages = state.messages + AgentMessage(id = newId(), role = AgentMessageRole.ASSISTANT, text = finish.summary),
+                        isRunning = false,
+                        phase = AgentRunPhase.COMPLETED
+                    )
+                }
+                publishState(state)
+                return state
+            }
+
+            val workflowStore = runCatching { workflowStoreProvider() }.getOrNull()
+            val workflowStart = System.currentTimeMillis()
+            val workflowObservation = observeLightweightSafely(deviceId, includeUiHierarchy = true)
+            val workflowState = workflowObservation?.let(PageSignatureEngine::state)
+            val workflow = workflowState?.let { current -> workflowStore?.findEnabled(task, current) }
+            if (workflow != null) {
+                val replay = GuardedWorkflowExecutor(deviceGateway, riskEvaluator).execute(
+                    workflow = workflow,
+                    deviceId = deviceId,
+                    initialState = state.copy(deviceState = workflowState),
+                    onState = publishState,
+                    confirmSensitiveAction = confirmSensitiveAction
+                )
+                state = replay.state
+                workflowStore?.recordResult(workflow.id, replay.completed, System.currentTimeMillis() - workflowStart)
+                if (replay.completed) {
+                    return completePlannedTask(state, "Workflow completed", publishState)
+                }
+                state = state.withPlanningNotice("Workflow stopped safely: ${replay.failure}. Switching to adaptive planning.")
+                publishState(state)
+            }
+
             AgentTaskTemplateMatcher.match(task)
                 ?.takeIf { taskSource == AgentTaskSource.DIRECT_TEMPLATE }
                 ?.let { template ->
@@ -61,21 +165,24 @@ class AgentOrchestrator(
                     plan = template,
                     deviceId = deviceId,
                     initialState = state,
-                    onState = onState,
+                    onState = publishState,
                     confirmSensitiveAction = confirmSensitiveAction,
                     strategy = AgentExecutionStrategy.FAST_TEMPLATE,
                     maxSteps = TEMPLATE_MAX_STEPS
                 )
                 state = execution.state
-                if (execution.completed) return completePlannedTask(state, template.summary, onState)
+                if (execution.completed) return completePlannedTask(state, template.summary, publishState)
                 state = state.withPlanningNotice(
                     "Fast path verification failed: ${execution.failure}. Switching to adaptive planning."
                 )
-                onState(state)
+                publishState(state)
             }
 
             val planningObservation = observeLightweightSafely(deviceId)
             if (planningObservation != null) {
+                if (!budgetTracker.canRequest(includeVision = false, isReplan = false)) {
+                    throw AgentException(budgetTracker.current().stopReason ?: "Model budget reached")
+                }
                 val planned = requestPlanSafely(
                     config = config,
                     apiKey = apiKey,
@@ -83,46 +190,54 @@ class AgentOrchestrator(
                     observation = planningObservation
                 )
                 if (planned != null) {
-                    state = state.copy(usage = state.usage + planned.usage, phase = AgentRunPhase.THINKING)
-                    onState(state)
+                    state = state.copy(
+                        usage = state.usage + planned.usage,
+                        budgetStatus = budgetTracker.record(planned.usage, usedVision = false),
+                        phase = AgentRunPhase.THINKING
+                    )
+                    publishState(state)
                     if (planned.plan.mode == AgentPlanMode.BATCH) {
                         val execution = planExecutor.execute(
                             plan = planned.plan,
                             deviceId = deviceId,
                             initialState = state,
-                            onState = onState,
+                            onState = publishState,
                             confirmSensitiveAction = confirmSensitiveAction,
                             strategy = AgentExecutionStrategy.BATCH_PLAN,
                             maxSteps = BATCH_MAX_STEPS
                         )
                         state = execution.state
-                        if (execution.completed) return completePlannedTask(state, planned.plan.summary, onState)
+                        if (execution.completed) return completePlannedTask(state, planned.plan.summary, publishState)
 
                         val repairObservation = observeLightweightSafely(deviceId)
                         val repair = repairObservation?.let {
-                            requestRepairSafely(
+                            if (budgetTracker.canRequest(includeVision = false, isReplan = true)) requestRepairSafely(
                                 config = config,
                                 apiKey = apiKey,
                                 task = task,
                                 observation = it,
                                 completedSteps = state.steps,
                                 failure = execution.failure
-                            )
+                            ) else null
                         }
                         if (repair?.plan?.mode == AgentPlanMode.BATCH) {
-                            state = state.copy(usage = state.usage + repair.usage, phase = AgentRunPhase.THINKING)
-                            onState(state)
+                            state = state.copy(
+                                usage = state.usage + repair.usage,
+                                budgetStatus = budgetTracker.record(repair.usage, usedVision = false, isReplan = true),
+                                phase = AgentRunPhase.THINKING
+                            )
+                            publishState(state)
                             val repaired = planExecutor.execute(
                                 plan = repair.plan,
                                 deviceId = deviceId,
                                 initialState = state,
-                                onState = onState,
+                                onState = publishState,
                                 confirmSensitiveAction = confirmSensitiveAction,
                                 strategy = AgentExecutionStrategy.REPAIR_PLAN,
                                 maxSteps = REPAIR_MAX_STEPS
                             )
                             state = repaired.state
-                            if (repaired.completed) return completePlannedTask(state, repair.plan.summary, onState)
+                            if (repaired.completed) return completePlannedTask(state, repair.plan.summary, publishState)
                             state = state.withPlanningNotice(
                                 "Batch repair failed: ${repaired.failure}. Switching to adaptive execution."
                             )
@@ -131,10 +246,10 @@ class AgentOrchestrator(
                                 "Batch plan failed: ${execution.failure}. Switching to adaptive execution."
                             )
                         }
-                        onState(state)
+                        publishState(state)
                     } else {
                         state = state.copy(executionStrategy = AgentExecutionStrategy.INTERACTIVE)
-                        onState(state)
+                        publishState(state)
                     }
                 }
             }
@@ -143,19 +258,36 @@ class AgentOrchestrator(
                     throw AgentException("The selected device is no longer connected")
                 }
                 state = state.copy(phase = AgentRunPhase.OBSERVING)
-                onState(state)
+                publishState(state)
                 val observation = deviceGateway.observe(deviceId)
+                val nextDeviceState = PageSignatureEngine.state(observation)
+                val pageDiff = PageSignatureEngine.diff(state.deviceState, nextDeviceState)
                 val canSendScreenshot = visionAvailable &&
                     config.visionMode != VisionMode.DISABLED &&
-                    observation.screenshotPng != null
+                    (config.visionMode == VisionMode.ENABLED || task.shouldUseVisionAutomatically(observation)) &&
+                    observation.screenshotPng != null &&
+                    budgetTracker.current().mode !in setOf(AgentBudgetMode.NO_OPTIONAL_VISION, AgentBudgetMode.FINAL_RECOVERY_ONLY, AgentBudgetMode.EXHAUSTED) &&
+                    budgetTracker.canRequest(includeVision = true, isReplan = false)
                 state = state.copy(
                     observationMode = if (canSendScreenshot) {
                         AgentObservationMode.VISION
                     } else {
                         AgentObservationMode.TEXT_ONLY
                     },
-                    phase = AgentRunPhase.THINKING
+                    phase = AgentRunPhase.THINKING,
+                    deviceState = nextDeviceState,
+                    pageDiff = pageDiff,
+                    latestScreenshot = observation.screenshotPng ?: state.latestScreenshot,
+                    budgetStatus = budgetTracker.current(),
+                    executionDetails = (state.executionDetails + "Observed ${nextDeviceState.pageSignature.value}; ${if (pageDiff.changed) "page changed" else "page stable"}").takeLast(40)
                 )
+
+                if (nextDeviceState.packageName != null) {
+                    appKnowledgeContext = runCatching {
+                        workflowStoreProvider().listKnowledgeCards(nextDeviceState.packageName, enabledOnly = true)
+                            .joinToString("\n\n") { card -> "[${card.title}]\n${card.guide}" }
+                    }.getOrDefault("")
+                }
 
                 contextSnapshot = if (contextSnapshot == null || (targetPackage != null && !appScopedMemoryLoaded)) {
                     contextManager.prepare(
@@ -180,7 +312,7 @@ class AgentOrchestrator(
                         existingCompactions = state.compactionCount
                     )
                 }
-                if (contextManager.needsModelCompaction(contextSnapshot!!)) {
+                if (contextManager.needsModelCompaction(contextSnapshot!!) && budgetTracker.canSpendOnCompaction()) {
                     val compaction = modelClient.compactContext(
                         config = config,
                         apiKey = apiKey,
@@ -189,7 +321,8 @@ class AgentOrchestrator(
                             observation = observation,
                             completedSteps = contextSnapshot!!.recentSteps,
                             memoryContext = contextSnapshot!!.memoryText,
-                            compactedHistory = contextSnapshot!!.compactedHistory
+                            compactedHistory = contextSnapshot!!.compactedHistory,
+                            appKnowledgeContext = appKnowledgeContext
                         )
                     )
                     if (compaction != null) {
@@ -200,31 +333,52 @@ class AgentOrchestrator(
                             observation = observation
                         )
                         state = state.copy(usage = state.usage + compaction.usage)
+                        state = state.copy(budgetStatus = budgetTracker.record(compaction.usage, usedVision = false))
                     }
+                } else if (contextManager.needsModelCompaction(contextSnapshot!!)) {
+                    state = state.copy(
+                        executionDetails = (
+                            state.executionDetails + "Skipped optional model compaction to preserve action and final-result budget"
+                            ).takeLast(40)
+                    )
                 }
                 state = state.copy(
                     memoryHitCount = contextSnapshot!!.memoryIds.size,
                     compactionCount = contextSnapshot!!.compactionCount
                 )
-                onState(state)
+                publishState(state)
 
                 var context = AgentModelContext(
                     task = task,
                     observation = observation,
                     completedSteps = contextSnapshot!!.recentSteps,
                     memoryContext = contextSnapshot!!.memoryText,
-                    compactedHistory = contextSnapshot!!.compactedHistory
+                    compactedHistory = contextSnapshot!!.compactedHistory,
+                    appKnowledgeContext = appKnowledgeContext
                 )
+                val recoveringMissingElement = missingElementRecoveryCount > 0
+                if (!budgetTracker.canRequest(canSendScreenshot, isReplan = recoveringMissingElement)) {
+                    throw AgentException(budgetTracker.current().stopReason ?: "Model budget reached")
+                }
+                val finalResponseOnly = budgetTracker.shouldForceFinalResponse()
+                if (finalResponseOnly) {
+                    state = state.copy(
+                        executionDetails = (
+                            state.executionDetails + "Final reserved model call: requesting a verified task result"
+                            ).takeLast(40)
+                    )
+                    publishState(state)
+                }
                 val decision = try {
-                    requestDecision(config, apiKey, context, canSendScreenshot) {
+                    requestDecision(config, apiKey, context, canSendScreenshot, finalResponseOnly) {
                         visionAvailable = false
                         state = state.copy(observationMode = AgentObservationMode.TEXT_ONLY)
-                        onState(state)
+                        publishState(state)
                     }
                 } catch (overflow: ModelContextOverflowException) {
                     contextManager.recordContextOverflow(config)
                     state = state.copy(phase = AgentRunPhase.RETRYING)
-                    onState(state)
+                    publishState(state)
                     contextSnapshot = contextManager.compact(
                         task = task,
                         memoryText = contextSnapshot!!.memoryText,
@@ -238,19 +392,53 @@ class AgentOrchestrator(
                         completedSteps = contextSnapshot!!.recentSteps,
                         compactedHistory = contextSnapshot!!.compactedHistory
                     )
-                    requestDecision(config, apiKey, context, false) {
+                    requestDecision(config, apiKey, context, false, finalResponseOnly) {
                         visionAvailable = false
                     }
                 }
                 state = state.copy(
                     usage = state.usage + decision.usage,
+                    budgetStatus = budgetTracker.record(
+                        decision.usage,
+                        decision.usedVision,
+                        isReplan = recoveringMissingElement
+                    ),
                     phase = AgentRunPhase.THINKING
                 )
 
                 val action = decision.action
-                validateAgentAction(action, observation).getOrElse {
-                    throw ModelProtocolException(it.message ?: "Invalid action arguments")
+                val validationError = validateAgentAction(action, observation).exceptionOrNull()
+                if (validationError != null) {
+                    val message = validationError.message ?: "Invalid action arguments"
+                    if (action.hasMissingElementReference(message)) {
+                        missingElementRecoveryCount += 1
+                        val recoveryDetail = action.missingElementRecoveryDetail(observation, message)
+                        val failedStep = AgentStep(
+                            id = newId(),
+                            action = action,
+                            status = AgentStepStatus.FAILED,
+                            result = recoveryDetail
+                        )
+                        state = state.copy(
+                            steps = state.steps + failedStep,
+                            phase = if (missingElementRecoveryCount < MAX_MISSING_ELEMENT_RECOVERIES) {
+                                AgentRunPhase.RETRYING
+                            } else {
+                                AgentRunPhase.FAILED
+                            },
+                            executionDetails = (state.executionDetails + recoveryDetail).takeLast(40)
+                        )
+                        publishState(state)
+                        if (missingElementRecoveryCount < MAX_MISSING_ELEMENT_RECOVERIES) {
+                            return@repeat
+                        }
+                        throw ModelProtocolException(
+                            "UI element resolution failed $missingElementRecoveryCount times; task stopped safely"
+                        )
+                    }
+                    throw ModelProtocolException(message)
                 }
+                missingElementRecoveryCount = 0
                 if (action is AgentAction.Finish) {
                     if (action.outcome == AgentFinishOutcome.BLOCKED) {
                         val message = "Task blocked: ${action.summary}"
@@ -265,7 +453,7 @@ class AgentOrchestrator(
                             phase = AgentRunPhase.FAILED,
                             errorMessage = message
                         )
-                        onState(state)
+                        publishState(state)
                         return state
                     }
                     val saved = contextManager.saveSuccessfulTask(
@@ -275,6 +463,14 @@ class AgentOrchestrator(
                         finish = action,
                         steps = state.steps
                     )
+                    val workflowDraft = WorkflowDraftFactory.fromRecordedTask(
+                        task,
+                        workflowEvidence.firstOrNull()?.before,
+                        workflowEvidence
+                    )
+                    if (workflowDraft != null) {
+                        runCatching { AgentWorkflowRuntime.store.save(workflowDraft) }
+                    }
                     state = state.copy(
                         messages = state.messages + AgentMessage(
                             id = newId(),
@@ -284,9 +480,14 @@ class AgentOrchestrator(
                         isRunning = false,
                         pendingConfirmation = null,
                         phase = AgentRunPhase.COMPLETED,
-                        savedMemoryCount = saved
+                        savedMemoryCount = saved,
+                        executionDetails = (state.executionDetails + if (workflowDraft == null) {
+                            "Workflow draft was not created because the task was not fully safe and verified"
+                        } else {
+                            "Workflow draft created; review it before enabling"
+                        }).takeLast(40)
                     )
-                    onState(state)
+                    publishState(state)
                     return state
                 }
 
@@ -303,7 +504,7 @@ class AgentOrchestrator(
                             steps = state.steps + loopStep,
                             phase = AgentRunPhase.THINKING
                         )
-                        onState(state)
+                        publishState(state)
                         return@repeat
                     }
                     is LoopDecision.Abort -> throw AgentLoopException(
@@ -336,7 +537,7 @@ class AgentOrchestrator(
                         AgentRunPhase.EXECUTING
                     }
                 )
-                onState(state)
+                publishState(state)
 
                 if (risk.level == AgentRiskLevel.CONFIRMATION_REQUIRED) {
                     val approved = confirmSensitiveAction(step)
@@ -349,7 +550,7 @@ class AgentOrchestrator(
                             pendingConfirmation = null,
                             phase = AgentRunPhase.THINKING
                         )
-                        onState(state)
+                        publishState(state)
                         return@repeat
                     }
                     step = step.copy(status = AgentStepStatus.RUNNING)
@@ -357,13 +558,19 @@ class AgentOrchestrator(
                         pendingConfirmation = null,
                         phase = AgentRunPhase.EXECUTING
                     )
-                    onState(state)
+                    publishState(state)
                 }
 
                 val result = deviceGateway.execute(deviceId, action)
                 state = state.copy(phase = AgentRunPhase.VERIFYING)
-                onState(state)
-                val postObservation = runCatching { deviceGateway.observe(deviceId) }.getOrNull()
+                publishState(state)
+                val postObservation = runCatching {
+                    if (action.requiresVisibleChange()) {
+                        waitForStableObservation(observe = { deviceGateway.observe(deviceId) }) ?: deviceGateway.observe(deviceId)
+                    } else {
+                        deviceGateway.observe(deviceId)
+                    }
+                }.getOrNull()
                 val visibleChange = postObservation?.let { hasVisibleChange(observation, it) }
                 val verification = verifyAction(
                     action = action,
@@ -381,11 +588,21 @@ class AgentOrchestrator(
                         }
                     }.take(MAX_STEP_RESULT_LENGTH)
                 )
-                state = state.replaceStep(step).copy(phase = AgentRunPhase.THINKING)
+                state = state.replaceStep(step).copy(
+                    phase = AgentRunPhase.THINKING,
+                    executionDetails = (state.executionDetails + "${action.toolName}: ${verification.status.name.lowercase()} ${verification.message}").takeLast(40)
+                )
                 if (action is AgentAction.LaunchPackage && verification.status == AgentStepStatus.COMPLETED) {
                     targetPackage = action.packageName
                 }
-                onState(state)
+                if (verification.status == AgentStepStatus.COMPLETED && postObservation != null) {
+                    workflowEvidence += WorkflowRecordedStep(
+                        action = action,
+                        before = PageSignatureEngine.state(observation),
+                        after = PageSignatureEngine.state(postObservation)
+                    )
+                }
+                publishState(state)
             }
             throw AgentException("The task stopped after reaching the $maxActions-action safety limit")
         } catch (cancelled: CancellationException) {
@@ -399,7 +616,7 @@ class AgentOrchestrator(
                     text = "Task cancelled"
                 )
             )
-            onState(state)
+            publishState(state)
             throw cancelled
         } catch (error: Exception) {
             state = state.copy(
@@ -413,7 +630,7 @@ class AgentOrchestrator(
                     text = error.message ?: "Agent task failed"
                 )
             )
-            onState(state)
+            publishState(state)
             return state
         }
     }
@@ -423,13 +640,22 @@ class AgentOrchestrator(
         apiKey: String,
         context: AgentModelContext,
         includeScreenshot: Boolean,
+        finalResponseOnly: Boolean,
         onVisionFallback: () -> Unit
     ): AgentModelDecision = try {
-        modelClient.nextAction(config, apiKey, context, includeScreenshot)
+        if (finalResponseOnly) {
+            modelClient.finishTask(config, apiKey, context, includeScreenshot)
+        } else {
+            modelClient.nextAction(config, apiKey, context, includeScreenshot)
+        }
     } catch (unsupported: UnsupportedVisionException) {
         if (!includeScreenshot || config.visionMode == VisionMode.ENABLED) throw unsupported
         onVisionFallback()
-        modelClient.nextAction(config, apiKey, context, includeScreenshot = false)
+        if (finalResponseOnly) {
+            modelClient.finishTask(config, apiKey, context, includeScreenshot = false)
+        } else {
+            modelClient.nextAction(config, apiKey, context, includeScreenshot = false)
+        }
     }
 
     private suspend fun requestPlanSafely(
@@ -445,8 +671,11 @@ class AgentOrchestrator(
         null
     }
 
-    private suspend fun observeLightweightSafely(deviceId: String): AgentObservation? = try {
-        deviceGateway.observeLightweight(deviceId)
+    private suspend fun observeLightweightSafely(
+        deviceId: String,
+        includeUiHierarchy: Boolean = false
+    ): AgentObservation? = try {
+        deviceGateway.observeLightweight(deviceId, includeUiHierarchy)
     } catch (cancelled: CancellationException) {
         throw cancelled
     } catch (_: Exception) {
@@ -519,9 +748,13 @@ private fun verifyAction(
                 AgentStepStatus.UNVERIFIED,
                 "Launch command succeeded, but the foreground Activity is unavailable for verification"
             )
-            activity.belongsToPackage(action.packageName) -> ActionVerification(
+            activity.isExpectedLaunchTarget(action.packageName) -> ActionVerification(
                 AgentStepStatus.COMPLETED,
-                "Verified foreground Activity: $activity"
+                if (activity.belongsToPackage(action.packageName)) {
+                    "Verified foreground Activity: $activity"
+                } else {
+                    "Verified approved launch handoff: $activity"
+                }
             )
             else -> ActionVerification(
                 AgentStepStatus.FAILED,
@@ -542,6 +775,18 @@ private fun verifyAction(
 
 private fun String.belongsToPackage(packageName: String): Boolean =
     contains("$packageName/") || contains("$packageName ") || trim() == packageName
+
+/**
+ * Gemini's exported Bard entry point intentionally hands the foreground task to the
+ * Google Search assistant deeplink host. The ActivityTaskManager log records this
+ * handoff as a successful launch, so treating it as a different-app failure is wrong.
+ */
+private fun String.isExpectedLaunchTarget(packageName: String): Boolean {
+    if (belongsToPackage(packageName)) return true
+    return packageName == GEMINI_PACKAGE &&
+        contains("$GOOGLE_SEARCH_PACKAGE/") &&
+        contains("MainAssistantDeeplink", ignoreCase = true)
+}
 
 private fun hasVisibleChange(before: AgentObservation, after: AgentObservation): Boolean {
     if (before.currentActivity != after.currentActivity) return true
@@ -594,9 +839,38 @@ private fun AgentAction.loopActionLabel(): String? = when (this) {
     is AgentAction.LaunchPackage -> "launch_package:$packageName"
     is AgentAction.KeyEvent -> "key_event:${key.name}"
     is AgentAction.FindApp -> "find_app:${query.trim().lowercase()}"
-    AgentAction.Observe -> "observe"
+    AgentAction.Observe -> null // Observation is a local runtime refresh, never a navigation loop.
     is AgentAction.Wait -> "wait:$durationMs"
     else -> null
+}
+
+private fun AgentAction.hasMissingElementReference(message: String): Boolean =
+    (this is AgentAction.TapElement && message == "The requested UI element does not exist") ||
+        (this is AgentAction.InputText && message == "The requested input element does not exist")
+
+private fun AgentAction.missingElementRecoveryDetail(
+    observation: AgentObservation,
+    validationMessage: String
+): String = buildString {
+    append("Selector recovery: ").append(validationMessage)
+    when (this@missingElementRecoveryDetail) {
+        is AgentAction.TapElement -> append("; requested_observation=").append(observationId)
+            .append("; requested_element=").append(elementId)
+        is AgentAction.InputText -> append("; requested_observation=").append(observationId ?: "<none>")
+            .append("; requested_element=").append(elementId ?: "<none>")
+        else -> Unit
+    }
+    append("; available_nodes=")
+    append(
+        observation.uiNodes.take(MAX_LOGGED_SELECTOR_NODES).joinToString(",") { node ->
+            buildString {
+                append(node.elementId).append("{")
+                append("role=").append(node.role.ifBlank { node.className })
+                if (node.resourceId.isNotBlank()) append(",id=").append(node.resourceId)
+                append(",enabled=").append(node.enabled).append("}")
+            }
+        }.ifBlank { "<none>" }
+    )
 }
 
 private fun AgentObservation.stateFingerprint(): String {
@@ -605,6 +879,39 @@ private fun AgentObservation.stateFingerprint(): String {
     return MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
 }
 
+private enum class AgentTaskMode {
+    CONVERSATIONAL,
+    READ_ONLY_DEVICE,
+    INTERACTIVE
+}
+
+private fun String.classifyMode(): AgentTaskMode {
+    val normalized = lowercase().replace(Regex("\\s+"), "")
+    if (normalized in setOf("你好", "您好", "嗨", "hello", "hi", "hey")) {
+        return AgentTaskMode.CONVERSATIONAL
+    }
+    if (INTERACTIVE_TASK_TERMS.any(normalized::contains)) return AgentTaskMode.INTERACTIVE
+    return if (DEVICE_READ_ONLY_TERMS.any(normalized::contains)) {
+        AgentTaskMode.READ_ONLY_DEVICE
+    } else {
+        AgentTaskMode.INTERACTIVE
+    }
+}
+
+private fun String.shouldUseVisionAutomatically(observation: AgentObservation): Boolean {
+    val normalized = lowercase()
+    return observation.uiNodes.isEmpty() || AUTO_VISION_TERMS.any(normalized::contains)
+}
+
+private fun conversationObservation(): AgentObservation = AgentObservation(
+    screenshotPng = null,
+    uiHierarchy = "",
+    currentActivity = "",
+    screenWidth = 0,
+    screenHeight = 0,
+    warnings = listOf("No device observation was requested for this conversational message")
+)
+
 private class AgentLoopException(message: String) : AgentException(message)
 
 private fun newId(): String = UUID.randomUUID().toString()
@@ -612,6 +919,24 @@ private fun newId(): String = UUID.randomUUID().toString()
 private const val DEFAULT_MAX_ACTIONS = 20
 private const val MAX_STEP_RESULT_LENGTH = 2_000
 private const val LOOP_CHECKPOINT_WINDOW = 8
+private const val MAX_MISSING_ELEMENT_RECOVERIES = 2
+private const val MAX_LOGGED_SELECTOR_NODES = 24
 private const val TEMPLATE_MAX_STEPS = 3
 private const val BATCH_MAX_STEPS = 6
 private const val REPAIR_MAX_STEPS = 3
+private const val GEMINI_PACKAGE = "com.google.android.apps.bard"
+private const val GOOGLE_SEARCH_PACKAGE = "com.google.android.googlequicksearchbox"
+
+private val INTERACTIVE_TASK_TERMS = listOf(
+    "打开", "启动", "点击", "点一下", "输入", "发送", "安装", "卸载", "清除", "删除", "重启", "关闭",
+    "返回", "滑动", "下拉", "授权", "允许", "拒绝", "切换", "设置", "调整", "修改", "搜索"
+)
+
+private val DEVICE_READ_ONLY_TERMS = listOf(
+    "设备概览", "设备情况", "设备状态", "当前设备", "设备信息", "分析设备", "分析我", "诊断设备",
+    "电量", "网络状态", "无线调试", "wifi", "wi-fi", "版本信息", "系统信息", "硬件信息"
+)
+
+private val AUTO_VISION_TERMS = listOf(
+    "截图", "屏幕", "画面", "图片", "图像", "图标", "视觉", "坐标", "识别", "看图"
+)

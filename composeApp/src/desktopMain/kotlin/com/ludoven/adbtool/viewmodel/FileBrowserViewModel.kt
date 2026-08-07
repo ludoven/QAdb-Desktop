@@ -249,9 +249,9 @@ class FileBrowserViewModel : BaseViewModel() {
             clearClipboard()
             loadFiles(deviceId = deviceId, forceRefresh = true)
             if (failCount > 0) {
-                showTipDialog(MsgContent.Text(l10n("完成：成功 $successCount 个，失败 $failCount 个", "Completed: $successCount succeeded, $failCount failed")), autoDismiss = true)
+                showToast(MsgContent.Text(l10n("完成：成功 $successCount 个，失败 $failCount 个", "Completed: $successCount succeeded, $failCount failed")))
             } else {
-                showTipDialog(MsgContent.Text(l10n("操作成功：$successCount 个文件", "Completed: $successCount files")), autoDismiss = true)
+                showToast(MsgContent.Text(l10n("操作成功：$successCount 个文件", "Completed: $successCount files")))
             }
         }
     }
@@ -266,10 +266,10 @@ class FileBrowserViewModel : BaseViewModel() {
                 AdbTool.execShellAsync(command, deviceId)
             }
             if (result.success || result.output.isBlank()) {
-                showTipDialog(MsgContent.Text(l10n("已删除: ${path.substringAfterLast("/")}", "Deleted: ${path.substringAfterLast("/")}")), autoDismiss = true)
+                showToast(MsgContent.Text(l10n("已删除: ${path.substringAfterLast("/")}", "Deleted: ${path.substringAfterLast("/")}")))
                 loadFiles(deviceId = deviceId, forceRefresh = true)
             } else {
-                showTipDialog(MsgContent.Text(l10n("删除失败: ${result.errorMessage ?: result.output}", "Delete failed: ${result.errorMessage ?: result.output}")))
+                showToast(MsgContent.Text(l10n("删除失败: ${result.errorMessage ?: result.output}", "Delete failed: ${result.errorMessage ?: result.output}")))
             }
         }
     }
@@ -284,10 +284,10 @@ class FileBrowserViewModel : BaseViewModel() {
                 AdbTool.execShellAsync(command, deviceId)
             }
             if (result.success || result.output.isBlank()) {
-                showTipDialog(MsgContent.Text(l10n("已删除 ${targets.size} 个项目", "Deleted ${targets.size} items")), autoDismiss = true)
+                showToast(MsgContent.Text(l10n("已删除 ${targets.size} 个项目", "Deleted ${targets.size} items")))
                 loadFiles(deviceId = deviceId, forceRefresh = true)
             } else {
-                showTipDialog(MsgContent.Text(l10n("删除失败: ${result.errorMessage ?: result.output}", "Delete failed: ${result.errorMessage ?: result.output}")))
+                showToast(MsgContent.Text(l10n("删除失败: ${result.errorMessage ?: result.output}", "Delete failed: ${result.errorMessage ?: result.output}")))
             }
         }
     }
@@ -301,10 +301,10 @@ class FileBrowserViewModel : BaseViewModel() {
                 AdbTool.execShellAsync(command, deviceId)
             }
             if (result.success || result.output.isBlank()) {
-                showTipDialog(MsgContent.Text(l10n("重命名成功", "Renamed successfully")), autoDismiss = true)
+                showToast(MsgContent.Text(l10n("重命名成功", "Renamed successfully")))
                 loadFiles(deviceId = deviceId, forceRefresh = true)
             } else {
-                showTipDialog(MsgContent.Text(l10n("重命名失败: ${result.errorMessage ?: result.output}", "Rename failed: ${result.errorMessage ?: result.output}")))
+                showToast(MsgContent.Text(l10n("重命名失败: ${result.errorMessage ?: result.output}", "Rename failed: ${result.errorMessage ?: result.output}")))
             }
         }
     }
@@ -318,10 +318,10 @@ class FileBrowserViewModel : BaseViewModel() {
                 AdbTool.execShellAsync(command, deviceId)
             }
             if (result.success || result.output.isBlank()) {
-                showTipDialog(MsgContent.Text(l10n("已创建目录: $dirName", "Created directory: $dirName")), autoDismiss = true)
+                showToast(MsgContent.Text(l10n("已创建目录: $dirName", "Created directory: $dirName")))
                 loadFiles(deviceId = deviceId, forceRefresh = true)
             } else {
-                showTipDialog(MsgContent.Text(l10n("创建失败: ${result.errorMessage ?: result.output}", "Create failed: ${result.errorMessage ?: result.output}")))
+                showToast(MsgContent.Text(l10n("创建失败: ${result.errorMessage ?: result.output}", "Create failed: ${result.errorMessage ?: result.output}")))
             }
         }
     }
@@ -339,7 +339,7 @@ class FileBrowserViewModel : BaseViewModel() {
                 AdbTool.pullFileAsync(devicePath, localPath, deviceId)
             }
             if (result.success) {
-                showTipDialog(MsgContent.Text(l10n("已拉取到: $localPath", "Pulled to: $localPath")), autoDismiss = true)
+                showToast(MsgContent.Text(l10n("已拉取到: $localPath", "Pulled to: $localPath")))
                 // Open the folder
                 runCatching {
                     val dir = java.io.File(localPath).parentFile
@@ -348,7 +348,7 @@ class FileBrowserViewModel : BaseViewModel() {
                     }
                 }
             } else {
-                showTipDialog(MsgContent.Text(l10n("拉取失败: ${result.errorMessage ?: result.output}", "Pull failed: ${result.errorMessage ?: result.output}")))
+                showToast(MsgContent.Text(l10n("拉取失败: ${result.errorMessage ?: result.output}", "Pull failed: ${result.errorMessage ?: result.output}")))
             }
         }
     }
@@ -366,10 +366,10 @@ class FileBrowserViewModel : BaseViewModel() {
                 AdbTool.execAdbAsync("-s", deviceId, "push", localPath, destPath)
             }
             if (result.success) {
-                showTipDialog(MsgContent.Text(l10n("推送成功: $fileName", "Pushed: $fileName")), autoDismiss = true)
+                showToast(MsgContent.Text(l10n("推送成功: $fileName", "Pushed: $fileName")))
                 loadFiles(deviceId = deviceId, forceRefresh = true)
             } else {
-                showTipDialog(MsgContent.Text(l10n("推送失败: ${result.errorMessage ?: result.output}", "Push failed: ${result.errorMessage ?: result.output}")))
+                showToast(MsgContent.Text(l10n("推送失败: ${result.errorMessage ?: result.output}", "Push failed: ${result.errorMessage ?: result.output}")))
             }
         }
     }
@@ -384,7 +384,7 @@ class FileBrowserViewModel : BaseViewModel() {
             if (result.success) {
                 showTipDialog(MsgContent.Text(result.output))
             } else {
-                showTipDialog(MsgContent.Text(l10n("获取信息失败: ${result.errorMessage ?: result.output}", "Failed to get details: ${result.errorMessage ?: result.output}")))
+                showToast(MsgContent.Text(l10n("获取信息失败: ${result.errorMessage ?: result.output}", "Failed to get details: ${result.errorMessage ?: result.output}")))
             }
         }
     }
@@ -404,7 +404,7 @@ class FileBrowserViewModel : BaseViewModel() {
                 AdbTool.execShellAsync(command, deviceId)
             }
             if (!result.success) {
-                showTipDialog(MsgContent.Text(l10n("无法打开文件: ${result.errorMessage ?: result.output}", "Unable to open file: ${result.errorMessage ?: result.output}")))
+                showToast(MsgContent.Text(l10n("无法打开文件: ${result.errorMessage ?: result.output}", "Unable to open file: ${result.errorMessage ?: result.output}")))
             }
         }
     }

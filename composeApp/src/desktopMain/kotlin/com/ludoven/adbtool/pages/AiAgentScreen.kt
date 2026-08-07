@@ -59,17 +59,6 @@ import adbtool_desktop.composeapp.generated.resources.agent_send
 import adbtool_desktop.composeapp.generated.resources.agent_sensitive_desc
 import adbtool_desktop.composeapp.generated.resources.agent_sensitive_reason
 import adbtool_desktop.composeapp.generated.resources.agent_sensitive_title
-import adbtool_desktop.composeapp.generated.resources.agent_step_confirm
-import adbtool_desktop.composeapp.generated.resources.agent_step_denied
-import adbtool_desktop.composeapp.generated.resources.agent_step_done
-import adbtool_desktop.composeapp.generated.resources.agent_step_failed
-import adbtool_desktop.composeapp.generated.resources.agent_step_running
-import adbtool_desktop.composeapp.generated.resources.agent_step_unverified
-import adbtool_desktop.composeapp.generated.resources.agent_step_waiting
-import adbtool_desktop.composeapp.generated.resources.agent_strategy_batch
-import adbtool_desktop.composeapp.generated.resources.agent_strategy_fast
-import adbtool_desktop.composeapp.generated.resources.agent_strategy_interactive
-import adbtool_desktop.composeapp.generated.resources.agent_strategy_repair
 import adbtool_desktop.composeapp.generated.resources.agent_text_mode
 import adbtool_desktop.composeapp.generated.resources.agent_vision_mode
 import adbtool_desktop.composeapp.generated.resources.ai_agent_subtitle
@@ -85,6 +74,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -114,6 +104,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
@@ -131,12 +122,15 @@ import androidx.compose.material.icons.filled.Add
 import com.ludoven.adbtool.QadbColors
 import com.ludoven.adbtool.UiTokens
 import com.ludoven.adbtool.agent.AgentAction
-import com.ludoven.adbtool.agent.AgentExecutionStrategy
+import com.ludoven.adbtool.agent.AgentBudgetMode
+import com.ludoven.adbtool.agent.AgentBudgetStatus
 import com.ludoven.adbtool.agent.AgentMessage
 import com.ludoven.adbtool.agent.AgentMessageRole
 import com.ludoven.adbtool.agent.AgentObservationMode
 import com.ludoven.adbtool.agent.AgentStep
-import com.ludoven.adbtool.agent.AgentStepStatus
+import com.ludoven.adbtool.agent.AgentAppKnowledgeCard
+import com.ludoven.adbtool.agent.AgentWorkflow
+import com.ludoven.adbtool.agent.WorkflowStatus
 import com.ludoven.adbtool.entity.DeviceCenterInfoData
 import com.ludoven.adbtool.entity.DeviceInfoData
 import com.ludoven.adbtool.ui.icons.IconParkIcons
@@ -152,6 +146,7 @@ import com.ludoven.adbtool.viewmodel.AiAgentViewModel
 import com.ludoven.adbtool.viewmodel.DevicesViewModel
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
+import org.jetbrains.skia.Image as SkiaImage
 
 @Composable
 fun AiAgentScreen(
@@ -166,6 +161,8 @@ fun AiAgentScreen(
     val configurationReady by viewModel.configurationReady.collectAsState()
     val memoryEnabled by viewModel.memoryEnabled.collectAsState()
     val memoryNeedsConsent by viewModel.memoryNeedsConsent.collectAsState()
+    val workflows by viewModel.workflows.collectAsState()
+    val knowledgeCards by viewModel.knowledgeCards.collectAsState()
     val selectedDevice by devicesViewModel.selectedDevice.collectAsState()
     val devices by devicesViewModel.devices.collectAsState()
     val deviceNames by devicesViewModel.deviceDisplayNames.collectAsState()
@@ -173,6 +170,7 @@ fun AiAgentScreen(
     val centerInfo by devicesViewModel.centerInfo.collectAsState()
     var prompt by remember { mutableStateOf("") }
     var showModelDialog by remember { mutableStateOf(false) }
+    var showAutomationDialog by remember { mutableStateOf(false) }
     val isConnected = selectedDevice != null && selectedDevice in devices
     val canSend = configurationReady && isConnected && !taskState.isRunning
 
@@ -200,6 +198,12 @@ fun AiAgentScreen(
             connected = isConnected,
             running = taskState.isRunning
         )
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = UiTokens.SpaceXLarge),
+            horizontalArrangement = Arrangement.End
+        ) {
+            TextButton(onClick = { showAutomationDialog = true }) { Text("自动化知识") }
+        }
 
         BoxWithConstraints(
             modifier = Modifier
@@ -216,19 +220,13 @@ fun AiAgentScreen(
                 ) {
                     AgentConversation(
                         messages = taskState.messages,
-                        steps = taskState.steps,
-                        executionStrategy = taskState.executionStrategy,
                         configurationReady = configurationReady,
                         connected = isConnected,
                         errorMessage = taskState.errorMessage,
+                        budgetStatus = taskState.budgetStatus,
                         onOpenSettings = { showModelDialog = true },
                         onOpenDevices = onOpenDevices,
                         modifier = Modifier.weight(1f)
-                    )
-
-                    QuickPromptRow(
-                        enabled = canSend,
-                        onPrompt = ::submit
                     )
 
                     AgentComposer(
@@ -245,6 +243,7 @@ fun AiAgentScreen(
                         compactionCount = taskState.compactionCount,
                         savedMemoryCount = taskState.savedMemoryCount,
                         onSend = { submit(prompt) },
+                        onQuickPrompt = ::submit,
                         onNewTask = viewModel::newTask,
                         onCancel = viewModel::cancelTask,
                         onOpenMemory = onOpenSettings
@@ -254,6 +253,9 @@ fun AiAgentScreen(
                 if (showPreview) {
                     DevicePreviewPanel(
                         observationMode = taskState.observationMode,
+                        screenshot = taskState.latestScreenshot,
+                        pageSignature = taskState.deviceState?.pageSignature?.value,
+                        pageChanged = taskState.pageDiff?.changed,
                         modifier = Modifier
                             .width(316.dp)
                             .fillMaxHeight()
@@ -324,6 +326,115 @@ fun AiAgentScreen(
             onDismiss = { showModelDialog = false }
         )
     }
+
+    if (showAutomationDialog) {
+        AutomationKnowledgeDialog(
+            workflows = workflows,
+            knowledgeCards = knowledgeCards,
+            onEnableWorkflow = { viewModel.setWorkflowEnabled(it, true) },
+            onDisableWorkflow = { viewModel.setWorkflowEnabled(it, false) },
+            onDeleteWorkflow = viewModel::deleteWorkflow,
+            onSaveKnowledge = viewModel::saveKnowledgeCard,
+            onSetKnowledgeEnabled = viewModel::setKnowledgeCardEnabled,
+            onDeleteKnowledge = viewModel::deleteKnowledgeCard,
+            onDismiss = { showAutomationDialog = false }
+        )
+    }
+}
+
+@Composable
+private fun AutomationKnowledgeDialog(
+    workflows: List<AgentWorkflow>,
+    knowledgeCards: List<AgentAppKnowledgeCard>,
+    onEnableWorkflow: (AgentWorkflow) -> Unit,
+    onDisableWorkflow: (AgentWorkflow) -> Unit,
+    onDeleteWorkflow: (AgentWorkflow) -> Unit,
+    onSaveKnowledge: (AgentAppKnowledgeCard) -> Unit,
+    onSetKnowledgeEnabled: (AgentAppKnowledgeCard, Boolean) -> Unit,
+    onDeleteKnowledge: (AgentAppKnowledgeCard) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var tab by remember { mutableStateOf(0) }
+    var editing by remember { mutableStateOf<AgentAppKnowledgeCard?>(null) }
+    var pendingWorkflowDelete by remember { mutableStateOf<AgentWorkflow?>(null) }
+    var pendingKnowledgeDelete by remember { mutableStateOf<AgentAppKnowledgeCard?>(null) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("自动化知识") },
+        text = {
+            Column(modifier = Modifier.heightIn(max = 480.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)) {
+                    TextButton(onClick = { tab = 0 }) { Text(if (tab == 0) "Workflow ·" else "Workflow") }
+                    TextButton(onClick = { tab = 1 }) { Text(if (tab == 1) "应用知识 ·" else "应用知识") }
+                    if (tab == 1) TextButton(onClick = { editing = AgentAppKnowledgeCard(packageName = "", title = "", guide = "") }) { Text("新建") }
+                }
+                if (tab == 0) {
+                    workflows.forEach { workflow ->
+                        Surface(color = QadbColors.surfaceVariant, shape = RoundedCornerShape(UiTokens.RadiusMedium)) {
+                            Column(modifier = Modifier.padding(UiTokens.SpaceMedium)) {
+                                Text(workflow.name, fontWeight = FontWeight.SemiBold)
+                                Text("${workflow.packageName} · ${workflow.replaySteps.size} 步 · 成功率 ${"%.0f".format(workflow.statistics.successRate * 100)}%", color = QadbColors.textSecondary, fontSize = UiTokens.TextCaption)
+                                Text(if (workflow.canEnable) workflow.status.name else "旧版或无效草稿，需重新生成", color = QadbColors.textTertiary, fontSize = UiTokens.TextCaption)
+                                Row {
+                                    if (workflow.status == WorkflowStatus.ENABLED) TextButton(onClick = { onDisableWorkflow(workflow) }) { Text("停用") }
+                                    else TextButton(onClick = { onEnableWorkflow(workflow) }, enabled = workflow.canEnable) { Text("启用") }
+                                    TextButton(onClick = { pendingWorkflowDelete = workflow }) { Text("删除") }
+                                }
+                            }
+                        }
+                    }
+                    if (workflows.isEmpty()) Text("暂无 Workflow 草稿", color = QadbColors.textSecondary)
+                } else {
+                    knowledgeCards.forEach { card ->
+                        Surface(color = QadbColors.surfaceVariant, shape = RoundedCornerShape(UiTokens.RadiusMedium)) {
+                            Column(modifier = Modifier.padding(UiTokens.SpaceMedium)) {
+                                Text(card.title, fontWeight = FontWeight.SemiBold)
+                                Text(card.packageName, color = QadbColors.textSecondary, fontSize = UiTokens.TextCaption)
+                                Text(card.guide, color = QadbColors.textSecondary, fontSize = UiTokens.TextCaption, maxLines = 3, overflow = TextOverflow.Ellipsis)
+                                Row {
+                                    TextButton(onClick = { editing = card }) { Text("编辑") }
+                                    TextButton(onClick = { onSetKnowledgeEnabled(card, !card.enabled) }) { Text(if (card.enabled) "停用" else "启用") }
+                                    TextButton(onClick = { pendingKnowledgeDelete = card }) { Text("删除") }
+                                }
+                            }
+                        }
+                    }
+                    if (knowledgeCards.isEmpty()) Text("暂无应用知识卡", color = QadbColors.textSecondary)
+                }
+            }
+        },
+        confirmButton = { Button(onClick = onDismiss) { Text("完成") } }
+    )
+    editing?.let { card -> KnowledgeCardEditor(card, onSave = { onSaveKnowledge(it); editing = null }, onDismiss = { editing = null }) }
+    pendingWorkflowDelete?.let { workflow -> ConfirmDeleteDialog("删除该 Workflow？", { onDeleteWorkflow(workflow); pendingWorkflowDelete = null }) { pendingWorkflowDelete = null } }
+    pendingKnowledgeDelete?.let { card -> ConfirmDeleteDialog("删除该应用知识卡？", { onDeleteKnowledge(card); pendingKnowledgeDelete = null }) { pendingKnowledgeDelete = null } }
+}
+
+@Composable
+private fun KnowledgeCardEditor(card: AgentAppKnowledgeCard, onSave: (AgentAppKnowledgeCard) -> Unit, onDismiss: () -> Unit) {
+    var packageName by remember(card.id) { mutableStateOf(card.packageName) }
+    var title by remember(card.id) { mutableStateOf(card.title) }
+    var guide by remember(card.id) { mutableStateOf(card.guide) }
+    AlertDialog(onDismissRequest = onDismiss, title = { Text("应用知识卡") }, text = {
+        Column(verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)) {
+            KnowledgeField("包名", packageName) { packageName = it }
+            KnowledgeField("标题", title) { title = it }
+            KnowledgeField("指南（最多 4000 字符）", guide, minLines = 5) { guide = it }
+        }
+    }, confirmButton = { Button(onClick = { onSave(card.copy(packageName = packageName.trim(), title = title.trim(), guide = guide.trim())) }, enabled = packageName.isNotBlank() && title.isNotBlank() && guide.isNotBlank()) { Text("保存") } }, dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } })
+}
+
+@Composable
+private fun KnowledgeField(label: String, value: String, minLines: Int = 1, onValueChange: (String) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(label, fontSize = UiTokens.TextCaption, color = QadbColors.textSecondary)
+        BasicTextField(value = value, onValueChange = onValueChange, minLines = minLines, modifier = Modifier.fillMaxWidth().border(BorderStroke(1.dp, QadbColors.border), RoundedCornerShape(UiTokens.RadiusSmall)).padding(UiTokens.SpaceSmall), textStyle = MaterialTheme.typography.body1.copy(color = QadbColors.textPrimary))
+    }
+}
+
+@Composable
+private fun ConfirmDeleteDialog(message: String, onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(onDismissRequest = onDismiss, title = { Text("确认删除") }, text = { Text(message) }, confirmButton = { Button(onClick = onConfirm) { Text("删除") } }, dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } })
 }
 
 @Composable
@@ -360,7 +471,6 @@ private fun AgentDeviceHeader(
         modifier = Modifier
             .fillMaxWidth()
             .height(58.dp)
-            .border(width = 1.dp, color = QadbColors.divider)
             .padding(horizontal = UiTokens.SpaceXLarge),
         horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceLarge),
         verticalAlignment = Alignment.CenterVertically
@@ -431,17 +541,16 @@ private fun StatusDot(connected: Boolean) {
 @Composable
 private fun AgentConversation(
     messages: List<AgentMessage>,
-    steps: List<AgentStep>,
-    executionStrategy: AgentExecutionStrategy,
     configurationReady: Boolean,
     connected: Boolean,
     errorMessage: String?,
+    budgetStatus: AgentBudgetStatus,
     onOpenSettings: () -> Unit,
     onOpenDevices: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val scrollState = rememberScrollState()
-    LaunchedEffect(messages.size, steps.size, errorMessage) {
+    LaunchedEffect(messages.size, errorMessage) {
         scrollState.animateScrollTo(scrollState.maxValue)
     }
 
@@ -480,17 +589,7 @@ private fun AgentConversation(
             AgentMessageBubble(message)
         }
 
-        if (steps.isNotEmpty()) {
-            Text(
-                text = executionStrategyDisplayName(executionStrategy),
-                color = QadbColors.textTertiary,
-                fontSize = UiTokens.TextCaption
-            )
-        }
-
-        if (steps.isNotEmpty()) {
-            AgentStepsCard(steps)
-        }
+        AgentBudgetCard(budgetStatus)
 
         errorMessage?.let {
             Surface(
@@ -510,11 +609,67 @@ private fun AgentConversation(
 }
 
 @Composable
-private fun executionStrategyDisplayName(strategy: AgentExecutionStrategy): String = when (strategy) {
-    AgentExecutionStrategy.FAST_TEMPLATE -> stringResource(Res.string.agent_strategy_fast)
-    AgentExecutionStrategy.BATCH_PLAN -> stringResource(Res.string.agent_strategy_batch)
-    AgentExecutionStrategy.REPAIR_PLAN -> stringResource(Res.string.agent_strategy_repair)
-    AgentExecutionStrategy.INTERACTIVE -> stringResource(Res.string.agent_strategy_interactive)
+private fun AgentBudgetCard(status: AgentBudgetStatus) {
+    if (status.modelCalls == 0 && status.stopReason == null) return
+    AgentRuntimeDetail(
+        title = "任务预算",
+        titleColor = if (status.stopReason == null) QadbColors.textSecondary else QadbColors.danger
+    ) {
+        Text(
+            "模型 ${status.modelCalls}/${status.modelCallLimit} · 视觉 ${status.visionCalls}/${status.visionCallLimit} · 重规划 ${status.replans}/${status.replanLimit}",
+            color = QadbColors.textSecondary,
+            fontSize = UiTokens.TextCaption
+        )
+        Text(
+            "输入 ${status.usage.promptTokens} · 输出 ${status.usage.completionTokens} · 缓存 ${status.usage.cachedTokens} · 预计 ${"%.4f".format(status.estimatedCost)} CNY",
+            color = QadbColors.textSecondary,
+            fontSize = UiTokens.TextCaption
+        )
+        Text(
+            budgetModeLabel(status.mode),
+            color = if (status.stopReason == null) QadbColors.textTertiary else QadbColors.danger,
+            fontSize = UiTokens.TextCaption
+        )
+        status.stopReason?.let { reason ->
+            Text(reason, color = QadbColors.danger, fontSize = UiTokens.TextCaption)
+        }
+    }
+}
+
+@Composable
+private fun AgentRuntimeDetail(
+    title: String,
+    titleColor: androidx.compose.ui.graphics.Color = QadbColors.textTertiary,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .widthIn(max = 680.dp)
+            .fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceXSmall)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(1.dp)
+                .background(QadbColors.divider)
+        )
+        Text(
+            title,
+            color = titleColor,
+            fontSize = UiTokens.TextCaption,
+            fontWeight = FontWeight.Medium
+        )
+        content()
+    }
+}
+
+private fun budgetModeLabel(mode: AgentBudgetMode): String = when (mode) {
+    AgentBudgetMode.NORMAL -> "正常预算模式"
+    AgentBudgetMode.DIFF_ONLY -> "已切换为页面差异优先"
+    AgentBudgetMode.NO_OPTIONAL_VISION -> "已关闭非必要视觉请求"
+    AgentBudgetMode.FINAL_RECOVERY_ONLY -> "仅保留最终结果调用"
+    AgentBudgetMode.EXHAUSTED -> "预算已耗尽"
 }
 
 @Composable
@@ -571,93 +726,27 @@ private fun AgentMessageBubble(message: AgentMessage) {
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start
     ) {
-        if (!isUser) {
-            Surface(shape = CircleShape, color = QadbColors.primaryContainer) {
-                Icon(
-                    IconParkIcons.Command,
-                    contentDescription = null,
-                    tint = QadbColors.primary,
-                    modifier = Modifier.padding(7.dp).size(17.dp)
+        if (isUser) {
+            Surface(
+                modifier = Modifier.widthIn(max = 500.dp),
+                shape = RoundedCornerShape(18.dp),
+                color = QadbColors.surfaceVariant
+            ) {
+                Text(
+                    text = message.text,
+                    modifier = Modifier.padding(horizontal = UiTokens.SpaceLarge, vertical = 10.dp),
+                    color = QadbColors.textPrimary,
+                    fontSize = UiTokens.TextBodyLarge
                 )
             }
-            Spacer(Modifier.width(UiTokens.SpaceSmall))
-        }
-        Surface(
-            modifier = Modifier.widthIn(max = 620.dp),
-            shape = RoundedCornerShape(UiTokens.RadiusLarge),
-            color = if (isUser) QadbColors.primaryContainer else QadbColors.surfaceVariant,
-            border = BorderStroke(1.dp, QadbColors.border)
-        ) {
+        } else {
             Text(
                 text = message.text,
-                modifier = Modifier.padding(horizontal = UiTokens.SpaceLarge, vertical = UiTokens.SpaceMedium),
+                modifier = Modifier.widthIn(max = 680.dp),
                 color = QadbColors.textPrimary,
                 fontSize = UiTokens.TextBodyLarge
             )
         }
-    }
-}
-
-@Composable
-private fun AgentStepsCard(steps: List<AgentStep>) {
-    Surface(
-        modifier = Modifier
-            .widthIn(max = 620.dp)
-            .fillMaxWidth(),
-        shape = RoundedCornerShape(UiTokens.RadiusLarge),
-        color = QadbColors.surface,
-        border = BorderStroke(1.dp, QadbColors.border)
-    ) {
-        Column(modifier = Modifier.padding(UiTokens.SpaceLarge)) {
-            steps.forEachIndexed { index, step ->
-                if (index > 0) Spacer(Modifier.height(UiTokens.SpaceMedium))
-                AgentStepRow(step)
-            }
-        }
-    }
-}
-
-@Composable
-private fun AgentStepRow(step: AgentStep) {
-    val (statusText, statusColor) = when (step.status) {
-        AgentStepStatus.WAITING -> stringResource(Res.string.agent_step_waiting) to QadbColors.textTertiary
-        AgentStepStatus.RUNNING -> stringResource(Res.string.agent_step_running) to QadbColors.primary
-        AgentStepStatus.AWAITING_CONFIRMATION -> stringResource(Res.string.agent_step_confirm) to QadbColors.warning
-        AgentStepStatus.COMPLETED -> stringResource(Res.string.agent_step_done) to QadbColors.success
-        AgentStepStatus.UNVERIFIED -> stringResource(Res.string.agent_step_unverified) to QadbColors.warning
-        AgentStepStatus.FAILED -> stringResource(Res.string.agent_step_failed) to QadbColors.danger
-        AgentStepStatus.DENIED -> stringResource(Res.string.agent_step_denied) to QadbColors.warning
-    }
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium),
-        verticalAlignment = Alignment.Top
-    ) {
-        Box(
-            Modifier
-                .padding(top = 4.dp)
-                .size(10.dp)
-                .clip(CircleShape)
-                .background(statusColor)
-        )
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                actionDisplayName(step.action),
-                color = QadbColors.textPrimary,
-                fontSize = UiTokens.TextBodyLarge,
-                fontWeight = FontWeight.Medium
-            )
-            if (step.result.isNotBlank()) {
-                Text(
-                    step.result,
-                    color = QadbColors.textSecondary,
-                    fontSize = UiTokens.TextCaption,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-        }
-        Text(statusText, color = statusColor, fontSize = UiTokens.TextCaption)
     }
 }
 
@@ -676,22 +765,21 @@ private fun QuickPromptRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(bottom = UiTokens.SpaceMedium),
+            .padding(bottom = UiTokens.SpaceSmall),
         horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
     ) {
         quickPrompts.forEach { (label, prompt, icon) ->
             val promptText = stringResource(prompt)
             Surface(
                 modifier = Modifier
-                    .height(36.dp)
+                    .height(30.dp)
                     .clickable(enabled = enabled) { onPrompt(promptText) },
-                shape = RoundedCornerShape(UiTokens.RadiusMedium),
-                color = if (enabled) QadbColors.surface else QadbColors.disabledSurface,
-                border = BorderStroke(1.dp, QadbColors.border)
+                shape = RoundedCornerShape(UiTokens.BadgeRadius),
+                color = if (enabled) QadbColors.surfaceVariant.copy(alpha = 0.72f) else QadbColors.disabledSurface
             ) {
                 Row(
-                    modifier = Modifier.padding(horizontal = UiTokens.SpaceMedium),
-                    horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall),
+                    modifier = Modifier.padding(horizontal = UiTokens.SpaceSmall),
+                    horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceXSmall),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(icon, contentDescription = null, modifier = Modifier.size(16.dp), tint = QadbColors.textSecondary)
@@ -717,12 +805,13 @@ private fun AgentComposer(
     compactionCount: Int,
     savedMemoryCount: Int,
     onSend: () -> Unit,
+    onQuickPrompt: (String) -> Unit,
     onNewTask: () -> Unit,
     onCancel: () -> Unit,
     onOpenMemory: () -> Unit
 ) {
     var focused by remember { mutableStateOf(false) }
-    val composerShape = RoundedCornerShape(18.dp)
+    val composerShape = RoundedCornerShape(20.dp)
     val borderColor = if (focused) {
         QadbColors.primary.copy(alpha = 0.62f)
     } else {
@@ -746,7 +835,7 @@ private fun AgentComposer(
             .fillMaxWidth()
             .padding(bottom = UiTokens.SpaceMedium)
             .shadow(
-                elevation = if (focused) 8.dp else 3.dp,
+                elevation = if (focused) 7.dp else 3.dp,
                 shape = composerShape,
                 clip = false
             ),
@@ -757,7 +846,7 @@ private fun AgentComposer(
         Column(
             modifier = Modifier.padding(
                 start = UiTokens.SpaceLarge,
-                top = UiTokens.SpaceLarge,
+                top = 14.dp,
                 end = UiTokens.SpaceMedium,
                 bottom = UiTokens.SpaceSmall
             )
@@ -774,7 +863,7 @@ private fun AgentComposer(
                 cursorBrush = SolidColor(QadbColors.primary),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(min = 64.dp, max = 138.dp)
+                    .heightIn(min = 68.dp, max = 138.dp)
                     .onFocusChanged { focused = it.isFocused }
                     .onPreviewKeyEvent { event ->
                         if (
@@ -804,6 +893,11 @@ private fun AgentComposer(
                         innerTextField()
                     }
                 }
+            )
+
+            QuickPromptRow(
+                enabled = !running && configurationReady && connected,
+                onPrompt = onQuickPrompt
             )
 
             BoxWithConstraints(
@@ -838,30 +932,6 @@ private fun AgentComposer(
                     }
 
                     Surface(
-                        shape = RoundedCornerShape(UiTokens.BadgeRadius),
-                        color = QadbColors.surfaceVariant
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Box(
-                                Modifier
-                                    .size(6.dp)
-                                    .clip(CircleShape)
-                                    .background(statusColor)
-                            )
-                            Text(
-                                text = statusText,
-                                color = QadbColors.textSecondary,
-                                fontSize = 11.sp,
-                                maxLines = 1
-                            )
-                        }
-                    }
-
-                    Surface(
                         modifier = Modifier.clickable(onClick = onOpenMemory),
                         shape = RoundedCornerShape(UiTokens.BadgeRadius),
                         color = if (memoryEnabled) {
@@ -890,6 +960,30 @@ private fun AgentComposer(
                     }
 
                     Spacer(Modifier.weight(1f))
+
+                    Surface(
+                        shape = RoundedCornerShape(UiTokens.BadgeRadius),
+                        color = QadbColors.surfaceVariant
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                Modifier
+                                    .size(6.dp)
+                                    .clip(CircleShape)
+                                    .background(statusColor)
+                            )
+                            Text(
+                                text = statusText,
+                                color = QadbColors.textSecondary,
+                                fontSize = 11.sp,
+                                maxLines = 1
+                            )
+                        }
+                    }
 
                     if (totalTokens > 0 && showKeyboardHint) {
                         Text(
@@ -920,8 +1014,7 @@ private fun AgentComposer(
                             ),
                         shape = CircleShape,
                         color = when {
-                            running -> QadbColors.errorSurface
-                            canSend -> QadbColors.primary
+                            running || canSend -> QadbColors.textPrimary
                             else -> QadbColors.disabledSurface
                         }
                     ) {
@@ -935,8 +1028,7 @@ private fun AgentComposer(
                                     if (running) Res.string.agent_cancel_task else Res.string.agent_send
                                 ),
                                 tint = when {
-                                    running -> QadbColors.danger
-                                    canSend -> QadbColors.onPrimary
+                                    running || canSend -> QadbColors.surface
                                     else -> QadbColors.textDisabled
                                 },
                                 modifier = Modifier.size(18.dp)
@@ -952,8 +1044,14 @@ private fun AgentComposer(
 @Composable
 private fun DevicePreviewPanel(
     observationMode: AgentObservationMode,
+    screenshot: ByteArray?,
+    pageSignature: String?,
+    pageChanged: Boolean?,
     modifier: Modifier = Modifier
 ) {
+    val deviceImage = remember(screenshot) {
+        screenshot?.let { bytes -> runCatching { SkiaImage.makeFromEncoded(bytes).toComposeImageBitmap() }.getOrNull() }
+    }
     Column(
         modifier = modifier
             .border(width = 1.dp, color = QadbColors.divider)
@@ -988,15 +1086,21 @@ private fun DevicePreviewPanel(
                 )
             }
         }
-        Image(
-            painter = painterResource(Res.drawable.agent_device_placeholder),
-            contentDescription = stringResource(Res.string.agent_preview_unavailable),
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth()
-                .padding(vertical = UiTokens.SpaceLarge),
-            contentScale = ContentScale.Fit
-        )
+        if (deviceImage != null) {
+            Image(
+                bitmap = deviceImage,
+                contentDescription = stringResource(Res.string.agent_preview_title),
+                modifier = Modifier.weight(1f).fillMaxWidth().padding(vertical = UiTokens.SpaceLarge),
+                contentScale = ContentScale.Fit
+            )
+        } else {
+            Image(
+                painter = painterResource(Res.drawable.agent_device_placeholder),
+                contentDescription = stringResource(Res.string.agent_preview_unavailable),
+                modifier = Modifier.weight(1f).fillMaxWidth().padding(vertical = UiTokens.SpaceLarge),
+                contentScale = ContentScale.Fit
+            )
+        }
         Surface(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(UiTokens.RadiusLarge),
@@ -1007,13 +1111,14 @@ private fun DevicePreviewPanel(
                 verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceXSmall)
             ) {
                 Text(
-                    stringResource(Res.string.agent_preview_unavailable),
+                    if (deviceImage == null) stringResource(Res.string.agent_preview_unavailable) else "Live device observation",
                     color = QadbColors.textPrimary,
                     fontWeight = FontWeight.SemiBold,
                     fontSize = UiTokens.TextBody
                 )
                 Text(
-                    stringResource(Res.string.agent_preview_desc),
+                    pageSignature?.let { "Page ${it.take(10)} · ${if (pageChanged == true) "changed" else "stable"}" }
+                        ?: stringResource(Res.string.agent_preview_desc),
                     color = QadbColors.textSecondary,
                     fontSize = UiTokens.TextCaption
                 )

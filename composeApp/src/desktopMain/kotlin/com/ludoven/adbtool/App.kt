@@ -8,6 +8,7 @@ import adbtool_desktop.composeapp.generated.resources.file_browser
 import adbtool_desktop.composeapp.generated.resources.home
 import adbtool_desktop.composeapp.generated.resources.set
 import adbtool_desktop.composeapp.generated.resources.terminal
+import com.ludoven.adbtool.agent.AgentFeatureRuntime
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -71,6 +72,7 @@ import com.ludoven.adbtool.pages.HomeScreen
 import com.ludoven.adbtool.widget.SidebarGroup
 import com.ludoven.adbtool.pages.SettingScreen
 import com.ludoven.adbtool.pages.TerminalScreen
+import com.ludoven.adbtool.pages.TipDialog
 import com.ludoven.adbtool.util.AdbPathManager
 import com.ludoven.adbtool.util.LanguageManager
 import com.ludoven.adbtool.util.LocalAppLanguage
@@ -87,6 +89,7 @@ import com.ludoven.adbtool.viewmodel.DevicesViewModel
 import com.ludoven.adbtool.viewmodel.FileBrowserViewModel
 import com.ludoven.adbtool.viewmodel.KeyEventViewModel
 import com.ludoven.adbtool.viewmodel.LogViewModel
+import com.ludoven.adbtool.widget.FeedbackToast
 import com.ludoven.adbtool.viewmodel.ScreenRecordUiState
 import com.ludoven.adbtool.viewmodel.TerminalViewModel
 import com.ludoven.adbtool.widget.Sidebar
@@ -101,7 +104,6 @@ import org.jetbrains.compose.ui.tooling.preview.Preview
 @Preview
 fun App() {
     val devicesViewModel: DevicesViewModel = viewModel()
-    val aiAgentViewModel: AiAgentViewModel = viewModel()
     val appViewModel: AppViewModel = viewModel()
     val commonModel: CommonModel = viewModel()
     val deviceMirrorViewModel: DeviceMirrorViewModel = viewModel()
@@ -110,6 +112,8 @@ fun App() {
     val terminalViewModel: TerminalViewModel = viewModel()
     val fileBrowserViewModel: FileBrowserViewModel = viewModel()
     val currentLanguage by LanguageManager.currentLanguage.collectAsState()
+    val agentFeaturePreferences = remember { AgentFeatureRuntime.preferences }
+    val agentFeatureEnabled by agentFeaturePreferences.enabled.collectAsState()
     LaunchedEffect(Unit) {
         LanguageManager.initialize()
         ThemeManager.initialize()
@@ -124,14 +128,6 @@ fun App() {
             icon = IconParkIcons.Home,
             defaultRoute = "home",
             items = listOf(TabItem(stringResource(Res.string.home), IconParkIcons.Home, "home")),
-            collapsible = false
-        ),
-        SidebarGroup(
-            id = "ai",
-            label = l10n("AI", "AI"),
-            icon = IconParkIcons.Command,
-            defaultRoute = "ai",
-            items = listOf(TabItem(l10n("AI", "AI"), IconParkIcons.Command, "ai")),
             collapsible = false
         ),
         SidebarGroup(
@@ -153,17 +149,17 @@ fun App() {
         SidebarGroup(
             id = "app",
             label = stringResource(Res.string.app),
-            icon = IconParkIcons.Application,
+            icon = IconParkIcons.System,
             defaultRoute = "app",
-            items = listOf(TabItem(stringResource(Res.string.app), IconParkIcons.Application, "app")),
+            items = listOf(TabItem(stringResource(Res.string.app), IconParkIcons.System, "app")),
             collapsible = false
         ),
         SidebarGroup(
             id = "filebrowser",
             label = stringResource(Res.string.file_browser),
-            icon = IconParkIcons.Folder,
+            icon = IconParkIcons.File,
             defaultRoute = "filebrowser",
-            items = listOf(TabItem(stringResource(Res.string.file_browser), IconParkIcons.Folder, "filebrowser")),
+            items = listOf(TabItem(stringResource(Res.string.file_browser), IconParkIcons.File, "filebrowser")),
             collapsible = false
         ),
         SidebarGroup(
@@ -182,6 +178,16 @@ fun App() {
             items = listOf(TabItem(stringResource(Res.string.terminal), IconParkIcons.Terminal, "terminal")),
             collapsible = false
         ),
+        *listOfNotNull(
+            SidebarGroup(
+                id = "ai",
+                label = l10n("AI Agent", "AI Agent"),
+                icon = IconParkIcons.AiAssistant,
+                defaultRoute = "ai",
+                items = listOf(TabItem(l10n("AI Agent", "AI Agent"), IconParkIcons.AiAssistant, "ai")),
+                collapsible = false
+            ).takeIf { agentFeatureEnabled }
+        ).toTypedArray(),
         SidebarGroup(
             id = "settings",
             label = stringResource(Res.string.set),
@@ -196,7 +202,6 @@ fun App() {
     val stateHolder = rememberSaveableStateHolder()
     val currentBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = currentBackStackEntry?.destination?.route ?: "home"
-    val usePlainContentContainer = currentRoute == "setting"
     val selectedPrimaryRoute = normalizeRouteForPrimaryNavigation(currentRoute)
     var showRebootConfirm by remember { mutableStateOf(false) }
     var showScreenRecordDialog by remember { mutableStateOf(false) }
@@ -222,7 +227,8 @@ fun App() {
 
     fun handleGlobalShortcut(key: Key): Boolean {
         fun navigatePrimary(index: Int): Boolean {
-            navigateToRoute(PRIMARY_SHORTCUT_ROUTES.getValue(index))
+            val route = primaryShortcutRoute(index, agentFeatureEnabled) ?: return false
+            navigateToRoute(route)
             return true
         }
         return when (key) {
@@ -253,7 +259,7 @@ fun App() {
                         val output = withContext(Dispatchers.IO) {
                             AdbTool.execAdbOutputAsync("connect", address)
                         }
-                        commonModel.showTipDialog(MsgContent.Text(output), autoDismiss = true)
+                        commonModel.showToast(MsgContent.Text(output))
                         devicesViewModel.refreshDevices()
                     }
                 }
@@ -279,7 +285,33 @@ fun App() {
         }
     }
 
+    LaunchedEffect(agentFeatureEnabled, currentRoute) {
+        if (!agentFeatureEnabled && currentRoute == "ai") {
+            navigateToRoute("home")
+        }
+    }
+
     AdbToolTheme(useDarkTheme = resolvedDarkTheme) {
+        val commonDialogMessage by commonModel.dialogMessage.collectAsState()
+        val commonShowDialog by commonModel.showDialog.collectAsState()
+        val commonToastMessage by commonModel.feedbackToastMessage.collectAsState()
+
+        FeedbackToast(commonToastMessage)
+        if (commonShowDialog) {
+            commonDialogMessage?.let { message ->
+                TipDialog(
+                    dialogText = when (message) {
+                        is MsgContent.Resource -> stringResource(
+                            message.stringResource,
+                            *message.args.toTypedArray()
+                        )
+                        is MsgContent.Text -> message.text
+                    },
+                    onDismiss = commonModel::dismissTipDialog
+                )
+            }
+        }
+
         Scaffold(
             modifier = Modifier
                 .fillMaxSize()
@@ -296,13 +328,6 @@ fun App() {
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(paddingValues)
-                    .padding(
-                        start = UiTokens.WindowPadding,
-                        top = UiTokens.SpaceSmall,
-                        end = UiTokens.WindowPadding,
-                        bottom = UiTokens.WindowPadding
-                    ),
-                horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceLarge)
             ) {
                 SidebarContainer(
                     groups = tabGroups,
@@ -321,18 +346,16 @@ fun App() {
                     Surface(
                         modifier = Modifier.fillMaxSize(),
                         shape = RoundedCornerShape(0.dp),
-                        color = MaterialTheme.colorScheme.surface
+                        color = MaterialTheme.colorScheme.surface,
+                        border = null
                     ) {
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
-                            .padding(if (usePlainContentContainer) 0.dp else UiTokens.SpaceSmall)
                         ) {
                             NavHost(navController, startDestination = "home") {
                                 composable("home") {
                                     stateHolder.SaveableStateProvider("home") {
-                                        val commonDialogMessage by commonModel.dialogMessage.collectAsState()
-                                        val commonShowDialog by commonModel.showDialog.collectAsState()
                                         Box(modifier = Modifier.fillMaxSize()) {
                                             HomeScreen(
                                                 viewModel = devicesViewModel,
@@ -352,21 +375,20 @@ fun App() {
                                                     navigateToRoute("app")
                                                 }
                                             )
-                                            HomeActionToast(
-                                                visible = commonShowDialog,
-                                                message = commonDialogMessage
-                                            )
                                         }
                                     }
                                 }
                                 composable("ai") {
-                                    stateHolder.SaveableStateProvider("ai") {
-                                        AiAgentScreen(
-                                            viewModel = aiAgentViewModel,
-                                            devicesViewModel = devicesViewModel,
-                                            onOpenDevices = { navigateToRoute("home") },
-                                            onOpenSettings = { navigateToRoute("setting") }
-                                        )
+                                    if (agentFeatureEnabled) {
+                                        val aiAgentViewModel: AiAgentViewModel = viewModel()
+                                        stateHolder.SaveableStateProvider("ai") {
+                                            AiAgentScreen(
+                                                viewModel = aiAgentViewModel,
+                                                devicesViewModel = devicesViewModel,
+                                                onOpenDevices = { navigateToRoute("home") },
+                                                onOpenSettings = { navigateToRoute("setting") }
+                                            )
+                                        }
                                     }
                                 }
                                 composable("device-control") {
@@ -1187,6 +1209,9 @@ internal fun normalizeRouteForPrimaryNavigation(route: String): String = when (r
     else -> route
 }
 
+internal fun primaryShortcutRoute(index: Int, agentFeatureEnabled: Boolean): String? =
+    PRIMARY_SHORTCUT_ROUTES[index]?.takeIf { route -> agentFeatureEnabled || route != "ai" }
+
 @Composable
 private fun DeviceControlRoute(
     mirrorViewModel: DeviceMirrorViewModel,
@@ -1242,38 +1267,6 @@ private fun SidebarContainer(
             devicesViewModel.selectDevice(deviceId)
         }
     )
-}
-
-@Composable
-private fun HomeActionToast(
-    visible: Boolean,
-    message: MsgContent?
-) {
-    if (!visible || message == null) return
-
-    val text = when (message) {
-        is MsgContent.Resource -> stringResource(message.stringResource, *message.args.toTypedArray())
-        is MsgContent.Text -> message.text
-    }
-
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.BottomCenter
-    ) {
-        Surface(
-            shape = RoundedCornerShape(12.dp),
-            color = MaterialTheme.colorScheme.inverseSurface,
-            shadowElevation = 6.dp,
-            modifier = Modifier.padding(bottom = 24.dp)
-        ) {
-            Text(
-                text = text,
-                modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
-                color = MaterialTheme.colorScheme.inverseOnSurface,
-                style = MaterialTheme.typography.bodyMedium
-            )
-        }
-    }
 }
 
 data class TabItem(

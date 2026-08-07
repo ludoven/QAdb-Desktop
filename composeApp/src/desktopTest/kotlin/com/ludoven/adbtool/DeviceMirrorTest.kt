@@ -3,6 +3,7 @@ package com.ludoven.adbtool
 import com.ludoven.adbtool.entity.DeviceMirrorSettings
 import com.ludoven.adbtool.util.AdbTool
 import com.ludoven.adbtool.util.ScrcpyPathManager
+import com.ludoven.adbtool.viewmodel.isUnexpectedMirrorExit
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -85,6 +86,81 @@ class DeviceMirrorTest {
             ),
             command
         )
+    }
+
+    @Test
+    fun `build scrcpy tcpip command targets a wireless endpoint`() {
+        assertEquals(
+            listOf(
+                "/opt/homebrew/bin/scrcpy",
+                "--tcpip=192.168.198.157:43253",
+                "--force-adb-forward",
+                "--window-title",
+                "QADB Device Mirror",
+                "--max-size",
+                "1280",
+                "--max-fps",
+                "60",
+                "--video-bit-rate",
+                "8M",
+                "--stay-awake"
+            ),
+            AdbTool.buildScrcpyTcpIpCommand(
+                scrcpyPath = "/opt/homebrew/bin/scrcpy",
+                endpoint = "192.168.198.157:43253",
+                windowTitle = "QADB Device Mirror"
+            )
+        )
+    }
+
+    @Test
+    fun `wireless endpoint should use the route source and TLS port`() {
+        assertEquals(
+            "192.168.198.157:43253",
+            AdbTool.parseScrcpyTcpIpEndpoint(
+                routeOutput = "192.168.198.0/24 dev wlan0 proto kernel scope link src 192.168.198.157",
+                tlsPortOutput = "43253\n\n"
+            )
+        )
+    }
+
+    @Test
+    fun `wireless endpoint should resolve an mdns service name containing spaces`() {
+        val mdnsOutput = """
+            List of discovered mdns services
+            adb-0123456789ABCDEF-RY0GTI (2)    _adb-tls-connect._tcp    192.168.198.157:42419
+            adb-0123456789ABCDEF-RY0GTI        _adb-tls-connect._tcp    192.168.198.157:35103
+        """.trimIndent()
+
+        assertEquals(
+            "192.168.198.157:42419",
+            AdbTool.parseScrcpyMdnsEndpoint(
+                mdnsOutput,
+                "adb-0123456789ABCDEF-RY0GTI (2)._adb-tls-connect._tcp"
+            )
+        )
+    }
+
+    @Test
+    fun `wireless endpoint should reject another mdns instance or invalid port`() {
+        assertNull(
+            AdbTool.parseScrcpyMdnsEndpoint(
+                "adb-device    _adb-tls-connect._tcp    192.168.198.157:70000",
+                "adb-device._adb-tls-connect._tcp"
+            )
+        )
+        assertNull(
+            AdbTool.parseScrcpyMdnsEndpoint(
+                "adb-device    _adb-tls-connect._tcp    192.168.198.157:42419",
+                "another-device._adb-tls-connect._tcp"
+            )
+        )
+    }
+
+    @Test
+    fun `wireless endpoint should reject a missing route or invalid port`() {
+        assertNull(AdbTool.parseScrcpyTcpIpEndpoint("default via 192.168.198.1 dev wlan0", "43253"))
+        assertNull(AdbTool.parseScrcpyTcpIpEndpoint("src 192.168.198.157", "70000"))
     }
 
     @Test
@@ -177,6 +253,17 @@ class DeviceMirrorTest {
 
         assertTrue(stopped)
         assertFalse(process.isAlive)
+    }
+
+    @Test
+    fun `closing the mirror window normally should not be treated as an unexpected exit`() {
+        assertFalse(isUnexpectedMirrorExit(0))
+        assertFalse(isUnexpectedMirrorExit(null))
+    }
+
+    @Test
+    fun `a non-zero mirror exit code should be treated as an unexpected exit`() {
+        assertTrue(isUnexpectedMirrorExit(1))
     }
 
     private fun startFailingProcess(): Process {

@@ -8,7 +8,6 @@ import com.ludoven.adbtool.ui.icons.IconParkIcons
 import com.ludoven.adbtool.ui.mac.*
 
 import adbtool_desktop.composeapp.generated.resources.Res
-import adbtool_desktop.composeapp.generated.resources.apk_not_selected
 import adbtool_desktop.composeapp.generated.resources.confirm
 import adbtool_desktop.composeapp.generated.resources.tip_title
 import androidx.compose.foundation.BorderStroke
@@ -166,8 +165,6 @@ fun CommonScreen(
     selectedDevice: String? = null
 ) {
     val coroutineScope = rememberCoroutineScope()
-    val showDialog by viewModel.showDialog.collectAsState()
-    val dialogMsg by viewModel.dialogMessage.collectAsState()
 
     var favoriteIds by remember { mutableStateOf(CommandFavoritesManager.load()) }
     var customCommands by remember { mutableStateOf(CustomCommandManager.load()) }
@@ -441,8 +438,8 @@ fun CommonScreen(
                             else -> {
                                 command.actionType?.let(viewModel::executeAdbAction)
                                 executionResult = l10n(
-                                    "已触发执行：$resolvedCommandPreview\n具体结果请查看提示弹窗",
-                                    "Triggered: $resolvedCommandPreview\nSee toast/tip for details"
+                                    "已触发执行：$resolvedCommandPreview\n具体结果请查看底部提示",
+                                    "Triggered: $resolvedCommandPreview\nSee the bottom notification for details"
                                 )
                             }
                         }
@@ -595,54 +592,6 @@ fun CommonScreen(
                 editingCommand = null
             }
         )
-    }
-
-    val latestDialogText = dialogMsg?.let {
-        when (it) {
-            is MsgContent.Resource -> stringResource(it.stringResource, *it.args.toTypedArray())
-            is MsgContent.Text -> it.text
-        }
-    }
-    LaunchedEffect(showDialog, latestDialogText) {
-        if (showDialog && !latestDialogText.isNullOrBlank()) {
-            executionResult = latestDialogText
-        }
-    }
-
-    if (showDialog) {
-        dialogMsg?.let {
-            val dialogText = when (it) {
-                is MsgContent.Resource -> stringResource(it.stringResource, *it.args.toTypedArray())
-                is MsgContent.Text -> it.text
-            }
-            val showAsToast = it is MsgContent.Resource && it.stringResource == Res.string.apk_not_selected
-
-            if (showAsToast) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.BottomCenter
-                ) {
-                    Surface(
-                        shape = RoundedCornerShape(UiTokens.RadiusLarge),
-                        color = MaterialTheme.colorScheme.inverseSurface,
-                        shadowElevation = 6.dp,
-                        modifier = Modifier.padding(bottom = UiTokens.SpaceXXLarge)
-                    ) {
-                        Text(
-                            text = dialogText,
-                            modifier = Modifier.padding(horizontal = UiTokens.SpaceXLarge, vertical = UiTokens.SpaceMedium),
-                            color = MaterialTheme.colorScheme.inverseOnSurface,
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
-                }
-            } else {
-                TipDialog(dialogText = dialogText) {
-                    viewModel.dismissTipDialog()
-                }
-            }
-        }
     }
 
 }

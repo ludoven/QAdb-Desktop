@@ -105,11 +105,16 @@ class RealAgentDeviceGateway(
         action: AgentAction,
         observation: AgentObservation
     ): String? {
-        if (action !is AgentAction.InputText || !inputHelper.requiresUnicodeHelper(action.text)) return null
-        return if (inputHelper.status(deviceId).installed) {
+        val input = action as? AgentAction.InputText ?: return null
+        if (!inputHelper.requiresUnicodeHelper(input.text)) return null
+
+        val helperInstalled = runCatching { inputHelper.status(deviceId).installed }
+            .getOrDefault(false)
+        return if (helperInstalled) {
             null
         } else {
-            "Install the local QADB Unicode input helper on this device. It will temporarily switch the input method and restore the previous one afterward."
+            "Chinese or emoji input requires installing QADB's Unicode input helper on this device. " +
+                "QADB will switch to it only for this input, restore the previous input method, and record the result in the task log."
         }
     }
 

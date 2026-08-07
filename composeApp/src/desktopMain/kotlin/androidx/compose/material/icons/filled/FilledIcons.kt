@@ -6,7 +6,7 @@ import com.ludoven.adbtool.ui.icons.CompatIconVectors
 import com.ludoven.adbtool.ui.icons.IconParkIcons
 
 val Icons.Filled.Add: ImageVector get() = CompatIconVectors.Add
-val Icons.Filled.Android: ImageVector get() = IconParkIcons.Application
+val Icons.Filled.Android: ImageVector get() = CompatIconVectors.Android
 val Icons.Filled.Apps: ImageVector get() = IconParkIcons.Application
 val Icons.Filled.Archive: ImageVector get() = IconParkIcons.Folder
 val Icons.Filled.ArrowDownward: ImageVector get() = CompatIconVectors.ArrowDownward

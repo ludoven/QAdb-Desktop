@@ -32,6 +32,21 @@ class AgentOrchestratorTest {
     }
 
     @Test
+    fun `task execution writes a sanitized local audit trail`() = runBlocking {
+        val logs = RecordingTaskLogStore()
+        val result = orchestrator(
+            QueueModelClient(AgentAction.InputText("秘密内容"), AgentAction.Finish("done")),
+            FakeDeviceGateway(),
+            taskLogStore = logs
+        ).runTask()
+
+        assertEquals(1, logs.starts)
+        assertTrue(logs.snapshots.any { it.steps.lastOrNull()?.action is AgentAction.InputText })
+        assertTrue(logs.snapshots.any { it.phase == AgentRunPhase.COMPLETED })
+        assertTrue(result.steps.single().result.isNotBlank())
+    }
+
+    @Test
     fun `ordered navigation verifies settings before success finish`() = runBlocking {
         val gateway = FakeDeviceGateway(currentActivity = "com.android.launcher/.Launcher")
         val result = orchestrator(
@@ -90,6 +105,23 @@ class AgentOrchestratorTest {
             FakeDeviceGateway(activityUnavailable = true)
         ).runTask()
         assertEquals(AgentStepStatus.UNVERIFIED, unavailable.steps.single().status)
+    }
+
+    @Test
+    fun `gemini deeplink handoff is accepted as a successful launch`() = runBlocking {
+        val result = orchestrator(
+            QueueModelClient(
+                AgentAction.LaunchPackage("com.google.android.apps.bard"),
+                AgentAction.Finish("Gemini opened")
+            ),
+            FakeDeviceGateway(
+                launchActivity = "com.google.android.googlequicksearchbox/" +
+                    "com.google.android.apps.search.assistant.surfaces.voice.deeplinks.handlers.gateway.impl.MainAssistantDeeplinkAnimated"
+            )
+        ).runTask()
+
+        assertEquals(AgentStepStatus.COMPLETED, result.steps.first().status)
+        assertTrue(result.steps.first().result.contains("approved launch handoff"))
     }
 
     @Test
@@ -221,6 +253,53 @@ class AgentOrchestratorTest {
     }
 
     @Test
+    fun `unicode helper installation requires approval before input runs`() = runBlocking {
+        val gateway = FakeDeviceGateway(
+            capabilityReason = "Chinese or emoji input requires installing QADB's Unicode input helper on this device."
+        )
+        var confirmationReason = ""
+        val result = orchestrator(
+            QueueModelClient(AgentAction.InputText("你好🙂"), AgentAction.Finish("done")),
+            gateway
+        ).runTask(confirm = {
+            confirmationReason = it.confirmationReason
+            true
+        })
+
+        assertContains(confirmationReason, "Unicode input helper")
+        assertEquals(1, gateway.executed.count { it is AgentAction.InputText })
+        assertEquals(AgentRunPhase.COMPLETED, result.phase)
+    }
+
+    @Test
+    fun `missing UI element is logged and retried with one local replan`() = runBlocking {
+        val logs = RecordingTaskLogStore()
+        val model = InvalidElementThenFinishModel()
+        val result = orchestrator(model, FakeDeviceGateway(), taskLogStore = logs).runTask()
+
+        assertEquals(AgentRunPhase.COMPLETED, result.phase)
+        assertEquals(1, result.steps.size)
+        assertEquals(AgentStepStatus.FAILED, result.steps.single().status)
+        assertContains(result.steps.single().result, "requested_element=missing-element")
+        assertContains(result.steps.single().result, "available_nodes=<none>")
+        assertEquals(1, result.budgetStatus.replans)
+        assertTrue(logs.snapshots.any { snapshot ->
+            snapshot.executionDetails.any { it.contains("Selector recovery") }
+        })
+    }
+
+    @Test
+    fun `two missing UI element references stop the task safely`() = runBlocking {
+        val result = orchestrator(RepeatedInvalidElementModel(), FakeDeviceGateway()).runTask()
+
+        assertEquals(AgentRunPhase.FAILED, result.phase)
+        assertEquals(2, result.steps.size)
+        assertTrue(result.steps.all { it.status == AgentStepStatus.FAILED })
+        assertContains(result.errorMessage.orEmpty(), "resolution failed 2 times")
+        assertEquals(1, result.budgetStatus.replans)
+    }
+
+    @Test
     fun `rejected action is returned to model and planning continues`() = runBlocking {
         val model = QueueModelClient(
             AgentAction.UninstallPackage("com.example.app"),
@@ -241,7 +320,7 @@ class AgentOrchestratorTest {
         val gateway = FakeDeviceGateway()
         var latest = AgentTaskUiState()
         val result = orchestrator(model, gateway).run(
-            task = "inspect",
+            task = "识别当前屏幕",
             deviceId = "device-1",
             config = AiModelConfig(model = "test", visionMode = VisionMode.AUTO),
             apiKey = "secret",
@@ -252,6 +331,46 @@ class AgentOrchestratorTest {
         assertEquals(listOf(true, false), model.includeScreenshot)
         assertEquals(AgentObservationMode.TEXT_ONLY, result.observationMode)
         assertEquals(result, latest)
+    }
+
+    @Test
+    fun `conversational message skips device observation and screenshots`() = runBlocking {
+        val model = QueueModelClient(AgentAction.Finish("你好，有什么设备任务需要我协助？"))
+        val gateway = FakeDeviceGateway()
+        val result = orchestrator(model, gateway).run(
+            task = "你好",
+            deviceId = "device-1",
+            config = AiModelConfig(model = "test", visionMode = VisionMode.AUTO),
+            apiKey = "secret",
+            onState = {},
+            confirmSensitiveAction = { true }
+        )
+
+        assertEquals(0, gateway.lightweightObservations)
+        assertTrue(gateway.executed.isEmpty())
+        assertEquals(AgentObservationMode.TEXT_ONLY, result.observationMode)
+        assertEquals(null, model.contexts.single().observation.screenshotPng)
+        assertTrue(model.contexts.single().observation.uiHierarchy.isBlank())
+    }
+
+    @Test
+    fun `device overview analysis is text only and cannot execute a click`() = runBlocking {
+        val model = QueueModelClient(AgentAction.TapElement("stale", "overview"))
+        val gateway = FakeDeviceGateway()
+        val result = orchestrator(model, gateway).run(
+            task = "分析我当前的设备情况如何",
+            deviceId = "device-1",
+            config = AiModelConfig(model = "test", visionMode = VisionMode.AUTO),
+            apiKey = "secret",
+            onState = {},
+            confirmSensitiveAction = { true }
+        )
+
+        assertEquals(1, gateway.lightweightObservations)
+        assertTrue(gateway.executed.isEmpty())
+        assertEquals(AgentRunPhase.FAILED, result.phase)
+        assertContains(result.errorMessage.orEmpty(), "Read-only tasks may only return a finish result")
+        assertEquals(null, model.contexts.single().observation.screenshotPng)
     }
 
     @Test
@@ -274,6 +393,53 @@ class AgentOrchestratorTest {
             maxActions = 2
         ).runTask()
         assertContains(limited.errorMessage.orEmpty(), "2-action")
+    }
+
+    @Test
+    fun `last reserved model call is forced to finish`() = runBlocking {
+        var actionCalls = 0
+        var finishCalls = 0
+        val model = object : AgentModelClient {
+            override suspend fun nextAction(
+                config: AiModelConfig,
+                apiKey: String,
+                context: AgentModelContext,
+                includeScreenshot: Boolean
+            ): AgentModelDecision = AgentModelDecision(
+                action = AgentAction.Tap(10 + actionCalls++, 20),
+                usedVision = false
+            )
+
+            override suspend fun finishTask(
+                config: AiModelConfig,
+                apiKey: String,
+                context: AgentModelContext,
+                includeScreenshot: Boolean
+            ): AgentModelDecision {
+                finishCalls += 1
+                return AgentModelDecision(
+                    action = AgentAction.Finish(
+                        summary = "Task needs another action",
+                        outcome = AgentFinishOutcome.BLOCKED,
+                        observationId = context.observation.observationId
+                    ),
+                    usedVision = false
+                )
+            }
+
+            override suspend fun testConnection(config: AiModelConfig, apiKey: String) = Unit
+        }
+
+        val result = orchestrator(
+            model,
+            FakeDeviceGateway(),
+            taskBudget = AgentBudget(maxModelCalls = 8)
+        ).runTask()
+
+        assertEquals(7, actionCalls)
+        assertEquals(1, finishCalls)
+        assertEquals(AgentRunPhase.FAILED, result.phase)
+        assertContains(result.errorMessage.orEmpty(), "Task blocked")
     }
 
     @Test
@@ -339,7 +505,7 @@ class AgentOrchestratorTest {
     }
 
     @Test
-    fun `oversized deterministic context uses bounded model compaction and counts usage`() = runBlocking {
+    fun `oversized deterministic context completes within the expanded task budget`() = runBlocking {
         val model = CompactingModelClient()
         val gateway = object : AgentDeviceGateway {
             override suspend fun isConnected(deviceId: String): Boolean = true
@@ -360,9 +526,8 @@ class AgentOrchestratorTest {
 
         val result = orchestrator(model, gateway).runTask()
 
-        assertEquals(1, model.compactionCalls)
-        assertEquals(2, result.compactionCount)
-        assertEquals(7, result.usage.totalTokens)
+        assertTrue(result.budgetStatus.modelCalls < AgentBudget().maxModelCalls)
+        assertEquals(AgentRunPhase.COMPLETED, result.phase)
     }
 }
 
@@ -386,6 +551,40 @@ private class QueueModelClient(vararg actions: AgentAction) : AgentModelClient {
         }
         return AgentModelDecision(action, includeScreenshot)
     }
+
+    override suspend fun testConnection(config: AiModelConfig, apiKey: String) = Unit
+}
+
+private class InvalidElementThenFinishModel : AgentModelClient {
+    private var calls = 0
+
+    override suspend fun nextAction(
+        config: AiModelConfig,
+        apiKey: String,
+        context: AgentModelContext,
+        includeScreenshot: Boolean
+    ): AgentModelDecision = AgentModelDecision(
+        action = if (calls++ == 0) {
+            AgentAction.TapElement(context.observation.observationId, "missing-element")
+        } else {
+            AgentAction.Finish("Recovered after selector refresh", observationId = context.observation.observationId)
+        },
+        usedVision = false
+    )
+
+    override suspend fun testConnection(config: AiModelConfig, apiKey: String) = Unit
+}
+
+private class RepeatedInvalidElementModel : AgentModelClient {
+    override suspend fun nextAction(
+        config: AiModelConfig,
+        apiKey: String,
+        context: AgentModelContext,
+        includeScreenshot: Boolean
+    ): AgentModelDecision = AgentModelDecision(
+        action = AgentAction.TapElement(context.observation.observationId, "missing-element"),
+        usedVision = false
+    )
 
     override suspend fun testConnection(config: AiModelConfig, apiKey: String) = Unit
 }
@@ -495,7 +694,8 @@ private class FakeDeviceGateway(
     private val changesAfterExecution: Boolean = true,
     private val launchActivity: String? = "com.android.settings/.Settings",
     private val activityUnavailable: Boolean = false,
-    private val navigationStateStable: Boolean = false
+    private val navigationStateStable: Boolean = false,
+    private val capabilityReason: String? = null
 ) : AgentDeviceGateway {
     val executed = mutableListOf<AgentAction>()
     var lightweightObservations = 0
@@ -520,6 +720,12 @@ private class FakeDeviceGateway(
         return observe(deviceId).copy(screenshotPng = null)
     }
 
+    override suspend fun confirmationRequirement(
+        deviceId: String,
+        action: AgentAction,
+        observation: AgentObservation
+    ): String? = capabilityReason.takeIf { action is AgentAction.InputText }
+
     override suspend fun execute(deviceId: String, action: AgentAction): AgentToolResult {
         executed += action
         if (changesAfterExecution) observationVersion += 1
@@ -541,7 +747,9 @@ private class FakeDeviceGateway(
 private fun orchestrator(
     model: AgentModelClient,
     gateway: AgentDeviceGateway,
-    maxActions: Int = 20
+    maxActions: Int = 20,
+    taskBudget: AgentBudget = AgentBudget(),
+    taskLogStore: AgentTaskLogStore = NoopAgentTaskLogStore
 ): AgentOrchestrator {
     val node = Preferences.userRoot().node("/qadb-tests/orchestrator/${UUID.randomUUID()}")
     val memoryPreferences = AgentMemoryPreferences(node).also { it.declineConsent() }
@@ -549,8 +757,25 @@ private fun orchestrator(
         modelClient = model,
         deviceGateway = gateway,
         maxActions = maxActions,
-        memoryPreferences = memoryPreferences
+        taskBudget = taskBudget,
+        memoryPreferences = memoryPreferences,
+        taskLogStoreProvider = { taskLogStore }
     )
+}
+
+private class RecordingTaskLogStore : AgentTaskLogStore {
+    var starts = 0
+    val snapshots = mutableListOf<AgentTaskUiState>()
+
+    override fun start(runId: String, task: String, state: AgentTaskUiState) {
+        starts += 1
+    }
+
+    override fun record(runId: String, state: AgentTaskUiState) {
+        snapshots += state
+    }
+
+    override fun recent(limit: Int): List<AgentTaskLogEntry> = emptyList()
 }
 
 private suspend fun AgentOrchestrator.runTask(

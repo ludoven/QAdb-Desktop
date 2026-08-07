@@ -95,7 +95,12 @@ data class AgentTaskUiState(
     val memoryHitCount: Int = 0,
     val savedMemoryCount: Int = 0,
     val compactionCount: Int = 0,
-    val executionStrategy: AgentExecutionStrategy = AgentExecutionStrategy.INTERACTIVE
+    val executionStrategy: AgentExecutionStrategy = AgentExecutionStrategy.INTERACTIVE,
+    val deviceState: DeviceState? = null,
+    val pageDiff: PageDiff? = null,
+    val latestScreenshot: ByteArray? = null,
+    val budgetStatus: AgentBudgetStatus = AgentBudgetStatus(),
+    val executionDetails: List<String> = emptyList()
 )
 
 enum class AgentRunPhase {
@@ -115,6 +120,7 @@ enum class AgentExecutionStrategy {
     FAST_TEMPLATE,
     BATCH_PLAN,
     REPAIR_PLAN,
+    GUARDED_WORKFLOW,
     INTERACTIVE
 }
 
@@ -190,7 +196,11 @@ data class UiNodeSnapshot(
     val clickable: Boolean,
     val editable: Boolean,
     val enabled: Boolean,
-    val password: Boolean
+    val password: Boolean,
+    val resourceId: String = "",
+    val role: String = "",
+    val selected: Boolean = false,
+    val checked: Boolean = false
 )
 
 enum class AgentOperationKind {
@@ -454,7 +464,9 @@ data class AgentModelContext(
     val observation: AgentObservation,
     val completedSteps: List<AgentStep>,
     val memoryContext: String = "",
-    val compactedHistory: String = ""
+    val compactedHistory: String = "",
+    /** Local, user-authored reference material. It is untrusted and cannot change tool safety rules. */
+    val appKnowledgeContext: String = ""
 )
 
 data class AgentModelDecision(
@@ -475,6 +487,17 @@ interface AgentModelClient {
         context: AgentModelContext,
         includeScreenshot: Boolean
     ): AgentModelDecision
+
+    /**
+     * Uses the last reserved model call to produce a verified terminal result instead of
+     * spending it on another action that cannot be followed up within the task budget.
+     */
+    suspend fun finishTask(
+        config: AiModelConfig,
+        apiKey: String,
+        context: AgentModelContext,
+        includeScreenshot: Boolean
+    ): AgentModelDecision = nextAction(config, apiKey, context, includeScreenshot)
 
     suspend fun testConnection(
         config: AiModelConfig,

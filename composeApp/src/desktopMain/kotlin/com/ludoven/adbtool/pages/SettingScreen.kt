@@ -16,6 +16,10 @@ import adbtool_desktop.composeapp.generated.resources.ai_config_saved
 import adbtool_desktop.composeapp.generated.resources.ai_context_window
 import adbtool_desktop.composeapp.generated.resources.ai_context_window_hint
 import adbtool_desktop.composeapp.generated.resources.ai_edit_model
+import adbtool_desktop.composeapp.generated.resources.ai_agent_beta_disabled_desc
+import adbtool_desktop.composeapp.generated.resources.ai_agent_beta_enabled_desc
+import adbtool_desktop.composeapp.generated.resources.ai_agent_beta_settings
+import adbtool_desktop.composeapp.generated.resources.ai_agent_beta_title
 import adbtool_desktop.composeapp.generated.resources.ai_hide_key
 import adbtool_desktop.composeapp.generated.resources.ai_key_cleared
 import adbtool_desktop.composeapp.generated.resources.ai_model_configured
@@ -54,6 +58,12 @@ import adbtool_desktop.composeapp.generated.resources.agent_memory_consent_desc
 import adbtool_desktop.composeapp.generated.resources.agent_memory_consent_title
 import adbtool_desktop.composeapp.generated.resources.agent_memory_enable
 import adbtool_desktop.composeapp.generated.resources.agent_memory_not_now
+import adbtool_desktop.composeapp.generated.resources.agent_approval_settings
+import adbtool_desktop.composeapp.generated.resources.agent_approval_policy
+import adbtool_desktop.composeapp.generated.resources.agent_approval_smart
+import adbtool_desktop.composeapp.generated.resources.agent_approval_cautious
+import adbtool_desktop.composeapp.generated.resources.agent_approval_smart_desc
+import adbtool_desktop.composeapp.generated.resources.agent_approval_cautious_desc
 import adbtool_desktop.composeapp.generated.resources.ai_openai_compatible_badge
 import adbtool_desktop.composeapp.generated.resources.ai_privacy_notice
 import adbtool_desktop.composeapp.generated.resources.ai_save_config
@@ -171,10 +181,15 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.ludoven.adbtool.AppVersion
+import com.ludoven.adbtool.entity.MsgContent
 import com.ludoven.adbtool.agent.AiConfiguration
+import com.ludoven.adbtool.agent.AgentProviderRuntime
 import com.ludoven.adbtool.agent.AiModelConfig
 import com.ludoven.adbtool.agent.AgentInputHelper
 import com.ludoven.adbtool.agent.AgentInputHelperStatus
+import com.ludoven.adbtool.agent.AgentApprovalPolicy
+import com.ludoven.adbtool.agent.AgentApprovalRuntime
+import com.ludoven.adbtool.agent.AgentFeatureRuntime
 import com.ludoven.adbtool.agent.AgentMemory
 import com.ludoven.adbtool.agent.AgentMemoryRuntime
 import com.ludoven.adbtool.agent.AgentMemoryStats
@@ -204,9 +219,11 @@ import com.ludoven.adbtool.ui.mac.titleMedium
 import com.ludoven.adbtool.util.AdbPathManager
 import com.ludoven.adbtool.util.FileUtils
 import com.ludoven.adbtool.util.GitHubUpdateManager
+import com.ludoven.adbtool.widget.FeedbackToast
 import com.ludoven.adbtool.util.LanguageManager
 import com.ludoven.adbtool.util.ThemeManager
 import com.ludoven.adbtool.widget.PageHeader
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
 import java.awt.Desktop
@@ -226,7 +243,6 @@ private object SettingColors {
     val PrimarySoft: Color @Composable get() = QadbColors.primaryContainer
     val PrimaryBorder: Color @Composable get() = QadbColors.primary.copy(alpha = 0.34f)
     val ButtonBorder: Color @Composable get() = QadbColors.border
-    val NeutralButton: Color @Composable get() = QadbColors.surfaceVariant
     val ControlBackground: Color @Composable get() = QadbColors.disabledSurface
     val Danger: Color @Composable get() = QadbColors.danger
     val Success: Color @Composable get() = QadbColors.success
@@ -308,7 +324,7 @@ private fun SettingActionButton(
             shape = RoundedCornerShape(UiTokens.RadiusMedium),
             border = BorderStroke(1.dp, SettingColors.ButtonBorder.copy(alpha = 0.72f)),
             colors = ButtonDefaults.outlinedButtonColors(
-                containerColor = SettingColors.NeutralButton,
+                containerColor = SettingColors.Surface,
                 contentColor = SettingColors.Text,
                 disabledContentColor = SettingColors.Muted
             ),
@@ -371,7 +387,7 @@ fun SettingScreen(selectedDeviceId: String? = null) {
         Column(
             modifier = Modifier
                 .align(Alignment.TopCenter)
-                .widthIn(max = 880.dp)
+                .widthIn(max = 760.dp)
                 .fillMaxWidth()
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = UiTokens.PagePadding, vertical = UiTokens.PagePaddingCompact),
@@ -382,271 +398,408 @@ fun SettingScreen(selectedDeviceId: String? = null) {
                 subtitle = stringResource(Res.string.settings_subtitle)
             )
 
-            AiModelSettingsSection()
-
-            AiMemorySettingsSection()
-
-            AgentInputHelperSettingsSection(selectedDeviceId)
-
-            SettingsSection(title = stringResource(Res.string.adb_path_setting)) {
-                val sourceText = settingAdbSourceText(adbEnvironment.source)
-                val isCheckingAdb = !adbEnvironment.isReady &&
-                    adbEnvironment.source == AdbPathManager.AdbSource.NONE &&
-                    adbEnvironment.message?.contains("检测") == true
-                val statusText = if (adbEnvironment.isReady) {
-                    stringResource(Res.string.adb_environment_ready)
-                } else if (isCheckingAdb) {
-                    stringResource(Res.string.adb_environment_checking)
-                } else {
-                    adbEnvironment.message ?: stringResource(Res.string.adb_environment_failed)
-                }
-
-                AdbEnvironmentSummary(
-                    statusLabel = stringResource(Res.string.settings_status_label),
-                    statusText = statusText,
-                    tone = when {
-                        adbEnvironment.isReady -> StatusTone.Positive
-                        isCheckingAdb -> StatusTone.Neutral
-                        else -> StatusTone.Danger
-                    },
-                    sourceLabel = stringResource(Res.string.adb_current_using),
-                    sourceDescription = stringResource(Res.string.settings_adb_source_desc),
-                    sourceValue = sourceText,
-                    pathLabel = stringResource(Res.string.adb_path_label),
-                    pathDescription = stringResource(Res.string.settings_adb_path_desc),
-                    pathValue = adbEnvironment.path ?: notSetText,
-                    versionLabel = stringResource(Res.string.adb_version_label),
-                    versionDescription = stringResource(Res.string.settings_adb_version_desc),
-                    versionValue = adbEnvironment.version ?: notSetText,
-                    trailingIcon = IconParkIcons.Folder,
-                    trailingIconDescription = stringResource(Res.string.adb_path_label),
-                    onTrailingAction = {
-                        openPathLocation(adbEnvironment.path)
-                    }
-                )
-
-                ActionButtonRow {
-                    SettingActionButton(
-                        text = stringResource(Res.string.adb_auto_detect),
-                        icon = IconParkIcons.Refresh,
-                        onClick = {
-                            coroutineScope.launch {
-                                AdbPathManager.autoDetect()
-                            }
-                        },
-                        primary = true
-                    )
-
-                    SettingActionButton(
-                        text = stringResource(Res.string.adb_select_adb),
-                        icon = IconParkIcons.Folder,
-                        onClick = {
-                            coroutineScope.launch {
-                                val newPath = FileUtils.selectFile()
-                                if (newPath != null) {
-                                    AdbPathManager.setAdbPath(newPath)
-                                }
-                            }
-                        }
-                    )
-
-                    SettingActionButton(
-                        text = stringResource(Res.string.adb_restore_bundled),
-                        icon = IconParkIcons.Setting,
-                        onClick = {
-                            coroutineScope.launch {
-                                AdbPathManager.useBundledAdb()
-                            }
-                        }
-                    )
-
-                    SettingActionButton(
-                        text = stringResource(Res.string.adb_open_help),
-                        icon = Icons.AutoMirrored.Filled.OpenInNew,
-                        onClick = {
-                            AdbPathManager.openHelp().onFailure { _ -> }
-                        }
-                    )
-                }
-            }
-
-            SettingsSection(title = stringResource(Res.string.preferences_setting)) {
-                val currentThemeText = when (currentThemeMode) {
-                    ThemeManager.ThemeMode.SYSTEM -> stringResource(Res.string.theme_mode_system)
-                    ThemeManager.ThemeMode.LIGHT -> stringResource(Res.string.theme_mode_light)
-                    ThemeManager.ThemeMode.DARK -> stringResource(Res.string.theme_mode_dark)
-                }
-
-                SettingsDropdownRow(
-                    title = stringResource(Res.string.select_language),
-                    description = stringResource(Res.string.settings_pref_language_desc),
-                    value = currentLanguage.displayName,
-                    expanded = showLanguageDropdown,
-                    onExpandedChange = { showLanguageDropdown = it }
-                ) {
-                    supportedLanguages.forEach { language ->
-                        DropdownMenuItem(
-                            text = { Text(language.displayName) },
-                            onClick = {
-                                LanguageManager.setLanguage(language)
-                                showLanguageDropdown = false
-                                showLanguageDialog = true
-                            }
-                        )
-                    }
-                }
-
-                SectionDivider()
-
-                SettingsDropdownRow(
-                    title = stringResource(Res.string.select_theme),
-                    description = stringResource(Res.string.settings_pref_theme_desc),
-                    value = currentThemeText,
-                    expanded = showThemeDropdown,
-                    onExpandedChange = { showThemeDropdown = it }
-                ) {
-                    supportedThemeModes.forEach { themeMode ->
-                        val text = when (themeMode) {
+            SettingsColumns(
+                mainContent = {
+                    SettingsSection(title = stringResource(Res.string.preferences_setting)) {
+                        val currentThemeText = when (currentThemeMode) {
                             ThemeManager.ThemeMode.SYSTEM -> stringResource(Res.string.theme_mode_system)
                             ThemeManager.ThemeMode.LIGHT -> stringResource(Res.string.theme_mode_light)
                             ThemeManager.ThemeMode.DARK -> stringResource(Res.string.theme_mode_dark)
                         }
-                        DropdownMenuItem(
-                            text = { Text(text) },
-                            onClick = {
-                                ThemeManager.setThemeMode(themeMode)
-                                showThemeDropdown = false
+
+                        SettingsDropdownRow(
+                            title = stringResource(Res.string.select_language),
+                            description = stringResource(Res.string.settings_pref_language_desc),
+                            value = currentLanguage.displayName,
+                            expanded = showLanguageDropdown,
+                            onExpandedChange = { showLanguageDropdown = it }
+                        ) {
+                            supportedLanguages.forEach { language ->
+                                DropdownMenuItem(
+                                    text = { Text(language.displayName) },
+                                    onClick = {
+                                        LanguageManager.setLanguage(language)
+                                        showLanguageDropdown = false
+                                        showLanguageDialog = true
+                                    }
+                                )
+                            }
+                        }
+
+                        SectionDivider()
+
+                        SettingsDropdownRow(
+                            title = stringResource(Res.string.select_theme),
+                            description = stringResource(Res.string.settings_pref_theme_desc),
+                            value = currentThemeText,
+                            expanded = showThemeDropdown,
+                            onExpandedChange = { showThemeDropdown = it }
+                        ) {
+                            supportedThemeModes.forEach { themeMode ->
+                                val text = when (themeMode) {
+                                    ThemeManager.ThemeMode.SYSTEM -> stringResource(Res.string.theme_mode_system)
+                                    ThemeManager.ThemeMode.LIGHT -> stringResource(Res.string.theme_mode_light)
+                                    ThemeManager.ThemeMode.DARK -> stringResource(Res.string.theme_mode_dark)
+                                }
+                                DropdownMenuItem(
+                                    text = { Text(text) },
+                                    onClick = {
+                                        ThemeManager.setThemeMode(themeMode)
+                                        showThemeDropdown = false
+                                    }
+                                )
+                            }
+                        }
+
+                        SectionDivider()
+
+                        SettingSwitchRow(
+                            title = stringResource(Res.string.settings_pref_auto_detect_title),
+                            description = stringResource(Res.string.settings_pref_auto_detect_desc),
+                            checked = autoDetectDeviceOnLaunch,
+                            onCheckedChange = {
+                                autoDetectDeviceOnLaunch = it
+                                userPrefs.putBoolean("setting.auto_detect_device_on_launch", it)
+                            }
+                        )
+
+                        SectionDivider()
+
+                        SettingSwitchRow(
+                            title = stringResource(Res.string.settings_pref_remember_device_title),
+                            description = stringResource(Res.string.settings_pref_remember_device_desc),
+                            checked = rememberLastDevice,
+                            onCheckedChange = {
+                                rememberLastDevice = it
+                                userPrefs.putBoolean("setting.remember_last_device", it)
                             }
                         )
                     }
-                }
 
-                SectionDivider()
-
-                SettingSwitchRow(
-                    title = stringResource(Res.string.settings_pref_auto_detect_title),
-                    description = stringResource(Res.string.settings_pref_auto_detect_desc),
-                    checked = autoDetectDeviceOnLaunch,
-                    onCheckedChange = {
-                        autoDetectDeviceOnLaunch = it
-                        userPrefs.putBoolean("setting.auto_detect_device_on_launch", it)
-                    }
-                )
-
-                SectionDivider()
-
-                SettingSwitchRow(
-                    title = stringResource(Res.string.settings_pref_remember_device_title),
-                    description = stringResource(Res.string.settings_pref_remember_device_desc),
-                    checked = rememberLastDevice,
-                    onCheckedChange = {
-                        rememberLastDevice = it
-                        userPrefs.putBoolean("setting.remember_last_device", it)
-                    }
-                )
-            }
-
-            SettingsSection(title = stringResource(Res.string.update_section_title)) {
-                SettingValueRow(
-                    title = stringResource(Res.string.current_version, "").trim().trimEnd(':', '：'),
-                    description = stringResource(Res.string.settings_update_current_version_desc),
-                    value = currentVersionLabel
-                )
-                SectionDivider()
-                SettingValueRow(
-                    title = stringResource(Res.string.settings_update_status),
-                    description = stringResource(Res.string.settings_update_status_desc),
-                    value = updateStatusText,
-                    valueColor = updateStatusColor(updateStatus)
-                )
-
-                ActionButtonRow {
-                    SettingActionButton(
-                        text = stringResource(Res.string.check_update),
-                        icon = IconParkIcons.Refresh,
-                        onClick = {
-                            coroutineScope.launch {
-                                isCheckingUpdate = true
-                                updateStatus = UpdateStatus.Checking
-                                val result = GitHubUpdateManager.checkForUpdate(currentVersionLabel)
-                                when (result) {
-                                    is GitHubUpdateManager.CheckResult.UpToDate -> {
-                                        latestVersion = result.latestVersion
-                                        releaseUrl = null
-                                        downloadableAsset = null
-                                        updateStatus = UpdateStatus.UpToDate(result.latestVersion)
-                                    }
-                                    is GitHubUpdateManager.CheckResult.UpdateAvailable -> {
-                                        latestVersion = result.latestVersion
-                                        releaseUrl = result.htmlUrl
-                                        downloadableAsset = result.asset
-                                        updateStatus = UpdateStatus.UpdateAvailable(result.latestVersion, hasAutoInstall = true)
-                                    }
-                                    is GitHubUpdateManager.CheckResult.UpdateAvailableNoAsset -> {
-                                        latestVersion = result.latestVersion
-                                        releaseUrl = result.htmlUrl
-                                        downloadableAsset = null
-                                        updateStatus = UpdateStatus.UpdateAvailable(result.latestVersion, hasAutoInstall = false)
-                                    }
-                                    is GitHubUpdateManager.CheckResult.Error -> {
-                                        updateStatus = UpdateStatus.CheckFailed(result.message)
-                                    }
-                                }
-                                isCheckingUpdate = false
+                    Box {
+                        Column(verticalArrangement = Arrangement.spacedBy(UiTokens.SectionSpacing)) {
+                            val agentFeatureEnabled = AgentFeatureSettingsSection()
+                            if (agentFeatureEnabled) {
+                                AiModelSettingsSection()
+                                AiMemorySettingsSection()
+                                AgentApprovalSettingsSection()
+                                AgentInputHelperSettingsSection(selectedDeviceId)
                             }
-                        },
-                        enabled = !isCheckingUpdate && !isDownloadingUpdate,
-                        loading = isCheckingUpdate,
-                        primary = true
-                    )
+                        }
+                    }
+                },
+                sideContent = {
+                    val adbSettingsContent: @Composable () -> Unit = {
+                        SettingsSection(title = stringResource(Res.string.adb_path_setting)) {
+                        val sourceText = settingAdbSourceText(adbEnvironment.source)
+                        val isCheckingAdb = !adbEnvironment.isReady &&
+                            adbEnvironment.source == AdbPathManager.AdbSource.NONE &&
+                            adbEnvironment.message?.contains("检测") == true
+                        val statusText = if (adbEnvironment.isReady) {
+                            stringResource(Res.string.adb_environment_ready)
+                        } else if (isCheckingAdb) {
+                            stringResource(Res.string.adb_environment_checking)
+                        } else {
+                            adbEnvironment.message ?: stringResource(Res.string.adb_environment_failed)
+                        }
 
-                    if (downloadableAsset != null) {
-                        SettingActionButton(
-                            text = stringResource(Res.string.download_and_install),
-                            icon = IconParkIcons.Download,
-                            onClick = {
-                                val asset = downloadableAsset
-                                if (asset != null) {
-                                    coroutineScope.launch {
-                                        isDownloadingUpdate = true
-                                        updateStatus = UpdateStatus.Downloading
-                                        val result = GitHubUpdateManager.downloadAndInstall(asset)
-                                        result.onSuccess { path ->
-                                            updateStatus = UpdateStatus.DownloadSuccess(path.toString())
-                                        }.onFailure { error ->
-                                            updateStatus = UpdateStatus.DownloadFailed(error.message ?: "Unknown error")
-                                        }
-                                        isDownloadingUpdate = false
-                                    }
-                                }
+                        AdbEnvironmentSummary(
+                            statusLabel = stringResource(Res.string.settings_status_label),
+                            statusText = statusText,
+                            tone = when {
+                                adbEnvironment.isReady -> StatusTone.Positive
+                                isCheckingAdb -> StatusTone.Neutral
+                                else -> StatusTone.Danger
                             },
-                            enabled = !isCheckingUpdate && !isDownloadingUpdate,
-                            loading = isDownloadingUpdate
+                            sourceLabel = stringResource(Res.string.adb_current_using),
+                            sourceDescription = stringResource(Res.string.settings_adb_source_desc),
+                            sourceValue = sourceText,
+                            pathLabel = stringResource(Res.string.adb_path_label),
+                            pathDescription = stringResource(Res.string.settings_adb_path_desc),
+                            pathValue = adbEnvironment.path ?: notSetText,
+                            versionLabel = stringResource(Res.string.adb_version_label),
+                            versionDescription = stringResource(Res.string.settings_adb_version_desc),
+                            versionValue = adbEnvironment.version ?: notSetText,
+                            trailingIcon = IconParkIcons.FolderOpen,
+                            trailingIconDescription = stringResource(Res.string.adb_path_label),
+                            onTrailingAction = { openPathLocation(adbEnvironment.path) }
                         )
+
+                        SettingsActionArea {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
+                            ) {
+                                SettingActionButton(
+                                    text = stringResource(Res.string.adb_auto_detect),
+                                    icon = IconParkIcons.Refresh,
+                                    onClick = {
+                                        coroutineScope.launch {
+                                            AdbPathManager.autoDetect()
+                                        }
+                                    },
+                                    modifier = Modifier.weight(1f),
+                                    primary = true
+                                )
+
+                                SettingActionButton(
+                                    text = stringResource(Res.string.adb_select_adb),
+                                    icon = IconParkIcons.File,
+                                    onClick = {
+                                        coroutineScope.launch {
+                                            val newPath = FileUtils.selectFile()
+                                            if (newPath != null) {
+                                                AdbPathManager.setAdbPath(newPath)
+                                            }
+                                        }
+                                    },
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
+                            ) {
+                                SettingActionButton(
+                                    text = stringResource(Res.string.adb_restore_bundled),
+                                    icon = IconParkIcons.Setting,
+                                    onClick = {
+                                        coroutineScope.launch {
+                                            AdbPathManager.useBundledAdb()
+                                        }
+                                    },
+                                    modifier = Modifier.weight(1.4f)
+                                )
+
+                                SettingActionButton(
+                                    text = stringResource(Res.string.adb_open_help),
+                                    icon = Icons.AutoMirrored.Filled.OpenInNew,
+                                    onClick = {
+                                        AdbPathManager.openHelp().onFailure { _ -> }
+                                    },
+                                    modifier = Modifier.weight(0.6f)
+                                )
+                            }
+                        }
+                        }
                     }
 
-                    if (!releaseUrl.isNullOrBlank() && latestVersion != null) {
-                        SettingActionButton(
-                            text = stringResource(Res.string.open_release_page),
-                            icon = Icons.AutoMirrored.Filled.OpenInNew,
-                            onClick = {
-                                val url = releaseUrl
-                                if (!url.isNullOrBlank()) {
-                                    GitHubUpdateManager.openReleasePage(url).onFailure { error ->
-                                        updateStatus = UpdateStatus.CheckFailed(error.message ?: "Unknown error")
-                                    }
-                                }
-                            }
+                    SettingsSection(title = stringResource(Res.string.update_section_title)) {
+                        SideSettingValueRow(
+                            title = stringResource(Res.string.current_version, "").trim().trimEnd(':', '：'),
+                            description = stringResource(Res.string.settings_update_current_version_desc),
+                            value = currentVersionLabel
                         )
+                        SectionDivider()
+                        SideSettingValueRow(
+                            title = stringResource(Res.string.settings_update_status),
+                            description = stringResource(Res.string.settings_update_status_desc),
+                            value = updateStatusText,
+                            valueColor = updateStatusColor(updateStatus)
+                        )
+
+                        SettingsActionArea {
+                            SettingActionButton(
+                                text = stringResource(Res.string.check_update),
+                                icon = IconParkIcons.Refresh,
+                                onClick = {
+                                    coroutineScope.launch {
+                                        isCheckingUpdate = true
+                                        updateStatus = UpdateStatus.Checking
+                                        val result = GitHubUpdateManager.checkForUpdate(currentVersionLabel)
+                                        when (result) {
+                                            is GitHubUpdateManager.CheckResult.UpToDate -> {
+                                                latestVersion = result.latestVersion
+                                                releaseUrl = null
+                                                downloadableAsset = null
+                                                updateStatus = UpdateStatus.UpToDate(result.latestVersion)
+                                            }
+                                            is GitHubUpdateManager.CheckResult.UpdateAvailable -> {
+                                                latestVersion = result.latestVersion
+                                                releaseUrl = result.htmlUrl
+                                                downloadableAsset = result.asset
+                                                updateStatus = UpdateStatus.UpdateAvailable(
+                                                    result.latestVersion,
+                                                    hasAutoInstall = true
+                                                )
+                                            }
+                                            is GitHubUpdateManager.CheckResult.UpdateAvailableNoAsset -> {
+                                                latestVersion = result.latestVersion
+                                                releaseUrl = result.htmlUrl
+                                                downloadableAsset = null
+                                                updateStatus = UpdateStatus.UpdateAvailable(
+                                                    result.latestVersion,
+                                                    hasAutoInstall = false
+                                                )
+                                            }
+                                            is GitHubUpdateManager.CheckResult.Error -> {
+                                                updateStatus = UpdateStatus.CheckFailed(result.message)
+                                            }
+                                        }
+                                        isCheckingUpdate = false
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                enabled = !isCheckingUpdate && !isDownloadingUpdate,
+                                loading = isCheckingUpdate,
+                                primary = true
+                            )
+
+                            if (downloadableAsset != null) {
+                                SettingActionButton(
+                                    text = stringResource(Res.string.download_and_install),
+                                    icon = IconParkIcons.Download,
+                                    onClick = {
+                                        val asset = downloadableAsset
+                                        if (asset != null) {
+                                            coroutineScope.launch {
+                                                isDownloadingUpdate = true
+                                                updateStatus = UpdateStatus.Downloading
+                                                val result = GitHubUpdateManager.downloadAndInstall(asset)
+                                                result.onSuccess { path ->
+                                                    updateStatus = UpdateStatus.DownloadSuccess(path.toString())
+                                                }.onFailure { error ->
+                                                    updateStatus = UpdateStatus.DownloadFailed(
+                                                        error.message ?: "Unknown error"
+                                                    )
+                                                }
+                                                isDownloadingUpdate = false
+                                            }
+                                        }
+                                    },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    enabled = !isCheckingUpdate && !isDownloadingUpdate,
+                                    loading = isDownloadingUpdate
+                                )
+                            }
+
+                            if (!releaseUrl.isNullOrBlank() && latestVersion != null) {
+                                SettingActionButton(
+                                    text = stringResource(Res.string.open_release_page),
+                                    icon = Icons.AutoMirrored.Filled.OpenInNew,
+                                    onClick = {
+                                        val url = releaseUrl
+                                        if (!url.isNullOrBlank()) {
+                                            GitHubUpdateManager.openReleasePage(url).onFailure { error ->
+                                                updateStatus = UpdateStatus.CheckFailed(
+                                                    error.message ?: "Unknown error"
+                                                )
+                                            }
+                                        }
+                                    },
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            }
+                        }
                     }
+
+                    adbSettingsContent()
                 }
-            }
+            )
         }
     }
 
-    if (showLanguageDialog) {
-        TipDialog(stringResource(Res.string.language_changed)) {
+    LaunchedEffect(showLanguageDialog) {
+        if (showLanguageDialog) {
+            delay(2400L)
             showLanguageDialog = false
+        }
+    }
+    FeedbackToast(
+        if (showLanguageDialog) MsgContent.Resource(Res.string.language_changed) else null
+    )
+}
+
+@Composable
+private fun SettingsColumns(
+    mainContent: @Composable ColumnScope.() -> Unit,
+    sideContent: @Composable ColumnScope.() -> Unit
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(UiTokens.SectionSpacing)
+    ) {
+        sideContent()
+        mainContent()
+    }
+}
+
+@Composable
+private fun AgentFeatureSettingsSection(): Boolean {
+    val preferences = remember { AgentFeatureRuntime.preferences }
+    val enabled by preferences.enabled.collectAsState()
+
+    SettingsSection(title = stringResource(Res.string.ai_agent_beta_settings)) {
+        SettingSwitchRow(
+            title = stringResource(Res.string.ai_agent_beta_title),
+            description = stringResource(
+                if (enabled) {
+                    Res.string.ai_agent_beta_enabled_desc
+                } else {
+                    Res.string.ai_agent_beta_disabled_desc
+                }
+            ),
+            checked = enabled,
+            onCheckedChange = preferences::setEnabled
+        )
+    }
+    return enabled
+}
+
+@Composable
+private fun AgentApprovalSettingsSection() {
+    val preferences = remember { AgentApprovalRuntime.preferences }
+    val policy by preferences.policy.collectAsState()
+    var expanded by remember { mutableStateOf(false) }
+    val policyLabel = stringResource(
+        when (policy) {
+            AgentApprovalPolicy.SMART -> Res.string.agent_approval_smart
+            AgentApprovalPolicy.CAUTIOUS -> Res.string.agent_approval_cautious
+        }
+    )
+
+    SettingsSection(title = stringResource(Res.string.agent_approval_settings)) {
+        SettingsDropdownRow(
+            title = stringResource(Res.string.agent_approval_policy),
+            description = stringResource(
+                when (policy) {
+                    AgentApprovalPolicy.SMART -> Res.string.agent_approval_smart_desc
+                    AgentApprovalPolicy.CAUTIOUS -> Res.string.agent_approval_cautious_desc
+                }
+            ),
+            value = policyLabel,
+            expanded = expanded,
+            onExpandedChange = { expanded = it }
+        ) {
+            AgentApprovalPolicy.entries.forEach { candidate ->
+                val title = stringResource(
+                    if (candidate == AgentApprovalPolicy.SMART) {
+                        Res.string.agent_approval_smart
+                    } else {
+                        Res.string.agent_approval_cautious
+                    }
+                )
+                val description = stringResource(
+                    if (candidate == AgentApprovalPolicy.SMART) {
+                        Res.string.agent_approval_smart_desc
+                    } else {
+                        Res.string.agent_approval_cautious_desc
+                    }
+                )
+                DropdownMenuItem(
+                    text = {
+                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Text(title, color = SettingColors.Text, fontSize = UiTokens.TextBody)
+                            Text(description, color = SettingColors.Muted, fontSize = UiTokens.TextCaption)
+                        }
+                    },
+                    onClick = {
+                        preferences.setPolicy(candidate)
+                        expanded = false
+                    }
+                )
+            }
         }
     }
 }
@@ -1549,6 +1702,7 @@ internal fun AiModelConfigDialog(
                                 statusIsError = result.isFailure
                                 statusMessage = result.exceptionOrNull()?.message
                                 if (result.isSuccess) {
+                                    AgentProviderRuntime.repository.syncLegacy(currentConfig(), apiKey)
                                     onSaved()
                                 }
                                 isSaving = false
@@ -1700,14 +1854,26 @@ private fun SettingsSection(
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
     ) {
-        Text(
-            text = title,
-            modifier = Modifier.padding(horizontal = UiTokens.SpaceLarge),
-            style = MaterialTheme.typography.titleMedium,
-            color = SettingColors.Text,
-            fontWeight = FontWeight.Medium,
-            fontSize = UiTokens.TextSection
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .width(3.dp)
+                    .height(16.dp)
+                    .clip(RoundedCornerShape(UiTokens.BadgeRadius))
+                    .background(SettingColors.Primary)
+            )
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                color = SettingColors.Text,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = UiTokens.TextSection
+            )
+        }
         Column(
             modifier = Modifier.fillMaxWidth(),
             content = content
@@ -1738,6 +1904,66 @@ private fun ActionButtonRow(content: @Composable () -> Unit) {
 }
 
 @Composable
+private fun SettingsActionArea(content: @Composable ColumnScope.() -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = UiTokens.SpaceLarge, vertical = UiTokens.SpaceMedium),
+        verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall),
+        content = content
+    )
+}
+
+@Composable
+private fun SideSettingValueRow(
+    title: String,
+    description: String,
+    value: String,
+    valueColor: Color = Color.Unspecified
+) {
+    val resolvedValueColor = if (valueColor == Color.Unspecified) SettingColors.Text else valueColor
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = UiTokens.SpaceLarge, vertical = UiTokens.SpaceMedium),
+        verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceXSmall)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium),
+            verticalAlignment = Alignment.Top
+        ) {
+            Text(
+                text = title,
+                modifier = Modifier.weight(0.4f),
+                style = MaterialTheme.typography.bodyMedium,
+                color = SettingColors.Text,
+                fontWeight = FontWeight.Medium,
+                fontSize = UiTokens.TextBodyLarge
+            )
+            Text(
+                text = value,
+                modifier = Modifier.weight(0.6f),
+                style = MaterialTheme.typography.bodyMedium,
+                color = resolvedValueColor,
+                fontSize = UiTokens.TextBodyLarge,
+                textAlign = androidx.compose.ui.text.style.TextAlign.End,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+        Text(
+            text = description,
+            style = MaterialTheme.typography.bodySmall,
+            color = SettingColors.Muted,
+            fontSize = UiTokens.TextCaption,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+@Composable
 private fun AdbEnvironmentSummary(
     statusLabel: String,
     statusText: String,
@@ -1757,8 +1983,8 @@ private fun AdbEnvironmentSummary(
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(UiTokens.RadiusLarge),
-        color = SettingColors.SoftSurface,
+        shape = RoundedCornerShape(0.dp),
+        color = Color.Transparent,
         tonalElevation = 0.dp,
         shadowElevation = 0.dp
     ) {
@@ -1785,20 +2011,25 @@ private fun AdbEnvironmentSummary(
                 StatusPill(statusText = statusText, tone = tone)
             }
 
-            Column(verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)) {
+            HorizontalDivider(color = SettingColors.Divider)
+
+            Column {
                 SummaryInfoRow(
                     title = sourceLabel,
                     description = sourceDescription,
                     value = sourceValue
                 )
+                HorizontalDivider(color = SettingColors.Divider)
                 SummaryInfoRow(
                     title = pathLabel,
                     description = pathDescription,
                     value = pathValue,
+                    stackedValue = true,
                     trailingIcon = trailingIcon,
                     trailingIconDescription = trailingIconDescription,
                     onTrailingAction = onTrailingAction
                 )
+                HorizontalDivider(color = SettingColors.Divider)
                 SummaryInfoRow(
                     title = versionLabel,
                     description = versionDescription,
@@ -1814,65 +2045,121 @@ private fun SummaryInfoRow(
     title: String,
     description: String,
     value: String,
+    stackedValue: Boolean = false,
     trailingIcon: ImageVector? = null,
     trailingIconDescription: String? = null,
     onTrailingAction: (() -> Unit)? = null
 ) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = UiTokens.SpaceMedium),
+        verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
+    ) {
+        if (stackedValue) {
+            SummaryInfoLabel(
+                title = title,
+                description = description,
+                modifier = Modifier.fillMaxWidth()
+            )
+            SummaryInfoValue(
+                value = value,
+                modifier = Modifier.fillMaxWidth(),
+                maxLines = 2,
+                trailingIcon = trailingIcon,
+                trailingIconDescription = trailingIconDescription,
+                onTrailingAction = onTrailingAction
+            )
+        } else {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                SummaryInfoLabel(
+                    title = title,
+                    description = description,
+                    modifier = Modifier.weight(0.46f)
+                )
+                SummaryInfoValue(
+                    value = value,
+                    modifier = Modifier.weight(0.54f),
+                    maxLines = 1,
+                    trailingIcon = trailingIcon,
+                    trailingIconDescription = trailingIconDescription,
+                    onTrailingAction = onTrailingAction
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SummaryInfoLabel(title: String, description: String, modifier: Modifier) {
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceXSmall)
+    ) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.bodyMedium,
+            color = SettingColors.Text,
+            fontWeight = FontWeight.Medium,
+            fontSize = UiTokens.TextBodyLarge
+        )
+        Text(
+            text = description,
+            style = MaterialTheme.typography.bodySmall,
+            color = SettingColors.Muted,
+            fontSize = UiTokens.TextCaption,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+@Composable
+private fun SummaryInfoValue(
+    value: String,
+    modifier: Modifier,
+    maxLines: Int,
+    trailingIcon: ImageVector?,
+    trailingIconDescription: String?,
+    onTrailingAction: (() -> Unit)?
+) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium),
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Column(modifier = Modifier.weight(0.44f), verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceXSmall)) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.bodyMedium,
-                color = SettingColors.Text,
-                fontWeight = FontWeight.Medium,
-                fontSize = UiTokens.TextBodyLarge
-            )
-            Text(
-                text = description,
-                style = MaterialTheme.typography.bodySmall,
-                color = SettingColors.Muted,
-                fontSize = UiTokens.TextCaption,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
-        Row(
-            modifier = Modifier.weight(0.56f),
-            horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall, Alignment.End),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = value,
-                style = MaterialTheme.typography.bodyMedium,
-                color = SettingColors.Text,
-                fontWeight = FontWeight.Medium,
-                fontSize = UiTokens.TextBodyLarge,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            if (trailingIcon != null && onTrailingAction != null) {
-                OutlinedButton(
-                    onClick = onTrailingAction,
-                    modifier = Modifier.height(30.dp),
-                    shape = RoundedCornerShape(UiTokens.RadiusMedium),
-                    border = BorderStroke(1.dp, SettingColors.ButtonBorder.copy(alpha = 0.72f)),
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        containerColor = SettingColors.Surface,
-                        contentColor = SettingColors.Muted
-                    ),
-                    contentPadding = PaddingValues(horizontal = UiTokens.SpaceSmall, vertical = 0.dp)
-                ) {
-                    Icon(
-                        imageVector = trailingIcon,
-                        contentDescription = trailingIconDescription,
-                        tint = SettingColors.Muted,
-                        modifier = Modifier.size(14.dp)
-                    )
-                }
+        Text(
+            text = value,
+            modifier = Modifier.weight(1f),
+            style = MaterialTheme.typography.bodyMedium,
+            color = SettingColors.Text,
+            fontWeight = FontWeight.Medium,
+            fontSize = UiTokens.TextBodyLarge,
+            maxLines = maxLines,
+            overflow = TextOverflow.Ellipsis
+        )
+        if (trailingIcon != null && onTrailingAction != null) {
+            OutlinedButton(
+                onClick = onTrailingAction,
+                modifier = Modifier.height(30.dp),
+                shape = RoundedCornerShape(UiTokens.RadiusMedium),
+                border = BorderStroke(1.dp, SettingColors.ButtonBorder.copy(alpha = 0.72f)),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    containerColor = SettingColors.Surface,
+                    contentColor = SettingColors.Muted
+                ),
+                contentPadding = PaddingValues(horizontal = UiTokens.SpaceSmall, vertical = 0.dp)
+            ) {
+                Icon(
+                    imageVector = trailingIcon,
+                    contentDescription = trailingIconDescription,
+                    tint = SettingColors.Muted,
+                    modifier = Modifier.size(14.dp)
+                )
             }
         }
     }
@@ -1881,22 +2168,24 @@ private fun SummaryInfoRow(
 @Composable
 private fun StatusPill(statusText: String, tone: StatusTone) {
     val color = when (tone) {
-        StatusTone.Positive -> SettingColors.Primary
+        StatusTone.Positive -> SettingColors.Success
         StatusTone.Neutral -> SettingColors.Muted
         StatusTone.Danger -> SettingColors.Danger
     }
-    val background = if (tone == StatusTone.Positive) SettingColors.PrimarySoft else color.copy(alpha = 0.08f)
-    val border = if (tone == StatusTone.Positive) SettingColors.PrimaryBorder.copy(alpha = 0.72f) else color.copy(alpha = 0.14f)
 
-    Surface(
+    Row(
         modifier = Modifier.widthIn(max = 360.dp),
-        shape = RoundedCornerShape(UiTokens.BadgeRadius),
-        color = background,
-        border = BorderStroke(1.dp, border)
+        horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall),
+        verticalAlignment = Alignment.CenterVertically
     ) {
+        Box(
+            modifier = Modifier
+                .size(7.dp)
+                .clip(CircleShape)
+                .background(color)
+        )
         Text(
             text = statusText,
-            modifier = Modifier.padding(horizontal = UiTokens.SpaceSmall, vertical = UiTokens.SpaceXSmall),
             style = MaterialTheme.typography.bodySmall,
             color = color,
             fontWeight = FontWeight.SemiBold,

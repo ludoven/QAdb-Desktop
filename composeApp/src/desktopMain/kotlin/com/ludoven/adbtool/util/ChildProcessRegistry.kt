@@ -19,18 +19,26 @@ object ChildProcessRegistry {
     fun terminateAll(timeoutMillis: Long = 1_500L) {
         val snapshot = processes.toList()
         snapshot.forEach { process ->
-            if (process.isAlive) {
-                process.destroy()
+            runCatching {
+                if (process.isAlive) process.destroy()
             }
         }
+
+        val deadlineNanos = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeoutMillis.coerceAtLeast(0L))
         snapshot.forEach { process ->
-            if (process.isAlive) {
-                val stopped = runCatching {
-                    process.waitFor(timeoutMillis, TimeUnit.MILLISECONDS)
-                }.getOrDefault(false)
-                if (!stopped && process.isAlive) {
-                    process.destroyForcibly()
+            val remainingNanos = deadlineNanos - System.nanoTime()
+            if (remainingNanos > 0L) {
+                runCatching {
+                    if (process.isAlive) {
+                        process.waitFor(remainingNanos, TimeUnit.NANOSECONDS)
+                    }
                 }
+            }
+        }
+
+        snapshot.forEach { process ->
+            runCatching {
+                if (process.isAlive) process.destroyForcibly()
             }
             unregister(process)
         }
