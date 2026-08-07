@@ -11,7 +11,7 @@
 <p align="center">
   <a href="https://ludoven.github.io/QADB/">官网</a> |
   <a href="./README_CN.md">中文</a> |
-  <a href="./README_EN.md">English</a>
+  <a href="./README.md">English</a>
 </p>
 
 <p align="center">
@@ -359,9 +359,6 @@ cd QADB
 
 ## 📮 联系方式
 
-- 微信二维码：
-
-  ![微信二维码](docs/wechat.png)
 - 邮箱：ludoven2019@gmail.com
 
 ---
