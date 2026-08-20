@@ -1,121 +1,136 @@
 package com.ludoven.adbtool.agent
 
-import com.ludoven.adbtool.util.AdbPathManager
 import com.ludoven.adbtool.util.AdbTool
-import com.ludoven.adbtool.util.ChildProcessRegistry
-import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.TimeUnit
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.withContext
 
 class RealAgentDeviceGateway(
     private val appCatalog: InstalledAppCatalog = RealInstalledAppCatalog(),
     private val uiParser: UiHierarchyParser = UiHierarchyParser(),
     private val screenshotProcessor: AgentScreenshotProcessor = AgentScreenshotProcessor(),
-    private val inputHelper: AgentInputHelper = AgentInputHelper()
-) : AgentDeviceGateway {
+    private val inputHelper: AgentInputHelper = AgentInputHelper(),
+    private val deviceStatusRepository: DeviceStatusRepository = DeviceStatusRuntime.repository
+) : AgentDeviceGateway, AgentDeviceStatusGateway, AgentAppCatalogGateway, CuratedDeviceCommandGateway {
     private val observations = ConcurrentHashMap<String, AgentObservation>()
+    private val adbObservationSource = AdbObservationSource(uiParser, screenshotProcessor)
 
     override suspend fun isConnected(deviceId: String): Boolean =
         AdbTool.getConnectedDevices().contains(deviceId)
 
-    override suspend fun observe(deviceId: String): AgentObservation = coroutineScope {
-        if (!isConnected(deviceId)) {
-            throw AgentException("The selected device is no longer connected")
-        }
-        val screenshotTask = async { runCatching { captureScreenshotPng(deviceId) } }
-        val hierarchyTask = async { runCatching { loadUiHierarchy(deviceId) } }
-        val activityTask = async { runCatching { loadCurrentActivity(deviceId) } }
-        val displayTask = async { runCatching { loadDisplaySize(deviceId) } }
-
-        val warnings = mutableListOf<String>()
-        val screenshot = screenshotTask.await().getOrElse {
-            warnings += "Screenshot unavailable"
-            null
-        }?.let(screenshotProcessor::process).also {
-            if (it == null) warnings += "Visual observation unavailable"
-        }
-        val displaySize = screenshot?.let { it.width to it.height }
-            ?: displayTask.await().getOrElse {
-                warnings += "Display size unavailable"
-                null
-            }
-            ?: throw AgentException("Unable to read the device display size")
-        val rawHierarchy = hierarchyTask.await().getOrElse {
-            warnings += "UI hierarchy unavailable"
-            ""
-        }
-        val parsedHierarchy = uiParser.parse(rawHierarchy, displaySize.first, displaySize.second)
-        val currentActivity = activityTask.await().getOrElse {
-            warnings += "Current Activity unavailable"
-            ""
-        }
-        val observation = AgentObservation(
-            screenshotPng = screenshot?.bytes,
-            screenshotMimeType = screenshot?.mimeType ?: "image/jpeg",
-            uiHierarchy = parsedHierarchy.compactText,
-            uiNodes = parsedHierarchy.nodes,
-            currentActivity = currentActivity,
-            screenWidth = displaySize.first,
-            screenHeight = displaySize.second,
-            warnings = warnings.distinct()
-        )
-        observations[deviceId] = observation
-        observation
-    }
-
-    override suspend fun observeLightweight(
-        deviceId: String,
-        includeUiHierarchy: Boolean
-    ): AgentObservation = coroutineScope {
-        if (!isConnected(deviceId)) {
-            throw AgentException("The selected device is no longer connected")
-        }
-        val activityTask = async { runCatching { loadCurrentActivity(deviceId) } }
-        val displayTask = async { runCatching { loadDisplaySize(deviceId) } }
-        val hierarchyTask = if (includeUiHierarchy) {
-            async { runCatching { loadUiHierarchy(deviceId) } }
-        } else {
-            null
-        }
-        val displaySize = displayTask.await().getOrNull()
-            ?: throw AgentException("Unable to read the device display size")
-        val hierarchy = hierarchyTask?.await()?.getOrDefault("").orEmpty()
-        val parsedHierarchy = uiParser.parse(hierarchy, displaySize.first, displaySize.second)
-        AgentObservation(
-            screenshotPng = null,
-            uiHierarchy = parsedHierarchy.compactText,
-            uiNodes = parsedHierarchy.nodes,
-            currentActivity = activityTask.await().getOrDefault(""),
-            screenWidth = displaySize.first,
-            screenHeight = displaySize.second,
-            warnings = buildList {
-                if (activityTask.await().isFailure) add("Current Activity unavailable")
-                if (includeUiHierarchy && hierarchyTask?.await()?.isFailure == true) add("UI hierarchy unavailable")
-            }
-        )
-    }
+    override suspend fun capabilities(deviceId: String): AgentDeviceCapabilities =
+        adbObservationSource.capabilities(deviceId)
 
     override suspend fun confirmationRequirement(
         deviceId: String,
         action: AgentAction,
         observation: AgentObservation
-    ): String? {
-        val input = action as? AgentAction.InputText ?: return null
-        if (!inputHelper.requiresUnicodeHelper(input.text)) return null
+    ): String? = when {
+        action is AgentAction.InputText && inputHelper.requiresUnicodeHelper(action.text) ->
+            "Unicode input temporarily installs, enables, or switches the QADB input method"
+        action is AgentAction.Tap && action.meta.target == "visual candidate" ->
+            "The target is available only as an unstructured visual location; confirm this coordinate action"
+        else -> null
+    }
 
-        val helperInstalled = runCatching { inputHelper.status(deviceId).installed }
-            .getOrDefault(false)
-        return if (helperInstalled) {
-            null
-        } else {
-            "Chinese or emoji input requires installing QADB's Unicode input helper on this device. " +
-                "QADB will switch to it only for this input, restore the previous input method, and record the result in the task log."
+    override suspend fun readStatus(deviceId: String, forceRefresh: Boolean): DeviceStatusSnapshot {
+        if (!isConnected(deviceId)) {
+            throw AgentException("The selected device is no longer connected")
         }
+        return deviceStatusRepository.readStatus(deviceId, forceRefresh)
+    }
+
+    override suspend fun readInstalledApps(
+        deviceId: String,
+        forceRefresh: Boolean
+    ): List<InstalledAgentApp> {
+        if (!isConnected(deviceId)) {
+            throw AgentException("The selected device is no longer connected")
+        }
+        return appCatalog.list(deviceId, forceRefresh)
+    }
+
+    override suspend fun observe(deviceId: String): AgentObservation {
+        if (!isConnected(deviceId)) {
+            throw AgentException("The selected device is no longer connected")
+        }
+        val observation = adbObservationSource.observe(
+            deviceId = deviceId,
+            includeScreenshot = true,
+            includeUiHierarchy = true
+        )
+        observations[deviceId] = observation
+        return observation
+    }
+
+    override suspend fun observeLightweight(
+        deviceId: String,
+        includeUiHierarchy: Boolean
+    ): AgentObservation {
+        if (!isConnected(deviceId)) {
+            throw AgentException("The selected device is no longer connected")
+        }
+        val observation = adbObservationSource.observe(
+            deviceId = deviceId,
+            includeScreenshot = false,
+            includeUiHierarchy = includeUiHierarchy
+        )
+        observations[deviceId] = observation
+        return observation
+    }
+
+    override suspend fun readSystemProbe(deviceId: String, probeId: String): String? =
+        adbObservationSource.readSystemProbe(deviceId, probeId)
+
+    override suspend fun readSetting(
+        deviceId: String,
+        setting: CuratedDeviceSetting
+    ): CuratedSettingValue? {
+        if (!isConnected(deviceId)) return null
+        return when (setting) {
+            CuratedDeviceSetting.WIFI -> readSystemProbe(deviceId, "wifi")?.toBooleanStrictOrNull()
+                ?.let(CuratedSettingValue::Toggle)
+            CuratedDeviceSetting.BLUETOOTH -> readSystemProbe(deviceId, "bluetooth")?.toBooleanStrictOrNull()
+                ?.let(CuratedSettingValue::Toggle)
+            CuratedDeviceSetting.BRIGHTNESS -> readSystemProbe(deviceId, "brightness")?.toIntOrNull()
+                ?.coerceIn(0, 255)
+                ?.let { CuratedSettingValue.Level((it * 100 + 127) / 255) }
+            CuratedDeviceSetting.ROTATION_AUTO -> readSystemProbe(deviceId, "rotation_auto")?.toBooleanStrictOrNull()
+                ?.let(CuratedSettingValue::Toggle)
+        }
+    }
+
+    override suspend fun writeSetting(
+        deviceId: String,
+        setting: CuratedDeviceSetting,
+        value: CuratedSettingValue
+    ): AgentToolResult {
+        if (!isConnected(deviceId)) {
+            return AgentToolResult(false, "The selected device is no longer connected")
+        }
+        val args = when (setting) {
+            CuratedDeviceSetting.WIFI -> {
+                val enabled = (value as? CuratedSettingValue.Toggle)?.enabled
+                    ?: return AgentToolResult(false, "Wi-Fi requires a toggle value")
+                arrayOf("shell", "svc", "wifi", if (enabled) "enable" else "disable")
+            }
+            CuratedDeviceSetting.BLUETOOTH -> {
+                val enabled = (value as? CuratedSettingValue.Toggle)?.enabled
+                    ?: return AgentToolResult(false, "Bluetooth requires a toggle value")
+                arrayOf("shell", "svc", "bluetooth", if (enabled) "enable" else "disable")
+            }
+            CuratedDeviceSetting.BRIGHTNESS -> {
+                val percent = (value as? CuratedSettingValue.Level)?.value
+                    ?: return AgentToolResult(false, "Brightness requires a level value")
+                val platformValue = (percent * 255 + 50) / 100
+                arrayOf("shell", "settings", "put", "system", "screen_brightness", platformValue.toString())
+            }
+            CuratedDeviceSetting.ROTATION_AUTO -> {
+                val enabled = (value as? CuratedSettingValue.Toggle)?.enabled
+                    ?: return AgentToolResult(false, "Rotation requires a toggle value")
+                arrayOf("shell", "settings", "put", "system", "accelerometer_rotation", if (enabled) "1" else "0")
+            }
+        }
+        return adbResult(AdbTool.execAdbWithTimeoutAsync(ADB_ACTION_TIMEOUT_MILLIS, "-s", deviceId, *args))
     }
 
     override suspend fun execute(deviceId: String, action: AgentAction): AgentToolResult {
@@ -125,6 +140,7 @@ class RealAgentDeviceGateway(
         return when (action) {
             AgentAction.Observe -> AgentToolResult(true, "Observation refreshed")
             is AgentAction.FindApp -> findApp(deviceId, action.query)
+            is AgentAction.OpenApp -> openApp(deviceId, action.query)
             is AgentAction.Tap -> tap(deviceId, action.x, action.y)
             is AgentAction.TapElement -> {
                 val node = resolveNode(deviceId, action.observationId, action.elementId)
@@ -141,14 +157,20 @@ class RealAgentDeviceGateway(
                 )
             )
             is AgentAction.InputText -> {
+                var targetNode: UiNodeSnapshot? = null
                 action.elementId?.let { elementId ->
                     val observationId = action.observationId
                         ?: return AgentToolResult(false, "Input element requires an observation ID")
                     val node = resolveNode(deviceId, observationId, elementId)
                         ?: return AgentToolResult(false, "The input element reference is stale; observe again")
+                    targetNode = node
                     val focusResult = tap(deviceId, node.bounds.centerX, node.bounds.centerY)
                     if (!focusResult.success) return focusResult
                     delay(INPUT_FOCUS_SETTLE_MILLIS)
+                }
+                if (action.replaceExisting && !targetNode?.text.isNullOrEmpty()) {
+                    val clearResult = clearFocusedText(deviceId, requireNotNull(targetNode).text)
+                    if (!clearResult.success) return clearResult
                 }
                 inputHelper.input(deviceId, action.text, allowInstall = true)
             }
@@ -201,6 +223,31 @@ class RealAgentDeviceGateway(
         )
     }
 
+    private suspend fun openApp(deviceId: String, query: String): AgentToolResult {
+        val matches = appCatalog.find(deviceId, query)
+        if (matches.isEmpty()) {
+            return AgentToolResult(false, "No installed launchable application matched the query")
+        }
+        if (matches.size != 1) {
+            return AgentToolResult(
+                success = false,
+                output = "The application query is ambiguous; refine the app name",
+                ambiguous = true,
+                resolvedPackages = matches.map { it.packageName }
+            )
+        }
+        val resolved = matches.single()
+        val launched = adbResult(AdbTool.startAppAsync(resolved.packageName, deviceId))
+        return launched.copy(
+            output = if (launched.success) {
+                "Opened installed app ${resolved.label.take(100)}"
+            } else {
+                launched.output
+            },
+            resolvedPackages = listOf(resolved.packageName)
+        )
+    }
+
     private suspend fun tap(deviceId: String, x: Int, y: Int): AgentToolResult = adbResult(
         AdbTool.execAdbWithTimeoutAsync(
             ADB_ACTION_TIMEOUT_MILLIS,
@@ -208,78 +255,24 @@ class RealAgentDeviceGateway(
         )
     )
 
+    private suspend fun clearFocusedText(deviceId: String, currentText: String): AgentToolResult {
+        val deleteCount = currentText.codePointCount(0, currentText.length).coerceIn(1, MAX_REPLACE_DELETE_KEYS)
+        val keyCodes = Array(deleteCount + 1) { index ->
+            if (index == 0) KEYCODE_MOVE_END else KEYCODE_DEL
+        }
+        return adbResult(
+            AdbTool.execAdbWithTimeoutAsync(
+                ADB_ACTION_TIMEOUT_MILLIS,
+                "-s", deviceId, "shell", "input", "keyevent", *keyCodes
+            )
+        )
+    }
+
     private fun resolveNode(deviceId: String, observationId: String, elementId: String): UiNodeSnapshot? =
         observations[deviceId]
             ?.takeIf { it.observationId == observationId }
             ?.uiNodes
             ?.firstOrNull { it.elementId == elementId }
-
-    private suspend fun loadUiHierarchy(deviceId: String): String {
-        val remotePath = "/sdcard/qadb_agent_window.xml"
-        return try {
-            val dump = AdbTool.execAdbAsync(
-                "-s", deviceId, "shell", "uiautomator", "dump", remotePath
-            )
-            if (!dump.success) throw AgentException("Unable to capture UI hierarchy")
-            AdbTool.execAdbOutputAsync("-s", deviceId, "shell", "cat", remotePath)
-                .take(MAX_RAW_UI_HIERARCHY_LENGTH)
-        } finally {
-            runCatching { AdbTool.execAdbAsync("-s", deviceId, "shell", "rm", "-f", remotePath) }
-        }
-    }
-
-    private suspend fun loadCurrentActivity(deviceId: String): String =
-        parseCurrentActivity(
-            AdbTool.execAdbOutputAsync(
-                "-s", deviceId, "shell", "dumpsys", "activity", "activities"
-            )
-        )
-
-    private suspend fun loadDisplaySize(deviceId: String): Pair<Int, Int>? {
-        val output = AdbTool.execAdbOutputAsync("-s", deviceId, "shell", "wm", "size")
-        val match = SCREEN_SIZE_PATTERN.findAll(output).lastOrNull() ?: return null
-        return match.groupValues[1].toInt() to match.groupValues[2].toInt()
-    }
-
-    private suspend fun captureScreenshotPng(deviceId: String): ByteArray? = withContext(Dispatchers.IO) {
-        val adbPath = AdbPathManager.getAdbPath() ?: return@withContext null
-        val process = runCatching {
-            ProcessBuilder(adbPath, "-s", deviceId, "exec-out", "screencap", "-p")
-                .redirectErrorStream(false)
-                .start()
-        }.getOrNull() ?: return@withContext null
-        ChildProcessRegistry.register(process)
-        val outputFuture = CompletableFuture.supplyAsync {
-            process.inputStream.use { it.readBytes() }
-        }
-        try {
-            val completed = process.waitFor(ADB_ACTION_TIMEOUT_SECONDS, TimeUnit.SECONDS)
-            if (!completed) {
-                process.destroyForcibly()
-                return@withContext null
-            }
-            outputFuture.get(2, TimeUnit.SECONDS)
-                .takeIf { process.exitValue() == 0 && it.isNotEmpty() }
-        } catch (_: Exception) {
-            null
-        } finally {
-            if (process.isAlive) process.destroyForcibly()
-            outputFuture.cancel(true)
-            ChildProcessRegistry.unregister(process)
-        }
-    }
-
-    private fun parseCurrentActivity(output: String): String =
-        output.lineSequence()
-            .firstOrNull { line ->
-                line.contains("mResumedActivity") ||
-                    line.contains("topResumedActivity") ||
-                    line.contains("ResumedActivity")
-            }
-            ?.substringAfter('{')
-            ?.substringBefore('}')
-            ?.trim()
-            .orEmpty()
 
     private fun adbResult(result: AdbTool.AdbResult): AgentToolResult = AgentToolResult(
         success = result.success,
@@ -291,8 +284,9 @@ class RealAgentDeviceGateway(
     )
 }
 
-private val SCREEN_SIZE_PATTERN = Regex("(\\d+)x(\\d+)")
-private const val MAX_RAW_UI_HIERARCHY_LENGTH = 120_000
 private const val ADB_ACTION_TIMEOUT_SECONDS = 30L
 private const val ADB_ACTION_TIMEOUT_MILLIS = ADB_ACTION_TIMEOUT_SECONDS * 1_000L
 private const val INPUT_FOCUS_SETTLE_MILLIS = 250L
+private const val KEYCODE_MOVE_END = "123"
+private const val KEYCODE_DEL = "67"
+private const val MAX_REPLACE_DELETE_KEYS = 2_000

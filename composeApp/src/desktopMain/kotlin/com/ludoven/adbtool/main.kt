@@ -10,8 +10,6 @@ import adbtool_desktop.composeapp.generated.resources.menu_always_on_top
 import adbtool_desktop.composeapp.generated.resources.menu_check_update
 import adbtool_desktop.composeapp.generated.resources.menu_close
 import adbtool_desktop.composeapp.generated.resources.menu_connect_device
-import adbtool_desktop.composeapp.generated.resources.menu_connect_device_prompt
-import adbtool_desktop.composeapp.generated.resources.menu_connect_device_title
 import adbtool_desktop.composeapp.generated.resources.menu_device
 import adbtool_desktop.composeapp.generated.resources.menu_device_info
 import adbtool_desktop.composeapp.generated.resources.menu_docs
@@ -60,7 +58,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.geometry.RoundRect
@@ -84,7 +81,6 @@ import java.io.File
 import java.net.URI
 import java.util.concurrent.atomic.AtomicBoolean
 import javax.swing.JOptionPane
-import kotlinx.coroutines.launch
 import kotlin.system.exitProcess
 import com.ludoven.adbtool.util.AdbTool
 import com.ludoven.adbtool.util.LanguageManager
@@ -118,7 +114,6 @@ fun main() = application {
         ThemeManager.ThemeMode.LIGHT -> false
         ThemeManager.ThemeMode.DARK -> true
     }
-    val coroutineScope = rememberCoroutineScope()
     val isClosing = remember { AtomicBoolean(false) }
     val shutdownAndExit: () -> Unit = shutdownAndExit@{
         if (!isClosing.compareAndSet(false, true)) {
@@ -162,11 +157,6 @@ fun main() = application {
                                 ThemeManager.ThemeMode.DARK
                             }
                             ThemeManager.setThemeMode(nextMode)
-                        },
-                        onConnectDevice = { address ->
-                            coroutineScope.launch {
-                                AppMenuCommandBus.dispatch(AppMenuCommand.ConnectDevice(address))
-                            }
                         }
                     )
                 }
@@ -208,8 +198,7 @@ private fun MenuBarScope.AppMenuBar(
     onZoomIn: () -> Unit,
     onZoomOut: () -> Unit,
     onZoomReset: () -> Unit,
-    onToggleTheme: () -> Unit,
-    onConnectDevice: (String) -> Unit
+    onToggleTheme: () -> Unit
 ) {
     val menuQadb = stringResource(Res.string.menu_qadb)
     val menuFile = stringResource(Res.string.menu_file)
@@ -222,8 +211,6 @@ private fun MenuBarScope.AppMenuBar(
     val menuOff = stringResource(Res.string.menu_off)
     val menuAboutQadb = stringResource(Res.string.menu_about_qadb)
     val menuAboutQadbMessage = stringResource(Res.string.menu_about_qadb_message)
-    val menuConnectDevicePrompt = stringResource(Res.string.menu_connect_device_prompt)
-    val menuConnectDeviceTitle = stringResource(Res.string.menu_connect_device_title)
     val menuShortcuts = stringResource(Res.string.menu_shortcuts)
     val menuShortcutsMessage = stringResource(Res.string.menu_shortcuts_message)
 
@@ -249,14 +236,7 @@ private fun MenuBarScope.AppMenuBar(
 
     Menu(menuDevice) {
         Item(stringResource(Res.string.menu_connect_device)) {
-            val input = JOptionPane.showInputDialog(
-                null,
-                menuConnectDevicePrompt,
-                menuConnectDeviceTitle,
-                JOptionPane.PLAIN_MESSAGE
-            )
-            val address = input?.trim().orEmpty()
-            if (address.isNotBlank()) onConnectDevice(address)
+            AppMenuCommandBus.dispatch(AppMenuCommand.OpenWirelessConnection)
         }
         Item(stringResource(Res.string.menu_refresh_devices)) { AppMenuCommandBus.dispatch(AppMenuCommand.RefreshDevices) }
         Item(stringResource(Res.string.menu_reboot_device)) { AppMenuCommandBus.dispatch(AppMenuCommand.RebootDevice) }

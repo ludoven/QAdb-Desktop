@@ -1,6 +1,9 @@
 package com.ludoven.adbtool.agent
 
+import java.net.InetAddress
 import java.net.URI
+import java.net.URLDecoder
+import java.nio.charset.StandardCharsets
 import java.time.LocalDateTime
 import java.util.UUID
 
@@ -22,18 +25,114 @@ data class AiModelConfig(
 }
 
 fun normalizeChatCompletionsEndpoint(baseUrl: String): String {
-    val normalized = baseUrl.trim().trimEnd('/')
-    val uri = runCatching { URI.create(normalized) }
+    val uri = runCatching { URI.create(baseUrl.trim()) }
         .getOrElse { throw IllegalArgumentException("Base URL is invalid") }
     require(uri.scheme.equals("https", ignoreCase = true) || uri.scheme.equals("http", ignoreCase = true)) {
         "Base URL must use HTTP or HTTPS"
     }
     require(!uri.host.isNullOrBlank()) { "Base URL must include a host" }
-    return if (normalized.substringBefore('?').endsWith("/chat/completions")) {
-        normalized
-    } else {
-        "$normalized/chat/completions"
+    require(uri.rawUserInfo == null) { "Base URL must not contain user credentials" }
+    require(uri.rawFragment == null) { "Base URL must not contain a fragment" }
+    uri.rawQuery?.split('&', ';')?.filter(String::isNotEmpty)?.forEach { parameter ->
+        val decodedName = runCatching {
+            URLDecoder.decode(parameter.substringBefore('='), StandardCharsets.UTF_8)
+        }.getOrElse { throw IllegalArgumentException("Base URL query is invalid") }
+        require(!isSecretLikeProviderConfigPath(providerConfigKeyTokens(decodedName))) {
+            "Base URL query must not contain secret-like parameter names"
+        }
     }
+    val normalizedPath = uri.rawPath.orEmpty().trimEnd('/')
+    val endpointPath = if (normalizedPath.endsWith("/chat/completions")) {
+        normalizedPath
+    } else {
+        "$normalizedPath/chat/completions"
+    }
+    return buildString {
+        append(uri.scheme)
+        append("://")
+        append(uri.rawAuthority)
+        append(endpointPath)
+        uri.rawQuery?.let { query -> append('?').append(query) }
+    }
+}
+
+internal fun providerConfigKeyTokens(key: String): List<String> = key
+    .replace(PROVIDER_CAMEL_CASE_BOUNDARY, "_")
+    .lowercase()
+    .split(PROVIDER_KEY_SEPARATOR)
+    .filter(String::isNotEmpty)
+
+internal fun isSecretLikeProviderConfigPath(segments: List<String>): Boolean {
+    val compact = segments.joinToString(separator = "")
+    return segments.any { it in SECRET_LIKE_PROVIDER_CONFIG_SEGMENTS } ||
+        segments.zipWithNext().any { it in SECRET_LIKE_PROVIDER_CONFIG_PAIRS } ||
+        compact in SECRET_LIKE_PROVIDER_CONFIG_KEYS ||
+        compact.endsWith("secret") ||
+        compact.endsWith("password") ||
+        compact.endsWith("passwd") ||
+        compact.endsWith("apikey") ||
+        compact.endsWith("token")
+}
+
+private val SECRET_LIKE_PROVIDER_CONFIG_KEYS = setOf(
+    "authorization",
+    "credential",
+    "credentials",
+    "privatekey"
+)
+
+private val SECRET_LIKE_PROVIDER_CONFIG_SEGMENTS = setOf(
+    "apikey",
+    "authorization",
+    "credential",
+    "credentials",
+    "password",
+    "passwd",
+    "pwd",
+    "secret",
+    "token"
+)
+
+private val SECRET_LIKE_PROVIDER_CONFIG_PAIRS = setOf(
+    "api" to "key",
+    "auth" to "key",
+    "access" to "key",
+    "private" to "key"
+)
+
+private val PROVIDER_CAMEL_CASE_BOUNDARY =
+    Regex("(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])")
+private val PROVIDER_KEY_SEPARATOR = Regex("[^a-z0-9]+")
+
+/** Prevents configured provider secrets from being sent over a remote plaintext connection. */
+fun validateAgentProviderEndpointSecurity(profile: AgentProviderProfile): Result<Unit> = runCatching {
+    val endpoint = URI.create(normalizeChatCompletionsEndpoint(profile.baseUrl))
+    val sendsSecrets = profile.authType != AgentProviderAuthType.NONE ||
+        profile.requestOptions.secretHeaderNames.isNotEmpty()
+    require(
+        !endpoint.scheme.equals("http", ignoreCase = true) ||
+            !sendsSecrets ||
+            isLoopbackProviderHost(endpoint.host)
+    ) {
+        "Provider authentication and secret headers require HTTPS for non-loopback endpoints"
+    }
+}
+
+private fun isLoopbackProviderHost(host: String): Boolean {
+    val normalized = host
+        .removePrefix("[")
+        .removeSuffix("]")
+        .removeSuffix(".")
+        .lowercase()
+    if (normalized == "localhost" || normalized.endsWith(".localhost")) return true
+    if (':' in normalized) {
+        return runCatching { InetAddress.getByName(normalized).isLoopbackAddress }.getOrDefault(false)
+    }
+    val octets = normalized.split('.')
+    return octets.size == 4 &&
+        octets.mapNotNull { it.toIntOrNull() }.let { values ->
+            values.size == 4 && values.first() == 127 && values.all { it in 0..255 }
+        }
 }
 
 fun validateAiModelConfig(config: AiModelConfig): Result<Unit> = runCatching {
@@ -54,7 +153,9 @@ data class AgentMessage(
     val id: String,
     val role: AgentMessageRole,
     val text: String,
-    val createdAt: LocalDateTime = LocalDateTime.now()
+    val createdAt: LocalDateTime = LocalDateTime.now(),
+    /** Associates the message with its public activity card without exposing internal task ids. */
+    val runId: String? = null
 )
 
 enum class AgentStepStatus {
@@ -62,6 +163,7 @@ enum class AgentStepStatus {
     RUNNING,
     AWAITING_CONFIRMATION,
     COMPLETED,
+    RECOVERED,
     UNVERIFIED,
     FAILED,
     DENIED
@@ -78,17 +180,31 @@ data class AgentStep(
     val status: AgentStepStatus,
     val result: String = "",
     val riskLevel: AgentRiskLevel = AgentRiskLevel.SAFE,
-    val confirmationReason: String = ""
-)
+    val confirmationReason: String = "",
+    val containsSensitiveData: Boolean = false,
+    /** Number of gateway executions that actually started for this logical step. */
+    val executedActionCount: Int = 0
+) {
+    init {
+        require(executedActionCount >= 0) { "Executed action count cannot be negative" }
+    }
+
+    /** Compatibility view for callers that only need to know whether execution started. */
+    val executed: Boolean
+        get() = executedActionCount > 0
+}
 
 data class AgentTaskUiState(
     val messages: List<AgentMessage> = emptyList(),
     val steps: List<AgentStep> = emptyList(),
     val isRunning: Boolean = false,
+    /** Terminal handoff: execution stopped safely and requires an explicit new user turn to continue. */
+    val needsUser: Boolean = false,
     val boundDeviceId: String? = null,
     val pendingConfirmation: AgentStep? = null,
     val observationMode: AgentObservationMode = AgentObservationMode.VISION,
     val errorMessage: String? = null,
+    val failure: AgentFailure? = null,
     val phase: AgentRunPhase = AgentRunPhase.IDLE,
     val usage: AgentUsage = AgentUsage(),
     val memoryEnabled: Boolean = false,
@@ -100,8 +216,27 @@ data class AgentTaskUiState(
     val pageDiff: PageDiff? = null,
     val latestScreenshot: ByteArray? = null,
     val budgetStatus: AgentBudgetStatus = AgentBudgetStatus(),
-    val executionDetails: List<String> = emptyList()
+    val executionDetails: List<String> = emptyList(),
+    val deviceChannel: AgentObservationSource = AgentObservationSource.ADB,
+    val observationTimings: AgentObservationTimings = AgentObservationTimings(),
+    val benchmarkTaskId: String? = null,
+    val semanticActivity: AgentSemanticActivity? = null,
+    val v2Metrics: AgentV2RunMetrics = AgentV2RunMetrics(),
+    val publicActivity: AgentPublicActivityState = AgentPublicActivityState()
 )
+
+interface AgentTaskRunner {
+    suspend fun run(
+        task: String,
+        deviceId: String,
+        initialState: AgentTaskUiState = AgentTaskUiState(),
+        runId: String? = null,
+        acceptedAtMs: Long? = null,
+        firstFeedbackMs: Long? = null,
+        onState: (AgentTaskUiState) -> Unit = {},
+        confirmSensitiveAction: suspend (AgentStep) -> Boolean = { false }
+    ): AgentTaskUiState
+}
 
 enum class AgentRunPhase {
     IDLE,
@@ -117,17 +252,11 @@ enum class AgentRunPhase {
 }
 
 enum class AgentExecutionStrategy {
-    FAST_TEMPLATE,
+    SEMANTIC_V2,
     BATCH_PLAN,
     REPAIR_PLAN,
     GUARDED_WORKFLOW,
     INTERACTIVE
-}
-
-/** Identifies whether the caller explicitly chose a local template or submitted natural language. */
-enum class AgentTaskSource {
-    NATURAL_LANGUAGE,
-    DIRECT_TEMPLATE
 }
 
 data class AgentUsage(
@@ -149,6 +278,29 @@ enum class AgentObservationMode {
     TEXT_ONLY
 }
 
+enum class AgentObservationSource {
+    ADB,
+    BRIDGE
+}
+
+data class AgentObservationTimings(
+    val totalMs: Long = 0,
+    val hierarchyMs: Long = 0,
+    val activityMs: Long = 0,
+    val displayMs: Long = 0,
+    val screenshotMs: Long = 0
+)
+
+data class AgentDeviceCapabilities(
+    val observationSource: AgentObservationSource = AgentObservationSource.ADB,
+    val uiHierarchy: Boolean = true,
+    val screenshots: Boolean = true,
+    val semanticActions: Boolean = false,
+    val incrementalEvents: Boolean = false,
+    val unicodeInput: Boolean = false,
+    val bridgeProtocolVersion: Int? = null
+)
+
 data class AgentObservation(
     val screenshotPng: ByteArray?,
     val uiHierarchy: String,
@@ -159,7 +311,12 @@ data class AgentObservation(
     val uiNodes: List<UiNodeSnapshot> = emptyList(),
     val screenshotMimeType: String = "image/png",
     val orientation: AgentOrientation = if (screenWidth >= screenHeight) AgentOrientation.LANDSCAPE else AgentOrientation.PORTRAIT,
-    val warnings: List<String> = emptyList()
+    val warnings: List<String> = emptyList(),
+    val source: AgentObservationSource = AgentObservationSource.ADB,
+    val capturedAtMs: Long = System.currentTimeMillis(),
+    val revision: Long = capturedAtMs,
+    val timings: AgentObservationTimings = AgentObservationTimings(),
+    val capabilities: AgentDeviceCapabilities = AgentDeviceCapabilities()
 ) {
     fun asText(): String = buildString {
         appendLine("Observation ID: $observationId")
@@ -200,7 +357,9 @@ data class UiNodeSnapshot(
     val resourceId: String = "",
     val role: String = "",
     val selected: Boolean = false,
-    val checked: Boolean = false
+    val checked: Boolean = false,
+    val ancestorResourceIds: List<String> = emptyList(),
+    val ancestorRoles: List<String> = emptyList()
 )
 
 enum class AgentOperationKind {
@@ -216,7 +375,8 @@ enum class AgentOperationKind {
 
 enum class AgentRiskLevel {
     SAFE,
-    CONFIRMATION_REQUIRED
+    CONFIRMATION_REQUIRED,
+    BLOCKED
 }
 
 data class AgentActionMeta(
@@ -277,7 +437,9 @@ sealed interface AgentAction {
         val text: String,
         val observationId: String? = null,
         val elementId: String? = null,
-        override val meta: AgentActionMeta = AgentActionMeta(operationKind = AgentOperationKind.DATA_ENTRY)
+        override val meta: AgentActionMeta = AgentActionMeta(operationKind = AgentOperationKind.DATA_ENTRY),
+        /** Local execution hint. Model-generated input remains append-only unless Kotlin explicitly opts in. */
+        val replaceExisting: Boolean = false
     ) : AgentAction {
         override val toolName = "input_text"
         override val requiresConfirmation = false
@@ -290,6 +452,15 @@ sealed interface AgentAction {
 
     data class FindApp(val query: String) : AgentAction {
         override val toolName = "find_app"
+        override val requiresConfirmation = false
+    }
+
+    /** Resolves one installed app, launches it, and returns the resolved package for verification. */
+    data class OpenApp(
+        val query: String,
+        override val meta: AgentActionMeta = AgentActionMeta()
+    ) : AgentAction {
+        override val toolName = "open_app"
         override val requiresConfirmation = false
     }
 
@@ -318,7 +489,7 @@ sealed interface AgentAction {
 
     data class ForceStopPackage(val packageName: String) : AgentAction {
         override val toolName = "force_stop_package"
-        override val requiresConfirmation = true
+        override val requiresConfirmation = false
     }
 
     data class ClearAppData(val packageName: String) : AgentAction {
@@ -333,7 +504,7 @@ sealed interface AgentAction {
 
     data object RebootDevice : AgentAction {
         override val toolName = "reboot_device"
-        override val requiresConfirmation = true
+        override val requiresConfirmation = false
     }
 }
 
@@ -356,8 +527,8 @@ fun validateAgentAction(action: AgentAction, observation: AgentObservation): Res
         is AgentAction.Tap -> {
             validateCoordinate(action.x, observation.screenWidth, "x")
             validateCoordinate(action.y, observation.screenHeight, "y")
-            action.observationId?.let {
-                require(it == observation.observationId) { "The tap references a stale observation" }
+            require(action.observationId == observation.observationId) {
+                "Coordinate taps must reference the latest observation"
             }
         }
         is AgentAction.TapElement -> {
@@ -378,16 +549,16 @@ fun validateAgentAction(action: AgentAction, observation: AgentObservation): Res
         is AgentAction.InputText -> {
             require(action.text.isNotBlank()) { "Input text cannot be blank" }
             require(action.text.length <= MAX_INPUT_TEXT_LENGTH) { "Input text is too long" }
-            action.observationId?.let {
-                require(it == observation.observationId) { "The input references a stale observation" }
-            }
-            action.elementId?.let { elementId ->
-                val node = observation.uiNodes.firstOrNull { it.elementId == elementId }
-                    ?: error("The requested input element does not exist")
-                require(node.enabled && node.editable) { "The requested UI element is not editable" }
+            require(action.observationId == observation.observationId) { "Input requires the latest observation" }
+            val elementId = requireNotNull(action.elementId) { "Input requires a semantic target element" }
+            val node = observation.uiNodes.firstOrNull { it.elementId == elementId }
+                ?: error("The requested input element does not exist")
+            require(node.enabled && node.editable && !node.password) {
+                "The requested UI element is not an enabled non-password input"
             }
         }
         is AgentAction.FindApp -> require(action.query.trim().length in 1..100) { "App query is invalid" }
+        is AgentAction.OpenApp -> require(action.query.trim().length in 1..100) { "App query is invalid" }
         is AgentAction.LaunchPackage -> validatePackage(action.packageName)
         is AgentAction.ForceStopPackage -> validatePackage(action.packageName)
         is AgentAction.ClearAppData -> validatePackage(action.packageName)
@@ -425,27 +596,83 @@ enum class AgentPlanMode {
 
 data class AgentPlanDecision(
     val plan: AgentTaskPlan,
-    val usage: AgentUsage = AgentUsage()
+    val usage: AgentUsage = AgentUsage(),
+    val providerSnapshot: AgentModelProviderSnapshot? = null,
+    val billing: AgentModelBilling? = null
 )
 
 data class AgentTaskPlan(
     val mode: AgentPlanMode,
     val steps: List<AgentPlanStep> = emptyList(),
-    val summary: String = ""
+    val summary: String = "",
+    val goal: AgentPredicate = AgentPredicate.Unspecified
 )
 
 data class AgentPlanStep(
     val id: String,
     val action: AgentPlanAction,
-    val verification: AgentVerification = AgentVerification.None
+    val verification: AgentVerification = AgentVerification.None,
+    val precondition: AgentPredicate = AgentPredicate.Always,
+    val postcondition: AgentPredicate = AgentPredicate.Unspecified,
+    val timeoutMs: Long = 8_000
 )
+
+enum class AgentSwipeDirection { UP, DOWN, LEFT, RIGHT }
 
 sealed interface AgentPlanAction {
     data class KeyEvent(val key: AgentKey) : AgentPlanAction
     data class FindApp(val query: String) : AgentPlanAction
     data class LaunchResolvedApp(val sourceStepId: String) : AgentPlanAction
-    data class LaunchKnownPackage(val packageName: String) : AgentPlanAction
     data class Wait(val durationMs: Int) : AgentPlanAction
+    data class TapSelector(
+        val selector: AgentSelector,
+        val meta: AgentActionMeta = AgentActionMeta()
+    ) : AgentPlanAction
+    data class InputSelector(
+        val selector: AgentSelector,
+        val text: String,
+        val meta: AgentActionMeta = AgentActionMeta(operationKind = AgentOperationKind.DATA_ENTRY)
+    ) : AgentPlanAction
+    data class SwipeDirection(
+        val direction: AgentSwipeDirection,
+        val distancePercent: Int = 60,
+        val durationMs: Int = 350
+    ) : AgentPlanAction
+    data class ScrollUntil(
+        val selector: AgentSelector,
+        val direction: AgentSwipeDirection = AgentSwipeDirection.UP,
+        val maxSwipes: Int = 4
+    ) : AgentPlanAction
+    data class WaitUntil(
+        val predicate: AgentPredicate,
+        val timeoutMs: Long = 8_000
+    ) : AgentPlanAction
+    data class ExtractText(val selector: AgentSelector) : AgentPlanAction
+}
+
+data class AgentElementState(
+    val enabled: Boolean? = null,
+    val selected: Boolean? = null,
+    val checked: Boolean? = null,
+    val editable: Boolean? = null
+)
+
+sealed interface AgentPredicate {
+    data object Unspecified : AgentPredicate
+    data object Always : AgentPredicate
+    data class All(val predicates: List<AgentPredicate>) : AgentPredicate
+    data class Any(val predicates: List<AgentPredicate>) : AgentPredicate
+    data class Not(val predicate: AgentPredicate) : AgentPredicate
+    data class ForegroundPackage(
+        val packageName: String? = null,
+        val sourceStepId: String? = null
+    ) : AgentPredicate
+    data class ActivityMatches(val pattern: String) : AgentPredicate
+    data class ElementPresent(val selector: AgentSelector) : AgentPredicate
+    data class ElementAbsent(val selector: AgentSelector) : AgentPredicate
+    data class ElementState(val selector: AgentSelector, val state: AgentElementState) : AgentPredicate
+    data class TextPresent(val text: String, val ignoreCase: Boolean = true) : AgentPredicate
+    data class RegisteredSystemProbe(val probeId: String, val expectedValue: String) : AgentPredicate
 }
 
 sealed interface AgentVerification {
@@ -466,18 +693,165 @@ data class AgentModelContext(
     val memoryContext: String = "",
     val compactedHistory: String = "",
     /** Local, user-authored reference material. It is untrusted and cannot change tool safety rules. */
-    val appKnowledgeContext: String = ""
+    val appKnowledgeContext: String = "",
+    val observationDelta: AgentObservationDeltaContext? = null,
+    val trustedEvidence: AgentTrustedEvidence? = null
+)
+
+enum class AgentTrustedEvidenceSource {
+    COMBINED,
+    DEVICE_STATUS,
+    APP_CATALOG,
+    SYSTEM_PROBE
+}
+
+/**
+ * Kotlin-owned read-only evidence. Only the source and field boundaries are trusted; every value
+ * remains untrusted device data and must never be interpreted as an instruction.
+ */
+data class AgentTrustedEvidence(
+    val source: AgentTrustedEvidenceSource,
+    val facts: Map<String, String>,
+    val unavailableFields: Set<String> = emptySet(),
+    val complete: Boolean = true
+) {
+    init {
+        require(facts.keys.none(String::isBlank)) { "Evidence field names cannot be blank" }
+        require(unavailableFields.none(String::isBlank)) { "Unavailable evidence field names cannot be blank" }
+    }
+}
+
+data class AgentObservationDeltaContext(
+    val baselineObservation: AgentObservation,
+    val pageDiff: PageDiff
 )
 
 data class AgentModelDecision(
     val action: AgentAction,
     val usedVision: Boolean,
-    val usage: AgentUsage = AgentUsage()
+    val usage: AgentUsage = AgentUsage(),
+    val providerSnapshot: AgentModelProviderSnapshot? = null,
+    val billing: AgentModelBilling? = null
+)
+
+/** Structured output from the optional, no-device-context intent classifier. */
+data class AgentTaskIntentClassification(
+    val intent: AgentTaskIntentKind,
+    val requiredStatusFields: Set<DeviceStatusField> = emptySet(),
+    val requiresDeviceEvidence: Boolean,
+    val explicitOperation: Boolean,
+    val clarificationQuestion: String? = null,
+    /** All app labels/package fragments referenced by one catalog question. */
+    val appQueries: List<String> = emptyList(),
+    /** Legacy single-query field retained for compatible providers. */
+    val appQuery: String? = null,
+    val systemProbeId: String? = null,
+    val directResponse: String? = null,
+    val directOperation: AgentDirectOperation? = null,
+    val operationTarget: String? = null,
+    /** Concise installed-app label for a multi-step device operation, such as 微信 for sending a message. */
+    val operationAppTarget: String? = null
+) {
+    init {
+        val evidenceRequired = intent !in setOf(
+            AgentTaskIntentKind.CONVERSATION,
+            AgentTaskIntentKind.CLARIFICATION
+        )
+        require(requiresDeviceEvidence == evidenceRequired) {
+            "Intent and device-evidence requirement are inconsistent"
+        }
+        require(explicitOperation == (intent == AgentTaskIntentKind.DEVICE_OPERATION)) {
+            "Only an explicit device operation may be classified as mutating"
+        }
+        require(intent == AgentTaskIntentKind.CLARIFICATION || clarificationQuestion == null) {
+            "Only clarification intents may include a clarification question"
+        }
+        require(intent != AgentTaskIntentKind.CLARIFICATION || !clarificationQuestion.isNullOrBlank()) {
+            "Clarification intents require a user-facing question"
+        }
+        require(
+            requiredStatusFields.isEmpty() ||
+                intent == AgentTaskIntentKind.DEVICE_STATUS ||
+                intent == AgentTaskIntentKind.SCREEN_READ
+        ) {
+            "Status fields are only valid for status or screen-read intents"
+        }
+        require(
+            intent != AgentTaskIntentKind.DEVICE_STATUS ||
+                requiredStatusFields.isNotEmpty() ||
+                systemProbeId != null
+        ) {
+            "Device-status classifications require status fields or a registered system probe"
+        }
+        require(appQuery == null || (intent == AgentTaskIntentKind.APP_CATALOG_READ && appQuery.isNotBlank())) {
+            "An application query is only valid for application-catalog reads"
+        }
+        require(appQueries.size <= MAX_INTENT_APP_QUERIES && appQueries.all { it.isNotBlank() }) {
+            "Application queries must be non-blank and bounded"
+        }
+        require(appQueries.isEmpty() || intent == AgentTaskIntentKind.APP_CATALOG_READ) {
+            "Application queries are only valid for application-catalog reads"
+        }
+        require(
+            systemProbeId == null ||
+                (intent == AgentTaskIntentKind.DEVICE_STATUS && systemProbeId in REGISTERED_INTENT_SYSTEM_PROBES)
+        ) {
+            "The intent classifier returned an unsupported system probe"
+        }
+        require(
+            directResponse == null ||
+                (directResponse.isNotBlank() && intent in setOf(
+                    AgentTaskIntentKind.CONVERSATION,
+                    AgentTaskIntentKind.CLARIFICATION
+                ))
+        ) {
+            "Only conversation or clarification intents may include a direct response"
+        }
+        require((directOperation == null) == operationTarget.isNullOrBlank()) {
+            "A direct operation and its target must be provided together"
+        }
+        require(directOperation == null || intent == AgentTaskIntentKind.DEVICE_OPERATION) {
+            "Direct operations are only valid for device-operation intents"
+        }
+        require(
+            operationAppTarget == null ||
+                (intent == AgentTaskIntentKind.DEVICE_OPERATION && operationAppTarget.isNotBlank())
+        ) {
+            "An operation app target is only valid for device-operation intents"
+        }
+    }
+
+    fun catalogQueries(): List<String> = (if (appQueries.isNotEmpty()) appQueries else listOfNotNull(appQuery))
+        .map(String::trim)
+        .filter(String::isNotEmpty)
+        .distinctBy(String::lowercase)
+        .take(MAX_INTENT_APP_QUERIES)
+}
+
+private const val MAX_INTENT_APP_QUERIES = 8
+
+enum class AgentDirectOperation {
+    OPEN_APP
+}
+
+private val REGISTERED_INTENT_SYSTEM_PROBES = setOf(
+    "airplane_mode",
+    "wifi",
+    "rotation_locked"
+)
+
+data class AgentIntentClassificationDecision(
+    val classification: AgentTaskIntentClassification,
+    val usage: AgentUsage = AgentUsage(),
+    val providerSnapshot: AgentModelProviderSnapshot? = null,
+    val billing: AgentModelBilling? = null
 )
 
 data class AgentCompactionResult(
     val summary: String,
-    val usage: AgentUsage = AgentUsage()
+    val usage: AgentUsage = AgentUsage(),
+    val providerSnapshot: AgentModelProviderSnapshot? = null,
+    val billing: AgentModelBilling? = null
 )
 
 interface AgentModelClient {
@@ -504,6 +878,12 @@ interface AgentModelClient {
         apiKey: String
     )
 
+    suspend fun classifyTaskIntent(
+        config: AiModelConfig,
+        apiKey: String,
+        task: String
+    ): AgentIntentClassificationDecision? = null
+
     suspend fun planTask(
         config: AiModelConfig,
         apiKey: String,
@@ -529,6 +909,7 @@ interface AgentModelClient {
 
 interface AgentDeviceGateway {
     suspend fun isConnected(deviceId: String): Boolean
+    suspend fun capabilities(deviceId: String): AgentDeviceCapabilities = AgentDeviceCapabilities()
     suspend fun observe(deviceId: String): AgentObservation
     suspend fun observeLightweight(deviceId: String, includeUiHierarchy: Boolean = false): AgentObservation {
         val observation = observe(deviceId)
@@ -543,7 +924,24 @@ interface AgentDeviceGateway {
         action: AgentAction,
         observation: AgentObservation
     ): String? = null
+    suspend fun readSystemProbe(deviceId: String, probeId: String): String? = null
     suspend fun execute(deviceId: String, action: AgentAction): AgentToolResult
+}
+
+/** Optional production seam used to bind every primitive action to the immutable V2 contract. */
+internal interface AgentOperationContractGateway {
+    fun bindOperationContract(contract: SemanticGoal)
+}
+
+/** Freezes a bounded multi-operation plan before the first primitive action and advances by equality only. */
+internal interface AgentOperationPlanGateway {
+    fun bindOperationPlan(contracts: List<SemanticGoal>)
+    fun advanceOperationPlan(completed: SemanticGoal, next: SemanticGoal)
+}
+
+/** Binds a user confirmation to the exact prepared Runtime action instead of inferring approval from execute(). */
+internal interface AgentPreparedActionApprovalGateway {
+    fun approvePreparedAction(deviceId: String, action: AgentAction, observationId: String): Boolean
 }
 
 open class AgentException(message: String) : Exception(message)
@@ -553,5 +951,8 @@ class ModelContextOverflowException(message: String) : AgentException(message)
 class ModelHttpException(
     val statusCode: Int,
     message: String,
-    val retryAfterMillis: Long? = null
+    val retryAfterMillis: Long? = null,
+    val usage: AgentUsage = AgentUsage(),
+    val providerSnapshot: AgentModelProviderSnapshot? = null,
+    val billing: AgentModelBilling? = null
 ) : AgentException(message)

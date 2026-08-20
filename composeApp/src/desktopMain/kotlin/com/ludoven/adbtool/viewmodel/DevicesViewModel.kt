@@ -1,35 +1,25 @@
 package com.ludoven.adbtool.viewmodel
 
 import androidx.lifecycle.viewModelScope
-import com.ludoven.adbtool.util.AdbTool
+import com.ludoven.adbtool.agent.DeviceBatteryState
+import com.ludoven.adbtool.agent.DeviceConnectionType
+import com.ludoven.adbtool.agent.DeviceStatusRepository
+import com.ludoven.adbtool.agent.DeviceStatusRuntime
+import com.ludoven.adbtool.agent.DeviceStatusSnapshot
 import com.ludoven.adbtool.entity.DeviceInfoData
 import com.ludoven.adbtool.entity.DeviceCenterInfoData
 import com.ludoven.adbtool.entity.BatteryStatus
 import com.ludoven.adbtool.entity.MsgContent
+import com.ludoven.adbtool.util.AdbTool
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.async
-import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-
-private data class DeviceCommandOutputs(
-    val props: String,
-    val kernel: String,
-    val wmSize: String,
-    val wmDensity: String,
-    val fontScale: String,
-    val ifconfig: String,
-    val cpuStat: String,
-    val memInfo: String,
-    val dataDf: String,
-    val battery: String,
-    val latencyMs: Long
-)
 
 internal fun deviceInfoLoadShouldApply(requestedDeviceId: String?, selectedDeviceId: String?): Boolean {
     val requested = requestedDeviceId?.trim().orEmpty()
@@ -46,14 +36,15 @@ internal fun deviceInfoLoadShouldCancelForSelectionChange(
     return active != nextSelectedDeviceId?.trim().orEmpty()
 }
 
-class DevicesViewModel : BaseViewModel() {
+class DevicesViewModel(
+    private val deviceStatusRepository: DeviceStatusRepository = DeviceStatusRuntime.repository
+) : BaseViewModel() {
     companion object {
         internal fun normalizedDeviceId(deviceId: String?): String? =
             deviceId?.trim()?.takeIf { it.isNotBlank() }
     }
 
     private val refreshTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
-    private val propRegex = Regex("\\[(.*?)]\\s*:\\s*\\[(.*?)]")
 
     private val _devices = MutableStateFlow<List<String>>(emptyList())
     val devices: StateFlow<List<String>> = _devices.asStateFlow()
@@ -139,174 +130,25 @@ class DevicesViewModel : BaseViewModel() {
         deviceInfoLoadDeviceId = deviceId
         deviceInfoLoadJob = viewModelScope.launch {
             _isLoading.value = true
-
-            withContext(Dispatchers.IO) {
-                val outputs = coroutineScope {
-                    val props = async { AdbTool.execAdbOutputAsync("-s", deviceId, "shell", "getprop") }
-                    val kernel = async { AdbTool.execAdbOutputAsync("-s", deviceId, "shell", "uname", "-r") }
-                    val wmSize = async { AdbTool.execAdbOutputAsync("-s", deviceId, "shell", "wm", "size") }
-                    val wmDensity = async { AdbTool.execAdbOutputAsync("-s", deviceId, "shell", "wm", "density") }
-                    val fontScale = async {
-                        AdbTool.execAdbOutputAsync("-s", deviceId, "shell", "settings", "get", "system", "font_scale")
-                    }
-                    val ifconfig = async { AdbTool.execAdbOutputAsync("-s", deviceId, "shell", "ip addr show wlan0") }
-                    val cpuStat = async { AdbTool.execAdbOutputAsync("-s", deviceId, "shell", "cat", "/proc/stat") }
-                    val memInfo = async { AdbTool.execAdbOutputAsync("-s", deviceId, "shell", "cat", "/proc/meminfo") }
-                    val dataDf = async { AdbTool.execAdbOutputAsync("-s", deviceId, "shell", "df", "/data") }
-                    val battery = async { AdbTool.execAdbOutputAsync("-s", deviceId, "shell", "dumpsys", "battery") }
-                    val latency = async {
-                        try {
-                            val start = System.currentTimeMillis()
-                            AdbTool.execAdbOutputAsync("-s", deviceId, "shell", "echo", "ping")
-                            System.currentTimeMillis() - start
-                        } catch (_: Exception) {
-                            -1L
-                        }
-                    }
-                    DeviceCommandOutputs(
-                        props = props.await(),
-                        kernel = kernel.await(),
-                        wmSize = wmSize.await(),
-                        wmDensity = wmDensity.await(),
-                        fontScale = fontScale.await(),
-                        ifconfig = ifconfig.await(),
-                        cpuStat = cpuStat.await(),
-                        memInfo = memInfo.await(),
-                        dataDf = dataDf.await(),
-                        battery = battery.await(),
-                        latencyMs = latency.await()
-                    )
+            try {
+                val snapshot = withContext(Dispatchers.IO) {
+                    deviceStatusRepository.readStatus(deviceId)
                 }
+                if (!deviceInfoLoadShouldApply(deviceId, _selectedDevice.value)) return@launch
 
-                val propsOutput = outputs.props
-                val propMap = mutableMapOf<String, String>()
-
-                propsOutput.lines().forEach { line ->
-                    propRegex
-                        .find(line)?.let { match ->
-                        propMap[match.groupValues[1]] = match.groupValues[2]
-                    }
-                }
-
-                val androidVersion = propMap["ro.build.version.release"] ?: ""
-                val sdkVersion = propMap["ro.build.version.sdk"] ?: ""
-                val deviceModel = propMap["ro.product.model"] ?: ""
-                val manufacturer = propMap["ro.product.manufacturer"] ?: ""
-                val romVersion = propMap["ro.build.display.id"] ?: ""
-                val buildFingerprint = propMap["ro.build.fingerprint"] ?: ""
-                val kernelVersion = outputs.kernel
-                    .lineSequence()
-                    .firstOrNull { it.isNotBlank() }
-                    ?.trim()
-                    .orEmpty()
-                val screenResolution = formatScreenResolution(
-                    sizeOutput = outputs.wmSize,
-                    densityOutput = outputs.wmDensity
-                )
-                val fontScale = formatFontScale(outputs.fontScale)
-
-                // IP 和 MAC
-                val ifconfigOutput = outputs.ifconfig
-                val ipMatch = Regex("inet ([0-9.]+)").find(ifconfigOutput)
-                val macMatch = Regex("link/ether ([0-9a-f:]+)").find(ifconfigOutput)
-                val ipAddress = ipMatch?.groupValues?.get(1) ?: ""
-                val macAddress = macMatch?.groupValues?.get(1) ?: ""
-
-                // CPU 使用率（解析 idle 和总时间计算）
-                val cpuStatOutput = outputs.cpuStat
-                val cpuLine = cpuStatOutput.lines().firstOrNull { it.startsWith("cpu ") }
-                val cpuUsage = cpuLine?.let {
-                    val values = it.split(Regex("\\s+")).drop(1).mapNotNull { it.toLongOrNull() }
-                    if (values.size >= 7) {
-                        val idle = values[3] + values[4]
-                        val total = values.sum()
-                        // 简单快照不太准，可以两次取值做差更准，这里简单用 snapshot
-                        val usagePercent = 100 - ((idle * 100) / total)
-                        "$usagePercent%"
-                    } else {
-                        ""
-                    }
-                } ?: ""
-
-                // 内存使用率
-                val memOutput = outputs.memInfo
-                val totalMem = Regex("MemTotal:\\s+(\\d+)").find(memOutput)?.groupValues?.get(1)?.toIntOrNull() ?: 0
-                val freeMem = Regex("MemAvailable:\\s+(\\d+)").find(memOutput)?.groupValues?.get(1)?.toIntOrNull() ?: 0
-                val memoryUsage = if (totalMem > 0) {
-                    val usedPercent = ((totalMem - freeMem) * 100 / totalMem)
-                    "$usedPercent%"
-                } else {
-                    ""
-                }
-
-                // 存储空间（剩余/总共, 单位 GB）
-                val dfOutput = outputs.dataDf
-                val storageLine = dfOutput.lines().drop(1).firstOrNull()
-                val storageParts = storageLine?.split(Regex("\\s+")) ?: emptyList()
-                val storageUsage = if (storageParts.size >= 5) {
-                    val total = storageParts[1].toLongOrNull() ?: 0L
-                    val used = storageParts[2].toLongOrNull() ?: 0L
-                    val totalGB = total / 1024.0 / 1024.0
-                    val usedGB = used / 1024.0 / 1024.0
-                    String.format(Locale.US, "%.1f/%.1fG", usedGB, totalGB)
-                } else {
-                    ""
-                }
-
-                // 电量
-                val batteryOutput = outputs.battery
-                val level = Regex("level: (\\d+)").find(batteryOutput)?.groupValues?.get(1)
-                val status = Regex("status: (\\d+)").find(batteryOutput)?.groupValues?.get(1)
-                val batteryStatus = BatteryStatus.fromStatusCode(status)
-                val batteryLevel = if (level != null) "$level%" else ""
-
-                // Latency measurement: time a simple adb shell echo command
-                val latencyMs = outputs.latencyMs
-                val latencyStr = if (latencyMs >= 0) "${latencyMs}ms" else "--"
-
-                // Connection speed: detect USB vs WiFi
-                val connectionSpeedStr = if (deviceId.contains(":") || deviceId.matches(Regex(".*\\.\\d+\\.\\d+.*"))) {
-                    "Wi-Fi"
-                } else {
-                    "USB"
-                }
-
-                // 创建数据对象
-                val deviceInfo = DeviceInfoData(
-                    androidVersion = androidVersion,
-                    sdkVersion = sdkVersion,
-                    kernelVersion = kernelVersion,
-                    deviceModel = deviceModel,
-                    manufacturer = manufacturer,
-                    romVersion = romVersion,
-                    screenResolution = screenResolution,
-                    fontScale = fontScale,
-                    buildFingerprint = buildFingerprint,
-                    ipAddress = ipAddress,
-                    macAddress = macAddress,
-                    latency = latencyStr,
-                    connectionSpeed = connectionSpeedStr
-                )
-
-                val centerInfo = DeviceCenterInfoData(
-                    cpuUsage = cpuUsage,
-                    memoryUsage = memoryUsage,
-                    storageUsage = storageUsage,
-                    batteryLevel = batteryLevel,
-                    batteryStatus = batteryStatus
-                )
-
-                if (!deviceInfoLoadShouldApply(deviceId, _selectedDevice.value)) return@withContext
+                val deviceInfo = snapshot.toDeviceInfoData()
                 _deviceInfo.value = deviceInfo
-                _centerInfo.value = centerInfo
-                if (deviceModel.isNotBlank()) {
-                    _deviceDisplayNames.update { it + (deviceId to deviceModel) }
+                _centerInfo.value = snapshot.toDeviceCenterInfoData()
+                if (deviceInfo.deviceModel.isNotBlank()) {
+                    _deviceDisplayNames.update { it + (deviceId to deviceInfo.deviceModel) }
                 }
                 updateLastRefreshTime()
-            }
-
-            if (deviceInfoLoadShouldApply(deviceId, _selectedDevice.value)) {
-                _isLoading.value = false
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } finally {
+                if (deviceInfoLoadShouldApply(deviceId, _selectedDevice.value)) {
+                    _isLoading.value = false
+                }
             }
         }
     }
@@ -333,35 +175,70 @@ class DevicesViewModel : BaseViewModel() {
         }.getOrDefault("")
     }
 
-    private fun formatScreenResolution(sizeOutput: String, densityOutput: String): String {
-        val size = parseWmMetric(sizeOutput, metric = "size")
-        val density = parseWmMetric(densityOutput, metric = "density")
-        return when {
-            size.isNotBlank() && density.isNotBlank() -> "$size(${density}dpi)"
-            size.isNotBlank() -> size
-            else -> ""
-        }
-    }
-
-    private fun parseWmMetric(output: String, metric: String): String {
-        val override = Regex("Override $metric:\\s*([^\\n\\r]+)").find(output)?.groupValues?.get(1)?.trim()
-        if (!override.isNullOrBlank()) return override
-        return Regex("Physical $metric:\\s*([^\\n\\r]+)").find(output)?.groupValues?.get(1)?.trim().orEmpty()
-    }
-
-    private fun formatFontScale(rawScale: String): String {
-        val normalizedRaw = rawScale.trim()
-        if (normalizedRaw.isBlank() || normalizedRaw.equals("null", ignoreCase = true)) return ""
-        val scale = normalizedRaw.toFloatOrNull() ?: return normalizedRaw
-        val scaleText = if (scale.toInt().toFloat() == scale) {
-            scale.toInt().toString()
-        } else {
-            String.format(Locale.US, "%.2f", scale).trimEnd('0').trimEnd('.')
-        }
-        return "${scaleText}x"
-    }
-
     private fun updateLastRefreshTime() {
         _lastRefreshTime.value = LocalDateTime.now().format(refreshTimeFormatter)
     }
 }
+
+private fun DeviceStatusSnapshot.toDeviceInfoData(): DeviceInfoData {
+    val resolution = display?.let { value ->
+        val size = if (value.widthPx != null && value.heightPx != null) "${value.widthPx}x${value.heightPx}" else ""
+        when {
+            size.isNotEmpty() && value.densityDpi != null -> "$size(${value.densityDpi}dpi)"
+            size.isNotEmpty() -> size
+            value.densityDpi != null -> "${value.densityDpi}dpi"
+            else -> ""
+        }
+    }.orEmpty()
+    return DeviceInfoData(
+        androidVersion = identity?.androidVersion.orEmpty(),
+        sdkVersion = identity?.sdkVersion?.toString().orEmpty(),
+        kernelVersion = identity?.kernelVersion.orEmpty(),
+        deviceModel = identity?.model.orEmpty(),
+        manufacturer = identity?.manufacturer.orEmpty(),
+        romVersion = identity?.romVersion.orEmpty(),
+        screenResolution = resolution,
+        fontScale = display?.fontScale?.let(::formatFontScale).orEmpty(),
+        buildFingerprint = identity?.buildFingerprint.orEmpty(),
+        ipAddress = network.ipAddress.orEmpty(),
+        macAddress = network.macAddress.orEmpty(),
+        latency = adbLatencyMs?.let { "${it}ms" } ?: "--",
+        connectionSpeed = when (network.connectionType) {
+            DeviceConnectionType.USB -> "USB"
+            DeviceConnectionType.WIFI -> "Wi-Fi"
+        }
+    )
+}
+
+private fun DeviceStatusSnapshot.toDeviceCenterInfoData(): DeviceCenterInfoData = DeviceCenterInfoData(
+    cpuUsage = cpu?.usagePercent?.let(::formatPercent).orEmpty(),
+    memoryUsage = memory?.usedPercent?.let(::formatPercent).orEmpty(),
+    storageUsage = storage?.let { value ->
+        String.format(
+            Locale.US,
+            "%.1f/%.1fG",
+            value.usedBytes / BYTES_PER_GIBIBYTE,
+            value.totalBytes / BYTES_PER_GIBIBYTE
+        )
+    }.orEmpty(),
+    batteryLevel = battery?.levelPercent?.let { "$it%" }.orEmpty(),
+    batteryStatus = when (battery?.state) {
+        DeviceBatteryState.CHARGING -> BatteryStatus.CHARGING
+        DeviceBatteryState.DISCHARGING, DeviceBatteryState.NOT_CHARGING -> BatteryStatus.DISCHARGING
+        DeviceBatteryState.FULL -> BatteryStatus.FULL
+        DeviceBatteryState.UNKNOWN, null -> BatteryStatus.UNKNOWN
+    }
+)
+
+private fun formatFontScale(scale: Float): String {
+    val scaleText = if (scale.toInt().toFloat() == scale) {
+        scale.toInt().toString()
+    } else {
+        String.format(Locale.US, "%.2f", scale).trimEnd('0').trimEnd('.')
+    }
+    return "${scaleText}x"
+}
+
+private fun formatPercent(value: Double): String = String.format(Locale.US, "%.0f%%", value)
+
+private const val BYTES_PER_GIBIBYTE = 1024.0 * 1024.0 * 1024.0

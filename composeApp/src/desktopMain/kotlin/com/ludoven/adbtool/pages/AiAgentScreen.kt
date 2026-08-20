@@ -1,5 +1,6 @@
 package com.ludoven.adbtool.pages
 
+import adbtool_desktop.composeapp.generated.resources.*
 import adbtool_desktop.composeapp.generated.resources.Res
 import adbtool_desktop.composeapp.generated.resources.agent_approve
 import adbtool_desktop.composeapp.generated.resources.agent_action_clear_data
@@ -46,11 +47,8 @@ import adbtool_desktop.composeapp.generated.resources.agent_prompt_clear_cache
 import adbtool_desktop.composeapp.generated.resources.agent_prompt_recognize
 import adbtool_desktop.composeapp.generated.resources.agent_prompt_settings
 import adbtool_desktop.composeapp.generated.resources.agent_prompt_wechat
-import adbtool_desktop.composeapp.generated.resources.agent_quick_camera
-import adbtool_desktop.composeapp.generated.resources.agent_quick_clear_cache
 import adbtool_desktop.composeapp.generated.resources.agent_quick_recognize
 import adbtool_desktop.composeapp.generated.resources.agent_quick_settings
-import adbtool_desktop.composeapp.generated.resources.agent_quick_wechat
 import adbtool_desktop.composeapp.generated.resources.agent_ready_desc
 import adbtool_desktop.composeapp.generated.resources.agent_ready_title
 import adbtool_desktop.composeapp.generated.resources.agent_reject
@@ -66,7 +64,12 @@ import adbtool_desktop.composeapp.generated.resources.ai_agent_title
 import adbtool_desktop.composeapp.generated.resources.agent_device_placeholder
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -74,7 +77,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -87,21 +89,26 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.toComposeImageBitmap
@@ -113,6 +120,10 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -122,17 +133,30 @@ import androidx.compose.material.icons.filled.Add
 import com.ludoven.adbtool.QadbColors
 import com.ludoven.adbtool.UiTokens
 import com.ludoven.adbtool.agent.AgentAction
-import com.ludoven.adbtool.agent.AgentBudgetMode
-import com.ludoven.adbtool.agent.AgentBudgetStatus
+import com.ludoven.adbtool.agent.AgentFailureAction
+import com.ludoven.adbtool.agent.AgentFailureCategory
+import com.ludoven.adbtool.agent.AgentFailureCode
+import com.ludoven.adbtool.agent.AgentFailure
+import com.ludoven.adbtool.agent.AgentFailureStage
+import com.ludoven.adbtool.agent.AgentFailureSubsystem
+import com.ludoven.adbtool.agent.AgentFeatureRuntime
 import com.ludoven.adbtool.agent.AgentMessage
 import com.ludoven.adbtool.agent.AgentMessageRole
 import com.ludoven.adbtool.agent.AgentObservationMode
+import com.ludoven.adbtool.agent.AgentPublicActivityItem
+import com.ludoven.adbtool.agent.AgentPublicActivityState
+import com.ludoven.adbtool.agent.AgentPublicRunStatus
+import com.ludoven.adbtool.agent.AgentPublicStage
+import com.ludoven.adbtool.agent.AgentPublicToolKind
+import com.ludoven.adbtool.agent.AgentPublicToolResult
+import com.ludoven.adbtool.agent.AgentPublicToolSummary
+import com.ludoven.adbtool.agent.AgentRunPresentation
+import com.ludoven.adbtool.agent.AgentTaskExecutionGate
+import com.ludoven.adbtool.agent.executionGate
 import com.ludoven.adbtool.agent.AgentStep
-import com.ludoven.adbtool.agent.AgentAppKnowledgeCard
-import com.ludoven.adbtool.agent.AgentWorkflow
-import com.ludoven.adbtool.agent.WorkflowStatus
 import com.ludoven.adbtool.entity.DeviceCenterInfoData
 import com.ludoven.adbtool.entity.DeviceInfoData
+import com.ludoven.adbtool.util.l10n
 import com.ludoven.adbtool.ui.icons.IconParkIcons
 import com.ludoven.adbtool.ui.mac.AlertDialog
 import com.ludoven.adbtool.ui.mac.Button
@@ -147,6 +171,25 @@ import com.ludoven.adbtool.viewmodel.DevicesViewModel
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 import org.jetbrains.skia.Image as SkiaImage
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collect
+
+internal enum class AgentScreenLayout {
+    SINGLE_COLUMN,
+    OVERLAY_DEVICE_PANEL,
+    PERMANENT_DEVICE_PANEL
+}
+
+internal fun agentScreenLayout(widthDp: Float): AgentScreenLayout = when {
+    widthDp >= 960f -> AgentScreenLayout.PERMANENT_DEVICE_PANEL
+    widthDp >= 720f -> AgentScreenLayout.OVERLAY_DEVICE_PANEL
+    else -> AgentScreenLayout.SINGLE_COLUMN
+}
+
+internal fun agentLatestItemScrollOffset(): Int = 0
+
+internal fun shouldShowAgentGuide(messages: List<AgentMessage>): Boolean =
+    messages.none { it.role != AgentMessageRole.SYSTEM }
 
 @Composable
 fun AiAgentScreen(
@@ -159,20 +202,24 @@ fun AiAgentScreen(
     val modelConfig by viewModel.modelConfig.collectAsState()
     val apiKeyAvailable by viewModel.apiKeyAvailable.collectAsState()
     val configurationReady by viewModel.configurationReady.collectAsState()
-    val memoryEnabled by viewModel.memoryEnabled.collectAsState()
-    val memoryNeedsConsent by viewModel.memoryNeedsConsent.collectAsState()
-    val workflows by viewModel.workflows.collectAsState()
-    val knowledgeCards by viewModel.knowledgeCards.collectAsState()
     val selectedDevice by devicesViewModel.selectedDevice.collectAsState()
     val devices by devicesViewModel.devices.collectAsState()
     val deviceNames by devicesViewModel.deviceDisplayNames.collectAsState()
     val deviceInfo by devicesViewModel.deviceInfo.collectAsState()
     val centerInfo by devicesViewModel.centerInfo.collectAsState()
+    val agentFeaturePreferences = remember { AgentFeatureRuntime.preferences }
+    val reduceMotion by agentFeaturePreferences.reduceMotion.collectAsState()
     var prompt by remember { mutableStateOf("") }
     var showModelDialog by remember { mutableStateOf(false) }
-    var showAutomationDialog by remember { mutableStateOf(false) }
+    var showDeviceOverlay by remember { mutableStateOf(false) }
     val isConnected = selectedDevice != null && selectedDevice in devices
-    val canSend = configurationReady && isConnected && !taskState.isRunning
+
+    fun canStart(task: String): Boolean = task.isNotBlank() &&
+        !taskState.isRunning &&
+        isConnected &&
+        configurationReady
+
+    val canSend = canStart(prompt)
 
     LaunchedEffect(Unit) {
         viewModel.refreshConfigurationStatus()
@@ -180,7 +227,7 @@ fun AiAgentScreen(
     }
 
     fun submit(task: String) {
-        if (!canSend || task.isBlank()) return
+        if (!canStart(task)) return
         viewModel.startTask(task, selectedDevice)
         prompt = ""
     }
@@ -198,11 +245,26 @@ fun AiAgentScreen(
             connected = isConnected,
             running = taskState.isRunning
         )
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = UiTokens.SpaceXLarge),
-            horizontalArrangement = Arrangement.End
-        ) {
-            TextButton(onClick = { showAutomationDialog = true }) { Text("自动化知识") }
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+            val layout = agentScreenLayout(maxWidth.value)
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = UiTokens.SpaceXLarge),
+                horizontalArrangement = Arrangement.End
+            ) {
+                if (layout == AgentScreenLayout.OVERLAY_DEVICE_PANEL) {
+                    TextButton(onClick = { showDeviceOverlay = !showDeviceOverlay }) {
+                        Text(
+                            stringResource(
+                                if (showDeviceOverlay) {
+                                    Res.string.agent_preview_hide
+                                } else {
+                                    Res.string.agent_preview_show
+                                }
+                            )
+                        )
+                    }
+                }
+            }
         }
 
         BoxWithConstraints(
@@ -210,47 +272,52 @@ fun AiAgentScreen(
                 .weight(1f)
                 .fillMaxWidth()
         ) {
-            val showPreview = maxWidth >= 900.dp
+            val layout = agentScreenLayout(maxWidth.value)
+            LaunchedEffect(layout) {
+                if (layout != AgentScreenLayout.OVERLAY_DEVICE_PANEL) {
+                    showDeviceOverlay = false
+                }
+            }
             Row(modifier = Modifier.fillMaxSize()) {
                 Column(
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxHeight()
-                        .padding(horizontal = UiTokens.SpaceXLarge)
+                        .padding(horizontal = UiTokens.SpaceXLarge),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     AgentConversation(
                         messages = taskState.messages,
-                        configurationReady = configurationReady,
-                        connected = isConnected,
                         errorMessage = taskState.errorMessage,
-                        budgetStatus = taskState.budgetStatus,
+                        publicActivity = taskState.publicActivity,
+                        reduceMotion = reduceMotion,
+                        onRetry = ::submit,
                         onOpenSettings = { showModelDialog = true },
                         onOpenDevices = onOpenDevices,
+                        canSubmitQuickPrompt = ::canStart,
+                        onQuickPrompt = ::submit,
                         modifier = Modifier.weight(1f)
                     )
 
                     AgentComposer(
                         prompt = prompt,
                         onPromptChange = { prompt = it },
-                        canSend = canSend && prompt.isNotBlank(),
+                        canSend = canSend,
                         running = taskState.isRunning,
                         configurationReady = configurationReady,
                         connected = isConnected,
+                        requiresProvider = true,
+                        requiresDevice = true,
                         observationMode = taskState.observationMode,
-                        memoryEnabled = memoryEnabled,
-                        memoryHitCount = taskState.memoryHitCount,
                         totalTokens = taskState.usage.totalTokens,
-                        compactionCount = taskState.compactionCount,
-                        savedMemoryCount = taskState.savedMemoryCount,
+                        compactionCount = 0,
                         onSend = { submit(prompt) },
-                        onQuickPrompt = ::submit,
                         onNewTask = viewModel::newTask,
-                        onCancel = viewModel::cancelTask,
-                        onOpenMemory = onOpenSettings
+                        onCancel = viewModel::cancelTask
                     )
                 }
 
-                if (showPreview) {
+                if (layout == AgentScreenLayout.PERMANENT_DEVICE_PANEL) {
                     DevicePreviewPanel(
                         observationMode = taskState.observationMode,
                         screenshot = taskState.latestScreenshot,
@@ -262,28 +329,37 @@ fun AiAgentScreen(
                     )
                 }
             }
+
+            if (layout == AgentScreenLayout.OVERLAY_DEVICE_PANEL && showDeviceOverlay) {
+                Surface(
+                    modifier = Modifier
+                        .align(Alignment.CenterEnd)
+                        .width(316.dp)
+                        .fillMaxHeight()
+                        .shadow(12.dp, RoundedCornerShape(UiTokens.RadiusLarge)),
+                    shape = RoundedCornerShape(UiTokens.RadiusLarge),
+                    color = QadbColors.surface
+                ) {
+                    DevicePreviewPanel(
+                        observationMode = taskState.observationMode,
+                        screenshot = taskState.latestScreenshot,
+                        pageSignature = taskState.deviceState?.pageSignature?.value,
+                        pageChanged = taskState.pageDiff?.changed,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+            }
         }
     }
 
     taskState.pendingConfirmation?.let { step ->
+        val rejectFocusRequester = remember(step.id) { FocusRequester() }
+        LaunchedEffect(step.id) { rejectFocusRequester.requestFocus() }
         AlertDialog(
-            onDismissRequest = {},
+            onDismissRequest = { viewModel.respondToConfirmation(false) },
             title = { Text(stringResource(Res.string.agent_sensitive_title)) },
             text = {
-                Text(
-                    if (step.confirmationReason.isNotBlank()) {
-                        stringResource(
-                            Res.string.agent_sensitive_reason,
-                            actionDisplayName(step.action),
-                            step.confirmationReason
-                        )
-                    } else {
-                        stringResource(
-                            Res.string.agent_sensitive_desc,
-                            actionDisplayName(step.action)
-                        )
-                    }
-                )
+                AgentApprovalCardBody(step)
             },
             confirmButton = {
                 Button(onClick = { viewModel.respondToConfirmation(true) }) {
@@ -291,7 +367,10 @@ fun AiAgentScreen(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { viewModel.respondToConfirmation(false) }) {
+                TextButton(
+                    onClick = { viewModel.respondToConfirmation(false) },
+                    modifier = Modifier.focusRequester(rejectFocusRequester)
+                ) {
                     Text(stringResource(Res.string.agent_reject))
                 }
             },
@@ -299,142 +378,86 @@ fun AiAgentScreen(
         )
     }
 
-    if (memoryNeedsConsent) {
-        AlertDialog(
-            onDismissRequest = viewModel::declineMemoryConsent,
-            title = { Text(stringResource(Res.string.agent_memory_consent_title)) },
-            text = { Text(stringResource(Res.string.agent_memory_consent_desc)) },
-            confirmButton = {
-                Button(onClick = viewModel::acceptMemoryConsent) {
-                    Text(stringResource(Res.string.agent_memory_enable))
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = viewModel::declineMemoryConsent) {
-                    Text(stringResource(Res.string.agent_memory_not_now))
-                }
-            }
-        )
-    }
-
     if (showModelDialog) {
         AiModelConfigDialog(
             initialConfig = modelConfig,
             hasSavedKey = apiKeyAvailable,
-            onSaved = { showModelDialog = false },
+            onSaved = {
+                viewModel.refreshConfigurationStatus()
+                showModelDialog = false
+            },
             onKeyCleared = viewModel::refreshConfigurationStatus,
             onDismiss = { showModelDialog = false }
         )
     }
 
-    if (showAutomationDialog) {
-        AutomationKnowledgeDialog(
-            workflows = workflows,
-            knowledgeCards = knowledgeCards,
-            onEnableWorkflow = { viewModel.setWorkflowEnabled(it, true) },
-            onDisableWorkflow = { viewModel.setWorkflowEnabled(it, false) },
-            onDeleteWorkflow = viewModel::deleteWorkflow,
-            onSaveKnowledge = viewModel::saveKnowledgeCard,
-            onSetKnowledgeEnabled = viewModel::setKnowledgeCardEnabled,
-            onDeleteKnowledge = viewModel::deleteKnowledgeCard,
-            onDismiss = { showAutomationDialog = false }
-        )
-    }
 }
 
 @Composable
-private fun AutomationKnowledgeDialog(
-    workflows: List<AgentWorkflow>,
-    knowledgeCards: List<AgentAppKnowledgeCard>,
-    onEnableWorkflow: (AgentWorkflow) -> Unit,
-    onDisableWorkflow: (AgentWorkflow) -> Unit,
-    onDeleteWorkflow: (AgentWorkflow) -> Unit,
-    onSaveKnowledge: (AgentAppKnowledgeCard) -> Unit,
-    onSetKnowledgeEnabled: (AgentAppKnowledgeCard, Boolean) -> Unit,
-    onDeleteKnowledge: (AgentAppKnowledgeCard) -> Unit,
-    onDismiss: () -> Unit
-) {
-    var tab by remember { mutableStateOf(0) }
-    var editing by remember { mutableStateOf<AgentAppKnowledgeCard?>(null) }
-    var pendingWorkflowDelete by remember { mutableStateOf<AgentWorkflow?>(null) }
-    var pendingKnowledgeDelete by remember { mutableStateOf<AgentAppKnowledgeCard?>(null) }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("自动化知识") },
-        text = {
-            Column(modifier = Modifier.heightIn(max = 480.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)) {
-                Row(horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)) {
-                    TextButton(onClick = { tab = 0 }) { Text(if (tab == 0) "Workflow ·" else "Workflow") }
-                    TextButton(onClick = { tab = 1 }) { Text(if (tab == 1) "应用知识 ·" else "应用知识") }
-                    if (tab == 1) TextButton(onClick = { editing = AgentAppKnowledgeCard(packageName = "", title = "", guide = "") }) { Text("新建") }
+private fun AgentApprovalCardBody(step: AgentStep) {
+    val actionName = actionDisplayName(step.action)
+    val description = if (step.confirmationReason.isNotBlank()) {
+        stringResource(
+            Res.string.agent_sensitive_reason,
+            actionName,
+            step.confirmationReason
+        )
+    } else {
+        stringResource(Res.string.agent_sensitive_desc, actionName)
+    }
+
+    Surface(
+        shape = RoundedCornerShape(UiTokens.RadiusLarge),
+        color = QadbColors.warningSurface,
+        border = BorderStroke(1.dp, QadbColors.warning.copy(alpha = 0.24f))
+    ) {
+        Column(
+            modifier = Modifier.padding(UiTokens.SpaceLarge),
+            verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium)
+        ) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Surface(
+                    shape = CircleShape,
+                    color = QadbColors.warning.copy(alpha = 0.13f)
+                ) {
+                    Box(Modifier.size(30.dp), contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = IconParkIcons.Info,
+                            contentDescription = null,
+                            tint = QadbColors.warning,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
                 }
-                if (tab == 0) {
-                    workflows.forEach { workflow ->
-                        Surface(color = QadbColors.surfaceVariant, shape = RoundedCornerShape(UiTokens.RadiusMedium)) {
-                            Column(modifier = Modifier.padding(UiTokens.SpaceMedium)) {
-                                Text(workflow.name, fontWeight = FontWeight.SemiBold)
-                                Text("${workflow.packageName} · ${workflow.replaySteps.size} 步 · 成功率 ${"%.0f".format(workflow.statistics.successRate * 100)}%", color = QadbColors.textSecondary, fontSize = UiTokens.TextCaption)
-                                Text(if (workflow.canEnable) workflow.status.name else "旧版或无效草稿，需重新生成", color = QadbColors.textTertiary, fontSize = UiTokens.TextCaption)
-                                Row {
-                                    if (workflow.status == WorkflowStatus.ENABLED) TextButton(onClick = { onDisableWorkflow(workflow) }) { Text("停用") }
-                                    else TextButton(onClick = { onEnableWorkflow(workflow) }, enabled = workflow.canEnable) { Text("启用") }
-                                    TextButton(onClick = { pendingWorkflowDelete = workflow }) { Text("删除") }
-                                }
-                            }
-                        }
-                    }
-                    if (workflows.isEmpty()) Text("暂无 Workflow 草稿", color = QadbColors.textSecondary)
-                } else {
-                    knowledgeCards.forEach { card ->
-                        Surface(color = QadbColors.surfaceVariant, shape = RoundedCornerShape(UiTokens.RadiusMedium)) {
-                            Column(modifier = Modifier.padding(UiTokens.SpaceMedium)) {
-                                Text(card.title, fontWeight = FontWeight.SemiBold)
-                                Text(card.packageName, color = QadbColors.textSecondary, fontSize = UiTokens.TextCaption)
-                                Text(card.guide, color = QadbColors.textSecondary, fontSize = UiTokens.TextCaption, maxLines = 3, overflow = TextOverflow.Ellipsis)
-                                Row {
-                                    TextButton(onClick = { editing = card }) { Text("编辑") }
-                                    TextButton(onClick = { onSetKnowledgeEnabled(card, !card.enabled) }) { Text(if (card.enabled) "停用" else "启用") }
-                                    TextButton(onClick = { pendingKnowledgeDelete = card }) { Text("删除") }
-                                }
-                            }
-                        }
-                    }
-                    if (knowledgeCards.isEmpty()) Text("暂无应用知识卡", color = QadbColors.textSecondary)
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(
+                        text = actionName,
+                        color = QadbColors.textPrimary,
+                        fontSize = UiTokens.TextBodyLarge,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        text = stringResource(Res.string.agent_stage_waiting_confirmation),
+                        color = QadbColors.warning,
+                        fontSize = UiTokens.TextCaption,
+                        fontWeight = FontWeight.Medium
+                    )
                 }
             }
-        },
-        confirmButton = { Button(onClick = onDismiss) { Text("完成") } }
-    )
-    editing?.let { card -> KnowledgeCardEditor(card, onSave = { onSaveKnowledge(it); editing = null }, onDismiss = { editing = null }) }
-    pendingWorkflowDelete?.let { workflow -> ConfirmDeleteDialog("删除该 Workflow？", { onDeleteWorkflow(workflow); pendingWorkflowDelete = null }) { pendingWorkflowDelete = null } }
-    pendingKnowledgeDelete?.let { card -> ConfirmDeleteDialog("删除该应用知识卡？", { onDeleteKnowledge(card); pendingKnowledgeDelete = null }) { pendingKnowledgeDelete = null } }
-}
-
-@Composable
-private fun KnowledgeCardEditor(card: AgentAppKnowledgeCard, onSave: (AgentAppKnowledgeCard) -> Unit, onDismiss: () -> Unit) {
-    var packageName by remember(card.id) { mutableStateOf(card.packageName) }
-    var title by remember(card.id) { mutableStateOf(card.title) }
-    var guide by remember(card.id) { mutableStateOf(card.guide) }
-    AlertDialog(onDismissRequest = onDismiss, title = { Text("应用知识卡") }, text = {
-        Column(verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)) {
-            KnowledgeField("包名", packageName) { packageName = it }
-            KnowledgeField("标题", title) { title = it }
-            KnowledgeField("指南（最多 4000 字符）", guide, minLines = 5) { guide = it }
+            Box(Modifier.fillMaxWidth().height(1.dp).background(QadbColors.warning.copy(alpha = 0.18f)))
+            Text(
+                text = description,
+                color = QadbColors.textSecondary,
+                style = MaterialTheme.typography.body1.copy(
+                    fontSize = UiTokens.TextBody,
+                    lineHeight = 19.sp
+                )
+            )
         }
-    }, confirmButton = { Button(onClick = { onSave(card.copy(packageName = packageName.trim(), title = title.trim(), guide = guide.trim())) }, enabled = packageName.isNotBlank() && title.isNotBlank() && guide.isNotBlank()) { Text("保存") } }, dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } })
-}
-
-@Composable
-private fun KnowledgeField(label: String, value: String, minLines: Int = 1, onValueChange: (String) -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(label, fontSize = UiTokens.TextCaption, color = QadbColors.textSecondary)
-        BasicTextField(value = value, onValueChange = onValueChange, minLines = minLines, modifier = Modifier.fillMaxWidth().border(BorderStroke(1.dp, QadbColors.border), RoundedCornerShape(UiTokens.RadiusSmall)).padding(UiTokens.SpaceSmall), textStyle = MaterialTheme.typography.body1.copy(color = QadbColors.textPrimary))
     }
-}
-
-@Composable
-private fun ConfirmDeleteDialog(message: String, onConfirm: () -> Unit, onDismiss: () -> Unit) {
-    AlertDialog(onDismissRequest = onDismiss, title = { Text("确认删除") }, text = { Text(message) }, confirmButton = { Button(onClick = onConfirm) { Text("删除") } }, dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } })
 }
 
 @Composable
@@ -541,67 +564,470 @@ private fun StatusDot(connected: Boolean) {
 @Composable
 private fun AgentConversation(
     messages: List<AgentMessage>,
-    configurationReady: Boolean,
-    connected: Boolean,
     errorMessage: String?,
-    budgetStatus: AgentBudgetStatus,
+    publicActivity: AgentPublicActivityState,
+    reduceMotion: Boolean,
+    onRetry: (String) -> Unit,
     onOpenSettings: () -> Unit,
     onOpenDevices: () -> Unit,
+    canSubmitQuickPrompt: (String) -> Boolean,
+    onQuickPrompt: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val scrollState = rememberScrollState()
-    LaunchedEffect(messages.size, errorMessage) {
-        scrollState.animateScrollTo(scrollState.maxValue)
+    val listState = rememberLazyListState()
+    val activeRun = publicActivity.activeRun
+    val followThresholdPx = with(LocalDensity.current) { 64.dp.roundToPx() }
+    val conversationItems = remember(messages, publicActivity, errorMessage) {
+        val visibleMessages = messages.filter { it.role != AgentMessageRole.SYSTEM }
+        val assistantRunIds = visibleMessages.asSequence()
+            .filter { it.role == AgentMessageRole.ASSISTANT }
+            .mapNotNull { it.runId }
+            .toSet()
+        buildList<AgentConversationItem> {
+            if (shouldShowAgentGuide(messages)) add(AgentConversationItem.Guide)
+            visibleMessages.forEach { message ->
+                add(AgentConversationItem.Message(message))
+                if (message.role == AgentMessageRole.USER) {
+                    message.runId?.let(publicActivity.runs::get)?.let { run ->
+                        add(AgentConversationItem.Activity(message, run))
+                        if (run.responseText.isNotBlank() && run.runId !in assistantRunIds) {
+                            add(AgentConversationItem.Streaming(run.runId, run.responseText))
+                        }
+                    }
+                }
+            }
+            errorMessage?.takeIf { activeRun?.failure == null }?.let {
+                add(AgentConversationItem.Error(it))
+            }
+        }
+    }
+    val isNearLatest by remember(listState, followThresholdPx) {
+        derivedStateOf {
+            val layout = listState.layoutInfo
+            if (layout.totalItemsCount == 0) {
+                true
+            } else {
+                val lastVisible = layout.visibleItemsInfo.lastOrNull()
+                lastVisible != null &&
+                    lastVisible.index == layout.totalItemsCount - 1 &&
+                    lastVisible.offset + lastVisible.size - layout.viewportEndOffset <= followThresholdPx
+            }
+        }
+    }
+    var followsLatest by remember { mutableStateOf(true) }
+    var programmaticScroll by remember { mutableStateOf(false) }
+
+    LaunchedEffect(listState, followThresholdPx) {
+        snapshotFlow { listState.isScrollInProgress to isNearLatest }
+            .collect { (isScrolling, nearLatest) ->
+                if (!programmaticScroll && isScrolling) {
+                    followsLatest = nearLatest
+                } else if (!isScrolling && nearLatest) {
+                    followsLatest = true
+                }
+            }
+    }
+    LaunchedEffect(conversationItems, followsLatest) {
+        if (followsLatest && conversationItems.isNotEmpty()) {
+            programmaticScroll = true
+            try {
+                listState.scrollToItem(
+                    conversationItems.lastIndex,
+                    agentLatestItemScrollOffset()
+                )
+            } finally {
+                programmaticScroll = false
+            }
+        }
     }
 
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .verticalScroll(scrollState)
-            .padding(vertical = UiTokens.SpaceXLarge),
-        verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium)
+    Box(modifier = modifier.fillMaxWidth()) {
+        LazyColumn(
+            state = listState,
+            modifier = Modifier
+                .fillMaxSize(),
+            contentPadding = PaddingValues(vertical = UiTokens.SpaceXLarge),
+            verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium)
+        ) {
+            items(
+                items = conversationItems,
+                key = AgentConversationItem::stableKey,
+                contentType = AgentConversationItem::contentType
+            ) { item ->
+                when (item) {
+                    AgentConversationItem.Guide -> Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium)
+                    ) {
+                        AgentGuideCard(
+                            icon = IconParkIcons.Command,
+                            title = stringResource(Res.string.agent_ready_title),
+                            description = stringResource(Res.string.agent_ready_desc)
+                        )
+                        QuickPromptRow(
+                            canSubmit = canSubmitQuickPrompt,
+                            onPrompt = onQuickPrompt,
+                            modifier = Modifier.widthIn(max = 620.dp)
+                        )
+                    }
+                    is AgentConversationItem.Message -> Box(
+                        modifier = Modifier.fillMaxWidth(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        AgentMessageBubble(item.message)
+                    }
+                    is AgentConversationItem.Activity -> {
+                        Box(
+                            modifier = Modifier.fillMaxWidth(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            AgentActivityCard(
+                                run = item.run,
+                                reduceMotion = reduceMotion,
+                                onRetry = { onRetry(item.userMessage.text) },
+                                onOpenSettings = onOpenSettings,
+                                onOpenDevices = onOpenDevices
+                            )
+                        }
+                    }
+                    is AgentConversationItem.Streaming -> Box(
+                        modifier = Modifier.fillMaxWidth(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        AgentStreamingResponse(item.text)
+                    }
+                    is AgentConversationItem.Error -> {
+                        Surface(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(UiTokens.RadiusLarge),
+                            color = QadbColors.errorSurface
+                        ) {
+                            Text(
+                                text = item.text,
+                                modifier = Modifier.padding(UiTokens.SpaceLarge),
+                                color = QadbColors.danger,
+                                fontSize = UiTokens.TextBody
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        if (!followsLatest && !isNearLatest) {
+            OutlinedButton(
+                onClick = { followsLatest = true },
+                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = UiTokens.SpaceSmall)
+            ) {
+                Text(stringResource(Res.string.agent_back_to_latest))
+            }
+        }
+    }
+}
+
+private sealed interface AgentConversationItem {
+    val stableKey: String
+    val contentType: String
+
+    data object Guide : AgentConversationItem {
+        override val stableKey = "agent-guide"
+        override val contentType = "guide"
+    }
+
+    data class Message(val message: AgentMessage) : AgentConversationItem {
+        override val stableKey = "message:${message.id}"
+        override val contentType = "message"
+    }
+
+    data class Activity(
+        val userMessage: AgentMessage,
+        val run: AgentRunPresentation
+    ) : AgentConversationItem {
+        override val stableKey = "activity:${run.runId}"
+        override val contentType = "activity"
+    }
+
+    data class Streaming(val runId: String, val text: String) : AgentConversationItem {
+        override val stableKey = "streaming:$runId"
+        override val contentType = "streaming"
+    }
+
+    data class Error(val text: String) : AgentConversationItem {
+        override val stableKey = "agent-error"
+        override val contentType = "error"
+    }
+}
+
+@Composable
+private fun AgentActivityCard(
+    run: AgentRunPresentation,
+    reduceMotion: Boolean,
+    onRetry: () -> Unit,
+    onOpenSettings: () -> Unit,
+    onOpenDevices: () -> Unit
+) {
+    var expanded by remember(run.runId) { mutableStateOf(run.preferredExpanded) }
+    var nowMs by remember(run.runId) { mutableStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(run.status) {
+        when (run.status) {
+            AgentPublicRunStatus.WAITING_CONFIRMATION,
+            AgentPublicRunStatus.FAILED -> expanded = true
+            AgentPublicRunStatus.COMPLETED,
+            AgentPublicRunStatus.CANCELLED -> expanded = false
+            AgentPublicRunStatus.RUNNING,
+            AgentPublicRunStatus.CANCELLING -> Unit
+        }
+    }
+    LaunchedEffect(run.runId, run.finishedAtMs) {
+        val finishedAt = run.finishedAtMs
+        if (finishedAt != null) {
+            nowMs = finishedAt
+        } else {
+            while (true) {
+                nowMs = System.currentTimeMillis()
+                delay(1_000)
+            }
+        }
+    }
+
+    val elapsedMs = ((run.finishedAtMs ?: nowMs) - run.startedAtMs).coerceAtLeast(0)
+    val stageColor = when (run.status) {
+        AgentPublicRunStatus.COMPLETED -> QadbColors.success
+        AgentPublicRunStatus.FAILED -> QadbColors.danger
+        AgentPublicRunStatus.WAITING_CONFIRMATION -> QadbColors.warning
+        AgentPublicRunStatus.CANCELLED -> QadbColors.textTertiary
+        AgentPublicRunStatus.CANCELLING,
+        AgentPublicRunStatus.RUNNING -> QadbColors.primary
+    }
+    val stageLiveRegion = if (
+        run.status == AgentPublicRunStatus.FAILED ||
+        run.status == AgentPublicRunStatus.WAITING_CONFIRMATION
     ) {
-        if (!configurationReady) {
-            AgentGuideCard(
-                icon = IconParkIcons.Setting,
-                title = stringResource(Res.string.agent_config_required),
-                description = stringResource(Res.string.agent_config_required_desc),
-                action = stringResource(Res.string.agent_open_settings),
-                onAction = onOpenSettings
-            )
-        } else if (!connected) {
-            AgentGuideCard(
-                icon = IconParkIcons.Phone,
-                title = stringResource(Res.string.agent_no_device),
-                description = stringResource(Res.string.agent_no_device_desc),
-                action = stringResource(Res.string.agent_open_devices),
-                onAction = onOpenDevices
-            )
-        } else if (messages.isEmpty()) {
-            AgentGuideCard(
-                icon = IconParkIcons.Command,
-                title = stringResource(Res.string.agent_ready_title),
-                description = stringResource(Res.string.agent_ready_desc)
-            )
+        LiveRegionMode.Assertive
+    } else {
+        LiveRegionMode.Polite
+    }
+
+    Surface(
+        modifier = Modifier
+            .widthIn(max = 680.dp)
+            .fillMaxWidth()
+            .border(1.dp, QadbColors.border, RoundedCornerShape(UiTokens.RadiusLarge)),
+        shape = RoundedCornerShape(UiTokens.RadiusLarge),
+        color = when (run.status) {
+            AgentPublicRunStatus.FAILED -> QadbColors.errorSurface
+            AgentPublicRunStatus.WAITING_CONFIRMATION -> QadbColors.warningSurface
+            else -> QadbColors.surfaceVariant.copy(alpha = 0.58f)
         }
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { expanded = !expanded }
+                .padding(horizontal = UiTokens.SpaceLarge, vertical = UiTokens.SpaceMedium),
+            verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth().semantics { liveRegion = stageLiveRegion },
+                horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(Modifier.size(7.dp).clip(CircleShape).background(stageColor))
+                Text(
+                    text = publicStageLabel(run.stage),
+                    color = QadbColors.textPrimary,
+                    fontSize = UiTokens.TextBody,
+                    fontWeight = FontWeight.SemiBold
+                )
+                AgentThinkingDots(
+                    visible = run.status == AgentPublicRunStatus.RUNNING &&
+                        run.stage in setOf(
+                            AgentPublicStage.UNDERSTANDING,
+                            AgentPublicStage.PLANNING,
+                            AgentPublicStage.RECOVERING,
+                            AgentPublicStage.RESPONDING
+                        ),
+                    reduceMotion = reduceMotion
+                )
+                Spacer(Modifier.weight(1f))
+                Text(
+                    text = stringResource(
+                        Res.string.agent_activity_elapsed,
+                        publicDurationLabel(elapsedMs)
+                    ),
+                    color = QadbColors.textTertiary,
+                    fontSize = UiTokens.TextCaption
+                )
+                Text(
+                    text = stringResource(
+                        if (expanded) {
+                            Res.string.agent_activity_hide_details
+                        } else {
+                            Res.string.agent_activity_show_details
+                        }
+                    ),
+                    color = QadbColors.primary,
+                    fontSize = UiTokens.TextCaption,
+                    fontWeight = FontWeight.Medium
+                )
+            }
 
-        messages.forEach { message ->
-            AgentMessageBubble(message)
+            run.latestTool?.let { tool ->
+                AgentToolChip(tool)
+            }
+
+            if (expanded) {
+                Box(Modifier.fillMaxWidth().height(1.dp).background(QadbColors.divider))
+                run.failure?.let { failure ->
+                    Text(
+                        text = publicFailureLabel(failure),
+                        color = QadbColors.danger,
+                        fontSize = UiTokens.TextBody
+                    )
+                    Text(
+                        text = l10n(
+                            "阶段 ${publicFailureStageLabel(failure)} · 子系统 ${publicFailureSubsystemLabel(failure)} · 代码 ${failure.code.name.lowercase()}",
+                            "Stage ${publicFailureStageLabel(failure)} · subsystem ${publicFailureSubsystemLabel(failure)} · code ${failure.code.name.lowercase()}"
+                        ),
+                        color = QadbColors.textTertiary,
+                        fontSize = UiTokens.TextCaption
+                    )
+                    val actionLabel = when (failure.suggestedAction) {
+                        AgentFailureAction.RETRY -> stringResource(Res.string.file_browser_retry)
+                        AgentFailureAction.OPEN_MODEL_SETTINGS -> stringResource(Res.string.agent_open_settings)
+                        AgentFailureAction.OPEN_DEVICES -> stringResource(Res.string.agent_open_devices)
+                        AgentFailureAction.NONE -> null
+                    }
+                    if (actionLabel != null) {
+                        OutlinedButton(
+                            onClick = when (failure.suggestedAction) {
+                                AgentFailureAction.RETRY -> onRetry
+                                AgentFailureAction.OPEN_MODEL_SETTINGS -> onOpenSettings
+                                AgentFailureAction.OPEN_DEVICES -> onOpenDevices
+                                AgentFailureAction.NONE -> ({})
+                            }
+                        ) {
+                            Text(actionLabel)
+                        }
+                    }
+                }
+                run.activities.takeLast(12).forEach { activity ->
+                    AgentActivityTimelineRow(
+                        activity = activity,
+                        elapsedMs = (activity.occurredAtMs - run.startedAtMs).coerceAtLeast(0)
+                    )
+                }
+                val metrics = run.metrics
+                if (metrics.modelCalls > 0 || metrics.totalTokens > 0) {
+                    Box(Modifier.fillMaxWidth().height(1.dp).background(QadbColors.divider))
+                    Text(
+                        text = l10n(
+                            "运行引擎：${metrics.engineVersion.name}",
+                            "Engine: ${metrics.engineVersion.name}"
+                        ),
+                        color = QadbColors.textTertiary,
+                        fontSize = UiTokens.TextCaption
+                    )
+                    Text(
+                        text = stringResource(
+                            if (metrics.modelCallLimit > 0) {
+                                Res.string.agent_activity_budget
+                            } else {
+                                Res.string.agent_activity_usage
+                            }
+                        ),
+                        color = QadbColors.textSecondary,
+                        fontSize = UiTokens.TextCaption,
+                        fontWeight = FontWeight.Medium
+                    )
+                    Text(
+                        text = if (metrics.modelCallLimit > 0) {
+                            stringResource(
+                                Res.string.agent_activity_budget_calls,
+                                metrics.modelCalls,
+                                metrics.modelCallLimit,
+                                metrics.visionCalls,
+                                metrics.visionCallLimit,
+                                metrics.replans,
+                                metrics.replanLimit
+                            )
+                        } else {
+                            stringResource(
+                                Res.string.agent_activity_usage_calls,
+                                metrics.modelCalls,
+                                metrics.visionCalls,
+                                metrics.replans
+                            )
+                        },
+                        color = QadbColors.textSecondary,
+                        fontSize = UiTokens.TextCaption
+                    )
+                    Text(
+                        text = stringResource(
+                            Res.string.agent_activity_budget_tokens,
+                            metrics.promptTokens,
+                            metrics.completionTokens,
+                            metrics.cachedTokens,
+                            metrics.totalTokens
+                        ),
+                        color = QadbColors.textTertiary,
+                        fontSize = UiTokens.TextCaption
+                    )
+                }
+            }
         }
+    }
+}
 
-        AgentBudgetCard(budgetStatus)
-
-        errorMessage?.let {
+@Composable
+private fun AgentActivityTimelineRow(activity: AgentPublicActivityItem, elapsedMs: Long) {
+    val activityLabel = activity.tool?.let { publicToolLabel(it) } ?: publicStageLabel(activity.stage)
+    val resultLabel = activity.result?.let { publicToolResultLabel(it) }
+    val stateColor = when (activity.result) {
+        AgentPublicToolResult.SUCCEEDED,
+        AgentPublicToolResult.RECOVERED -> QadbColors.success
+        AgentPublicToolResult.FAILED,
+        AgentPublicToolResult.DENIED -> QadbColors.danger
+        AgentPublicToolResult.UNVERIFIED -> QadbColors.warning
+        null -> QadbColors.primary
+    }
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = publicDurationLabel(elapsedMs),
+            color = QadbColors.textTertiary,
+            fontSize = 11.sp,
+            modifier = Modifier.width(56.dp)
+        )
+        Box(
+            modifier = Modifier.size(18.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Box(Modifier.width(1.dp).height(18.dp).background(QadbColors.divider))
+            Box(Modifier.size(7.dp).clip(CircleShape).background(stateColor))
+        }
+        Text(
+            text = activityLabel,
+            color = QadbColors.textSecondary,
+            fontSize = UiTokens.TextCaption,
+            modifier = Modifier.weight(1f)
+        )
+        resultLabel?.let {
             Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(UiTokens.RadiusLarge),
-                color = QadbColors.errorSurface
+                shape = RoundedCornerShape(UiTokens.BadgeRadius),
+                color = stateColor.copy(alpha = 0.11f),
+                border = BorderStroke(1.dp, stateColor.copy(alpha = 0.22f))
             ) {
                 Text(
                     text = it,
-                    modifier = Modifier.padding(UiTokens.SpaceLarge),
-                    color = QadbColors.danger,
-                    fontSize = UiTokens.TextBody
+                    modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp),
+                    color = stateColor,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Medium
                 )
             }
         }
@@ -609,67 +1035,189 @@ private fun AgentConversation(
 }
 
 @Composable
-private fun AgentBudgetCard(status: AgentBudgetStatus) {
-    if (status.modelCalls == 0 && status.stopReason == null) return
-    AgentRuntimeDetail(
-        title = "任务预算",
-        titleColor = if (status.stopReason == null) QadbColors.textSecondary else QadbColors.danger
+private fun AgentToolChip(tool: AgentPublicToolSummary) {
+    Surface(
+        modifier = Modifier.widthIn(max = 360.dp),
+        shape = RoundedCornerShape(UiTokens.BadgeRadius),
+        color = QadbColors.surface,
+        border = BorderStroke(1.dp, QadbColors.border)
     ) {
-        Text(
-            "模型 ${status.modelCalls}/${status.modelCallLimit} · 视觉 ${status.visionCalls}/${status.visionCallLimit} · 重规划 ${status.replans}/${status.replanLimit}",
-            color = QadbColors.textSecondary,
-            fontSize = UiTokens.TextCaption
-        )
-        Text(
-            "输入 ${status.usage.promptTokens} · 输出 ${status.usage.completionTokens} · 缓存 ${status.usage.cachedTokens} · 预计 ${"%.4f".format(status.estimatedCost)} CNY",
-            color = QadbColors.textSecondary,
-            fontSize = UiTokens.TextCaption
-        )
-        Text(
-            budgetModeLabel(status.mode),
-            color = if (status.stopReason == null) QadbColors.textTertiary else QadbColors.danger,
-            fontSize = UiTokens.TextCaption
-        )
-        status.stopReason?.let { reason ->
-            Text(reason, color = QadbColors.danger, fontSize = UiTokens.TextCaption)
+        Row(
+            modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = IconParkIcons.Command,
+                contentDescription = null,
+                tint = QadbColors.primary,
+                modifier = Modifier.size(13.dp)
+            )
+            Text(
+                text = publicToolLabel(tool),
+                color = QadbColors.textSecondary,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
         }
     }
 }
 
 @Composable
-private fun AgentRuntimeDetail(
-    title: String,
-    titleColor: androidx.compose.ui.graphics.Color = QadbColors.textTertiary,
-    content: @Composable ColumnScope.() -> Unit
-) {
-    Column(
-        modifier = Modifier
-            .widthIn(max = 680.dp)
-            .fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceXSmall)
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(1.dp)
-                .background(QadbColors.divider)
+private fun AgentThinkingDots(visible: Boolean, reduceMotion: Boolean) {
+    if (!visible) return
+    val phase = if (reduceMotion) {
+        4
+    } else {
+        val transition = rememberInfiniteTransition()
+        val animatedPhase by transition.animateFloat(
+            initialValue = 0f,
+            targetValue = 9f,
+            animationSpec = infiniteRepeatable(tween(durationMillis = 900))
         )
-        Text(
-            title,
-            color = titleColor,
-            fontSize = UiTokens.TextCaption,
-            fontWeight = FontWeight.Medium
-        )
-        content()
+        animatedPhase.toInt().coerceIn(0, 8)
+    }
+    Column(verticalArrangement = Arrangement.spacedBy(1.5.dp)) {
+        repeat(3) { row ->
+            Row(horizontalArrangement = Arrangement.spacedBy(1.5.dp)) {
+                repeat(3) { column ->
+                    val index = row * 3 + column
+                    val distance = (index - phase + 9) % 9
+                    Box(
+                        Modifier
+                            .size(3.5.dp)
+                            .clip(RoundedCornerShape(1.dp))
+                            .background(
+                                QadbColors.primary.copy(
+                                    alpha = when (distance) {
+                                        0 -> 1f
+                                        1, 8 -> 0.58f
+                                        else -> 0.18f
+                                    }
+                                )
+                            )
+                    )
+                }
+            }
+        }
     }
 }
 
-private fun budgetModeLabel(mode: AgentBudgetMode): String = when (mode) {
-    AgentBudgetMode.NORMAL -> "正常预算模式"
-    AgentBudgetMode.DIFF_ONLY -> "已切换为页面差异优先"
-    AgentBudgetMode.NO_OPTIONAL_VISION -> "已关闭非必要视觉请求"
-    AgentBudgetMode.FINAL_RECOVERY_ONLY -> "仅保留最终结果调用"
-    AgentBudgetMode.EXHAUSTED -> "预算已耗尽"
+@Composable
+private fun publicDurationLabel(durationMs: Long): String {
+    val seconds = durationMs / 1_000
+    return if (seconds < 60) {
+        stringResource(Res.string.agent_activity_duration_seconds, seconds)
+    } else {
+        stringResource(
+            Res.string.agent_activity_duration_minutes,
+            seconds / 60,
+            seconds % 60
+        )
+    }
+}
+
+@Composable
+private fun publicStageLabel(stage: AgentPublicStage): String = stringResource(
+    when (stage) {
+        AgentPublicStage.UNDERSTANDING -> Res.string.agent_stage_understanding
+        AgentPublicStage.READING -> Res.string.agent_stage_reading
+        AgentPublicStage.PLANNING -> Res.string.agent_stage_planning
+        AgentPublicStage.EXECUTING -> Res.string.agent_stage_executing
+        AgentPublicStage.VERIFYING -> Res.string.agent_stage_verifying
+        AgentPublicStage.RECOVERING -> Res.string.agent_stage_recovering
+        AgentPublicStage.WAITING_CONFIRMATION -> Res.string.agent_stage_waiting_confirmation
+        AgentPublicStage.RESPONDING -> Res.string.agent_stage_responding
+        AgentPublicStage.CANCELLING -> Res.string.agent_stage_cancelling
+        AgentPublicStage.COMPLETED -> Res.string.agent_stage_completed
+        AgentPublicStage.FAILED -> Res.string.agent_stage_failed
+        AgentPublicStage.CANCELLED -> Res.string.agent_stage_cancelled
+    }
+)
+
+@Composable
+private fun publicToolLabel(tool: AgentPublicToolSummary): String = when (tool.kind) {
+    AgentPublicToolKind.SEMANTIC_GOAL -> l10n("执行语义设备任务", "Execute semantic device task")
+    AgentPublicToolKind.OBSERVE_DEVICE -> stringResource(Res.string.agent_public_tool_observe)
+    AgentPublicToolKind.FIND_APP -> stringResource(Res.string.agent_public_tool_find_app)
+    AgentPublicToolKind.OPEN_APP -> stringResource(Res.string.agent_public_tool_open_app)
+    AgentPublicToolKind.TAP -> stringResource(Res.string.agent_public_tool_tap)
+    AgentPublicToolKind.SWIPE -> stringResource(Res.string.agent_public_tool_swipe)
+    AgentPublicToolKind.INPUT_TEXT -> stringResource(
+        Res.string.agent_public_tool_input,
+        tool.inputCharacterCount ?: 0
+    )
+    AgentPublicToolKind.KEY_EVENT -> stringResource(Res.string.agent_public_tool_key)
+    AgentPublicToolKind.WAIT -> stringResource(Res.string.agent_public_tool_wait)
+    AgentPublicToolKind.FINISH -> stringResource(Res.string.agent_public_tool_finish)
+    AgentPublicToolKind.FORCE_STOP_APP -> stringResource(Res.string.agent_public_tool_force_stop)
+    AgentPublicToolKind.CLEAR_APP_DATA -> stringResource(Res.string.agent_public_tool_clear_data)
+    AgentPublicToolKind.UNINSTALL_APP -> stringResource(Res.string.agent_public_tool_uninstall)
+    AgentPublicToolKind.REBOOT_DEVICE -> stringResource(Res.string.agent_public_tool_reboot)
+}
+
+@Composable
+private fun publicToolResultLabel(result: AgentPublicToolResult): String = stringResource(
+    when (result) {
+        AgentPublicToolResult.SUCCEEDED -> Res.string.agent_public_result_succeeded
+        AgentPublicToolResult.RECOVERED -> Res.string.agent_public_result_recovered
+        AgentPublicToolResult.UNVERIFIED -> Res.string.agent_public_result_unverified
+        AgentPublicToolResult.FAILED -> Res.string.agent_public_result_failed
+        AgentPublicToolResult.DENIED -> Res.string.agent_public_result_denied
+    }
+)
+
+@Composable
+private fun publicFailureLabel(failure: AgentFailure): String = stringResource(
+    if (failure.code == AgentFailureCode.OUTCOME_UNCERTAIN) {
+        Res.string.agent_failure_outcome_uncertain
+    } else if (failure.code == AgentFailureCode.MODEL_CALL_TIMED_OUT) {
+        Res.string.agent_failure_model_timeout
+    } else when (failure.category) {
+        AgentFailureCategory.PROTOCOL -> Res.string.agent_failure_protocol
+        AgentFailureCategory.NETWORK -> Res.string.agent_failure_network
+        AgentFailureCategory.RATE_LIMIT -> Res.string.agent_failure_rate_limit
+        AgentFailureCategory.AUTHENTICATION -> Res.string.agent_failure_authentication
+        AgentFailureCategory.DEVICE_DISCONNECTED -> Res.string.agent_failure_device
+        AgentFailureCategory.DEVICE_EXECUTION -> Res.string.agent_failure_device_execution
+        AgentFailureCategory.OBSERVATION -> Res.string.agent_failure_observation
+        AgentFailureCategory.VERIFICATION -> Res.string.agent_failure_verification
+        AgentFailureCategory.SAFETY_BLOCKED -> Res.string.agent_failure_safety
+        AgentFailureCategory.BUDGET_EXHAUSTED -> Res.string.agent_failure_budget
+        AgentFailureCategory.UNKNOWN -> Res.string.agent_failure_unknown
+    }
+)
+
+private fun publicFailureStageLabel(failure: AgentFailure): String = when (failure.stage) {
+    AgentFailureStage.CONFIGURATION -> l10n("配置", "configuration")
+    AgentFailureStage.UNDERSTANDING -> l10n("理解", "understanding")
+    AgentFailureStage.OBSERVING -> l10n("观察", "observing")
+    AgentFailureStage.PLANNING -> l10n("规划", "planning")
+    AgentFailureStage.EXECUTING -> l10n("执行", "executing")
+    AgentFailureStage.VERIFYING -> l10n("验证", "verifying")
+    AgentFailureStage.RECOVERING -> l10n("恢复", "recovering")
+    AgentFailureStage.UNKNOWN -> l10n("未知", "unknown")
+}
+
+private fun publicFailureSubsystemLabel(failure: AgentFailure): String = when (failure.subsystem) {
+    AgentFailureSubsystem.PROVIDER -> "Provider"
+    AgentFailureSubsystem.DEVICE_TRANSPORT -> l10n("设备连接", "device transport")
+    AgentFailureSubsystem.OBSERVATION -> l10n("设备观察", "observation")
+    AgentFailureSubsystem.DEVICE_ACTION -> l10n("设备动作", "device action")
+    AgentFailureSubsystem.VERIFICATION -> l10n("完成验证", "verification")
+    AgentFailureSubsystem.SAFETY_POLICY -> l10n("安全策略", "safety policy")
+    AgentFailureSubsystem.ORCHESTRATOR -> l10n("任务编排", "orchestrator")
+    AgentFailureSubsystem.UNKNOWN -> l10n("未知", "unknown")
+}
+
+@Composable
+private fun AgentStreamingResponse(text: String) {
+    AgentMarkdownText(
+        text = text,
+        modifier = Modifier.widthIn(max = 680.dp)
+    )
 }
 
 @Composable
@@ -740,11 +1288,9 @@ private fun AgentMessageBubble(message: AgentMessage) {
                 )
             }
         } else {
-            Text(
+            AgentMarkdownText(
                 text = message.text,
-                modifier = Modifier.widthIn(max = 680.dp),
-                color = QadbColors.textPrimary,
-                fontSize = UiTokens.TextBodyLarge
+                modifier = Modifier.widthIn(max = 680.dp)
             )
         }
     }
@@ -752,24 +1298,23 @@ private fun AgentMessageBubble(message: AgentMessage) {
 
 @Composable
 private fun QuickPromptRow(
-    enabled: Boolean,
-    onPrompt: (String) -> Unit
+    canSubmit: (String) -> Boolean,
+    onPrompt: (String) -> Unit,
+    modifier: Modifier = Modifier
 ) {
     val quickPrompts = listOf(
-        Triple(Res.string.agent_quick_wechat, Res.string.agent_prompt_wechat, IconParkIcons.Send),
         Triple(Res.string.agent_quick_settings, Res.string.agent_prompt_settings, IconParkIcons.Setting),
-        Triple(Res.string.agent_quick_recognize, Res.string.agent_prompt_recognize, IconParkIcons.Search),
-        Triple(Res.string.agent_quick_camera, Res.string.agent_prompt_camera, IconParkIcons.Camera),
-        Triple(Res.string.agent_quick_clear_cache, Res.string.agent_prompt_clear_cache, IconParkIcons.StorageCard)
+        Triple(Res.string.agent_quick_recognize, Res.string.agent_prompt_recognize, IconParkIcons.Search)
     )
     Row(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
-            .padding(bottom = UiTokens.SpaceSmall),
-        horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
+            .padding(horizontal = UiTokens.SpaceSmall),
+        horizontalArrangement = Arrangement.Center
     ) {
         quickPrompts.forEach { (label, prompt, icon) ->
             val promptText = stringResource(prompt)
+            val enabled = canSubmit(promptText)
             Surface(
                 modifier = Modifier
                     .height(30.dp)
@@ -798,17 +1343,14 @@ private fun AgentComposer(
     running: Boolean,
     configurationReady: Boolean,
     connected: Boolean,
+    requiresProvider: Boolean,
+    requiresDevice: Boolean,
     observationMode: AgentObservationMode,
-    memoryEnabled: Boolean,
-    memoryHitCount: Int,
     totalTokens: Int,
     compactionCount: Int,
-    savedMemoryCount: Int,
     onSend: () -> Unit,
-    onQuickPrompt: (String) -> Unit,
     onNewTask: () -> Unit,
-    onCancel: () -> Unit,
-    onOpenMemory: () -> Unit
+    onCancel: () -> Unit
 ) {
     var focused by remember { mutableStateOf(false) }
     val composerShape = RoundedCornerShape(20.dp)
@@ -818,20 +1360,21 @@ private fun AgentComposer(
         QadbColors.border
     }
     val statusText = when {
-        !configurationReady -> stringResource(Res.string.agent_composer_waiting_model)
-        !connected -> stringResource(Res.string.agent_composer_waiting_device)
         running -> stringResource(Res.string.agent_running)
+        requiresProvider && !configurationReady -> stringResource(Res.string.agent_composer_waiting_model)
+        requiresDevice && !connected -> stringResource(Res.string.agent_composer_waiting_device)
         observationMode == AgentObservationMode.TEXT_ONLY -> stringResource(Res.string.agent_text_mode)
         else -> stringResource(Res.string.agent_vision_mode)
     }
     val statusColor = when {
         running -> QadbColors.primary
-        configurationReady && connected -> QadbColors.success
+        (!requiresProvider || configurationReady) && (!requiresDevice || connected) -> QadbColors.success
         else -> QadbColors.textTertiary
     }
 
     Surface(
         modifier = Modifier
+            .widthIn(max = 760.dp)
             .fillMaxWidth()
             .padding(bottom = UiTokens.SpaceMedium)
             .shadow(
@@ -863,7 +1406,7 @@ private fun AgentComposer(
                 cursorBrush = SolidColor(QadbColors.primary),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(min = 68.dp, max = 138.dp)
+                    .heightIn(min = 48.dp, max = 138.dp)
                     .onFocusChanged { focused = it.isFocused }
                     .onPreviewKeyEvent { event ->
                         if (
@@ -895,11 +1438,6 @@ private fun AgentComposer(
                 }
             )
 
-            QuickPromptRow(
-                enabled = !running && configurationReady && connected,
-                onPrompt = onQuickPrompt
-            )
-
             BoxWithConstraints(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -928,34 +1466,6 @@ private fun AgentComposer(
                             text = stringResource(Res.string.agent_new_task),
                             color = if (running) QadbColors.textDisabled else QadbColors.textPrimary,
                             fontSize = UiTokens.TextBody
-                        )
-                    }
-
-                    Surface(
-                        modifier = Modifier.clickable(onClick = onOpenMemory),
-                        shape = RoundedCornerShape(UiTokens.BadgeRadius),
-                        color = if (memoryEnabled) {
-                            QadbColors.primaryContainer
-                        } else {
-                            QadbColors.surfaceVariant
-                        }
-                    ) {
-                        Text(
-                            text = when {
-                                savedMemoryCount > 0 -> stringResource(
-                                    Res.string.agent_saved_memory,
-                                    savedMemoryCount
-                                )
-                                memoryEnabled -> stringResource(
-                                    Res.string.agent_memory_status,
-                                    memoryHitCount
-                                )
-                                else -> stringResource(Res.string.agent_memory_off)
-                            },
-                            modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp),
-                            color = if (memoryEnabled) QadbColors.primary else QadbColors.textTertiary,
-                            fontSize = 11.sp,
-                            maxLines = 1
                         )
                     }
 
@@ -1131,6 +1641,7 @@ private fun DevicePreviewPanel(
 private fun actionDisplayName(action: AgentAction): String = when (action) {
     AgentAction.Observe -> stringResource(Res.string.agent_action_observe)
     is AgentAction.FindApp -> stringResource(Res.string.agent_action_find_app, action.query)
+    is AgentAction.OpenApp -> stringResource(Res.string.agent_action_launch, action.query)
     is AgentAction.Tap -> stringResource(Res.string.agent_action_tap, action.x, action.y)
     is AgentAction.TapElement -> stringResource(Res.string.agent_action_tap_element, action.elementId)
     is AgentAction.Swipe -> stringResource(Res.string.agent_action_swipe)

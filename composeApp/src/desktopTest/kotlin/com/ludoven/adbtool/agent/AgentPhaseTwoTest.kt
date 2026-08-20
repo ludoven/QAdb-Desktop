@@ -8,6 +8,21 @@ import kotlin.test.assertTrue
 
 class AgentPhaseTwoTest {
     @Test
+    fun `selector keeps exact text when a repeated resource id is available`() {
+        val selector = SelectorResolver.from(
+            node(
+                resourceId = "com.tencent.mm:id/odf",
+                text = "奶娃",
+                role = "TextView"
+            )
+        )
+
+        assertEquals("com.tencent.mm:id/odf", selector.resourceId)
+        assertEquals(listOf("奶娃"), selector.textAny)
+        assertEquals("TextView", selector.role)
+    }
+
+    @Test
     fun `default task budget supports multi step execution`() {
         val budget = AgentBudget()
         assertEquals(16, budget.maxModelCalls)
@@ -62,6 +77,35 @@ class AgentPhaseTwoTest {
     }
 
     @Test
+    fun `disabled task budget keeps recording usage without blocking requests`() {
+        val tracker = AgentBudgetTracker(
+            AgentBudget(
+                maxModelCalls = 1,
+                maxInputTokens = 1,
+                maxOutputTokens = 1,
+                maxVisionCalls = 0,
+                maxReplans = 0,
+                enforceLimits = false
+            )
+        )
+
+        repeat(3) {
+            assertTrue(tracker.canRequest(includeVision = true, isReplan = true))
+            tracker.record(
+                AgentUsage(promptTokens = 10, completionTokens = 10, totalTokens = 20),
+                usedVision = true,
+                isReplan = true
+            )
+        }
+
+        assertEquals(3, tracker.current().modelCalls)
+        assertEquals(60, tracker.current().usage.totalTokens)
+        assertEquals(AgentBudgetMode.NORMAL, tracker.current().mode)
+        assertEquals(0, tracker.current().modelCallLimit)
+        assertEquals(null, tracker.current().stopReason)
+    }
+
+    @Test
     fun `cached selector only becomes reusable after proven success`() {
         val cached = CachedSelector("page", "send", Selector(textAny = listOf("Send")), successCount = 3)
         assertTrue(cached.reusable())
@@ -73,9 +117,14 @@ class AgentPhaseTwoTest {
         uiNodes = listOf(node("volatile", text, "app:id/action"))
     )
 
-    private fun node(id: String, text: String, resourceId: String) = UiNodeSnapshot(
-        elementId = id, text = text, contentDescription = "", className = "Button", packageName = "app",
+    private fun node(
+        id: String = "element",
+        text: String,
+        resourceId: String,
+        role: String = "button"
+    ) = UiNodeSnapshot(
+        elementId = id, text = text, contentDescription = "", className = role, packageName = "app",
         bounds = UiBounds(0, 0, 20, 20), clickable = true, editable = false, enabled = true, password = false,
-        resourceId = resourceId, role = "button"
+        resourceId = resourceId, role = role
     )
 }

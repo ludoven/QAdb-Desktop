@@ -191,6 +191,7 @@ fun HomeScreen(
     onOpenFileManager: () -> Unit = {},
     onOpenAppManager: () -> Unit = {},
     onOpenDiagnostics: () -> Unit = {},
+    onOpenWirelessConnection: () -> Unit = {},
     onOpenAppDetails: (String) -> Unit = {}
 ) {
     val devices by viewModel.devices.collectAsState()
@@ -384,6 +385,7 @@ fun HomeScreen(
                         compactLayout = compactLayout,
                         relativeUpdated = relativeUpdated,
                         isLoading = isLoading,
+                        onOpenWirelessConnection = onOpenWirelessConnection,
                         onRefresh = { viewModel.refreshDevices() }
                     )
                 }
@@ -551,6 +553,7 @@ private fun EmptyDeviceStatePanel(
     compactLayout: Boolean,
     relativeUpdated: String,
     isLoading: Boolean,
+    onOpenWirelessConnection: () -> Unit,
     onRefresh: () -> Unit
 ) {
     GlassCard(
@@ -576,6 +579,7 @@ private fun EmptyDeviceStatePanel(
                         compactLayout = true,
                         relativeUpdated = relativeUpdated,
                         isLoading = isLoading,
+                        onOpenWirelessConnection = onOpenWirelessConnection,
                         onRefresh = onRefresh
                     )
                     EmptyConnectGuidePanel(
@@ -594,6 +598,7 @@ private fun EmptyDeviceStatePanel(
                         compactLayout = false,
                         relativeUpdated = relativeUpdated,
                         isLoading = isLoading,
+                        onOpenWirelessConnection = onOpenWirelessConnection,
                         onRefresh = onRefresh
                     )
                     EmptyConnectGuidePanel(
@@ -611,6 +616,7 @@ private fun EmptyDeviceHero(
     compactLayout: Boolean,
     relativeUpdated: String,
     isLoading: Boolean,
+    onOpenWirelessConnection: () -> Unit,
     onRefresh: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -624,6 +630,7 @@ private fun EmptyDeviceHero(
         EmptyDeviceActions(
             compactLayout = compactLayout,
             isLoading = isLoading,
+            onOpenWirelessConnection = onOpenWirelessConnection,
             onRefresh = onRefresh
         )
     }
@@ -697,14 +704,23 @@ private fun EmptyDeviceIllustration() {
 private fun EmptyDeviceActions(
     compactLayout: Boolean,
     isLoading: Boolean,
+    onOpenWirelessConnection: () -> Unit,
     onRefresh: () -> Unit
 ) {
     if (compactLayout) {
         Column(verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)) {
             EmptyDeviceActionButton(
+                text = stringResource(Res.string.wireless_open_action),
+                icon = IconParkIcons.Wifi,
+                primary = true,
+                enabled = true,
+                onClick = onOpenWirelessConnection,
+                modifier = Modifier.width(220.dp)
+            )
+            EmptyDeviceActionButton(
                 text = stringResource(Res.string.refresh),
                 icon = IconParkIcons.Refresh,
-                primary = true,
+                primary = false,
                 enabled = !isLoading,
                 onClick = onRefresh,
                 modifier = Modifier.width(220.dp)
@@ -713,9 +729,17 @@ private fun EmptyDeviceActions(
     } else {
         Row(horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium)) {
             EmptyDeviceActionButton(
+                text = stringResource(Res.string.wireless_open_action),
+                icon = IconParkIcons.Wifi,
+                primary = true,
+                enabled = true,
+                onClick = onOpenWirelessConnection,
+                modifier = Modifier.width(180.dp)
+            )
+            EmptyDeviceActionButton(
                 text = stringResource(Res.string.refresh),
                 icon = IconParkIcons.Refresh,
-                primary = true,
+                primary = false,
                 enabled = !isLoading,
                 onClick = onRefresh,
                 modifier = Modifier.width(180.dp)

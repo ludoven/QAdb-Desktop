@@ -32,14 +32,13 @@ class UiHierarchyParser {
         }.getOrNull() ?: return ParsedUiHierarchy(emptyList(), "<unavailable/>")
 
         val snapshots = mutableListOf<UiNodeSnapshot>()
-        walk(document.documentElement) { element ->
+        walk(document.documentElement, emptyList()) { element, ancestors ->
             if (snapshots.size >= MAX_UI_NODES) return@walk
             val bounds = parseBounds(element.getAttribute("bounds")) ?: return@walk
             if (!bounds.isVisibleWithin(screenWidth, screenHeight)) return@walk
             val enabled = element.booleanAttribute("enabled", default = true)
             val clickable = element.booleanAttribute("clickable")
-            val editable = element.getAttribute("class").contains("EditText", ignoreCase = true) ||
-                element.booleanAttribute("focusable") && element.booleanAttribute("focused")
+            val editable = element.isEditableControl()
             val password = element.booleanAttribute("password") ||
                 element.getAttribute("class").contains("Password", ignoreCase = true)
             val rawText = element.getAttribute("text").cleanUiValue()
@@ -59,7 +58,9 @@ class UiHierarchyParser {
                 resourceId = element.getAttribute("resource-id").cleanUiValue().take(MAX_RESOURCE_ID_CHARS),
                 role = element.agentRole(clickable, editable),
                 selected = element.booleanAttribute("selected"),
-                checked = element.booleanAttribute("checked")
+                checked = element.booleanAttribute("checked"),
+                ancestorResourceIds = ancestors.mapNotNull { it.resourceId.takeIf(String::isNotBlank) }.takeLast(MAX_ANCESTOR_DEPTH),
+                ancestorRoles = ancestors.mapNotNull { it.role.takeIf(String::isNotBlank) }.takeLast(MAX_ANCESTOR_DEPTH)
             )
         }
         val compact = snapshots.joinToString("\n") { node ->
@@ -86,13 +87,31 @@ class UiHierarchyParser {
         return ParsedUiHierarchy(snapshots, compact)
     }
 
-    private fun walk(node: Node?, visit: (Element) -> Unit) {
+    private fun walk(
+        node: Node?,
+        ancestors: List<UiAncestor>,
+        visit: (Element, List<UiAncestor>) -> Unit
+    ) {
         if (node == null) return
-        if (node is Element && node.tagName == "node") visit(node)
+        val nextAncestors = if (node is Element && node.tagName == "node") {
+            visit(node, ancestors)
+            val clickable = node.booleanAttribute("clickable")
+            val editable = node.isEditableControl()
+            ancestors + UiAncestor(
+                resourceId = node.getAttribute("resource-id").cleanUiValue().take(MAX_RESOURCE_ID_CHARS),
+                role = node.agentRole(clickable, editable)
+            )
+        } else {
+            ancestors
+        }
         val children = node.childNodes
-        for (index in 0 until children.length) walk(children.item(index), visit)
+        for (index in 0 until children.length) walk(children.item(index), nextAncestors, visit)
     }
 }
+
+private data class UiAncestor(val resourceId: String, val role: String)
+
+private val EDITABLE_CLASS_MARKERS = listOf("EditText", "AutoCompleteTextView", "TextInputEditText")
 
 private fun Element.booleanAttribute(name: String, default: Boolean = false): Boolean =
     getAttribute(name).let {
@@ -102,6 +121,12 @@ private fun Element.booleanAttribute(name: String, default: Boolean = false): Bo
             else -> default
         }
     }
+
+private fun Element.isEditableControl(): Boolean {
+    if (booleanAttribute("editable")) return true
+    val className = getAttribute("class")
+    return EDITABLE_CLASS_MARKERS.any { marker -> className.contains(marker, ignoreCase = true) }
+}
 
 private fun Element.agentRole(clickable: Boolean, editable: Boolean): String = when {
     editable -> "text_field"
@@ -137,3 +162,4 @@ private const val MAX_UI_VALUE_CHARS = 160
 private const val MAX_CLASS_CHARS = 80
 private const val MAX_RESOURCE_ID_CHARS = 200
 private const val MAX_PACKAGE_CHARS = 160
+private const val MAX_ANCESTOR_DEPTH = 6

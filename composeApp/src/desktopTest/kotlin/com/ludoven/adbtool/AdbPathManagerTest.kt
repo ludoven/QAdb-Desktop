@@ -1,7 +1,11 @@
 package com.ludoven.adbtool
 
 import com.ludoven.adbtool.util.AdbPathManager
+import com.ludoven.adbtool.util.AdbProcessTimeoutContext
 import java.io.File
+import java.nio.file.Files
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -76,5 +80,27 @@ class AdbPathManagerTest {
             File(root, "scrcpy/adb.exe").absolutePath,
             AdbPathManager.resolvePackagedAdbPath(root, "Windows 11")?.absolutePath
         )
+    }
+
+    @Test
+    fun adbValidationCannotOutliveThePropagatedAgentDeadline() = runBlocking {
+        if (System.getProperty("os.name").lowercase().contains("windows")) return@runBlocking
+        val directory = Files.createTempDirectory("qadb-slow-adb").toFile().also(File::deleteOnExit)
+        val executable = File(directory, "adb").also { file ->
+            file.writeText("#!/bin/sh\nsleep 2\necho 'Android Debug Bridge version test'\n")
+            assertTrue(file.setExecutable(true))
+            file.deleteOnExit()
+        }
+        val validate = AdbPathManager::class.java
+            .getDeclaredMethod("validateAdb", String::class.java)
+            .also { it.isAccessible = true }
+
+        val startedAtNanos = System.nanoTime()
+        withContext(AdbProcessTimeoutContext.asContextElement(75L)) {
+            validate.invoke(AdbPathManager, executable.absolutePath)
+        }
+        val elapsedMillis = (System.nanoTime() - startedAtNanos) / 1_000_000L
+
+        assertTrue(elapsedMillis < 1_000L, "validation took ${elapsedMillis}ms")
     }
 }

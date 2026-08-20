@@ -1,3 +1,4 @@
+import java.io.File
 import org.gradle.api.DefaultTask
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.file.RegularFileProperty
@@ -72,6 +73,33 @@ abstract class RenameWindowsPackageFilesTask : DefaultTask() {
     }
 }
 
+abstract class VerifyHelperReleaseSigningTask : DefaultTask() {
+    init {
+        outputs.upToDateWhen { false }
+    }
+
+    @TaskAction
+    fun verify() {
+        val requiredVariables = listOf(
+            "QADB_HELPER_KEYSTORE",
+            "QADB_HELPER_STORE_PASSWORD",
+            "QADB_HELPER_KEY_PASSWORD",
+            "QADB_HELPER_KEY_ALIAS"
+        )
+        val missingVariables = requiredVariables.filter { System.getenv(it).isNullOrBlank() }
+        if (missingVariables.isNotEmpty()) {
+            throw GradleException(
+                "Release packaging requires helper signing variables: ${missingVariables.joinToString()}."
+            )
+        }
+
+        val keystore = File(requireNotNull(System.getenv("QADB_HELPER_KEYSTORE")))
+        if (!keystore.isFile) {
+            throw GradleException("QADB helper release keystore does not exist: ${keystore.absolutePath}")
+        }
+    }
+}
+
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
     alias(libs.plugins.composeMultiplatform)
@@ -96,6 +124,10 @@ val agentImeReleaseSigningReady = listOf(
     "QADB_HELPER_KEY_ALIAS"
 ).all { !System.getenv(it).isNullOrBlank() }
 val agentImeVariant = if (agentImeReleaseSigningReady) "release" else "debug"
+val verifyHelperReleaseSigning = tasks.register<VerifyHelperReleaseSigningTask>("verifyHelperReleaseSigning") {
+    group = "verification"
+    description = "Fails release packaging unless both bundled Android helpers can use the stable release signing key."
+}
 val generateDesktopAppVersion = tasks.register<GenerateAppVersionTask>("generateDesktopAppVersion") {
     versionName.set(appVersion)
     outputFile.set(generatedVersionSourceDir.map { it.file("com/ludoven/adbtool/AppVersion.kt") })
@@ -224,13 +256,22 @@ tasks.withType<KotlinCompile>().configureEach {
     }
 }
 tasks.withType<Test>().configureEach {
-    listOf("qadb.agent.device", "qadb.agent.realModelDevice").forEach { propertyName ->
+    listOf(
+        "qadb.agent.device",
+        "qadb.agent.realModelDevice",
+        "qadb.agent.realV2ReadDevice"
+    ).forEach { propertyName ->
         System.getProperty(propertyName)?.let { systemProperty(propertyName, it) }
     }
 }
 tasks.matching { it.name == "desktopProcessResources" || it.name == "processDesktopMainResources" }.configureEach {
     dependsOn(syncIconHelperResource)
     dependsOn(syncAgentImeResource)
+}
+tasks.matching {
+    it.name.startsWith("packageRelease") || it.name == "createReleaseDistributable"
+}.configureEach {
+    dependsOn(verifyHelperReleaseSigning)
 }
 listOf(
     "packageMsi",

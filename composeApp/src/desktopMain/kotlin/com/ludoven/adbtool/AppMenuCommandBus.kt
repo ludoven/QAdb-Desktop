@@ -6,7 +6,7 @@ import kotlinx.coroutines.flow.asSharedFlow
 
 sealed interface AppMenuCommand {
     data class Navigate(val route: String) : AppMenuCommand
-    data class ConnectDevice(val address: String) : AppMenuCommand
+    data object OpenWirelessConnection : AppMenuCommand
 
     data object RefreshDevices : AppMenuCommand
     data object RebootDevice : AppMenuCommand

@@ -89,7 +89,7 @@ class AiAgentCoreTest {
     @Test
     fun `action validation checks coordinates package names and text length`() {
         val observation = observation()
-        assertTrue(validateAgentAction(AgentAction.Tap(10, 20), observation).isSuccess)
+        assertTrue(validateAgentAction(AgentAction.Tap(10, 20, observation.observationId), observation).isSuccess)
         assertTrue(validateAgentAction(AgentAction.Tap(1080, 20), observation).isFailure)
         assertTrue(validateAgentAction(AgentAction.LaunchPackage("com.example.app"), observation).isSuccess)
         assertTrue(validateAgentAction(AgentAction.LaunchPackage("bad package"), observation).isFailure)
@@ -115,6 +115,9 @@ class AiAgentCoreTest {
         assertContains(serialized, "\"tool_choice\":\"auto\"")
         assertContains(serialized, "data:image/png;base64,AQID")
         assertContains(serialized, "\"clear_app_data\"")
+        assertContains(serialized, "\"open_app\"")
+        assertContains(serialized, "Kotlin applies the final action policy")
+        assertContains(serialized, "Never ask the user for confirmation in prose")
         assertFalse(serialized.contains("api-key"))
     }
 
@@ -128,6 +131,10 @@ class AiAgentCoreTest {
             )
         )
         assertEquals(AgentAction.Tap(120, 340), action)
+        assertEquals(
+            AgentAction.OpenApp("微信"),
+            client.parseSingleAction(response("open_app", """{"query":"微信"}"""))
+        )
 
         assertFailsWith<ModelProtocolException> {
             client.parseSingleAction(
@@ -139,6 +146,50 @@ class AiAgentCoreTest {
         assertFailsWith<ModelProtocolException> {
             client.parseSingleAction(response("tap", """{"x":"bad","y":2}"""))
         }
+    }
+
+    @Test
+    fun `intent classifier can select one deterministic open app operation`() {
+        val classification = OpenAiCompatibleClient().parseIntentClassification(
+            response(
+                "classify_task_intent",
+                """{
+                    "intent_kind":"DEVICE_OPERATION",
+                    "required_status_fields":[],
+                    "requires_device_evidence":true,
+                    "explicit_operation":true,
+                    "clarification_question":"",
+                    "app_query":"",
+                    "system_probe_id":"",
+                    "direct_response":"",
+                    "direct_operation":"OPEN_APP",
+                    "operation_target":"微信"
+                }""".trimIndent()
+            )
+        )
+
+        assertEquals(AgentDirectOperation.OPEN_APP, classification.directOperation)
+        assertEquals("微信", classification.operationTarget)
+
+        val messagingClassification = OpenAiCompatibleClient().parseIntentClassification(
+            response(
+                "classify_task_intent",
+                """{
+                    "intent_kind":"DEVICE_OPERATION",
+                    "required_status_fields":[],
+                    "requires_device_evidence":true,
+                    "explicit_operation":true,
+                    "clarification_question":"",
+                    "app_query":"",
+                    "system_probe_id":"",
+                    "direct_response":"",
+                    "direct_operation":"",
+                    "operation_target":"",
+                    "operation_app_target":"微信"
+                }""".trimIndent()
+            )
+        )
+        assertEquals("微信", messagingClassification.operationAppTarget)
     }
 
     @Test

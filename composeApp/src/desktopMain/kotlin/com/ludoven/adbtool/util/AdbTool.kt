@@ -6,8 +6,38 @@ import java.util.concurrent.CompletableFuture
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ThreadContextElement
+import kotlinx.coroutines.asContextElement
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+
+internal object AdbProcessTimeoutContext {
+    private val deadlineNanos = ThreadLocal<Long?>()
+
+    fun asContextElement(timeoutMillis: Long): ThreadContextElement<Long?> {
+        val requestedDeadline = saturatedAdd(
+            System.nanoTime(),
+            TimeUnit.MILLISECONDS.toNanos(timeoutMillis.coerceAtLeast(1L))
+        )
+        val inheritedDeadline = deadlineNanos.get()
+        return deadlineNanos.asContextElement(
+            inheritedDeadline?.let { minOf(it, requestedDeadline) } ?: requestedDeadline
+        )
+    }
+
+    fun clampTimeoutMillis(requestedMillis: Long): Long {
+        val deadline = deadlineNanos.get() ?: return requestedMillis.coerceAtLeast(0L)
+        val remainingNanos = (deadline - System.nanoTime()).coerceAtLeast(0L)
+        val remainingMillis = TimeUnit.NANOSECONDS.toMillis(remainingNanos) +
+            if (remainingNanos % NANOS_PER_MILLISECOND == 0L) 0L else 1L
+        return minOf(requestedMillis.coerceAtLeast(0L), remainingMillis)
+    }
+
+    private fun saturatedAdd(left: Long, right: Long): Long =
+        if (right > 0L && left > Long.MAX_VALUE - right) Long.MAX_VALUE else left + right
+
+    private const val NANOS_PER_MILLISECOND = 1_000_000L
+}
 
 /**
  * ADB工具类，提供统一的ADB命令执行接口
@@ -123,6 +153,10 @@ object AdbTool {
         timeoutMillis: Long,
         outputDrainTimeoutMillis: Long = OUTPUT_DRAIN_TIMEOUT_MS
     ): AdbResult {
+        val effectiveTimeoutMillis = AdbProcessTimeoutContext.clampTimeoutMillis(timeoutMillis)
+        if (effectiveTimeoutMillis <= 0L) {
+            return AdbResult(false, "", "Command timed out before it could start")
+        }
         return try {
             val fullCmd = mutableListOf(adbPath).apply { addAll(args) }
             val process = ProcessBuilder(fullCmd).redirectErrorStream(true).start()
@@ -131,18 +165,28 @@ object AdbTool {
                 process.inputStream.bufferedReader().use { it.readText() }
             }
             try {
-                val completed = process.waitFor(timeoutMillis, TimeUnit.MILLISECONDS)
+                val waitTimeoutMillis = AdbProcessTimeoutContext.clampTimeoutMillis(
+                    effectiveTimeoutMillis
+                )
+                val completed = waitTimeoutMillis > 0L &&
+                    process.waitFor(waitTimeoutMillis, TimeUnit.MILLISECONDS)
                 if (!completed) {
                     process.destroyForcibly()
-                    val partialOutput = drainProcessOutput(outputFuture, outputDrainTimeoutMillis).trim()
+                    val partialOutput = drainProcessOutput(
+                        outputFuture,
+                        AdbProcessTimeoutContext.clampTimeoutMillis(outputDrainTimeoutMillis)
+                    ).trim()
                     return AdbResult(
                         success = false,
                         output = partialOutput,
-                        errorMessage = "Command timed out after ${timeoutMillis}ms"
+                        errorMessage = "Command timed out after ${waitTimeoutMillis}ms"
                     )
                 }
 
-                val output = drainProcessOutput(outputFuture, outputDrainTimeoutMillis).trim()
+                val output = drainProcessOutput(
+                    outputFuture,
+                    AdbProcessTimeoutContext.clampTimeoutMillis(outputDrainTimeoutMillis)
+                ).trim()
                 val exitCode = process.exitValue()
                 if (exitCode == 0) {
                     AdbResult(true, output)
@@ -1070,6 +1114,16 @@ object AdbTool {
      */
     suspend fun disconnectDevice(deviceId: String): AdbResult {
         return executeCommand("disconnect", deviceId)
+    }
+
+    /** Connects to a device that already trusts this ADB host. */
+    suspend fun connectDevice(endpoint: String): AdbResult {
+        return executeCommand("connect", endpoint)
+    }
+
+    /** Pairs this ADB host with an Android 11+ wireless debugging endpoint. */
+    suspend fun pairDevice(endpoint: String, pairingCode: String): AdbResult {
+        return executeCommand("pair", endpoint, pairingCode)
     }
 
 }

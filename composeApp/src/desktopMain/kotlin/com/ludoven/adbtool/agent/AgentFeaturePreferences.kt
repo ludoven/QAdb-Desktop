@@ -11,6 +11,8 @@ class AgentFeaturePreferences(
 ) {
     private val _enabled = MutableStateFlow(preferences.getBoolean(KEY_ENABLED, false))
     val enabled: StateFlow<Boolean> = _enabled.asStateFlow()
+    private val _reduceMotion = MutableStateFlow(preferences.getBoolean(KEY_REDUCE_MOTION, false))
+    val reduceMotion: StateFlow<Boolean> = _reduceMotion.asStateFlow()
 
     fun setEnabled(enabled: Boolean) {
         preferences.putBoolean(KEY_ENABLED, enabled)
@@ -18,8 +20,15 @@ class AgentFeaturePreferences(
         _enabled.value = enabled
     }
 
+    fun setReduceMotion(reduceMotion: Boolean) {
+        preferences.putBoolean(KEY_REDUCE_MOTION, reduceMotion)
+        preferences.flush()
+        _reduceMotion.value = reduceMotion
+    }
+
     private companion object {
         const val KEY_ENABLED = "agent.feature.enabled"
+        const val KEY_REDUCE_MOTION = "agent.reduce_motion"
     }
 }
 

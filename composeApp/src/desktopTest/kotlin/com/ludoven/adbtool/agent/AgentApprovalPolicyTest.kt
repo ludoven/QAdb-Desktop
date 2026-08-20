@@ -19,21 +19,37 @@ class AgentApprovalPolicyTest {
     }
 
     @Test
-    fun `smart approval still prompts for explicit external and destructive actions`() {
+    fun `smart approval allows routine actions and prompts only for destructive data changes`() {
         val evaluator = AgentRiskEvaluator(preferences(AgentApprovalPolicy.SMART))
         val sendObservation = observation("发送", "send")
 
-        assertPrompt(evaluator.evaluate(AgentAction.TapElement(sendObservation.observationId, "target"), sendObservation))
-        val clearDataObservation = observation("清除数据", "clear data")
-        assertPrompt(evaluator.evaluate(AgentAction.TapElement(clearDataObservation.observationId, "target"), clearDataObservation))
-        assertPrompt(evaluator.evaluate(
+        assertSafe(evaluator.evaluate(AgentAction.TapElement(sendObservation.observationId, "target"), sendObservation))
+        assertSafe(evaluator.evaluate(
+            AgentAction.LaunchPackage(
+                "com.tencent.mm",
+                AgentActionMeta(
+                    intent = "打开微信以发送消息",
+                    target = "微信",
+                    operationKind = AgentOperationKind.SEND
+                )
+            ),
+            observation()
+        ))
+        assertSafe(evaluator.evaluate(
             AgentAction.Tap(10, 10, meta = AgentActionMeta(operationKind = AgentOperationKind.PERMISSION)),
             observation()
         ))
-        assertPrompt(evaluator.evaluate(AgentAction.ForceStopPackage("com.example.app"), observation()))
+        assertSafe(evaluator.evaluate(AgentAction.ForceStopPackage("com.example.app"), observation()))
+        assertSafe(evaluator.evaluate(AgentAction.RebootDevice, observation()))
+
+        val clearDataObservation = observation("清除数据", "clear data")
+        assertPrompt(evaluator.evaluate(AgentAction.TapElement(clearDataObservation.observationId, "target"), clearDataObservation))
+        assertPrompt(evaluator.evaluate(
+            AgentAction.Tap(10, 10, meta = AgentActionMeta(operationKind = AgentOperationKind.DELETE)),
+            observation()
+        ))
         assertPrompt(evaluator.evaluate(AgentAction.ClearAppData("com.example.app"), observation()))
         assertPrompt(evaluator.evaluate(AgentAction.UninstallPackage("com.example.app"), observation()))
-        assertPrompt(evaluator.evaluate(AgentAction.RebootDevice, observation()))
         assertPrompt(evaluator.evaluate(AgentAction.InputText("你好"), observation(), "Installing the local Unicode input helper requires approval"))
     }
 

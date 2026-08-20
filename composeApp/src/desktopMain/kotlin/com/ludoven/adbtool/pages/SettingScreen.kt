@@ -20,6 +20,8 @@ import adbtool_desktop.composeapp.generated.resources.ai_agent_beta_disabled_des
 import adbtool_desktop.composeapp.generated.resources.ai_agent_beta_enabled_desc
 import adbtool_desktop.composeapp.generated.resources.ai_agent_beta_settings
 import adbtool_desktop.composeapp.generated.resources.ai_agent_beta_title
+import adbtool_desktop.composeapp.generated.resources.ai_agent_reduce_motion_desc
+import adbtool_desktop.composeapp.generated.resources.ai_agent_reduce_motion_title
 import adbtool_desktop.composeapp.generated.resources.ai_hide_key
 import adbtool_desktop.composeapp.generated.resources.ai_key_cleared
 import adbtool_desktop.composeapp.generated.resources.ai_model_configured
@@ -184,18 +186,19 @@ import com.ludoven.adbtool.AppVersion
 import com.ludoven.adbtool.entity.MsgContent
 import com.ludoven.adbtool.agent.AiConfiguration
 import com.ludoven.adbtool.agent.AgentProviderRuntime
+import com.ludoven.adbtool.agent.AgentCapabilityProbe
+import com.ludoven.adbtool.agent.AgentCapabilityReport
+import com.ludoven.adbtool.agent.AgentCapabilityTier
+import com.ludoven.adbtool.agent.AgentModelRole
 import com.ludoven.adbtool.agent.AiModelConfig
 import com.ludoven.adbtool.agent.AgentInputHelper
 import com.ludoven.adbtool.agent.AgentInputHelperStatus
 import com.ludoven.adbtool.agent.AgentApprovalPolicy
 import com.ludoven.adbtool.agent.AgentApprovalRuntime
 import com.ludoven.adbtool.agent.AgentFeatureRuntime
-import com.ludoven.adbtool.agent.AgentMemory
-import com.ludoven.adbtool.agent.AgentMemoryRuntime
-import com.ludoven.adbtool.agent.AgentMemoryStats
-import com.ludoven.adbtool.agent.OpenAiCompatibleClient
 import com.ludoven.adbtool.agent.VisionMode
 import com.ludoven.adbtool.ui.icons.CompatIconVectors
+import com.ludoven.adbtool.util.l10n
 import com.ludoven.adbtool.ui.mac.AlertDialog
 import com.ludoven.adbtool.ui.mac.Button
 import com.ludoven.adbtool.ui.mac.ButtonDefaults
@@ -398,6 +401,13 @@ fun SettingScreen(selectedDeviceId: String? = null) {
                 subtitle = stringResource(Res.string.settings_subtitle)
             )
 
+            val agentFeaturePreferences = remember { AgentFeatureRuntime.preferences }
+            val agentFeatureEnabled by agentFeaturePreferences.enabled.collectAsState()
+            AgentFeatureSettingsSection(
+                enabled = agentFeatureEnabled,
+                onEnabledChange = agentFeaturePreferences::setEnabled
+            )
+
             SettingsColumns(
                 mainContent = {
                     SettingsSection(title = stringResource(Res.string.preferences_setting)) {
@@ -476,17 +486,6 @@ fun SettingScreen(selectedDeviceId: String? = null) {
                         )
                     }
 
-                    Box {
-                        Column(verticalArrangement = Arrangement.spacedBy(UiTokens.SectionSpacing)) {
-                            val agentFeatureEnabled = AgentFeatureSettingsSection()
-                            if (agentFeatureEnabled) {
-                                AiModelSettingsSection()
-                                AiMemorySettingsSection()
-                                AgentApprovalSettingsSection()
-                                AgentInputHelperSettingsSection(selectedDeviceId)
-                            }
-                        }
-                    }
                 },
                 sideContent = {
                     val adbSettingsContent: @Composable () -> Unit = {
@@ -697,6 +696,10 @@ fun SettingScreen(selectedDeviceId: String? = null) {
                     adbSettingsContent()
                 }
             )
+
+            if (agentFeatureEnabled) {
+                AiModelSettingsSection()
+            }
         }
     }
 
@@ -726,10 +729,10 @@ private fun SettingsColumns(
 }
 
 @Composable
-private fun AgentFeatureSettingsSection(): Boolean {
-    val preferences = remember { AgentFeatureRuntime.preferences }
-    val enabled by preferences.enabled.collectAsState()
-
+private fun AgentFeatureSettingsSection(
+    enabled: Boolean,
+    onEnabledChange: (Boolean) -> Unit
+) {
     SettingsSection(title = stringResource(Res.string.ai_agent_beta_settings)) {
         SettingSwitchRow(
             title = stringResource(Res.string.ai_agent_beta_title),
@@ -741,10 +744,9 @@ private fun AgentFeatureSettingsSection(): Boolean {
                 }
             ),
             checked = enabled,
-            onCheckedChange = preferences::setEnabled
+            onCheckedChange = onEnabledChange
         )
     }
-    return enabled
 }
 
 @Composable
@@ -803,348 +805,6 @@ private fun AgentApprovalSettingsSection() {
         }
     }
 }
-
-@Composable
-private fun AiMemorySettingsSection() {
-    val preferences = remember { AgentMemoryRuntime.preferences }
-    val enabled by preferences.enabled.collectAsState()
-    val coroutineScope = rememberCoroutineScope()
-    var stats by remember { mutableStateOf(AgentMemoryStats()) }
-    var memories by remember { mutableStateOf(emptyList<AgentMemory>()) }
-    var showConsent by remember { mutableStateOf(false) }
-    var showManager by remember { mutableStateOf(false) }
-    var showClearConfirmation by remember { mutableStateOf(false) }
-    var editingMemory by remember { mutableStateOf<AgentMemory?>(null) }
-    var statusMessage by remember { mutableStateOf<String?>(null) }
-
-    fun reload() {
-        coroutineScope.launch {
-            runCatching {
-                stats = AgentMemoryRuntime.store.stats()
-                memories = AgentMemoryRuntime.store.listActive()
-            }.onFailure { statusMessage = it.message }
-        }
-    }
-
-    LaunchedEffect(enabled, showManager) {
-        if (!preferences.needsConsent || enabled) reload()
-    }
-
-    SettingsSection(title = stringResource(Res.string.ai_memory_settings)) {
-        SettingSwitchRow(
-            title = stringResource(Res.string.ai_memory_title),
-            description = stringResource(
-                if (enabled) Res.string.ai_memory_enabled_desc else Res.string.ai_memory_disabled_desc
-            ),
-            checked = enabled,
-            onCheckedChange = { checked ->
-                if (checked && preferences.needsConsent) {
-                    showConsent = true
-                } else {
-                    preferences.setEnabled(checked)
-                }
-            }
-        )
-        SectionDivider()
-        SettingValueRow(
-            title = stringResource(Res.string.ai_memory_manage),
-            description = stringResource(Res.string.ai_memory_privacy),
-            value = stringResource(
-                Res.string.ai_memory_stats,
-                stats.activeCount,
-                stats.archivedCount,
-                stats.taskSummaryCount
-            )
-        )
-        ActionButtonRow {
-            SettingActionButton(
-                text = stringResource(Res.string.ai_memory_manage),
-                icon = CompatIconVectors.Edit,
-                onClick = {
-                    reload()
-                    showManager = true
-                }
-            )
-            SettingActionButton(
-                text = stringResource(Res.string.ai_memory_clear),
-                icon = CompatIconVectors.Delete,
-                onClick = { showClearConfirmation = true },
-                enabled = stats.activeCount + stats.archivedCount > 0
-            )
-        }
-        statusMessage?.let {
-            Text(
-                text = it,
-                modifier = Modifier.padding(horizontal = UiTokens.SpaceLarge),
-                color = SettingColors.Danger,
-                fontSize = UiTokens.TextBody
-            )
-        }
-    }
-
-    if (showConsent) {
-        AlertDialog(
-            onDismissRequest = { showConsent = false },
-            title = { Text(stringResource(Res.string.agent_memory_consent_title)) },
-            text = { Text(stringResource(Res.string.agent_memory_consent_desc)) },
-            confirmButton = {
-                Button(onClick = {
-                    preferences.acceptConsent()
-                    showConsent = false
-                    reload()
-                }) {
-                    Text(stringResource(Res.string.agent_memory_enable))
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = {
-                    preferences.declineConsent()
-                    showConsent = false
-                }) {
-                    Text(stringResource(Res.string.agent_memory_not_now))
-                }
-            }
-        )
-    }
-
-    if (showClearConfirmation) {
-        AlertDialog(
-            onDismissRequest = { showClearConfirmation = false },
-            title = { Text(stringResource(Res.string.ai_memory_clear_title)) },
-            text = { Text(stringResource(Res.string.ai_memory_clear_desc)) },
-            confirmButton = {
-                Button(onClick = {
-                    coroutineScope.launch {
-                        runCatching { AgentMemoryRuntime.store.clear() }
-                            .onFailure { statusMessage = it.message }
-                        showClearConfirmation = false
-                        reload()
-                    }
-                }) {
-                    Text(stringResource(Res.string.ai_memory_clear))
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showClearConfirmation = false }) {
-                    Text(stringResource(Res.string.cancel))
-                }
-            }
-        )
-    }
-
-    if (showManager) {
-        Dialog(onDismissRequest = { showManager = false }) {
-            Surface(
-                modifier = Modifier.width(680.dp).heightIn(max = 600.dp),
-                shape = RoundedCornerShape(UiTokens.RadiusLarge),
-                color = SettingColors.Surface,
-                border = BorderStroke(1.dp, SettingColors.Border)
-            ) {
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    DialogHeader(
-                        title = stringResource(Res.string.ai_memory_manage_title),
-                        onDismiss = { showManager = false }
-                    )
-                    HorizontalDivider(color = SettingColors.Divider)
-                    if (memories.isEmpty()) {
-                        Box(
-                            modifier = Modifier.fillMaxWidth().height(180.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                stringResource(Res.string.ai_memory_empty),
-                                color = SettingColors.Muted,
-                                fontSize = UiTokens.TextBody
-                            )
-                        }
-                    } else {
-                        LazyColumn(
-                            modifier = Modifier.fillMaxWidth().heightIn(max = 500.dp),
-                            contentPadding = PaddingValues(vertical = UiTokens.SpaceSmall)
-                        ) {
-                            items(memories, key = { it.id }) { memory ->
-                                MemoryRow(
-                                    memory = memory,
-                                    onEdit = { editingMemory = memory },
-                                    onDelete = {
-                                        coroutineScope.launch {
-                                            runCatching { AgentMemoryRuntime.store.delete(memory.id) }
-                                                .onFailure { statusMessage = it.message }
-                                            reload()
-                                        }
-                                    }
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    editingMemory?.let { memory ->
-        MemoryEditorDialog(
-            memory = memory,
-            onDismiss = { editingMemory = null },
-            onSave = { updated ->
-                coroutineScope.launch {
-                    runCatching { AgentMemoryRuntime.store.update(updated) }
-                        .onSuccess {
-                            editingMemory = null
-                            reload()
-                        }
-                        .onFailure { statusMessage = it.message }
-                }
-            }
-        )
-    }
-}
-
-@Composable
-private fun DialogHeader(title: String, onDismiss: () -> Unit) {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(UiTokens.SpaceLarge),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            title,
-            modifier = Modifier.weight(1f),
-            color = SettingColors.Text,
-            fontWeight = FontWeight.SemiBold,
-            fontSize = UiTokens.TextSection
-        )
-        Box(
-            modifier = Modifier.size(28.dp).clip(CircleShape).clickable(onClick = onDismiss),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                IconParkIcons.Close,
-                contentDescription = stringResource(Res.string.cancel),
-                modifier = Modifier.size(UiTokens.IconSmall),
-                tint = SettingColors.Muted
-            )
-        }
-    }
-}
-
-@Composable
-private fun MemoryRow(
-    memory: AgentMemory,
-    onEdit: () -> Unit,
-    onDelete: () -> Unit
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(
-            horizontal = UiTokens.SpaceLarge,
-            vertical = UiTokens.SpaceMedium
-        ),
-        horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium),
-        verticalAlignment = Alignment.Top
-    ) {
-        Column(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceXSmall)
-        ) {
-            Text(
-                "${memory.kind.name.lowercase().replace('_', ' ')} · ${memory.scope.type.name.lowercase()}",
-                color = SettingColors.Primary,
-                fontSize = UiTokens.TextCaption,
-                fontWeight = FontWeight.Medium
-            )
-            Text(
-                memory.content,
-                color = SettingColors.Text,
-                fontSize = UiTokens.TextBody,
-                maxLines = 3,
-                overflow = TextOverflow.Ellipsis
-            )
-            if (memory.keywords.isNotBlank()) {
-                Text(
-                    memory.keywords,
-                    color = SettingColors.Muted,
-                    fontSize = UiTokens.TextCaption,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-        }
-        OutlinedButton(
-            onClick = onEdit,
-            modifier = Modifier.height(32.dp),
-            contentPadding = PaddingValues(horizontal = UiTokens.SpaceSmall)
-        ) {
-            Text(stringResource(Res.string.ai_memory_edit), fontSize = UiTokens.TextCaption)
-        }
-        OutlinedButton(
-            onClick = onDelete,
-            modifier = Modifier.height(32.dp),
-            contentPadding = PaddingValues(horizontal = UiTokens.SpaceSmall)
-        ) {
-            Text(
-                stringResource(Res.string.ai_memory_delete),
-                color = SettingColors.Danger,
-                fontSize = UiTokens.TextCaption
-            )
-        }
-    }
-    SectionDivider()
-}
-
-@Composable
-private fun MemoryEditorDialog(
-    memory: AgentMemory,
-    onDismiss: () -> Unit,
-    onSave: (AgentMemory) -> Unit
-) {
-    var content by remember(memory.id) { mutableStateOf(memory.content) }
-    var keywords by remember(memory.id) { mutableStateOf(memory.keywords) }
-    Dialog(onDismissRequest = onDismiss) {
-        Surface(
-            modifier = Modifier.width(520.dp),
-            shape = RoundedCornerShape(UiTokens.RadiusLarge),
-            color = SettingColors.Surface,
-            border = BorderStroke(1.dp, SettingColors.Border)
-        ) {
-            Column {
-                DialogHeader(stringResource(Res.string.ai_memory_edit_title), onDismiss)
-                HorizontalDivider(color = SettingColors.Divider)
-                Column(
-                    modifier = Modifier.padding(UiTokens.SpaceLarge),
-                    verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium)
-                ) {
-                    AiDialogTextField(
-                        label = stringResource(Res.string.ai_memory_content),
-                        value = content,
-                        onValueChange = { content = it.take(600) },
-                        placeholder = ""
-                    )
-                    AiDialogTextField(
-                        label = stringResource(Res.string.ai_memory_keywords),
-                        value = keywords,
-                        onValueChange = { keywords = it.take(200) },
-                        placeholder = ""
-                    )
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.End
-                    ) {
-                        OutlinedButton(onClick = onDismiss) {
-                            Text(stringResource(Res.string.cancel))
-                        }
-                        Spacer(Modifier.width(UiTokens.SpaceSmall))
-                        Button(
-                            onClick = { onSave(memory.copy(content = content, keywords = keywords)) },
-                            enabled = content.trim().length >= 3
-                        ) {
-                            Text(stringResource(Res.string.ai_save_config))
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
 @Composable
 private fun AgentInputHelperSettingsSection(selectedDeviceId: String?) {
     val helper = remember { AgentInputHelper() }
@@ -1237,6 +897,8 @@ private fun AgentInputHelperSettingsSection(selectedDeviceId: String?) {
 @Composable
 private fun AiModelSettingsSection() {
     val repository = remember { AiConfiguration.repository }
+    val providerRepository = remember { AgentProviderRuntime.repository }
+    val providerProfiles by providerRepository.profiles.collectAsState()
     val savedConfig by repository.config.collectAsState()
     val hasSavedKey by repository.hasApiKeyState.collectAsState()
     var showModelDialog by remember { mutableStateOf(false) }
@@ -1256,10 +918,18 @@ private fun AiModelSettingsSection() {
         stringResource(Res.string.ai_model_not_configured)
     }
     val summaryDescription = if (isConfigured) {
-        stringResource(
+        val configured = stringResource(
             Res.string.ai_model_configured_desc,
             visionModeText(savedConfig.visionMode)
         )
+        val brainProfileId = providerRepository.providerFor(AgentModelRole.BRAIN)?.id
+        val profile = providerProfiles.firstOrNull { it.id == brainProfileId }
+        val attestation = profile?.let(providerRepository::capabilityAttestation)
+        if (attestation == null) {
+            "$configured · ${l10n("能力未验证", "Capabilities not verified")}"
+        } else {
+            "$configured · ${l10n("已验证", "Verified")} ${attestation.tier.name}"
+        }
     } else {
         stringResource(Res.string.ai_model_not_configured_desc)
     }
@@ -1380,21 +1050,20 @@ internal fun AiModelConfigDialog(
     onDismiss: () -> Unit
 ) {
     val repository = remember { AiConfiguration.repository }
+    val providerRepository = remember { AgentProviderRuntime.repository }
+    val capabilityProbe = remember { AgentCapabilityProbe() }
     val coroutineScope = rememberCoroutineScope()
     var baseUrl by remember(initialConfig.baseUrl) { mutableStateOf(initialConfig.baseUrl) }
     var model by remember(initialConfig.model) { mutableStateOf(initialConfig.model) }
     var apiKey by remember { mutableStateOf("") }
-    var visionMode by remember(initialConfig.visionMode) { mutableStateOf(initialConfig.visionMode) }
-    var contextWindow by remember(initialConfig.contextWindowTokens) {
-        mutableStateOf(initialConfig.contextWindowTokens?.toString().orEmpty())
-    }
+    val visionMode = VisionMode.ENABLED
     var keyAvailable by remember(hasSavedKey) { mutableStateOf(hasSavedKey) }
-    var showVisionDropdown by remember { mutableStateOf(false) }
     var showApiKey by remember { mutableStateOf(false) }
     var isSaving by remember { mutableStateOf(false) }
     var isTesting by remember { mutableStateOf(false) }
     var statusMessage by remember { mutableStateOf<String?>(null) }
     var statusIsError by remember { mutableStateOf(false) }
+    var capabilityReport by remember { mutableStateOf<AgentCapabilityReport?>(null) }
     val testSuccessText = stringResource(Res.string.ai_test_success)
     val keyClearedText = stringResource(Res.string.ai_key_cleared)
     val isBusy = isSaving || isTesting
@@ -1403,9 +1072,13 @@ internal fun AiModelConfigDialog(
         baseUrl = baseUrl,
         model = model,
         visionMode = visionMode,
-        contextWindowTokens = contextWindow.trim().takeIf { it.isNotEmpty() }?.toIntOrNull()
-            ?: if (contextWindow.isBlank()) null else 0
+        contextWindowTokens = initialConfig.contextWindowTokens
     )
+
+    fun invalidateCapabilityResult() {
+        capabilityReport = null
+        statusMessage = null
+    }
 
     Dialog(onDismissRequest = { if (!isBusy) onDismiss() }) {
         Surface(
@@ -1483,7 +1156,7 @@ internal fun AiModelConfigDialog(
                         value = baseUrl,
                         onValueChange = {
                             baseUrl = it
-                            statusMessage = null
+                            invalidateCapabilityResult()
                         },
                         placeholder = stringResource(Res.string.ai_base_url_hint)
                     )
@@ -1493,7 +1166,7 @@ internal fun AiModelConfigDialog(
                         value = apiKey,
                         onValueChange = {
                             apiKey = it
-                            statusMessage = null
+                            invalidateCapabilityResult()
                         },
                         placeholder = stringResource(
                             if (keyAvailable) {
@@ -1536,37 +1209,18 @@ internal fun AiModelConfigDialog(
                         value = model,
                         onValueChange = {
                             model = it
-                            statusMessage = null
+                            invalidateCapabilityResult()
                         },
                         placeholder = stringResource(Res.string.ai_model_name_hint)
                     )
 
-                    AiDialogSelectField(
-                        label = stringResource(Res.string.ai_vision_mode),
-                        value = visionModeText(visionMode),
-                        expanded = showVisionDropdown,
-                        onExpandedChange = { showVisionDropdown = it }
-                    ) {
-                        VisionMode.entries.forEach { mode ->
-                            DropdownMenuItem(
-                                text = { Text(visionModeText(mode)) },
-                                onClick = {
-                                    visionMode = mode
-                                    showVisionDropdown = false
-                                    statusMessage = null
-                                }
-                            )
-                        }
-                    }
-
-                    AiDialogTextField(
-                        label = stringResource(Res.string.ai_context_window),
-                        value = contextWindow,
-                        onValueChange = {
-                            contextWindow = it.filter(Char::isDigit).take(7)
-                            statusMessage = null
-                        },
-                        placeholder = stringResource(Res.string.ai_context_window_hint)
+                    SideSettingValueRow(
+                        title = l10n("视觉能力", "Vision capability"),
+                        description = l10n(
+                            "Agent 每一步都需要最新截图，不能切换为纯文本模式。",
+                            "Every Agent step requires a fresh screenshot; text-only mode is unavailable."
+                        ),
+                        value = l10n("强制开启", "Required")
                     )
 
                     Surface(
@@ -1643,10 +1297,22 @@ internal fun AiModelConfigDialog(
                                 val key = apiKey.trim().ifBlank { repository.loadApiKey().orEmpty() }
                                 val result = runCatching {
                                     require(key.isNotBlank()) { "API Key is required" }
-                                    OpenAiCompatibleClient().testConnection(currentConfig(), key)
+                                    val provider = providerRepository.legacyPreview(currentConfig(), key)
+                                    capabilityProbe.probe(provider)
                                 }
-                                statusIsError = result.isFailure
-                                statusMessage = result.exceptionOrNull()?.message ?: testSuccessText
+                                capabilityReport = result.getOrNull()
+                                statusIsError = result.isFailure ||
+                                    result.getOrNull()?.tier?.let { it < AgentCapabilityTier.L3_VISUAL_AGENT } == true
+                                statusMessage = result.exceptionOrNull()?.message ?: result.getOrNull()?.let { report ->
+                                    if (report.tier >= AgentCapabilityTier.L3_VISUAL_AGENT) {
+                                        "$testSuccessText · ${l10n("能力等级", "Capability tier")} ${report.tier.name}"
+                                    } else {
+                                        l10n(
+                                            "连接成功，但模型未通过视觉与工具调用能力测试（需要 L3，当前 ${report.tier.name}）。",
+                                            "Connection succeeded, but the model did not pass the visual tool-use test (L3 required, current ${report.tier.name})."
+                                        )
+                                    }
+                                } ?: testSuccessText
                                 isTesting = false
                             }
                         },
@@ -1702,7 +1368,13 @@ internal fun AiModelConfigDialog(
                                 statusIsError = result.isFailure
                                 statusMessage = result.exceptionOrNull()?.message
                                 if (result.isSuccess) {
-                                    AgentProviderRuntime.repository.syncLegacy(currentConfig(), apiKey)
+                                    providerRepository.syncLegacy(currentConfig(), apiKey)
+                                    capabilityReport?.let { report ->
+                                        providerRepository.resolve(AgentModelRole.BRAIN)
+                                            ?.let { provider ->
+                                                providerRepository.attestCapabilities(provider.profile, report.tier)
+                                            }
+                                    }
                                     onSaved()
                                 }
                                 isSaving = false
@@ -2346,7 +2018,8 @@ private fun SettingSwitchRow(
     title: String,
     description: String,
     checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit
+    onCheckedChange: (Boolean) -> Unit,
+    enabled: Boolean = true
 ) {
     Row(
         modifier = Modifier
@@ -2371,7 +2044,10 @@ private fun SettingSwitchRow(
                 fontSize = UiTokens.TextCaption
             )
         }
-        Switch(checked = checked, onCheckedChange = onCheckedChange)
+        Switch(
+            checked = checked,
+            onCheckedChange = { value -> if (enabled) onCheckedChange(value) }
+        )
     }
 }
 

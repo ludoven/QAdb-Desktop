@@ -22,6 +22,10 @@ interface InstalledAppCatalog {
     fun invalidate(deviceId: String)
 }
 
+interface AgentAppCatalogGateway {
+    suspend fun readInstalledApps(deviceId: String, forceRefresh: Boolean = false): List<InstalledAgentApp>
+}
+
 class RealInstalledAppCatalog(
     private val helperClient: AppIconHelperClient = AppIconHelperClient(
         File(AgentDataPaths.agentDataDirectory(), "app-catalog")
@@ -78,7 +82,7 @@ internal fun rankInstalledApps(
 ): List<InstalledAgentApp> {
     val normalized = query.trim()
     if (normalized.isEmpty()) return emptyList()
-    return apps
+    val ranked = apps
         .map { app ->
             app to when {
                 app.packageName.equals(normalized, ignoreCase = true) -> 4
@@ -90,6 +94,7 @@ internal fun rankInstalledApps(
         }
         .filter { it.second > 0 }
         .sortedWith(compareByDescending<Pair<InstalledAgentApp, Int>> { it.second }.thenBy { it.first.label })
+    return ranked
         .take(MAX_APP_RESULTS)
         .map { it.first }
 }

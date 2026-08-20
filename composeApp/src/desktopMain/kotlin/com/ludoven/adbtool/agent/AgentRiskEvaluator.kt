@@ -13,6 +13,19 @@ class AgentRiskEvaluator(
         observation: AgentObservation,
         localCapabilityReason: String? = null
     ): AgentRiskAssessment {
+        val targetNode = actionTargetNode(action, observation)
+        val targetText = targetNode.targetText()
+        val canCommitUiAction = action is AgentAction.Tap || action is AgentAction.TapElement
+        if ((action is AgentAction.InputText && targetNode?.password == true) ||
+            canCommitUiAction && (
+                action.meta.operationKind in BLOCKED_OPERATION_KINDS || targetText.hasBlockedRiskTerm()
+            )
+        ) {
+            return AgentRiskAssessment(
+                AgentRiskLevel.BLOCKED,
+                "Payments, account changes, and password entry are outside the enabled Agent scope"
+            )
+        }
         if (!localCapabilityReason.isNullOrBlank()) {
             return AgentRiskAssessment(AgentRiskLevel.CONFIRMATION_REQUIRED, localCapabilityReason)
         }
@@ -23,10 +36,9 @@ class AgentRiskEvaluator(
             )
         }
 
-        val modelRisk = action.meta.operationKind in CONFIRMATION_OPERATION_KINDS
-        val targetText = actionTargetText(action, observation)
-        val explicitTargetRisk = targetText.hasExplicitRiskTerm()
-        val cautiousTextRisk = targetText.hasCautiousOnlyRiskTerm()
+        val modelRisk = canCommitUiAction && action.meta.operationKind == AgentOperationKind.DELETE
+        val explicitTargetRisk = canCommitUiAction && targetText.hasDestructiveRiskTerm()
+        val cautiousTextRisk = canCommitUiAction && targetText.hasCautiousOnlyRiskTerm()
         val requiresConfirmation = modelRisk || explicitTargetRisk ||
             (approvalPreferences.policy.value == AgentApprovalPolicy.CAUTIOUS && cautiousTextRisk)
         return if (requiresConfirmation) {
@@ -40,8 +52,8 @@ class AgentRiskEvaluator(
         }
     }
 
-    private fun actionTargetText(action: AgentAction, observation: AgentObservation): String {
-        val node = when (action) {
+    private fun actionTargetNode(action: AgentAction, observation: AgentObservation): UiNodeSnapshot? =
+        when (action) {
             is AgentAction.TapElement -> observation.uiNodes.firstOrNull { it.elementId == action.elementId }
             is AgentAction.InputText -> action.elementId?.let { id ->
                 observation.uiNodes.firstOrNull { it.elementId == id }
@@ -56,40 +68,31 @@ class AgentRiskEvaluator(
             }
             else -> null
         }
-        return buildString {
-            append(action.meta.intent).append(' ')
-            append(action.meta.target).append(' ')
-            node?.let {
-                append(it.text).append(' ')
-                append(it.contentDescription)
-            }
-        }.trim()
-    }
+
 }
 
-private val CONFIRMATION_OPERATION_KINDS = setOf(
-    AgentOperationKind.SEND,
-    AgentOperationKind.PURCHASE,
-    AgentOperationKind.PERMISSION,
-    AgentOperationKind.DELETE,
-    AgentOperationKind.ACCOUNT,
-    AgentOperationKind.SYSTEM_CHANGE
-)
+private val BLOCKED_OPERATION_KINDS = setOf(AgentOperationKind.PURCHASE, AgentOperationKind.ACCOUNT)
 
-/** Clear, user-visible commit or destructive controls. These remain guarded in every policy. */
-private fun String.hasExplicitRiskTerm(): Boolean {
+private fun UiNodeSnapshot?.targetText(): String = this?.let {
+    "${it.text} ${it.contentDescription}".trim()
+}.orEmpty()
+
+private fun String.hasBlockedRiskTerm(): Boolean =
+    BLOCKED_ENGLISH_RISK.containsMatchIn(lowercase()) || BLOCKED_CHINESE_RISK.any(::contains)
+
+/** Only irreversible data and application removal controls require approval. */
+private fun String.hasDestructiveRiskTerm(): Boolean {
     val english = lowercase()
-    return EXPLICIT_ENGLISH_RISK.containsMatchIn(english) || EXPLICIT_CHINESE_RISK.any(::contains)
+    return DESTRUCTIVE_ENGLISH_RISK.containsMatchIn(english) || DESTRUCTIVE_CHINESE_RISK.any(::contains)
 }
 
 /** Legacy broad matches are intentionally opt-in because they flag harmless controls such as search clearing. */
 private fun String.hasCautiousOnlyRiskTerm(): Boolean =
     CAUTIOUS_ENGLISH_RISK.containsMatchIn(lowercase()) || CAUTIOUS_CHINESE_RISK.any(::contains)
 
-private val EXPLICIT_ENGLISH_RISK = Regex("\\b(send|submit|publish|post|pay|purchase|buy|allow|permission|delete|clear data|sign in|log in|uninstall|reboot|factory reset)\\b")
-private val EXPLICIT_CHINESE_RISK = listOf(
-    "发送", "提交", "发布", "付款", "支付", "购买", "下单", "授权", "允许", "始终允许",
-    "删除", "清除数据", "清空数据", "登录", "注册", "退出账号", "卸载", "重启", "恢复出厂"
-)
+private val DESTRUCTIVE_ENGLISH_RISK = Regex("\\b(delete|clear data|erase data|uninstall|factory reset)\\b")
+private val DESTRUCTIVE_CHINESE_RISK = listOf("删除", "清除数据", "清空数据", "卸载", "恢复出厂")
 private val CAUTIOUS_ENGLISH_RISK = Regex("\\b(remove|clear)\\b")
 private val CAUTIOUS_CHINESE_RISK = listOf("移除", "清除")
+private val BLOCKED_ENGLISH_RISK = Regex("\\b(pay|purchase|buy|checkout|sign in|log in|register|create account|password|passcode)\\b")
+private val BLOCKED_CHINESE_RISK = listOf("付款", "支付", "购买", "下单", "结账", "登录", "注册账号", "创建账号", "密码", "口令")

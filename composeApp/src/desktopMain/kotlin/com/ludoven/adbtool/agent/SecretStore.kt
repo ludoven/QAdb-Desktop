@@ -13,7 +13,11 @@ import java.util.concurrent.TimeUnit
 
 interface SecretStore {
     fun write(account: String, secret: String)
+
+    /** Returns null only when the account does not exist; storage failures are reported. */
     fun read(account: String): String?
+
+    /** Missing accounts are treated as already deleted; storage failures are reported. */
     fun delete(account: String)
 }
 
@@ -100,12 +104,14 @@ private class MacOsKeychainSecretStore : SecretStore {
         )
         if (status == ERR_SEC_ITEM_NOT_FOUND) return null
         checkStatus(operation = "read API key", status = status)
-        val data = passwordData.value ?: return null
+        require(passwordLength.value >= 0) { "Unable to read secret from macOS Keychain: invalid data length" }
+        val data = passwordData.value
+        if (passwordLength.value == 0 && data == null) return ""
+        val existingData = requireNotNull(data) { "Unable to read secret from macOS Keychain: missing data" }
         return try {
-            data.getByteArray(0, passwordLength.value).toString(StandardCharsets.UTF_8)
-                .takeIf { it.isNotEmpty() }
+            existingData.getByteArray(0, passwordLength.value).toString(StandardCharsets.UTF_8)
         } finally {
-            MacOsSecurityFramework.INSTANCE.SecKeychainItemFreeContent(null, data)
+            MacOsSecurityFramework.INSTANCE.SecKeychainItemFreeContent(null, existingData)
         }
     }
 
@@ -205,62 +211,100 @@ private interface MacOsCoreFoundation : Library {
 private class LinuxSecretServiceStore : SecretStore {
     override fun write(account: String, secret: String) {
         requireCommand()
-        val process = ProcessBuilder(
-            "secret-tool",
-            "store",
-            "--label=QADB AI API Key",
-            "service",
-            SERVICE_NAME,
-            "account",
-            account
-        ).redirectErrorStream(true).start()
-        process.outputStream.bufferedWriter(StandardCharsets.UTF_8).use {
-            it.write(secret)
-            it.newLine()
-        }
-        val output = process.inputStream.bufferedReader().use { it.readText() }
-        require(process.waitFor(COMMAND_TIMEOUT_SECONDS, TimeUnit.SECONDS) && process.exitValue() == 0) {
-            output.trim().ifBlank { "Unable to save API key to Linux Secret Service" }
+        val result = runCommand(
+            command = listOf(
+                "secret-tool",
+                "store",
+                "--label=QADB AI API Key",
+                "service",
+                SERVICE_NAME,
+                "account",
+                account
+            ),
+            input = secret,
+            timeoutSeconds = COMMAND_TIMEOUT_SECONDS,
+            operation = "save secret"
+        )
+        require(result.exitCode == 0) {
+            "Unable to save secret to Linux Secret Service (exit ${result.exitCode})"
         }
     }
 
     override fun read(account: String): String? {
         requireCommand()
-        val process = ProcessBuilder(
-            "secret-tool",
-            "lookup",
-            "service",
-            SERVICE_NAME,
-            "account",
-            account
-        ).redirectErrorStream(true).start()
-        val output = process.inputStream.bufferedReader().use { it.readText() }
-        val completed = process.waitFor(COMMAND_TIMEOUT_SECONDS, TimeUnit.SECONDS)
-        if (!completed || process.exitValue() != 0) return null
-        return output.trim().takeIf { it.isNotEmpty() }
+        val result = runCommand(
+            command = listOf(
+                "secret-tool",
+                "lookup",
+                "service",
+                SERVICE_NAME,
+                "account",
+                account
+            ),
+            timeoutSeconds = COMMAND_TIMEOUT_SECONDS,
+            operation = "read secret"
+        )
+        if (result.exitCode == 0) return result.output
+        if (result.exitCode == SECRET_TOOL_NOT_FOUND_EXIT_CODE && result.output.isBlank()) return null
+        error("Unable to read secret from Linux Secret Service (exit ${result.exitCode})")
     }
 
     override fun delete(account: String) {
         requireCommand()
-        val process = ProcessBuilder(
-            "secret-tool",
-            "clear",
-            "service",
-            SERVICE_NAME,
-            "account",
-            account
-        ).redirectErrorStream(true).start()
-        process.inputStream.bufferedReader().use { it.readText() }
-        process.waitFor(COMMAND_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+        val result = runCommand(
+            command = listOf(
+                "secret-tool",
+                "clear",
+                "service",
+                SERVICE_NAME,
+                "account",
+                account
+            ),
+            timeoutSeconds = COMMAND_TIMEOUT_SECONDS,
+            operation = "delete secret"
+        )
+        if (result.exitCode == 0) return
+        if (result.exitCode == SECRET_TOOL_NOT_FOUND_EXIT_CODE && result.output.isBlank()) return
+        error("Unable to delete secret from Linux Secret Service (exit ${result.exitCode})")
     }
 
     private fun requireCommand() {
-        val process = ProcessBuilder("sh", "-c", "command -v secret-tool").redirectErrorStream(true).start()
-        process.inputStream.bufferedReader().use { it.readText() }
-        require(process.waitFor(3, TimeUnit.SECONDS) && process.exitValue() == 0) {
+        val result = runCommand(
+            command = listOf("sh", "-c", "command -v secret-tool"),
+            timeoutSeconds = 3,
+            operation = "locate secret-tool"
+        )
+        require(result.exitCode == 0) {
             "Linux Secret Service is unavailable. Install secret-tool/libsecret."
         }
     }
+
+    private fun runCommand(
+        command: List<String>,
+        input: String? = null,
+        timeoutSeconds: Long,
+        operation: String
+    ): SecretToolResult {
+        val process = ProcessBuilder(command).redirectErrorStream(true).start()
+        process.outputStream.use { output ->
+            input?.let { value ->
+                output.bufferedWriter(StandardCharsets.UTF_8).use { writer ->
+                    writer.write(value)
+                    writer.newLine()
+                }
+            }
+        }
+        if (!process.waitFor(timeoutSeconds, TimeUnit.SECONDS)) {
+            process.destroyForcibly()
+            error("Linux Secret Service timed out while attempting to $operation")
+        }
+        return SecretToolResult(
+            exitCode = process.exitValue(),
+            output = process.inputStream.bufferedReader().use { it.readText() }.trimEnd('\r', '\n')
+        )
+    }
+
+    private data class SecretToolResult(val exitCode: Int, val output: String)
 }
 
 private class WindowsCredentialSecretStore : SecretStore {
@@ -284,12 +328,17 @@ private class WindowsCredentialSecretStore : SecretStore {
     override fun read(account: String): String? {
         val reference = PointerByReference()
         if (!CredentialAdvapi32.INSTANCE.CredReadW(WString(targetName(account)), CRED_TYPE_GENERIC, 0, reference)) {
-            return null
+            val errorCode = Native.getLastError()
+            if (errorCode == WINDOWS_ERROR_NOT_FOUND) return null
+            error("Unable to read secret from Windows Credential Manager (Win32 $errorCode)")
         }
         return try {
             val credential = WinCredential(reference.value).apply { read() }
-            if (credential.CredentialBlobSize <= 0 || credential.CredentialBlob == null) {
-                null
+            require(credential.CredentialBlobSize >= 0) {
+                "Unable to read secret from Windows Credential Manager: invalid data length"
+            }
+            if (credential.CredentialBlobSize == 0) {
+                ""
             } else {
                 val credentialBlob = requireNotNull(credential.CredentialBlob)
                 String(
@@ -303,7 +352,11 @@ private class WindowsCredentialSecretStore : SecretStore {
     }
 
     override fun delete(account: String) {
-        CredentialAdvapi32.INSTANCE.CredDeleteW(WString(targetName(account)), CRED_TYPE_GENERIC, 0)
+        if (CredentialAdvapi32.INSTANCE.CredDeleteW(WString(targetName(account)), CRED_TYPE_GENERIC, 0)) return
+        val errorCode = Native.getLastError()
+        if (errorCode != WINDOWS_ERROR_NOT_FOUND) {
+            error("Unable to delete secret from Windows Credential Manager (Win32 $errorCode)")
+        }
     }
 
     private fun targetName(account: String): String = "$SERVICE_NAME/$account"
@@ -357,5 +410,7 @@ private const val SERVICE_NAME = "com.ludoven.adbtool.ai"
 private const val COMMAND_TIMEOUT_SECONDS = 15L
 private const val ERR_SEC_SUCCESS = 0
 private const val ERR_SEC_ITEM_NOT_FOUND = -25300
+private const val SECRET_TOOL_NOT_FOUND_EXIT_CODE = 1
+private const val WINDOWS_ERROR_NOT_FOUND = 1168
 private const val CRED_TYPE_GENERIC = 1
 private const val CRED_PERSIST_LOCAL_MACHINE = 2

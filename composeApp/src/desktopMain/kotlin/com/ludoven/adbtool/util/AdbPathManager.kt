@@ -7,6 +7,7 @@ import java.net.URI
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import java.util.Properties
+import java.util.concurrent.CompletableFuture
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -51,6 +52,8 @@ object AdbPathManager {
     private const val APP_RESOURCES_DIR_PROPERTY = "compose.application.resources.dir"
     private const val HELP_URL = "https://ludoven.github.io/QADB/guide/getting-started.html"
     private const val FRIENDLY_INIT_ERROR = "ADB 初始化失败，请检查 QADB 是否有执行权限，或手动选择 adb 路径。"
+    private const val ADB_PROBE_TIMEOUT_MS = 5_000L
+    private const val ADB_PROBE_OUTPUT_TIMEOUT_MS = 500L
 
     private val _adbEnvironment = MutableStateFlow(
         AdbEnvironment(message = "正在检测 ADB 环境...")
@@ -329,21 +332,36 @@ object AdbPathManager {
                 return ValidationResult(false, error = "ADB file is missing or not executable")
             }
 
+            val initialTimeoutMillis = AdbProcessTimeoutContext.clampTimeoutMillis(ADB_PROBE_TIMEOUT_MS)
+            if (initialTimeoutMillis <= 0L) {
+                return ValidationResult(false, error = "ADB version check deadline reached")
+            }
+
             val process = ProcessBuilder(path, "version")
                 .redirectErrorStream(true)
                 .start()
-            val completed = process.waitFor(5, TimeUnit.SECONDS)
-            val output = process.inputStream.bufferedReader().readText()
-
-            if (!completed) {
-                process.destroyForcibly()
-                return ValidationResult(false, error = "ADB version check timed out")
+            val outputFuture = CompletableFuture.supplyAsync {
+                process.inputStream.bufferedReader().use { it.readText() }
             }
+            try {
+                val waitTimeoutMillis = AdbProcessTimeoutContext.clampTimeoutMillis(initialTimeoutMillis)
+                val completed = waitTimeoutMillis > 0L &&
+                    process.waitFor(waitTimeoutMillis, TimeUnit.MILLISECONDS)
+                if (!completed) {
+                    process.destroyForcibly()
+                    return ValidationResult(false, error = "ADB version check timed out")
+                }
 
-            if (process.exitValue() == 0 && output.contains("Android Debug Bridge")) {
-                ValidationResult(true, version = output.lines().firstOrNull { it.isNotBlank() }?.trim())
-            } else {
-                ValidationResult(false, error = output.ifBlank { "ADB version check failed" })
+                val output = drainProbeOutput(outputFuture)
+                if (process.exitValue() == 0 && output.contains("Android Debug Bridge")) {
+                    ValidationResult(true, version = output.lines().firstOrNull { it.isNotBlank() }?.trim())
+                } else {
+                    ValidationResult(false, error = output.ifBlank { "ADB version check failed" })
+                }
+            } finally {
+                runCatching { process.inputStream.close() }
+                if (process.isAlive) runCatching { process.destroyForcibly() }
+                outputFuture.cancel(true)
             }
         } catch (e: Exception) {
             ValidationResult(false, error = e.message)
@@ -352,27 +370,45 @@ object AdbPathManager {
 
     private fun getAdbFromSystemPath(): String? {
         return try {
+            val initialTimeoutMillis = AdbProcessTimeoutContext.clampTimeoutMillis(ADB_PROBE_TIMEOUT_MS)
+            if (initialTimeoutMillis <= 0L) return null
             val cmd = if (isWindows()) arrayOf("where", "adb") else arrayOf("which", "adb")
             val process = ProcessBuilder(*cmd)
                 .redirectErrorStream(true)
                 .start()
-            val completed = process.waitFor(5, TimeUnit.SECONDS)
-            if (!completed) {
-                process.destroyForcibly()
-                return null
+            val outputFuture = CompletableFuture.supplyAsync {
+                process.inputStream.bufferedReader().use { it.readText() }
             }
-            if (process.exitValue() == 0) {
-                process.inputStream.bufferedReader()
-                    .readLines()
+            try {
+                val waitTimeoutMillis = AdbProcessTimeoutContext.clampTimeoutMillis(initialTimeoutMillis)
+                val completed = waitTimeoutMillis > 0L &&
+                    process.waitFor(waitTimeoutMillis, TimeUnit.MILLISECONDS)
+                if (!completed) {
+                    process.destroyForcibly()
+                    return null
+                }
+                if (process.exitValue() != 0) return null
+                drainProbeOutput(outputFuture)
+                    .lineSequence()
                     .firstOrNull { it.isNotBlank() }
                     ?.trim()
                     ?.takeIf { validateAdb(it).isValid }
-            } else {
-                null
+            } finally {
+                runCatching { process.inputStream.close() }
+                if (process.isAlive) runCatching { process.destroyForcibly() }
+                outputFuture.cancel(true)
             }
         } catch (e: Exception) {
             null
         }
+    }
+
+    private fun drainProbeOutput(outputFuture: CompletableFuture<String>): String {
+        val timeoutMillis = AdbProcessTimeoutContext.clampTimeoutMillis(ADB_PROBE_OUTPUT_TIMEOUT_MS)
+        if (timeoutMillis <= 0L) return ""
+        return runCatching {
+            outputFuture.get(timeoutMillis, TimeUnit.MILLISECONDS)
+        }.getOrDefault("")
     }
 
     private fun extractBundledAdbFromClasspath(): File? {

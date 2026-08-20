@@ -25,6 +25,12 @@
 
 ## 📝 Changelog
 
+### Current development build (2.1.2)
+
+- Unified logs and processes in Diagnostics, with process search, sorting, and resource usage.
+- Added Linux `.deb`, `.rpm`, and `.tar.gz` release artifacts.
+- Added a guarded AI Agent Beta entry point that is off by default; device input and Accessibility Bridge helpers remain optional.
+
 ### v2.0.7 - 2026-05-29
 
 - Performance-focused release across terminal output, Logcat filtering, app list loading, and device info parsing.
@@ -46,7 +52,7 @@
 
 ## 🚀 Project Overview
 
-**QADB** is a cross-platform ADB GUI tool built with **Jetpack Compose Multiplatform**, supporting **Windows** and **macOS**.
+**QADB** is a cross-platform ADB GUI tool built with **Jetpack Compose Multiplatform**, supporting **Windows**, **macOS**, and **Linux**.
 
 It is designed for Android developers, testers, Android TV / TV box debugging users, and advanced users who frequently use ADB commands. It turns common ADB workflows into a visual interface so you can debug devices, manage apps, inspect logs, take screenshots and recordings, run terminal commands, and simulate key events more efficiently.
 
@@ -75,9 +81,11 @@ QADB can make these tasks much easier.
 - **Key Event Simulation**: Quickly trigger common key events such as Back, Home, Menu, Volume, and D-pad keys
 - **Built-in Terminal**: Run adb / shell commands directly inside the app
 - **Log Viewer**: View and filter Logcat logs to troubleshoot runtime issues
+- **Diagnostics**: Inspect Logcat and device processes together, including process search, sorting, and resource usage
 - **Command Center**: Organize frequently used ADB commands into visual actions
+- **AI Agent Beta**: Off by default; when enabled, provides device-operation assistance with human review
 - **TV / Box Debugging**: Suitable for Android TV, set-top boxes, and system app debugging scenarios
-- **Cross-Platform**: Built on Compose Multiplatform, supports Windows and macOS
+- **Cross-Platform**: Built on Compose Multiplatform, supports Windows, macOS, and Linux
 
 ---
 
@@ -103,10 +111,9 @@ QADB is suitable for:
 | Terminal | Built-in command terminal for adb / shell commands |
 | Key Events | Simulate Android device key operations |
 | Apps | App list, install, uninstall, clear data, force stop, etc. |
-| Logs | View and filter Logcat logs |
+| Diagnostics | View and filter Logcat, then search, sort, and inspect device processes |
 | Settings | Configure tool behavior, ADB path, and related options |
-| Performance | Planned: CPU, memory, network, and related metrics |
-| Processes | Planned: View and manage device processes |
+| AI Agent Beta | Off by default; when enabled, provides device-operation assistance with human review |
 
 ---
 
@@ -120,6 +127,8 @@ Please go to [GitHub Releases](https://github.com/ludoven/QADB/releases) to down
 | Windows | `.exe` | Portable / no installation |
 | Windows | `.zip` | Extract and run (portable package) |
 | macOS | `.dmg` | For macOS users |
+| Linux | `.deb` / `.rpm` | For mainstream Linux distributions |
+| Linux | `.tar.gz` | Extract and run (portable package) |
 
 > If macOS shows "cannot verify developer" or "cannot open", allow it in "System Settings" -> "Privacy & Security".
 
@@ -278,9 +287,7 @@ You can still switch to a custom ADB path in Settings when you need to use your 
 
 ### 5. Is Linux supported?
 
-Currently the main supported platforms are Windows and macOS.
-
-Linux support can be a future plan. If you have experience with Linux packaging or adaptation, contributions are welcome.
+Yes. The release workflow produces `.deb`, `.rpm`, and `.tar.gz` artifacts. Device mirroring still requires an available `scrcpy`; see the [download guide](./docs/download.md).
 
 ---
 
@@ -294,14 +301,15 @@ Linux support can be a future plan. If you have experience with Linux packaging 
 - [x] Screenshot / screen recording
 - [x] Built-in terminal
 - [x] Log viewer
+- [x] Process viewing, search, and sorting
+- [x] File management
+- [x] Visual ADB path configuration
+- [x] Linux installers and portable package
+- [x] AI Agent Beta (off by default)
 - [ ] Performance monitoring
-- [ ] Process management
-- [ ] File management
 - [ ] Command favorites
 - [ ] Custom command grouping
 - [ ] Multi-device batch operations
-- [ ] Visual ADB path configuration
-- [ ] Linux support
 - [ ] Plugin-based command extensions
 
 ---
@@ -315,10 +323,10 @@ You can contribute by:
 - Reporting bugs
 - Submitting useful ADB commands
 - Improving UI / interaction design
-- Enhancing Windows / macOS compatibility
+- Enhancing Windows / macOS / Linux compatibility
 - Improving English documentation
 - Adding usage tutorials
-- Helping with Linux packaging and adaptation
+- Improving Linux packaging and runtime compatibility
 
 If you have frequently used ADB commands, feel free to suggest them and help improve the QADB command center.
 

@@ -9,6 +9,8 @@ import adbtool_desktop.composeapp.generated.resources.home
 import adbtool_desktop.composeapp.generated.resources.set
 import adbtool_desktop.composeapp.generated.resources.terminal
 import com.ludoven.adbtool.agent.AgentFeatureRuntime
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -60,6 +62,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
 import com.ludoven.adbtool.pages.AppScreen
 import com.ludoven.adbtool.pages.AiAgentScreen
 import com.ludoven.adbtool.pages.CommonScreen
@@ -77,6 +81,7 @@ import com.ludoven.adbtool.util.AdbPathManager
 import com.ludoven.adbtool.util.LanguageManager
 import com.ludoven.adbtool.util.LocalAppLanguage
 import com.ludoven.adbtool.util.ThemeManager
+import com.ludoven.adbtool.util.WirelessAdbConnectionManager
 import com.ludoven.adbtool.entity.AdbFunctionType
 import com.ludoven.adbtool.entity.MsgContent
 import com.ludoven.adbtool.util.AdbTool
@@ -90,14 +95,17 @@ import com.ludoven.adbtool.viewmodel.FileBrowserViewModel
 import com.ludoven.adbtool.viewmodel.KeyEventViewModel
 import com.ludoven.adbtool.viewmodel.LogViewModel
 import com.ludoven.adbtool.widget.FeedbackToast
+import com.ludoven.adbtool.widget.WirelessConnectionDialog
 import com.ludoven.adbtool.viewmodel.ScreenRecordUiState
 import com.ludoven.adbtool.viewmodel.TerminalViewModel
 import com.ludoven.adbtool.widget.Sidebar
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.withContext
 import org.jetbrains.compose.resources.stringResource
 import org.jetbrains.compose.ui.tooling.preview.Preview
+
+private val aiAgentViewModelFactory = viewModelFactory {
+    initializer { AiAgentViewModel() }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -204,9 +212,12 @@ fun App() {
     val currentRoute = currentBackStackEntry?.destination?.route ?: "home"
     val selectedPrimaryRoute = normalizeRouteForPrimaryNavigation(currentRoute)
     var showRebootConfirm by remember { mutableStateOf(false) }
+    var showWirelessConnectionDialog by remember { mutableStateOf(false) }
     var showScreenRecordDialog by remember { mutableStateOf(false) }
     var screenRecordDurationText by remember { mutableStateOf("15") }
     val screenRecordState by commonModel.screenRecordState.collectAsState()
+    val wirelessConnectionManager = remember { WirelessAdbConnectionManager() }
+    val wirelessConnectionHistory by wirelessConnectionManager.history.collectAsState()
     val currentThemeMode by ThemeManager.currentThemeMode.collectAsState()
     val resolvedDarkTheme = when (currentThemeMode) {
         ThemeManager.ThemeMode.SYSTEM -> isSystemInDarkTheme()
@@ -253,16 +264,7 @@ fun App() {
         AppMenuCommandBus.commands.collect { command ->
             when (command) {
                 is AppMenuCommand.Navigate -> navigateToRoute(command.route)
-                is AppMenuCommand.ConnectDevice -> {
-                    val address = command.address.trim()
-                    if (address.isNotEmpty()) {
-                        val output = withContext(Dispatchers.IO) {
-                            AdbTool.execAdbOutputAsync("connect", address)
-                        }
-                        commonModel.showToast(MsgContent.Text(output))
-                        devicesViewModel.refreshDevices()
-                    }
-                }
+                AppMenuCommand.OpenWirelessConnection -> showWirelessConnectionDialog = true
                 AppMenuCommand.RefreshDevices -> devicesViewModel.refreshDevices()
                 AppMenuCommand.RebootDevice -> showRebootConfirm = true
                 AppMenuCommand.Screenshot -> commonModel.executeAdbAction(AdbFunctionType.SCREENSHOT)
@@ -353,7 +355,14 @@ fun App() {
                             modifier = Modifier
                                 .fillMaxSize()
                         ) {
-                            NavHost(navController, startDestination = "home") {
+                            NavHost(
+                                navController = navController,
+                                startDestination = "home",
+                                enterTransition = { EnterTransition.None },
+                                exitTransition = { ExitTransition.None },
+                                popEnterTransition = { EnterTransition.None },
+                                popExitTransition = { ExitTransition.None }
+                            ) {
                                 composable("home") {
                                     stateHolder.SaveableStateProvider("home") {
                                         Box(modifier = Modifier.fillMaxSize()) {
@@ -370,6 +379,9 @@ fun App() {
                                                 onOpenFileManager = { navigateToRoute("filebrowser") },
                                                 onOpenAppManager = { navigateToRoute("app") },
                                                 onOpenDiagnostics = { navigateToRoute("diagnostics") },
+                                                onOpenWirelessConnection = {
+                                                    showWirelessConnectionDialog = true
+                                                },
                                                 onOpenAppDetails = { packageName ->
                                                     appViewModel.openAppInfo(packageName)
                                                     navigateToRoute("app")
@@ -380,7 +392,9 @@ fun App() {
                                 }
                                 composable("ai") {
                                     if (agentFeatureEnabled) {
-                                        val aiAgentViewModel: AiAgentViewModel = viewModel()
+                                        val aiAgentViewModel: AiAgentViewModel = viewModel(
+                                            factory = aiAgentViewModelFactory
+                                        )
                                         stateHolder.SaveableStateProvider("ai") {
                                             AiAgentScreen(
                                                 viewModel = aiAgentViewModel,
@@ -506,6 +520,17 @@ fun App() {
                 }
             }
         }
+    }
+
+    if (showWirelessConnectionDialog) {
+        WirelessConnectionDialog(
+            history = wirelessConnectionHistory,
+            onConnect = wirelessConnectionManager::connect,
+            onPair = wirelessConnectionManager::pair,
+            onRemoveHistory = wirelessConnectionManager::removeHistory,
+            onDevicesChanged = devicesViewModel::refreshDevices,
+            onDismiss = { showWirelessConnectionDialog = false }
+        )
     }
 
     if (showRebootConfirm) {
