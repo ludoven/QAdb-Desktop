@@ -7,6 +7,7 @@ import com.ludoven.adbtool.UiTokens
 import com.ludoven.adbtool.entity.MsgContent
 import com.ludoven.adbtool.entity.DeviceCenterInfoData
 import com.ludoven.adbtool.widget.FeedbackToast
+import com.ludoven.adbtool.util.l10n
 
 import adbtool_desktop.composeapp.generated.resources.Res
 import adbtool_desktop.composeapp.generated.resources.*
@@ -56,22 +57,28 @@ import adbtool_desktop.composeapp.generated.resources.wireless_connection
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -83,6 +90,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -90,6 +98,7 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Android
+import com.ludoven.adbtool.ui.mac.CircularProgressIndicator
 import com.ludoven.adbtool.ui.mac.DropdownMenu
 import com.ludoven.adbtool.ui.mac.DropdownMenuItem
 import com.ludoven.adbtool.ui.mac.ExperimentalMaterial3Api
@@ -106,7 +115,13 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.pointerHoverIcon
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
@@ -114,6 +129,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -368,26 +384,36 @@ fun HomeScreen(
         }
 
         if (!isConnected) {
-            Box(modifier = Modifier.fillMaxSize()) {
+            BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+                val availableHeight = maxHeight
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
+                        .verticalScroll(scrollState)
                         .padding(
                             start = horizontalPadding,
                             end = horizontalPadding + scrollContentEndPadding,
                             top = topPadding,
                             bottom = verticalPadding
-                        )
-                        .verticalScroll(scrollState),
-                    verticalArrangement = Arrangement.spacedBy(spacing)
+                        ),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
                 ) {
-                    EmptyDeviceStatePanel(
-                        compactLayout = compactLayout,
-                        relativeUpdated = relativeUpdated,
-                        isLoading = isLoading,
-                        onOpenWirelessConnection = onOpenWirelessConnection,
-                        onRefresh = { viewModel.refreshDevices() }
-                    )
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = (availableHeight - topPadding - verticalPadding).coerceAtLeast(0.dp)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        EmptyDeviceStatePanel(
+                            compactLayout = compactLayout,
+                            relativeUpdated = relativeUpdated,
+                            isLoading = isLoading,
+                            onOpenWirelessConnection = onOpenWirelessConnection,
+                            onRefresh = { viewModel.refreshDevices() },
+                            modifier = Modifier.widthIn(max = 980.dp).fillMaxWidth()
+                        )
+                    }
                 }
 
                 if (scrollState.maxValue > 0) {
@@ -554,58 +580,102 @@ private fun EmptyDeviceStatePanel(
     relativeUpdated: String,
     isLoading: Boolean,
     onOpenWirelessConnection: () -> Unit,
-    onRefresh: () -> Unit
+    onRefresh: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
-    GlassCard(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(if (compactLayout) 500.dp else 520.dp),
-        shape = RoundedCornerShape(UiTokens.RadiusLarge),
-        borderStroke = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f))
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(if (compactLayout) 16.dp else 20.dp)
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = if (compactLayout) 20.dp else 48.dp, vertical = 30.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            if (compactLayout) {
-                Column(
+        // 1. Primary hero visual and three-step onboarding card.
+        EmptyDeviceMainCard(
+            compactLayout = compactLayout,
+            relativeUpdated = relativeUpdated,
+            isLoading = isLoading,
+            onOpenWirelessConnection = onOpenWirelessConnection,
+            onRefresh = onRefresh
+        )
+
+        // 2. Quick reference cards for USB and Wi-Fi connection modes.
+        EmptyDeviceConnectionModesSection(
+            compactLayout = compactLayout,
+            onOpenWirelessConnection = onOpenWirelessConnection
+        )
+
+        // 3. Common troubleshooting and diagnostics banner.
+        EmptyDeviceTroubleshootingBanner(
+            compactLayout = compactLayout,
+            onRefresh = onRefresh
+        )
+    }
+}
+
+@Composable
+private fun EmptyDeviceMainCard(
+    compactLayout: Boolean,
+    relativeUpdated: String,
+    isLoading: Boolean,
+    onOpenWirelessConnection: () -> Unit,
+    onRefresh: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val shape = RoundedCornerShape(16.dp)
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .background(MaterialTheme.colorScheme.surface)
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.65f), shape)
+            .padding(if (compactLayout) 20.dp else 32.dp)
+    ) {
+        if (compactLayout) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(24.dp)
+            ) {
+                EmptyDeviceHero(
+                    compactLayout = true,
+                    relativeUpdated = relativeUpdated,
+                    isLoading = isLoading,
+                    onOpenWirelessConnection = onOpenWirelessConnection,
+                    onRefresh = onRefresh
+                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(1.dp)
+                        .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                )
+                EmptyConnectGuidePanel(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceLarge)
-                ) {
-                    EmptyDeviceHero(
-                        compactLayout = true,
-                        relativeUpdated = relativeUpdated,
-                        isLoading = isLoading,
-                        onOpenWirelessConnection = onOpenWirelessConnection,
-                        onRefresh = onRefresh
-                    )
-                    EmptyConnectGuidePanel(
-                        modifier = Modifier.fillMaxWidth(),
-                        onRefresh = onRefresh
-                    )
-                }
-            } else {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceXXXLarge)
-                ) {
-                    EmptyDeviceHero(
-                        modifier = Modifier.weight(1f),
-                        compactLayout = false,
-                        relativeUpdated = relativeUpdated,
-                        isLoading = isLoading,
-                        onOpenWirelessConnection = onOpenWirelessConnection,
-                        onRefresh = onRefresh
-                    )
-                    EmptyConnectGuidePanel(
-                        modifier = Modifier.weight(1f),
-                        onRefresh = onRefresh
-                    )
-                }
+                    onRefresh = onRefresh
+                )
+            }
+        } else {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(36.dp)
+            ) {
+                EmptyDeviceHero(
+                    modifier = Modifier.weight(1.05f),
+                    compactLayout = false,
+                    relativeUpdated = relativeUpdated,
+                    isLoading = isLoading,
+                    onOpenWirelessConnection = onOpenWirelessConnection,
+                    onRefresh = onRefresh
+                )
+                Box(
+                    modifier = Modifier
+                        .width(1.dp)
+                        .height(260.dp)
+                        .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                )
+                EmptyConnectGuidePanel(
+                    modifier = Modifier.weight(1.15f),
+                    onRefresh = onRefresh
+                )
             }
         }
     }
@@ -623,7 +693,7 @@ private fun EmptyDeviceHero(
     Column(
         modifier = modifier,
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceLarge)
+        verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
         EmptyDeviceIllustration()
         EmptyDeviceIdentity(relativeUpdated = relativeUpdated)
@@ -644,58 +714,141 @@ private fun EmptyDeviceIdentity(
     Column(
         modifier = modifier,
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Text(
-                text = stringResource(Res.string.no_device),
-                style = MaterialTheme.typography.headlineMedium,
+                text = stringResource(Res.string.home_no_device_alert),
+                style = MaterialTheme.typography.titleLarge,
                 color = MaterialTheme.colorScheme.onSurface,
                 fontWeight = FontWeight.Bold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
-            ConnectionStatusBadge(
-                text = stringResource(Res.string.disconnected),
-                active = false
-            )
+            // Modern status badge
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(999.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.75f))
+                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f), RoundedCornerShape(999.dp))
+                    .padding(horizontal = 8.dp, vertical = 2.dp)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(6.dp)
+                            .clip(RoundedCornerShape(999.dp))
+                            .background(Color(0xFFFF9F0A))
+                    )
+                    Text(
+                        text = l10n("等待连接", "Waiting"),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
         }
+
         Text(
-            text = stringResource(Res.string.select_device_hint),
-            style = MaterialTheme.typography.bodySmall,
+            text = l10n("连接 Android 手机、平板或车机后即可开始使用全部调试与管理工具", "Connect your Android device via USB or Wi-Fi to start debugging and management."),
+            style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis
         )
-        DeviceMetaChip(
-            text = stringResource(Res.string.updated_ago, relativeUpdated),
-            icon = IconParkIcons.Refresh
-        )
+
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Icon(
+                imageVector = IconParkIcons.Time,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
+                modifier = Modifier.size(12.dp)
+            )
+            Text(
+                text = stringResource(Res.string.updated_ago, relativeUpdated),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f),
+                maxLines = 1
+            )
+        }
     }
 }
 
+/**
+ * Modern layered device illustration:
+ * Outer ambient halo + inner brand-tinted disc + device mobile glyph + pulsating status badge.
+ */
 @Composable
 private fun EmptyDeviceIllustration() {
-    val outerShape = RoundedCornerShape(UiTokens.RadiusLarge)
-    val innerShape = RoundedCornerShape(UiTokens.RadiusMedium)
+    val brand = QadbColors.primary
+    val infiniteTransition = rememberInfiniteTransition(label = "pulse")
+    val pulseAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.4f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1200, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "pulseAlpha"
+    )
+
     Box(
-        modifier = Modifier
-            .size(92.dp)
-            .background(HomeVisualTokens.Soft, outerShape)
-            .border(1.dp, HomeVisualTokens.Border, outerShape),
+        modifier = Modifier.size(88.dp),
         contentAlignment = Alignment.Center
     ) {
+        // Outer ambient glow ring
         Box(
             modifier = Modifier
-                .size(64.dp)
-                .background(MaterialTheme.colorScheme.surface, innerShape)
-                .border(1.dp, HomeVisualTokens.Border, innerShape),
+                .size(88.dp)
+                .clip(RoundedCornerShape(999.dp))
+                .background(brand.copy(alpha = 0.06f))
+                .border(1.dp, brand.copy(alpha = 0.14f), RoundedCornerShape(999.dp))
+        )
+
+        // Mid container
+        Box(
+            modifier = Modifier
+                .size(60.dp)
+                .clip(RoundedCornerShape(999.dp))
+                .background(brand.copy(alpha = 0.12f)),
             contentAlignment = Alignment.Center
         ) {
-            OpenSourceDeviceIcon(active = false)
+            Icon(
+                imageVector = IconParkIcons.Phone,
+                contentDescription = null,
+                tint = brand,
+                modifier = Modifier.size(30.dp)
+            )
+        }
+
+        // Floating status chip badge (offline / waiting)
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .offset(x = (-2).dp, y = (-2).dp)
+                .size(22.dp)
+                .clip(RoundedCornerShape(999.dp))
+                .background(MaterialTheme.colorScheme.surface)
+                .border(1.5.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(999.dp)),
+            contentAlignment = Alignment.Center
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(8.dp)
+                    .clip(RoundedCornerShape(999.dp))
+                    .background(Color(0xFFFF9F0A).copy(alpha = pulseAlpha))
+            )
         }
     }
 }
@@ -708,46 +861,62 @@ private fun EmptyDeviceActions(
     onRefresh: () -> Unit
 ) {
     if (compactLayout) {
-        Column(verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)) {
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
+        ) {
             EmptyDeviceActionButton(
                 text = stringResource(Res.string.wireless_open_action),
                 icon = IconParkIcons.Wifi,
                 primary = true,
                 enabled = true,
                 onClick = onOpenWirelessConnection,
-                modifier = Modifier.width(220.dp)
+                modifier = Modifier.fillMaxWidth()
             )
             EmptyDeviceActionButton(
                 text = stringResource(Res.string.refresh),
                 icon = IconParkIcons.Refresh,
                 primary = false,
                 enabled = !isLoading,
+                loading = isLoading,
                 onClick = onRefresh,
-                modifier = Modifier.width(220.dp)
+                modifier = Modifier.fillMaxWidth()
             )
         }
     } else {
-        Row(horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium)
+        ) {
             EmptyDeviceActionButton(
                 text = stringResource(Res.string.wireless_open_action),
                 icon = IconParkIcons.Wifi,
                 primary = true,
                 enabled = true,
                 onClick = onOpenWirelessConnection,
-                modifier = Modifier.width(180.dp)
+                modifier = Modifier.weight(1f)
             )
             EmptyDeviceActionButton(
                 text = stringResource(Res.string.refresh),
                 icon = IconParkIcons.Refresh,
                 primary = false,
                 enabled = !isLoading,
+                loading = isLoading,
                 onClick = onRefresh,
-                modifier = Modifier.width(180.dp)
+                modifier = Modifier.weight(1f)
             )
         }
     }
 }
 
+/**
+ * Empty-state action button with full interaction coverage:
+ * - content is centered both horizontally and vertically;
+ * - hover: background tint shift + slight scale-up + elevation shadow;
+ * - pressed: background deepens further;
+ * - loading: spinner indicator;
+ * - disabled: translucent content.
+ */
 @Composable
 private fun EmptyDeviceActionButton(
     text: String,
@@ -755,46 +924,97 @@ private fun EmptyDeviceActionButton(
     primary: Boolean,
     enabled: Boolean,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    loading: Boolean = false
 ) {
-    val containerColor = when {
-        primary && enabled -> MaterialTheme.colorScheme.primary
-        primary -> MaterialTheme.colorScheme.primary.copy(alpha = 0.45f)
-        else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.52f)
-    }
-    val borderColor = if (primary) {
-        MaterialTheme.colorScheme.primary.copy(alpha = if (enabled) 0.18f else 0.10f)
-    } else {
-        MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.62f)
-    }
-    val contentColor = if (primary) QadbColors.onPrimary else MaterialTheme.colorScheme.onSurface
-    val iconColor = if (primary) QadbColors.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+    val shape = RoundedCornerShape(10.dp)
+    val interactionSource = remember { MutableInteractionSource() }
+    val isHovered by interactionSource.collectIsHoveredAsState()
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val clickable = enabled && !loading
 
-    Row(
+    val containerColor by animateColorAsState(
+        targetValue = when {
+            !clickable -> (if (primary) QadbColors.primary else MaterialTheme.colorScheme.surfaceVariant).copy(alpha = 0.45f)
+            primary && isPressed -> Color(0xFF0039CB)
+            primary && isHovered -> Color(0xFF1E53E5)
+            primary -> QadbColors.primary
+            isPressed -> MaterialTheme.colorScheme.surfaceVariant
+            isHovered -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.85f)
+            else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
+        },
+        animationSpec = tween(UiTokens.HoverDurationMillis)
+    )
+    val borderColor by animateColorAsState(
+        targetValue = when {
+            !clickable -> Color.Transparent
+            primary -> containerColor
+            isHovered -> MaterialTheme.colorScheme.outlineVariant
+            else -> MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)
+        },
+        animationSpec = tween(UiTokens.HoverDurationMillis)
+    )
+
+    val contentColor = if (primary) {
+        Color.White
+    } else {
+        MaterialTheme.colorScheme.onSurface
+    }
+
+    val iconColor = if (primary) {
+        Color.White
+    } else if (isHovered && clickable) {
+        MaterialTheme.colorScheme.primary
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant
+    }
+
+    Box(
         modifier = modifier
-            .height(UiTokens.ControlHeight)
-            .background(containerColor, RoundedCornerShape(UiTokens.RadiusLarge))
-            .border(1.dp, borderColor, RoundedCornerShape(UiTokens.RadiusLarge))
-            .homeNoRippleClickable(enabled = enabled, onClick = onClick)
-            .padding(horizontal = UiTokens.SpaceLarge),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.Center
+            .height(UiTokens.InputHeight)
+            .clip(shape)
+            .background(containerColor)
+            .border(1.dp, borderColor, shape)
+            .hoverable(interactionSource)
+            .pointerHoverIcon(if (clickable) PointerIcon.Hand else PointerIcon.Default)
+            .clickable(
+                enabled = clickable,
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onClick
+            )
+            .alpha(if (clickable) 1f else 0.55f),
+        contentAlignment = Alignment.Center
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = text,
-            tint = iconColor,
-            modifier = Modifier.size(UiTokens.IconSmall)
-        )
-        Spacer(modifier = Modifier.width(UiTokens.SpaceSmall))
-        Text(
-            text = text,
-            color = contentColor,
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.SemiBold,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
+        Row(
+            modifier = Modifier.fillMaxSize(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center
+        ) {
+            if (loading) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(16.dp),
+                    color = if (primary) Color.White else MaterialTheme.colorScheme.primary,
+                    strokeWidth = 2.dp
+                )
+            } else {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = text,
+                    tint = iconColor,
+                    modifier = Modifier.size(UiTokens.IconSmall)
+                )
+            }
+            Spacer(modifier = Modifier.width(UiTokens.SpaceSmall))
+            Text(
+                text = text,
+                color = contentColor,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
     }
 }
 
@@ -805,53 +1025,77 @@ private fun EmptyConnectGuidePanel(
 ) {
     Column(
         modifier = modifier
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.28f), RoundedCornerShape(UiTokens.RadiusLarge))
-            .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f), RoundedCornerShape(UiTokens.RadiusLarge))
-            .padding(UiTokens.SpaceLarge),
-        verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium)
+            .clip(RoundedCornerShape(14.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f), RoundedCornerShape(14.dp))
+            .padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         Row(
+            modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
+            horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Box(
-                modifier = Modifier
-                    .size(26.dp)
-                    .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(UiTokens.RadiusMedium))
-                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f), RoundedCornerShape(UiTokens.RadiusMedium)),
-                contentAlignment = Alignment.Center
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Icon(
-                    imageVector = IconParkIcons.Info,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(15.dp)
+                Box(
+                    modifier = Modifier
+                        .size(24.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(QadbColors.primary.copy(alpha = 0.12f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = IconParkIcons.Sparkles,
+                        contentDescription = null,
+                        tint = QadbColors.primary,
+                        modifier = Modifier.size(14.dp)
+                    )
+                }
+                Text(
+                    text = stringResource(Res.string.home_connect_guide_title),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.Bold
                 )
             }
-            Text(
-                text = stringResource(Res.string.home_connect_guide_title),
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-                fontWeight = FontWeight.SemiBold
-            )
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(999.dp))
+                    .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f))
+                    .padding(horizontal = 8.dp, vertical = 2.dp)
+            ) {
+                Text(
+                    text = l10n("3 步接入", "3 Steps"),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = QadbColors.primary,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
         }
 
         EmptyConnectStep(
             index = "1",
+            icon = IconParkIcons.Usb,
             title = stringResource(Res.string.home_connect_step_connect_title),
             description = stringResource(Res.string.home_connect_step_connect_desc)
         )
         EmptyConnectStep(
             index = "2",
+            icon = IconParkIcons.ShieldCheck,
             title = stringResource(Res.string.home_connect_step_authorize_title),
             description = stringResource(Res.string.home_connect_step_authorize_desc)
         )
         EmptyConnectStep(
             index = "3",
+            icon = IconParkIcons.CheckCircle,
             title = stringResource(Res.string.home_connect_step_refresh_title),
             description = stringResource(Res.string.home_connect_step_refresh_desc)
         )
 
+        Spacer(modifier = Modifier.height(2.dp))
         EmptyDeviceRefreshHint(onRefresh = onRefresh)
     }
 }
@@ -859,40 +1103,54 @@ private fun EmptyConnectGuidePanel(
 @Composable
 private fun EmptyConnectStep(
     index: String,
+    icon: ImageVector,
     title: String,
     description: String
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.Top,
-        horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium)
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
+        // Step number container with icon
         Box(
             modifier = Modifier
-                .size(UiTokens.IconLarge)
-                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(UiTokens.BadgeRadius))
-                .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f), RoundedCornerShape(UiTokens.BadgeRadius)),
+                .size(28.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(MaterialTheme.colorScheme.surface)
+                .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f), RoundedCornerShape(8.dp)),
             contentAlignment = Alignment.Center
         ) {
             Text(
                 text = index,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                style = MaterialTheme.typography.labelSmall,
-                fontWeight = FontWeight.SemiBold
+                color = QadbColors.primary,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold
             )
         }
         Column(
             modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceXSmall)
+            verticalArrangement = Arrangement.spacedBy(2.dp)
         ) {
-            Text(
-                text = title,
-                color = MaterialTheme.colorScheme.onSurface,
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(14.dp)
+                )
+                Text(
+                    text = title,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
             Text(
                 text = description,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -908,39 +1166,392 @@ private fun EmptyConnectStep(
 private fun EmptyDeviceRefreshHint(
     onRefresh: () -> Unit
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isHovered by interactionSource.collectIsHoveredAsState()
+    val linkColor by animateColorAsState(
+        targetValue = if (isHovered) {
+            QadbColors.primary.copy(alpha = 0.85f)
+        } else {
+            QadbColors.primary
+        },
+        animationSpec = tween(UiTokens.HoverDurationMillis)
+    )
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(UiTokens.RadiusLarge))
-            .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f), RoundedCornerShape(UiTokens.RadiusLarge))
-            .homeNoRippleClickable(onClick = onRefresh)
-            .padding(horizontal = UiTokens.SpaceMedium, vertical = UiTokens.SpaceSmall),
+            .clip(RoundedCornerShape(8.dp))
+            .background(
+                if (isHovered) QadbColors.primary.copy(alpha = 0.08f) else MaterialTheme.colorScheme.surface.copy(alpha = 0.6f),
+                RoundedCornerShape(8.dp)
+            )
+            .border(
+                1.dp,
+                if (isHovered) QadbColors.primary.copy(alpha = 0.25f) else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
+                RoundedCornerShape(8.dp)
+            )
+            .hoverable(interactionSource)
+            .pointerHoverIcon(PointerIcon.Hand)
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onRefresh
+            )
+            .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        Icon(
-            imageVector = IconParkIcons.Refresh,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(15.dp)
-        )
         Text(
             text = stringResource(Res.string.home_no_device_alert_desc),
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             style = MaterialTheme.typography.bodySmall,
-            maxLines = 2,
+            maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f)
         )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Text(
+                text = stringResource(Res.string.refresh),
+                color = linkColor,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1
+            )
+            Icon(
+                imageVector = IconParkIcons.Right,
+                contentDescription = null,
+                tint = linkColor,
+                modifier = Modifier.size(12.dp)
+            )
+        }
+    }
+}
+
+/**
+ * Two side-by-side / stacked connection mode cards (USB Cable vs Wi-Fi Wireless).
+ */
+@Composable
+private fun EmptyDeviceConnectionModesSection(
+    compactLayout: Boolean,
+    onOpenWirelessConnection: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    if (compactLayout) {
+        Column(
+            modifier = modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            EmptyConnectionModeCard(
+                icon = IconParkIcons.Usb,
+                iconAccent = QadbColors.primary,
+                title = l10n("USB 有线连接", "USB Cable Connection"),
+                badge = l10n("推荐 · 即插即用", "Recommended · Plug & Play"),
+                desc = l10n("支持极速传输、无延迟投屏与固件刷写。插入后请在手机通知栏选择「传输文件 (MTP)」模式。", "High-speed data, ultra-low latency screen mirroring, and file management. Set USB mode to MTP."),
+                actionLabel = null,
+                onAction = null,
+                footerHint = l10n("无需额外配置 · 即插即用", "Plug & play ready · No setup needed"),
+                modifier = Modifier.fillMaxWidth()
+            )
+            EmptyConnectionModeCard(
+                icon = IconParkIcons.Wifi,
+                iconAccent = QadbColors.teal,
+                title = l10n("Wi-Fi 无线调试", "Wi-Fi Wireless Debugging"),
+                badge = l10n("免线缆 · 局域网", "Cable-Free · LAN"),
+                desc = l10n("无需数据线，在相同局域网下通过 IP 与端口号配对连接，支持 Android 11+ 六位配对码快速配对。", "Debug untethered on the same local Wi-Fi network. Supports Android 11+ wireless pairing code."),
+                actionLabel = l10n("配置无线连接 →", "Setup Wireless →"),
+                onAction = onOpenWirelessConnection,
+                footerHint = null,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+    } else {
+        Row(
+            modifier = modifier
+                .fillMaxWidth()
+                .height(IntrinsicSize.Max),
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            EmptyConnectionModeCard(
+                icon = IconParkIcons.Usb,
+                iconAccent = QadbColors.primary,
+                title = l10n("USB 有线连接", "USB Cable Connection"),
+                badge = l10n("推荐 · 即插即用", "Recommended · Plug & Play"),
+                desc = l10n("支持极速传输、无延迟投屏与固件刷写。插入后请在手机通知栏选择「传输文件 (MTP)」模式。", "High-speed data, ultra-low latency screen mirroring, and file management. Set USB mode to MTP."),
+                actionLabel = null,
+                onAction = null,
+                footerHint = l10n("无需额外配置 · 即插即用", "Plug & play ready · No setup needed"),
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+            )
+            EmptyConnectionModeCard(
+                icon = IconParkIcons.Wifi,
+                iconAccent = QadbColors.teal,
+                title = l10n("Wi-Fi 无线调试", "Wi-Fi Wireless Debugging"),
+                badge = l10n("免线缆 · 局域网", "Cable-Free · LAN"),
+                desc = l10n("无需数据线，在相同局域网下通过 IP 与端口号配对连接，支持 Android 11+ 六位配对码快速配对。", "Debug untethered on the same local Wi-Fi network. Supports Android 11+ wireless pairing code."),
+                actionLabel = l10n("配置无线连接 →", "Setup Wireless →"),
+                onAction = onOpenWirelessConnection,
+                footerHint = null,
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+            )
+        }
+    }
+}
+
+@Composable
+private fun EmptyConnectionModeCard(
+    icon: ImageVector,
+    iconAccent: Color,
+    title: String,
+    badge: String,
+    desc: String,
+    actionLabel: String?,
+    onAction: (() -> Unit)?,
+    footerHint: String?,
+    modifier: Modifier = Modifier
+) {
+    val shape = RoundedCornerShape(14.dp)
+    val interactionSource = remember { MutableInteractionSource() }
+    val isHovered by interactionSource.collectIsHoveredAsState()
+
+    val borderColor by animateColorAsState(
+        targetValue = if (isHovered) iconAccent.copy(alpha = 0.45f) else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f),
+        animationSpec = tween(UiTokens.HoverDurationMillis)
+    )
+
+    Box(
+        modifier = modifier
+            .clip(shape)
+            .background(MaterialTheme.colorScheme.surface)
+            .border(1.dp, borderColor, shape)
+            .hoverable(interactionSource)
+            .padding(18.dp)
+    ) {
+        Column(
+            modifier = Modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.SpaceBetween
+        ) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(iconAccent.copy(alpha = 0.12f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = icon,
+                                contentDescription = null,
+                                tint = iconAccent,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                        Text(
+                            text = title,
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(999.dp))
+                            .background(iconAccent.copy(alpha = 0.1f))
+                            .padding(horizontal = 8.dp, vertical = 3.dp)
+                    ) {
+                        Text(
+                            text = badge,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = iconAccent,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
+
+                Text(
+                    text = desc,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 12.dp),
+                contentAlignment = Alignment.CenterStart
+            ) {
+                if (actionLabel != null && onAction != null) {
+                    val actionInteractionSource = remember { MutableInteractionSource() }
+                    val isActionHovered by actionInteractionSource.collectIsHoveredAsState()
+                    Row(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .hoverable(actionInteractionSource)
+                            .pointerHoverIcon(PointerIcon.Hand)
+                            .clickable(
+                                interactionSource = actionInteractionSource,
+                                indication = null,
+                                onClick = onAction
+                            )
+                            .padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text(
+                            text = actionLabel,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = if (isActionHovered) iconAccent.copy(alpha = 0.8f) else iconAccent,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                } else if (footerHint != null) {
+                    Text(
+                        text = footerHint,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f),
+                        modifier = Modifier.padding(vertical = 4.dp)
+                    )
+                } else {
+                    Spacer(Modifier.height(26.dp))
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Common troubleshooting tips banner for ADB connection.
+ */
+@Composable
+private fun EmptyDeviceTroubleshootingBanner(
+    compactLayout: Boolean,
+    onRefresh: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val shape = RoundedCornerShape(14.dp)
+    val warningTone = Color(0xFFFF9F0A)
+
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f))
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f), shape)
+            .padding(18.dp)
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(24.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(warningTone.copy(alpha = 0.14f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = IconParkIcons.Bulb,
+                        contentDescription = null,
+                        tint = warningTone,
+                        modifier = Modifier.size(15.dp)
+                    )
+                }
+                Text(
+                    text = l10n("无法识别设备？快速排查建议", "Device Not Detected? Quick Troubleshooting Tips"),
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+
+            if (compactLayout) {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    TroubleshootingItem(
+                        text = l10n("1. 确认 USB 线支持数据传输（非单纯充电线），并尝试更换电脑 USB 口", "1. Ensure USB cable supports data transfer (not charge-only), or try another USB port.")
+                    )
+                    TroubleshootingItem(
+                        text = l10n("2. 手机未弹出调试授权时，可尝试重新插拔或在开发者选项中「撤销 USB 调试授权」重试", "2. If no prompt appears, reconnect or revoke USB debugging authorizations in Developer Options.")
+                    )
+                    TroubleshootingItem(
+                        text = l10n("3. 关闭其他手机助手或安卓模拟器，避免 ADB 5037 端口被占用冲突", "3. Close other phone managers or emulators to avoid ADB 5037 port conflict.")
+                    )
+                }
+            } else {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    TroubleshootingItem(
+                        text = l10n("1. 确认 USB 线支持数据传输（非纯充电线），可更换电脑 USB 接口", "1. Ensure USB cable supports data transfer, or try another USB port."),
+                        modifier = Modifier.weight(1f)
+                    )
+                    TroubleshootingItem(
+                        text = l10n("2. 若未弹授权框，可重新插拔或在开发者选项中撤销授权后重试", "2. If no prompt appears, reconnect or revoke authorizations in Developer Options."),
+                        modifier = Modifier.weight(1f)
+                    )
+                    TroubleshootingItem(
+                        text = l10n("3. 关闭其他助手软件或模拟器，避免 5037 端口冲突", "3. Close other assistants/emulators to avoid port 5037 conflict."),
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TroubleshootingItem(
+    text: String,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier,
+        verticalAlignment = Alignment.Top,
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .padding(top = 6.dp)
+                .size(4.dp)
+                .clip(RoundedCornerShape(999.dp))
+                .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f))
+        )
         Text(
-            text = stringResource(Res.string.refresh),
-            color = MaterialTheme.colorScheme.primary,
-            style = MaterialTheme.typography.labelMedium,
-            fontWeight = FontWeight.SemiBold,
-            maxLines = 1
+            text = text,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
 }
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

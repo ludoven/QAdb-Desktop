@@ -70,11 +70,13 @@ import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.MenuBar
 import androidx.compose.ui.window.MenuBarScope
+import androidx.compose.ui.window.Tray
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.WindowDecoration
 import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.WindowState
 import androidx.compose.ui.window.application
+import androidx.compose.ui.window.isTraySupported
 import androidx.compose.ui.window.rememberWindowState
 import java.awt.Desktop
 import java.io.File
@@ -83,6 +85,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 import javax.swing.JOptionPane
 import kotlin.system.exitProcess
 import com.ludoven.adbtool.util.AdbTool
+import com.ludoven.adbtool.util.AppBehaviorPreferences
 import com.ludoven.adbtool.util.LanguageManager
 import com.ludoven.adbtool.util.LocalAppLanguage
 import com.ludoven.adbtool.util.ThemeManager
@@ -106,6 +109,12 @@ fun main() = application {
         height = 800.dp,
         position = WindowPosition(Alignment.Center)
     )
+    val behaviorPreferences = remember { AppBehaviorPreferences.store }
+    val minimizeToTrayOnLaunch by behaviorPreferences.minimizeToTrayOnLaunch.collectAsState()
+    val minimizeToTrayOnClose by behaviorPreferences.minimizeToTrayOnClose.collectAsState()
+    var isWindowVisible by remember {
+        mutableStateOf(!behaviorPreferences.minimizeToTrayOnLaunch.value || !isTraySupported)
+    }
     var alwaysOnTop by remember { mutableStateOf(false) }
     val currentLanguage by LanguageManager.currentLanguage.collectAsState()
     val currentThemeMode by ThemeManager.currentThemeMode.collectAsState()
@@ -126,11 +135,34 @@ fun main() = application {
             exitProcess(0)
         }
     }
+    val showMainWindow: () -> Unit = {
+        isWindowVisible = true
+        windowState.isMinimized = false
+    }
+    val handleWindowClose: () -> Unit = {
+        if (minimizeToTrayOnClose && isTraySupported) {
+            isWindowVisible = false
+        } else {
+            shutdownAndExit()
+        }
+    }
 
     CompositionLocalProvider(LocalAppLanguage provides currentLanguage) {
+        if (isTraySupported && (minimizeToTrayOnLaunch || minimizeToTrayOnClose || !isWindowVisible)) {
+            Tray(
+                icon = appIcon,
+                tooltip = "QADB",
+                onAction = showMainWindow
+            ) {
+                Item(l10n("显示 QADB", "Show QADB"), onClick = showMainWindow)
+                Separator()
+                Item(stringResource(Res.string.menu_exit), onClick = shutdownAndExit)
+            }
+        }
         Window(
-            onCloseRequest = shutdownAndExit,
+            onCloseRequest = handleWindowClose,
             state = windowState,
+            visible = isWindowVisible,
             title = "QADB",
             icon = appIcon,
             decoration = if (isWindows) {
@@ -166,7 +198,7 @@ fun main() = application {
                 isWindows = isWindows,
                 useDarkTheme = useDarkTheme,
                 windowState = windowState,
-                onClose = shutdownAndExit
+                onClose = handleWindowClose
             ) {
                 App()
             }

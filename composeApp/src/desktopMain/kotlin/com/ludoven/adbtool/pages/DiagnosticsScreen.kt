@@ -58,7 +58,7 @@ fun DiagnosticsScreen(
                         .fillMaxWidth()
                         .padding(
                             horizontal = UiTokens.PagePadding,
-                            vertical = UiTokens.SpaceLarge
+                            vertical = UiTokens.SpaceSmall
                         )
                 )
                 Box(modifier = Modifier.fillMaxSize()) {

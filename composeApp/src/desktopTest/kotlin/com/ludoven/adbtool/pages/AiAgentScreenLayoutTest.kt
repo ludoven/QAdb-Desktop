@@ -10,10 +10,10 @@ import kotlin.test.assertTrue
 class AiAgentScreenLayoutTest {
     @Test
     fun `layout breakpoints select single overlay and permanent device panels`() {
-        assertEquals(AgentScreenLayout.SINGLE_COLUMN, agentScreenLayout(719.9f))
-        assertEquals(AgentScreenLayout.OVERLAY_DEVICE_PANEL, agentScreenLayout(720f))
-        assertEquals(AgentScreenLayout.OVERLAY_DEVICE_PANEL, agentScreenLayout(959.9f))
-        assertEquals(AgentScreenLayout.PERMANENT_DEVICE_PANEL, agentScreenLayout(960f))
+        assertEquals(AgentScreenLayout.SINGLE_COLUMN, agentScreenLayout(1079.9f))
+        assertEquals(AgentScreenLayout.OVERLAY_DEVICE_PANEL, agentScreenLayout(1080f))
+        assertEquals(AgentScreenLayout.OVERLAY_DEVICE_PANEL, agentScreenLayout(1279.9f))
+        assertEquals(AgentScreenLayout.PERMANENT_DEVICE_PANEL, agentScreenLayout(1280f))
     }
 
     @Test

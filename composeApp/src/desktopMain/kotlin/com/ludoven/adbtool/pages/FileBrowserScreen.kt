@@ -1,10 +1,10 @@
 package com.ludoven.adbtool.pages
 
 import com.ludoven.adbtool.UiTokens
+import com.ludoven.adbtool.QadbColors
+import com.ludoven.adbtool.QadbTokens
 import com.ludoven.adbtool.ui.icons.IconParkIcons
-
 import com.ludoven.adbtool.ui.mac.*
-
 import com.ludoven.adbtool.entity.FileInfo
 import com.ludoven.adbtool.entity.FileSortBy
 import com.ludoven.adbtool.entity.FileSortOrder
@@ -12,8 +12,10 @@ import com.ludoven.adbtool.entity.MsgContent
 import com.ludoven.adbtool.util.AdbTool
 import com.ludoven.adbtool.util.l10n
 import com.ludoven.adbtool.viewmodel.FileBrowserViewModel
-import com.ludoven.adbtool.widget.EmptyStatePanel
 import com.ludoven.adbtool.widget.FeedbackToast
+import com.ludoven.adbtool.widget.FileEmptyKind
+import com.ludoven.adbtool.widget.FileEmptyState
+import com.ludoven.adbtool.widget.FramedStateSurface
 import com.ludoven.adbtool.widget.PageHeader
 import androidx.compose.foundation.*
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -23,6 +25,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
@@ -38,13 +41,16 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import kotlin.math.max
 import org.jetbrains.compose.resources.stringResource
 
@@ -224,43 +230,83 @@ fun FileBrowserScreen(
     }
 
     Column(
-        modifier = Modifier.fillMaxSize().padding(UiTokens.PagePaddingCompact),
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = UiTokens.PagePadding, vertical = UiTokens.SectionSpacingCompact),
         verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium)
     ) {
+        // ── Header: Title & Actions ───────────────────────────────────────────
         PageHeader(
             title = l10n("文件管理", "File Manager"),
             subtitle = l10n("浏览和管理设备文件", "Browse and manage device files")
         ) {
-            Row(horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall), verticalAlignment = Alignment.CenterVertically) {
-                OutlinedButton(
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Primary Action: Upload
+                Button(
                     onClick = { viewModel.pushFile(selectedDevice) },
                     enabled = deviceActionsEnabled,
+                    modifier = Modifier.height(34.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = QadbColors.onPrimary
+                    ),
                     shape = RoundedCornerShape(UiTokens.RadiusMedium),
-                    contentPadding = PaddingValues(horizontal = UiTokens.SpaceMedium, vertical = UiTokens.SpaceSmall)
+                    contentPadding = PaddingValues(horizontal = UiTokens.SpaceMedium, vertical = 0.dp)
                 ) {
-                    Icon(Icons.Default.Upload, null, modifier = Modifier.size(UiTokens.IconSmall))
-                    Spacer(Modifier.width(UiTokens.SpaceSmall))
-                    Text(l10n("上传", "Upload"))
+                    Icon(
+                        Icons.Default.Upload,
+                        contentDescription = null,
+                        modifier = Modifier.size(UiTokens.IconSmall),
+                        tint = QadbColors.onPrimary
+                    )
+                    Spacer(Modifier.width(UiTokens.SpaceXSmall))
+                    Text(
+                        l10n("上传", "Upload"),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = QadbColors.onPrimary
+                    )
                 }
+
+                // Secondary Action: New Folder
                 OutlinedButton(
                     onClick = { showNewDirDialog = true },
                     enabled = deviceActionsEnabled,
+                    modifier = Modifier.height(34.dp),
                     shape = RoundedCornerShape(UiTokens.RadiusMedium),
-                    contentPadding = PaddingValues(horizontal = UiTokens.SpaceMedium, vertical = UiTokens.SpaceSmall)
+                    contentPadding = PaddingValues(horizontal = UiTokens.SpaceMedium, vertical = 0.dp)
                 ) {
-                    Icon(IconParkIcons.FolderAdd, null, modifier = Modifier.size(UiTokens.IconSmall))
-                    Spacer(Modifier.width(UiTokens.SpaceSmall))
-                    Text(l10n("新建文件夹", "New folder"))
+                    Icon(
+                        IconParkIcons.FolderAdd,
+                        contentDescription = null,
+                        modifier = Modifier.size(UiTokens.IconSmall)
+                    )
+                    Spacer(Modifier.width(UiTokens.SpaceXSmall))
+                    Text(
+                        l10n("新建文件夹", "New folder"),
+                        style = MaterialTheme.typography.labelLarge
+                    )
                 }
+
+                // Tool Action: More
                 Box {
-                    OutlinedButton(
-                        onClick = { toolbarMenuExpanded = true },
-                        shape = RoundedCornerShape(UiTokens.RadiusMedium),
-                        contentPadding = PaddingValues(horizontal = UiTokens.SpaceMedium, vertical = UiTokens.SpaceSmall)
+                    Box(
+                        modifier = Modifier
+                            .size(34.dp)
+                            .clip(RoundedCornerShape(UiTokens.RadiusMedium))
+                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
+                            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(UiTokens.RadiusMedium))
+                            .clickable { toolbarMenuExpanded = true },
+                        contentAlignment = Alignment.Center
                     ) {
-                        Icon(IconParkIcons.More, null, modifier = Modifier.size(UiTokens.IconSmall))
-                        Spacer(Modifier.width(UiTokens.SpaceSmall))
-                        Text(l10n("更多", "More"))
+                        Icon(
+                            IconParkIcons.More,
+                            contentDescription = l10n("更多", "More"),
+                            modifier = Modifier.size(16.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                     DropdownMenu(
                         expanded = toolbarMenuExpanded,
@@ -288,16 +334,16 @@ fun FileBrowserScreen(
         }
 
         if (selectedDevice.isNullOrBlank()) {
-            EmptyStatePanel(
+            FileEmptyState(
+                kind = FileEmptyKind.NoDevice,
                 title = l10n("未选择设备", "No device selected"),
                 description = l10n("请先连接并选择设备后查看文件。", "Connect and select a device before browsing files."),
-                icon = IconParkIcons.Folder,
                 modifier = Modifier.fillMaxSize()
             )
             return
         }
 
-        // Navigation toolbar
+        // ── Navigation Toolbar ────────────────────────────────────────────────
         NavigationToolbar(
             currentPath = currentPath,
             canGoBack = viewModel.canGoBack(),
@@ -311,49 +357,152 @@ fun FileBrowserScreen(
             onSearchChange = { viewModel.setSearchKeyword(it) },
         )
 
-        // Quick paths
+        // ── Quick Path Bar ────────────────────────────────────────────────────
         QuickPathBar(
             currentPath = currentPath,
             onNavigate = { viewModel.navigateTo(it, selectedDevice) }
         )
 
-        // File count and status bar
+        // ── Sorting & Count Row ───────────────────────────────────────────────
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
+            ) {
                 Text(
                     text = l10n("${filteredFiles.size} 项", "${filteredFiles.size} items"),
                     style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = UiTokens.TextBody
                 )
                 Text(
                     text = currentPath,
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
             }
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
                 SortChip(l10n("名称", "Name"), sortBy == FileSortBy.NAME, sortOrder) { viewModel.setSortBy(FileSortBy.NAME) }
                 SortChip(l10n("大小", "Size"), sortBy == FileSortBy.SIZE, sortOrder) { viewModel.setSortBy(FileSortBy.SIZE) }
                 SortChip(l10n("日期", "Date"), sortBy == FileSortBy.DATE, sortOrder) { viewModel.setSortBy(FileSortBy.DATE) }
             }
         }
 
-        // File list
-        Box(
+        // ── Multi-selection Action Bar (Conditional) ──────────────────────────
+        if (selectedPaths.isNotEmpty()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(UiTokens.RadiusMedium))
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.50f))
+                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.70f), RoundedCornerShape(UiTokens.RadiusMedium))
+                    .padding(horizontal = UiTokens.SpaceMedium, vertical = 6.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(UiTokens.BadgeRadius))
+                        .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.75f))
+                        .padding(horizontal = 8.dp, vertical = 3.dp)
+                ) {
+                    Text(
+                        text = l10n("已选 ${selectedPaths.size} 项", "${selectedPaths.size} selected"),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    OutlinedButton(
+                        onClick = {
+                            selectedPaths.forEach { viewModel.pullFile(it, selectedDevice) }
+                        },
+                        modifier = Modifier.height(30.dp),
+                        shape = RoundedCornerShape(UiTokens.RadiusSmall),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp)
+                    ) {
+                        Icon(IconParkIcons.Download, null, modifier = Modifier.size(13.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text(l10n("下载", "Download"), style = MaterialTheme.typography.labelSmall)
+                    }
+                    if (selectedPaths.size == 1) {
+                        OutlinedButton(
+                            onClick = {
+                                selectedPaths.firstOrNull()?.let {
+                                    val f = filteredFiles.firstOrNull { file -> "$currentPath/${file.name}" == it }
+                                    if (f != null) {
+                                        renameTarget = f
+                                        renameText = f.name
+                                        showRenameDialog = true
+                                    }
+                                }
+                            },
+                            modifier = Modifier.height(30.dp),
+                            shape = RoundedCornerShape(UiTokens.RadiusSmall),
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp)
+                        ) {
+                            Icon(Icons.Default.Edit, null, modifier = Modifier.size(13.dp))
+                            Spacer(Modifier.width(4.dp))
+                            Text(l10n("重命名", "Rename"), style = MaterialTheme.typography.labelSmall)
+                        }
+                    }
+                    OutlinedButton(
+                        onClick = {
+                            val copied = copyToClipboardText(selectedPaths.joinToString("\n"))
+                            viewModel.showToast(
+                                MsgContent.Text(if (copied) l10n("已复制 ${selectedPaths.size} 个路径", "Copied ${selectedPaths.size} paths") else l10n("复制失败", "Copy failed"))
+                            )
+                        },
+                        modifier = Modifier.height(30.dp),
+                        shape = RoundedCornerShape(UiTokens.RadiusSmall),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp)
+                    ) {
+                        Icon(Icons.Default.ContentCopy, null, modifier = Modifier.size(13.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text(l10n("复制路径", "Copy path"), style = MaterialTheme.typography.labelSmall)
+                    }
+                    Button(
+                        onClick = {
+                            if (selectedPaths.isNotEmpty()) {
+                                deleteTargets = selectedPaths.toList()
+                                showDeleteConfirm = true
+                            }
+                        },
+                        modifier = Modifier.height(30.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.8f),
+                            contentColor = MaterialTheme.colorScheme.error
+                        ),
+                        shape = RoundedCornerShape(UiTokens.RadiusSmall),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp)
+                    ) {
+                        Icon(Icons.Default.Delete, null, modifier = Modifier.size(13.dp), tint = MaterialTheme.colorScheme.error)
+                        Spacer(Modifier.width(4.dp))
+                        Text(l10n("删除", "Delete"), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error)
+                    }
+                }
+            }
+        }
+
+        // ── File List Area (FramedStateSurface) ────────────────────────────────
+        FramedStateSurface(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth()
-                .background(
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.28f),
-                    shape = RoundedCornerShape(UiTokens.RadiusLarge)
-                )
-                .padding(UiTokens.SpaceSmall)
         ) {
             when {
                 isLoading -> {
@@ -362,25 +511,31 @@ fun FileBrowserScreen(
                     }
                 }
                 errorText != null -> {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        EmptyStatePanel(
-                            title = l10n("目录读取失败", "Failed to load folder"),
-                            description = errorText.orEmpty(),
-                            actionLabel = l10n("重试", "Retry"),
-                            onAction = { viewModel.loadFiles(deviceId = selectedDevice, forceRefresh = true) }
-                        )
-                    }
-                }
-                filteredFiles.isEmpty() -> {
-                    EmptyStatePanel(
-                        title = if (searchKeyword.isBlank()) l10n("此目录为空", "This folder is empty") else l10n("没有匹配文件", "No matching files"),
-                        description = if (searchKeyword.isBlank()) {
-                            l10n("当前路径没有可显示的文件或文件夹。", "This path has no visible files or folders.")
-                        } else {
-                            l10n("调整搜索词或清除筛选后再试。", "Adjust the search term or clear the filter.")
-                        },
+                    FileEmptyState(
+                        kind = FileEmptyKind.EmptyFolder,
+                        title = l10n("目录读取失败", "Failed to load folder"),
+                        description = errorText.orEmpty(),
+                        actionLabel = l10n("重试", "Retry"),
+                        onAction = { viewModel.loadFiles(deviceId = selectedDevice, forceRefresh = true) },
                         modifier = Modifier.fillMaxSize()
                     )
+                }
+                filteredFiles.isEmpty() -> {
+                    if (searchKeyword.isNotBlank()) {
+                        FileEmptyState(
+                            kind = FileEmptyKind.NoMatchingFiles,
+                            title = l10n("没有匹配文件", "No matching files"),
+                            description = l10n("调整搜索词或清除筛选后再试。", "Adjust the search term or clear the filter."),
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    } else {
+                        FileEmptyState(
+                            kind = FileEmptyKind.EmptyFolder,
+                            title = l10n("此目录为空", "This folder is empty"),
+                            description = l10n("当前路径没有可显示的文件或文件夹。", "This path has no visible files or folders."),
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
                 }
                 else -> {
                     Box(
@@ -390,67 +545,90 @@ fun FileBrowserScreen(
                                 fileListRootPx = coordinates.positionInRoot()
                             }
                     ) {
-                        // Column header
                         Column(modifier = Modifier.fillMaxSize()) {
                             // Header row
-                            Row(modifier = Modifier.fillMaxWidth().padding(horizontal = UiTokens.SpaceSmall, vertical = UiTokens.SpaceSmall)) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f))
+                                    .padding(horizontal = UiTokens.SpaceMedium, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Spacer(modifier = Modifier.width(UiTokens.IndicatorWidth + UiTokens.SpaceSmall))
                                 Text(
-                                    text = l10n("名称", "Name"),
+                                    text = l10n("名称", "Name").uppercase(),
                                     modifier = Modifier.weight(1f),
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    fontWeight = FontWeight.SemiBold
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        fontSize = 10.sp,
+                                        letterSpacing = 0.6.sp
+                                    ),
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
+                                    fontWeight = FontWeight.Bold
                                 )
                                 Text(
-                                    text = l10n("大小", "Size"),
+                                    text = l10n("大小", "Size").uppercase(),
                                     modifier = Modifier.width(80.dp),
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    fontWeight = FontWeight.SemiBold
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        fontSize = 10.sp,
+                                        letterSpacing = 0.6.sp
+                                    ),
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
+                                    fontWeight = FontWeight.Bold
                                 )
                                 Text(
-                                    text = l10n("修改日期", "Modified"),
+                                    text = l10n("修改日期", "Modified").uppercase(),
                                     modifier = Modifier.width(130.dp),
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    fontWeight = FontWeight.SemiBold
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        fontSize = 10.sp,
+                                        letterSpacing = 0.6.sp
+                                    ),
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
+                                    fontWeight = FontWeight.Bold
                                 )
                                 if (showAdvancedFields) {
                                     Text(
-                                        text = l10n("权限", "Permission"),
+                                        text = l10n("权限", "Permission").uppercase(),
                                         modifier = Modifier.width(110.dp),
-                                        style = MaterialTheme.typography.labelMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        fontWeight = FontWeight.SemiBold
+                                        style = MaterialTheme.typography.labelSmall.copy(
+                                            fontSize = 10.sp,
+                                            letterSpacing = 0.6.sp
+                                        ),
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
+                                        fontWeight = FontWeight.Bold
                                     )
                                     Text(
-                                        text = l10n("所有者", "Owner"),
+                                        text = l10n("所有者", "Owner").uppercase(),
                                         modifier = Modifier.width(80.dp),
-                                        style = MaterialTheme.typography.labelMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        fontWeight = FontWeight.SemiBold
+                                        style = MaterialTheme.typography.labelSmall.copy(
+                                            fontSize = 10.sp,
+                                            letterSpacing = 0.6.sp
+                                        ),
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
+                                        fontWeight = FontWeight.Bold
                                     )
                                 } else {
                                     Text(
-                                        text = l10n("类型", "Type"),
+                                        text = l10n("类型", "Type").uppercase(),
                                         modifier = Modifier.width(90.dp),
-                                        style = MaterialTheme.typography.labelMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        fontWeight = FontWeight.SemiBold
+                                        style = MaterialTheme.typography.labelSmall.copy(
+                                            fontSize = 10.sp,
+                                            letterSpacing = 0.6.sp
+                                        ),
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
+                                        fontWeight = FontWeight.Bold
                                     )
                                 }
                             }
 
-                            HorizontalDivider(modifier = Modifier.padding(horizontal = UiTokens.SpaceXSmall, vertical = UiTokens.SpaceXSmall))
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.60f))
 
                             // File rows
                             Box(modifier = Modifier.weight(1f)) {
                                 LazyColumn(
                                     modifier = Modifier
                                         .fillMaxSize()
-                                        .padding(end = UiTokens.SpaceMedium),
-                                    state = listState,
-                                    verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceXSmall)
+                                        .padding(end = UiTokens.SpaceSmall),
+                                    state = listState
                                 ) {
                                     items(filteredFiles, key = { it.name }) { file ->
                                         FileRow(
@@ -478,6 +656,7 @@ fun FileBrowserScreen(
                                                 contextMenuExpanded = true
                                             }
                                         )
+                                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.30f))
                                     }
                                 }
 
@@ -487,6 +666,7 @@ fun FileBrowserScreen(
                                         .align(Alignment.CenterEnd)
                                         .fillMaxHeight()
                                         .padding(end = UiTokens.SpaceXSmall)
+                                        .padding(vertical = UiTokens.SpaceSmall)
                                 )
                             }
                         }
@@ -615,71 +795,23 @@ fun FileBrowserScreen(
             }
         }
 
-        if (selectedPaths.isNotEmpty()) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                OutlinedButton(
-                    onClick = {
-                        selectedPaths.forEach { viewModel.pullFile(it, selectedDevice) }
-                    },
-                    shape = RoundedCornerShape(UiTokens.RadiusMedium)
-                ) { Text(l10n("下载", "Download")) }
-                OutlinedButton(
-                    onClick = {
-                        selectedPaths.firstOrNull()?.let {
-                            val f = filteredFiles.firstOrNull { file -> "$currentPath/${file.name}" == it }
-                            if (f != null) {
-                                renameTarget = f
-                                renameText = f.name
-                                showRenameDialog = true
-                            }
-                        }
-                    },
-                    enabled = selectedPaths.size == 1,
-                    shape = RoundedCornerShape(UiTokens.RadiusMedium)
-                ) { Text(l10n("重命名", "Rename")) }
-                OutlinedButton(
-                    onClick = {
-                        val copied = copyToClipboardText(selectedPaths.joinToString("\n"))
-                        viewModel.showToast(
-                            MsgContent.Text(if (copied) l10n("已复制 ${selectedPaths.size} 个路径", "Copied ${selectedPaths.size} paths") else l10n("复制失败", "Copy failed"))
-                        )
-                    },
-                    shape = RoundedCornerShape(UiTokens.RadiusMedium)
-                ) { Text(l10n("复制路径", "Copy path")) }
-                OutlinedButton(
-                    onClick = {
-                        if (selectedPaths.isNotEmpty()) {
-                            deleteTargets = selectedPaths.toList()
-                            showDeleteConfirm = true
-                        }
-                    },
-                    shape = RoundedCornerShape(UiTokens.RadiusMedium)
-                ) { Text(l10n("删除", "Delete")) }
-            }
-        }
-
+        // ── Bottom Summary Bar ────────────────────────────────────────────────
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.28f), RoundedCornerShape(UiTokens.RadiusMedium))
-                .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)), RoundedCornerShape(UiTokens.RadiusMedium))
-                .padding(horizontal = UiTokens.SpaceMedium, vertical = UiTokens.SpaceSmall),
+                .padding(horizontal = UiTokens.SpaceSmall, vertical = 2.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
                 text = l10n("${filteredFiles.size} 项 · 已选择 ${selectedPaths.size} 项", "${filteredFiles.size} items · selected ${selectedPaths.size}"),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
             )
             Text(
-                text = l10n("路径: $currentPath · 可用空间: $availableSpace", "Path: $currentPath · Free: $availableSpace"),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                text = l10n("可用空间: $availableSpace", "Free: $availableSpace"),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -687,6 +819,7 @@ fun FileBrowserScreen(
     }
 }
 
+// ── Navigation Toolbar ────────────────────────────────────────────────────────
 @Composable
 private fun NavigationToolbar(
     currentPath: String,
@@ -703,8 +836,7 @@ private fun NavigationToolbar(
     var pathInput by remember(currentPath) { mutableStateOf(currentPath) }
     var isEditingPath by remember(currentPath) { mutableStateOf(false) }
     val crumbs = remember(currentPath) {
-        currentPath.trim('/').split("/")
-            .filter { it.isNotBlank() }
+        currentPath.trim('/').split("/").filter { it.isNotBlank() }
     }
     val crumbPaths = remember(currentPath, crumbs) {
         crumbs.mapIndexed { index, _ ->
@@ -712,104 +844,275 @@ private fun NavigationToolbar(
         }
     }
 
-    Surface(
-        shape = RoundedCornerShape(UiTokens.RadiusMedium),
-        color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
     ) {
+        // Nav button group (Back, Forward, Up, Refresh)
         Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = UiTokens.SpaceSmall, vertical = UiTokens.SpaceSmall),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
+            horizontalArrangement = Arrangement.spacedBy(2.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            IconButton(onClick = onBack, enabled = canGoBack) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, l10n("后退", "Back"), modifier = Modifier.size(UiTokens.IconMedium))
-            }
-            IconButton(onClick = onForward, enabled = canGoForward) {
-                Icon(Icons.AutoMirrored.Filled.ArrowForward, l10n("前进", "Forward"), modifier = Modifier.size(UiTokens.IconMedium))
-            }
-            IconButton(onClick = onUp) {
-                Icon(Icons.Default.ArrowUpward, l10n("上一级", "Up"), modifier = Modifier.size(UiTokens.IconMedium))
-            }
-            IconButton(onClick = onRefresh) {
-                Icon(IconParkIcons.Refresh, l10n("刷新", "Refresh"), modifier = Modifier.size(UiTokens.IconMedium))
-            }
+            NavIconButton(
+                icon = Icons.AutoMirrored.Filled.ArrowBack,
+                tooltip = l10n("后退", "Back"),
+                enabled = canGoBack,
+                onClick = onBack
+            )
+            NavIconButton(
+                icon = Icons.AutoMirrored.Filled.ArrowForward,
+                tooltip = l10n("前进", "Forward"),
+                enabled = canGoForward,
+                onClick = onForward
+            )
+            NavIconButton(
+                icon = Icons.Default.ArrowUpward,
+                tooltip = l10n("上一级", "Up"),
+                enabled = currentPath != "/" && currentPath.isNotBlank(),
+                onClick = onUp
+            )
+            NavIconButton(
+                icon = IconParkIcons.Refresh,
+                tooltip = l10n("刷新", "Refresh"),
+                enabled = true,
+                onClick = onRefresh
+            )
+        }
 
-            if (isEditingPath) {
-                OutlinedTextField(
-                    value = pathInput,
-                    onValueChange = { pathInput = it },
-                    modifier = Modifier.weight(1f),
-                    singleLine = true,
-                    textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-                    placeholder = { Text(l10n("输入路径", "Input path"), style = MaterialTheme.typography.bodySmall) },
-                    trailingIcon = {
-                        IconButton(
-                            onClick = {
+        // Path breadcrumbs or text input field
+        if (isEditingPath) {
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .height(34.dp)
+                    .clip(RoundedCornerShape(UiTokens.RadiusMedium))
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
+                    .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.6f), RoundedCornerShape(UiTokens.RadiusMedium))
+                    .padding(horizontal = UiTokens.SpaceSmall),
+                contentAlignment = Alignment.CenterStart
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
+                ) {
+                    Icon(
+                        IconParkIcons.Folder,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(14.dp)
+                    )
+                    BasicTextField(
+                        value = pathInput,
+                        onValueChange = { pathInput = it },
+                        modifier = Modifier.weight(1f),
+                        singleLine = true,
+                        cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                        textStyle = MaterialTheme.typography.bodySmall.copy(
+                            color = MaterialTheme.colorScheme.onSurface,
+                            fontFamily = FontFamily.Monospace
+                        ),
+                        decorationBox = { inner ->
+                            if (pathInput.isBlank()) {
+                                Text(
+                                    l10n("输入路径...", "Input path..."),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            inner()
+                        }
+                    )
+                    Box(
+                        modifier = Modifier
+                            .size(24.dp)
+                            .clip(RoundedCornerShape(UiTokens.RadiusSmall))
+                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f))
+                            .clickable {
                                 if (pathInput.isNotBlank()) onNavigateToPath(pathInput.trim())
                                 isEditingPath = false
-                            }
-                        ) { Icon(Icons.Default.Check, l10n("确认", "Confirm"), modifier = Modifier.size(UiTokens.IconSmall)) }
-                    }
-                )
-            } else {
-                Row(
-                    modifier = Modifier
-                        .weight(1f)
-                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.28f), RoundedCornerShape(UiTokens.RadiusMedium))
-                        .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)), RoundedCornerShape(UiTokens.RadiusMedium))
-                        .padding(horizontal = UiTokens.SpaceSmall, vertical = UiTokens.SpaceSmall),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceXSmall)
-                ) {
-                    Text(
-                        text = l10n("内部存储", "Internal storage"),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier.clickable { onNavigateToPath("/sdcard") }
-                    )
-                    crumbs.forEachIndexed { index, crumb ->
-                        Icon(IconParkIcons.Right, null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text(
-                            text = crumb,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.clickable { onNavigateToPath(crumbPaths.getOrNull(index) ?: "/sdcard") }
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            Icons.Default.Check,
+                            contentDescription = l10n("确认", "Confirm"),
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(13.dp)
                         )
                     }
                 }
             }
+        } else {
+            Row(
+                modifier = Modifier
+                    .weight(1f)
+                    .height(34.dp)
+                    .clip(RoundedCornerShape(UiTokens.RadiusMedium))
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
+                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(UiTokens.RadiusMedium))
+                    .padding(horizontal = UiTokens.SpaceSmall),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceXSmall)
+            ) {
+                // Root / Storage icon + click
+                Row(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(UiTokens.RadiusSmall))
+                        .clickable { onNavigateToPath("/sdcard") }
+                        .padding(horizontal = 4.dp, vertical = 2.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Icon(
+                        IconParkIcons.HardDisk,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(13.dp)
+                    )
+                    Text(
+                        text = l10n("内部存储", "Internal"),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
 
-            IconButton(onClick = { isEditingPath = !isEditingPath }) {
-                Icon(
-                    if (isEditingPath) Icons.Default.ViewModule else Icons.Default.Edit,
-                    l10n("切换路径输入", "Toggle path input"),
-                    modifier = Modifier.size(UiTokens.IconMedium)
-                )
+                crumbs.forEachIndexed { index, crumb ->
+                    Icon(
+                        IconParkIcons.Right,
+                        null,
+                        modifier = Modifier.size(11.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                    )
+                    Text(
+                        text = crumb,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (index == crumbs.lastIndex) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontWeight = if (index == crumbs.lastIndex) FontWeight.SemiBold else FontWeight.Normal,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(UiTokens.RadiusSmall))
+                            .clickable { onNavigateToPath(crumbPaths.getOrNull(index) ?: "/sdcard") }
+                            .padding(horizontal = 4.dp, vertical = 2.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.weight(1f))
+
+                // Toggle edit icon
+                Box(
+                    modifier = Modifier
+                        .size(24.dp)
+                        .clip(RoundedCornerShape(UiTokens.RadiusSmall))
+                        .clickable { isEditingPath = true },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        Icons.Default.Edit,
+                        contentDescription = l10n("编辑路径", "Edit path"),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                        modifier = Modifier.size(13.dp)
+                    )
+                }
             }
-            OutlinedTextField(
-                value = searchKeyword,
-                onValueChange = onSearchChange,
-                modifier = Modifier.widthIn(min = 220.dp, max = 320.dp),
-                singleLine = true,
-                textStyle = MaterialTheme.typography.bodySmall,
-                placeholder = { Text(l10n("搜索文件名...", "Search file name..."), style = MaterialTheme.typography.bodySmall) },
-                leadingIcon = { Icon(IconParkIcons.Search, l10n("搜索", "Search"), modifier = Modifier.size(UiTokens.IconMedium)) },
-                trailingIcon = {
-                    if (searchKeyword.isNotEmpty()) {
-                        IconButton(onClick = { onSearchChange("") }, modifier = Modifier.size(UiTokens.IconMedium)) {
-                            Icon(Icons.Default.Clear, l10n("清除", "Clear"), modifier = Modifier.size(UiTokens.IconSmall))
+        }
+
+        // Search input field
+        Box(
+            modifier = Modifier
+                .widthIn(min = 200.dp, max = 280.dp)
+                .height(34.dp)
+                .clip(RoundedCornerShape(UiTokens.RadiusMedium))
+                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
+                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(UiTokens.RadiusMedium))
+                .padding(horizontal = UiTokens.SpaceSmall),
+            contentAlignment = Alignment.CenterStart
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
+            ) {
+                Icon(
+                    IconParkIcons.Search,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(13.dp)
+                )
+                BasicTextField(
+                    value = searchKeyword,
+                    onValueChange = onSearchChange,
+                    modifier = Modifier.weight(1f),
+                    singleLine = true,
+                    cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                    textStyle = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurface),
+                    decorationBox = { inner ->
+                        if (searchKeyword.isEmpty()) {
+                            Text(
+                                l10n("搜索文件名...", "Search files..."),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
                         }
+                        inner()
+                    }
+                )
+                if (searchKeyword.isNotEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .size(18.dp)
+                            .clip(RoundedCornerShape(UiTokens.BadgeRadius))
+                            .clickable { onSearchChange("") },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            Icons.Default.Clear,
+                            contentDescription = l10n("清除", "Clear"),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(12.dp)
+                        )
                     }
                 }
-            )
+            }
         }
     }
 }
 
+@Composable
+private fun NavIconButton(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    tooltip: String,
+    enabled: Boolean,
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .size(32.dp)
+            .clip(RoundedCornerShape(UiTokens.RadiusMedium))
+            .background(if (enabled) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f) else Color.Transparent)
+            .border(
+                1.dp,
+                if (enabled) MaterialTheme.colorScheme.outlineVariant else Color.Transparent,
+                RoundedCornerShape(UiTokens.RadiusMedium)
+            )
+            .clickable(enabled = enabled) { onClick() },
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = tooltip,
+            tint = if (enabled) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f),
+            modifier = Modifier.size(15.dp)
+        )
+    }
+}
+
+// ── Quick Path Bar ────────────────────────────────────────────────────────────
 @Composable
 private fun QuickPathBar(
     currentPath: String,
@@ -819,7 +1122,8 @@ private fun QuickPathBar(
         modifier = Modifier
             .fillMaxWidth()
             .horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceXSmall)
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
         FileBrowserViewModel.QUICK_PATHS.forEach { (path, label) ->
             val isActive = currentPath == path || currentPath.startsWith("$path/")
@@ -834,21 +1138,27 @@ private fun QuickPathBar(
                 "/tmp" -> l10n("临时文件", "Temp")
                 else -> label
             }
-            Surface(
-                onClick = { onNavigate(path) },
-                shape = RoundedCornerShape(UiTokens.RadiusSmall),
-                color = if (isActive) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(
-                    alpha = 0.5f
-                ),
-                border = if (isActive) androidx.compose.foundation.BorderStroke(
-                    1.dp,
-                    MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
-                ) else null
+            val shape = RoundedCornerShape(UiTokens.BadgeRadius)
+            Box(
+                modifier = Modifier
+                    .clip(shape)
+                    .background(
+                        if (isActive) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.65f)
+                        else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
+                    )
+                    .border(
+                        1.dp,
+                        if (isActive) MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
+                        else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.65f),
+                        shape
+                    )
+                    .clickable { onNavigate(path) }
+                    .padding(horizontal = UiTokens.SpaceSmall, vertical = 5.dp),
+                contentAlignment = Alignment.Center
             ) {
                 Row(
-                    modifier = Modifier.padding(horizontal = UiTokens.SpaceSmall, vertical = UiTokens.SpaceSmall),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceXSmall)
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     Icon(
                         when (path) {
@@ -862,7 +1172,7 @@ private fun QuickPathBar(
                             else -> IconParkIcons.Folder
                         },
                         localizedLabel,
-                        modifier = Modifier.size(14.dp),
+                        modifier = Modifier.size(13.dp),
                         tint = if (isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
@@ -877,6 +1187,7 @@ private fun QuickPathBar(
     }
 }
 
+// ── Sort Chip ─────────────────────────────────────────────────────────────────
 @Composable
 private fun SortChip(
     label: String,
@@ -884,35 +1195,47 @@ private fun SortChip(
     order: FileSortOrder,
     onClick: () -> Unit
 ) {
-    Surface(
-        onClick = onClick,
-        shape = RoundedCornerShape(UiTokens.SpaceXSmall),
-        color = if (isActive) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f) else MaterialTheme.colorScheme.surfaceVariant.copy(
-            alpha = 0.3f
-        )
+    val shape = RoundedCornerShape(UiTokens.BadgeRadius)
+    Box(
+        modifier = Modifier
+            .clip(shape)
+            .background(
+                if (isActive) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.60f)
+                else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.40f)
+            )
+            .border(
+                1.dp,
+                if (isActive) MaterialTheme.colorScheme.primary.copy(alpha = 0.40f)
+                else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.50f),
+                shape
+            )
+            .clickable { onClick() }
+            .padding(horizontal = 8.dp, vertical = 4.dp),
+        contentAlignment = Alignment.Center
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = UiTokens.SpaceSmall, vertical = UiTokens.SpaceXSmall),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceXSmall)
+            horizontalArrangement = Arrangement.spacedBy(3.dp)
         ) {
             Text(
                 text = label,
-                style = MaterialTheme.typography.labelSmall,
+                style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
                 color = if (isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                 fontWeight = if (isActive) FontWeight.SemiBold else FontWeight.Normal
             )
             if (isActive) {
                 Text(
                     text = if (order == FileSortOrder.ASC) "↑" else "↓",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Bold
                 )
             }
         }
     }
 }
 
+// ── File Row ──────────────────────────────────────────────────────────────────
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
 private fun FileRow(
@@ -926,8 +1249,8 @@ private fun FileRow(
     val rowInteraction = remember { MutableInteractionSource() }
     val isHovered by rowInteraction.collectIsHoveredAsState()
     val bgColor = when {
-        isHighlighted -> MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
-        isHovered -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.32f)
+        isHighlighted -> MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
+        isHovered -> QadbColors.surfaceHover
         else -> Color.Transparent
     }
     var rowRootPx by remember(file.name) { mutableStateOf(Offset.Zero) }
@@ -940,11 +1263,14 @@ private fun FileRow(
         else -> l10n("文件", "File")
     }
 
-    Surface(
-        shape = RoundedCornerShape(UiTokens.RadiusMedium),
-        color = bgColor,
+    val warningColor = QadbTokens.warning
+    val brandColor = QadbTokens.brand
+
+    Row(
         modifier = Modifier
             .fillMaxWidth()
+            .heightIn(min = 36.dp, max = 40.dp)
+            .background(bgColor)
             .hoverable(rowInteraction)
             .onGloballyPositioned { coordinates ->
                 rowRootPx = coordinates.positionInRoot()
@@ -965,102 +1291,118 @@ private fun FileRow(
                 onLongClick = { onRightClick(rowRootPx) },
                 onDoubleClick = onOpen
             )
+            .padding(horizontal = UiTokens.SpaceMedium, vertical = UiTokens.SpaceSmall),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(min = 36.dp, max = 42.dp)
-                .padding(horizontal = UiTokens.SpaceSmall, vertical = UiTokens.SpaceSmall),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Name column with icon
-            Row(
-                modifier = Modifier.weight(1f),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
-            ) {
-                Icon(
-                    imageVector = when {
-                        file.isDirectory -> IconParkIcons.Folder
-                        file.isSymlink -> IconParkIcons.Link
-                        file.name.endsWith(".apk") -> Icons.Default.Android
-                        file.name.endsWith(".zip") || file.name.endsWith(".tar") || file.name.endsWith(".gz") -> Icons.Default.Archive
-                        file.name.endsWith(".jpg") || file.name.endsWith(".png") || file.name.endsWith(".gif") -> Icons.Default.Image
-                        file.name.endsWith(".mp3") || file.name.endsWith(".wav") || file.name.endsWith(".ogg") -> Icons.Default.MusicNote
-                        file.name.endsWith(".mp4") || file.name.endsWith(".avi") || file.name.endsWith(".mkv") -> IconParkIcons.Video
-                        file.name.endsWith(".txt") || file.name.endsWith(".log") || file.name.endsWith(".json") || file.name.endsWith(".xml") -> IconParkIcons.FileText
-                        file.name.endsWith(".sh") || file.name.endsWith(".py") || file.name.endsWith(".java") || file.name.endsWith(".kt") -> IconParkIcons.Code
-                        else -> IconParkIcons.File
-                    },
-                    contentDescription = null,
-                    modifier = Modifier.size(UiTokens.IconMedium),
-                    tint = when {
-                        file.isDirectory -> MaterialTheme.colorScheme.primary
-                        file.isSymlink -> MaterialTheme.colorScheme.tertiary
-                        file.name.endsWith(".apk") -> MaterialTheme.colorScheme.secondary
-                        else -> MaterialTheme.colorScheme.onSurfaceVariant
-                    }
-                )
-                Column {
-                    Text(
-                        text = file.name,
-                        style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        fontWeight = if (file.isDirectory) FontWeight.SemiBold else FontWeight.Normal
+        // Selection indicator bar
+        if (isHighlighted) {
+            Box(
+                modifier = Modifier
+                    .width(UiTokens.IndicatorWidth)
+                    .height(20.dp)
+                    .padding(end = UiTokens.SpaceSmall)
+                    .background(
+                        MaterialTheme.colorScheme.primary,
+                        RoundedCornerShape(UiTokens.RadiusSmall)
                     )
-                    if (file.isSymlink && file.symlinkTarget.isNotEmpty()) {
-                        Text(
-                            text = "-> ${file.symlinkTarget}",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
+            )
+        } else {
+            Spacer(modifier = Modifier.width(UiTokens.IndicatorWidth))
+        }
+
+        // Name column with icon
+        Row(
+            modifier = Modifier.weight(1f),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
+        ) {
+            Icon(
+                imageVector = when {
+                    file.isDirectory -> IconParkIcons.Folder
+                    file.isSymlink -> IconParkIcons.Link
+                    file.name.endsWith(".apk") -> Icons.Default.Android
+                    file.name.endsWith(".zip") || file.name.endsWith(".tar") || file.name.endsWith(".gz") -> Icons.Default.Archive
+                    file.name.endsWith(".jpg") || file.name.endsWith(".png") || file.name.endsWith(".gif") -> Icons.Default.Image
+                    file.name.endsWith(".mp3") || file.name.endsWith(".wav") || file.name.endsWith(".ogg") -> Icons.Default.MusicNote
+                    file.name.endsWith(".mp4") || file.name.endsWith(".avi") || file.name.endsWith(".mkv") -> IconParkIcons.Video
+                    file.name.endsWith(".txt") || file.name.endsWith(".log") || file.name.endsWith(".json") || file.name.endsWith(".xml") -> IconParkIcons.FileText
+                    file.name.endsWith(".sh") || file.name.endsWith(".py") || file.name.endsWith(".java") || file.name.endsWith(".kt") -> IconParkIcons.Code
+                    else -> IconParkIcons.File
+                },
+                contentDescription = null,
+                modifier = Modifier.size(UiTokens.IconMedium),
+                tint = when {
+                    file.isDirectory -> MaterialTheme.colorScheme.primary
+                    file.isSymlink -> MaterialTheme.colorScheme.tertiary
+                    file.name.endsWith(".apk") -> MaterialTheme.colorScheme.secondary
+                    file.name.endsWith(".zip") || file.name.endsWith(".tar") || file.name.endsWith(".gz") -> warningColor
+                    file.name.endsWith(".jpg") || file.name.endsWith(".png") || file.name.endsWith(".gif") -> brandColor
+                    else -> MaterialTheme.colorScheme.onSurfaceVariant
+                }
+            )
+            Column {
+                Text(
+                    text = file.name,
+                    style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    fontWeight = if (file.isDirectory) FontWeight.SemiBold else FontWeight.Normal
+                )
+                if (file.isSymlink && file.symlinkTarget.isNotEmpty()) {
+                    Text(
+                        text = "-> ${file.symlinkTarget}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
             }
-            // Size
+        }
+
+        // Size
+        Text(
+            text = if (file.isDirectory) "-" else file.displaySize,
+            modifier = Modifier.width(80.dp),
+            style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+
+        // Date
+        Text(
+            text = "${file.date} ${file.time}",
+            modifier = Modifier.width(130.dp),
+            style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+
+        // Advanced / Type
+        if (showAdvancedFields) {
             Text(
-                text = if (file.isDirectory) "-" else file.displaySize,
+                text = file.permissions,
+                modifier = Modifier.width(110.dp),
+                style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = file.owner,
                 modifier = Modifier.width(80.dp),
                 style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
-            // Date
+        } else {
             Text(
-                text = "${file.date} ${file.time}",
-                modifier = Modifier.width(130.dp),
-                style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                text = fileType,
+                modifier = Modifier.width(90.dp),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
-            if (showAdvancedFields) {
-                Text(
-                    text = file.permissions,
-                    modifier = Modifier.width(110.dp),
-                    style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    text = file.owner,
-                    modifier = Modifier.width(80.dp),
-                    style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            } else {
-                Text(
-                    text = fileType,
-                    modifier = Modifier.width(90.dp),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
         }
     }
 }

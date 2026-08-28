@@ -85,6 +85,7 @@ import com.ludoven.adbtool.util.WirelessAdbConnectionManager
 import com.ludoven.adbtool.entity.AdbFunctionType
 import com.ludoven.adbtool.entity.MsgContent
 import com.ludoven.adbtool.util.AdbTool
+import com.ludoven.adbtool.util.AppBehaviorPreferences
 import com.ludoven.adbtool.util.l10n
 import com.ludoven.adbtool.viewmodel.AppViewModel
 import com.ludoven.adbtool.viewmodel.AiAgentViewModel
@@ -122,89 +123,101 @@ fun App() {
     val currentLanguage by LanguageManager.currentLanguage.collectAsState()
     val agentFeaturePreferences = remember { AgentFeatureRuntime.preferences }
     val agentFeatureEnabled by agentFeaturePreferences.enabled.collectAsState()
+    val behaviorPreferences = remember { AppBehaviorPreferences.store }
     LaunchedEffect(Unit) {
         LanguageManager.initialize()
         ThemeManager.initialize()
         AdbPathManager.getAdbPath()
+        if (behaviorPreferences.autoDetectDeviceOnLaunch.value) {
+            devicesViewModel.refreshDevices()
+        }
     }
 
     CompositionLocalProvider(LocalAppLanguage provides currentLanguage) {
-    val tabGroups = listOf(
-        SidebarGroup(
-            id = "home",
-            label = stringResource(Res.string.home),
-            icon = IconParkIcons.Home,
-            defaultRoute = "home",
-            items = listOf(TabItem(stringResource(Res.string.home), IconParkIcons.Home, "home")),
-            collapsible = false
-        ),
-        SidebarGroup(
-            id = "common",
-            label = l10n("命令", "Commands"),
-            icon = IconParkIcons.Command,
-            defaultRoute = "common",
-            items = listOf(TabItem(l10n("命令", "Commands"), IconParkIcons.Command, "common")),
-            collapsible = false
-        ),
-        SidebarGroup(
-            id = "device-control",
-            label = l10n("设备控制", "Device Control"),
-            icon = IconParkIcons.Phone,
-            defaultRoute = "device-control",
-            items = listOf(TabItem(l10n("设备控制", "Device Control"), IconParkIcons.Phone, "device-control")),
-            collapsible = false
-        ),
-        SidebarGroup(
-            id = "app",
-            label = stringResource(Res.string.app),
-            icon = IconParkIcons.System,
-            defaultRoute = "app",
-            items = listOf(TabItem(stringResource(Res.string.app), IconParkIcons.System, "app")),
-            collapsible = false
-        ),
-        SidebarGroup(
-            id = "filebrowser",
-            label = stringResource(Res.string.file_browser),
-            icon = IconParkIcons.File,
-            defaultRoute = "filebrowser",
-            items = listOf(TabItem(stringResource(Res.string.file_browser), IconParkIcons.File, "filebrowser")),
-            collapsible = false
-        ),
-        SidebarGroup(
-            id = "diagnostics",
-            label = l10n("诊断", "Diagnostics"),
-            icon = IconParkIcons.ChartLine,
-            defaultRoute = "diagnostics",
-            items = listOf(TabItem(l10n("诊断", "Diagnostics"), IconParkIcons.ChartLine, "diagnostics")),
-            collapsible = false
-        ),
-        SidebarGroup(
-            id = "terminal",
-            label = stringResource(Res.string.terminal),
-            icon = IconParkIcons.Terminal,
-            defaultRoute = "terminal",
-            items = listOf(TabItem(stringResource(Res.string.terminal), IconParkIcons.Terminal, "terminal")),
-            collapsible = false
-        ),
-        *listOfNotNull(
+    val homeLabel = stringResource(Res.string.home)
+    val appLabel = stringResource(Res.string.app)
+    val fileBrowserLabel = stringResource(Res.string.file_browser)
+    val terminalLabel = stringResource(Res.string.terminal)
+    val setLabel = stringResource(Res.string.set)
+
+    val tabGroups = remember(currentLanguage, agentFeatureEnabled, homeLabel, appLabel, fileBrowserLabel, terminalLabel, setLabel) {
+        listOf(
             SidebarGroup(
-                id = "ai",
-                label = l10n("AI Agent", "AI Agent"),
-                icon = IconParkIcons.AiAssistant,
-                defaultRoute = "ai",
-                items = listOf(TabItem(l10n("AI Agent", "AI Agent"), IconParkIcons.AiAssistant, "ai")),
+                id = "home",
+                label = homeLabel,
+                icon = IconParkIcons.Home,
+                defaultRoute = "home",
+                items = listOf(TabItem(homeLabel, IconParkIcons.Home, "home")),
                 collapsible = false
-            ).takeIf { agentFeatureEnabled }
-        ).toTypedArray(),
-        SidebarGroup(
-            id = "settings",
-            label = stringResource(Res.string.set),
-            icon = IconParkIcons.Setting,
-            defaultRoute = "setting",
-            items = listOf(TabItem(stringResource(Res.string.set), IconParkIcons.Setting, "setting")),
-            collapsible = false
+            ),
+            SidebarGroup(
+                id = "common",
+                label = l10n("命令", "Commands"),
+                icon = IconParkIcons.Command,
+                defaultRoute = "common",
+                items = listOf(TabItem(l10n("命令", "Commands"), IconParkIcons.Command, "common")),
+                collapsible = false
+            ),
+            SidebarGroup(
+                id = "device-control",
+                label = l10n("设备控制", "Device Control"),
+                icon = IconParkIcons.Phone,
+                defaultRoute = "device-control",
+                items = listOf(TabItem(l10n("设备控制", "Device Control"), IconParkIcons.Phone, "device-control")),
+                collapsible = false
+            ),
+            SidebarGroup(
+                id = "app",
+                label = appLabel,
+                icon = IconParkIcons.System,
+                defaultRoute = "app",
+                items = listOf(TabItem(appLabel, IconParkIcons.System, "app")),
+                collapsible = false
+            ),
+            SidebarGroup(
+                id = "filebrowser",
+                label = fileBrowserLabel,
+                icon = IconParkIcons.File,
+                defaultRoute = "filebrowser",
+                items = listOf(TabItem(fileBrowserLabel, IconParkIcons.File, "filebrowser")),
+                collapsible = false
+            ),
+            SidebarGroup(
+                id = "diagnostics",
+                label = l10n("诊断", "Diagnostics"),
+                icon = IconParkIcons.ChartLine,
+                defaultRoute = "diagnostics",
+                items = listOf(TabItem(l10n("诊断", "Diagnostics"), IconParkIcons.ChartLine, "diagnostics")),
+                collapsible = false
+            ),
+            SidebarGroup(
+                id = "terminal",
+                label = terminalLabel,
+                icon = IconParkIcons.Terminal,
+                defaultRoute = "terminal",
+                items = listOf(TabItem(terminalLabel, IconParkIcons.Terminal, "terminal")),
+                collapsible = false
+            ),
+            *listOfNotNull(
+                SidebarGroup(
+                    id = "ai",
+                    label = l10n("AI Agent", "AI Agent"),
+                    icon = IconParkIcons.AiAssistant,
+                    defaultRoute = "ai",
+                    items = listOf(TabItem(l10n("AI Agent", "AI Agent"), IconParkIcons.AiAssistant, "ai")),
+                    collapsible = false
+                ).takeIf { agentFeatureEnabled }
+            ).toTypedArray(),
+            SidebarGroup(
+                id = "settings",
+                label = setLabel,
+                icon = IconParkIcons.Setting,
+                defaultRoute = "setting",
+                items = listOf(TabItem(setLabel, IconParkIcons.Setting, "setting")),
+                collapsible = false
+            )
         )
-    )
+    }
 
     val navController = rememberNavController()
     val stateHolder = rememberSaveableStateHolder()

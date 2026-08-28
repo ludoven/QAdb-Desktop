@@ -29,6 +29,7 @@ import com.ludoven.adbtool.viewmodel.KeyEventViewModel
 import com.ludoven.adbtool.viewmodel.LogViewModel
 import com.ludoven.adbtool.viewmodel.appListLoadShouldApply
 import com.ludoven.adbtool.viewmodel.fileListLoadShouldApply
+import com.ludoven.adbtool.viewmodel.parseDumpsysPackages
 import com.ludoven.adbtool.viewmodel.parseRunningPackagesFromActivityProcesses
 import java.util.ArrayDeque
 import kotlin.test.Test
@@ -527,6 +528,81 @@ class SecurityAndPerformanceFixesTest {
         assertEquals(false, homeDeviceConnected(""))
         assertEquals(false, homeDeviceConnected("   "))
         assertEquals(true, homeDeviceConnected("emulator-5554"))
+    }
+
+    @Test
+    fun `dumpsys packages parser should extract version, flags and timestamps`() {
+        val dumpsys = """
+            Package [com.example.app] (3089d2f):
+              userId=10185
+              pkg=Package{a8a25c com.example.app}
+              versionCode=1240 minSdk=26 targetSdk=34
+              versionName=2.4.0
+              pkgFlags=[ DEBUGGABLE HAS_CODE ALLOW_CLEAR_USER_DATA ]
+              firstInstallTime=2024-03-15 10:20:30
+              lastUpdateTime=2024-03-16 14:05:00
+              enabled=0
+
+            Package [com.android.systemui] (b54f9a1):
+              userId=1000
+              pkg=Package{c4123d com.android.systemui}
+              versionCode=34 minSdk=34 targetSdk=34
+              versionName=14
+              pkgFlags=[ SYSTEM HAS_CODE ]
+              firstInstallTime=2024-01-01 00:00:00
+              lastUpdateTime=2024-01-01 00:00:00
+              enabled=disabled-user
+        """.trimIndent()
+
+        val parsed = parseDumpsysPackages(dumpsys)
+        assertEquals(2, parsed.size)
+
+        val app = parsed["com.example.app"]
+        assertEquals("2.4.0", app?.versionName)
+        assertEquals("1240", app?.versionCode)
+        assertEquals(true, app?.isDebuggable)
+        assertEquals(false, app?.isSystemApp)
+        assertEquals(false, app?.isDisabled)
+        assertEquals("2024-03-15 10:20:30", app?.firstInstallTime)
+
+        val sysUi = parsed["com.android.systemui"]
+        assertEquals("14", sysUi?.versionName)
+        assertEquals("34", sysUi?.versionCode)
+        assertEquals(true, sysUi?.isSystemApp)
+        assertEquals(true, sysUi?.isDisabled)
+    }
+
+    @Test
+    fun `detectLikelyPackage should identify highest scoring non-system package`() {
+        val logs = listOf(
+            LogEntry(System.currentTimeMillis(), com.ludoven.adbtool.entity.LogLevel.INFO, "ActivityTaskManager", "START u0 {act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] cmp=com.tencent.mm/.ui.LauncherUI}", 1000, 1000),
+            LogEntry(System.currentTimeMillis(), com.ludoven.adbtool.entity.LogLevel.INFO, "com.tencent.mm", "onCreate finished", 2000, 2000),
+            LogEntry(System.currentTimeMillis(), com.ludoven.adbtool.entity.LogLevel.DEBUG, "android.view.ViewRootImpl", "ViewRootImpl draw", 2000, 2000),
+            LogEntry(System.currentTimeMillis(), com.ludoven.adbtool.entity.LogLevel.INFO, "com.tencent.mm.app", "Application initialized", 2000, 2000)
+        )
+
+        val likely = LogViewModel.detectLikelyPackage(logs)
+        assertEquals("com.tencent.mm", likely)
+    }
+
+    @Test
+    fun `parseLogcatTimestamp should convert timestamp string to epoch millis`() {
+        val millis = LogViewModel.parseLogcatTimestamp("08-28 16:30:00.500")
+        assertEquals(true, millis > 0)
+
+        val fallback = LogViewModel.parseLogcatTimestamp("invalid-time")
+        assertEquals(true, fallback > 0)
+    }
+
+    @Test
+    fun `adb_commands json should be loadable from classloaders`() {
+        val streamZh = CommonModel::class.java.classLoader?.getResourceAsStream("adb_commands.json")
+            ?: Thread.currentThread().contextClassLoader?.getResourceAsStream("adb_commands.json")
+        assertEquals(true, streamZh != null)
+
+        val streamEn = CommonModel::class.java.classLoader?.getResourceAsStream("adb_commands_en.json")
+            ?: Thread.currentThread().contextClassLoader?.getResourceAsStream("adb_commands_en.json")
+        assertEquals(true, streamEn != null)
     }
 
 }

@@ -16,7 +16,7 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.sp
-import com.ludoven.adbtool.QadbColors
+import com.ludoven.adbtool.QadbTokens
 import com.ludoven.adbtool.UiTokens
 import com.ludoven.adbtool.ui.mac.Text
 
@@ -33,10 +33,10 @@ internal fun AgentMarkdownText(
     modifier: Modifier = Modifier
 ) {
     val palette = AgentMarkdownPalette(
-        text = QadbColors.textPrimary,
-        secondaryText = QadbColors.textSecondary,
-        link = QadbColors.primary,
-        codeBackground = QadbColors.surfaceVariant
+        text = QadbTokens.textPrimary,
+        secondaryText = QadbTokens.textSecondary,
+        link = QadbTokens.brand,
+        codeBackground = QadbTokens.bg3
     )
     val annotatedText = remember(text, palette) {
         buildAgentMarkdownAnnotatedString(text, palette)

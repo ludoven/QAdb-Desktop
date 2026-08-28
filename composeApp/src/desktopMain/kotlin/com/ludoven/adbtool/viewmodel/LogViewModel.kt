@@ -17,11 +17,15 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.text.SimpleDateFormat
+import java.time.LocalDateTime
+import java.time.ZoneId
 import java.util.*
 
 @OptIn(FlowPreview::class)
@@ -30,6 +34,12 @@ class LogViewModel : ViewModel() {
         internal const val MAX_LOG_ENTRIES = 10_000
         private const val LOG_UI_BATCH_SIZE = 40
         private const val LOG_UI_PUBLISH_INTERVAL_MS = 100L
+
+        private val PACKAGE_PATTERN = Regex("""([a-zA-Z][a-zA-Z0-9_]*(?:\.[a-zA-Z0-9_]+){2,})""")
+        private val STRUCTURED_REGEX = Regex("""^(\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}\.\d{3})\s+(\d+)\s+(\d+)\s+([VDIWEF])\s+(.+?):\s?(.*)$""")
+        private val LEGACY_REGEX = Regex("""^(\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}\.\d{3})\s+([VDIWEF])\/([^\(]+)\(\s*(\d+)\):\s(.*)$""")
+        private val SYSTEM_ZONE = ZoneId.systemDefault()
+        private val CURRENT_YEAR = LocalDateTime.now().year
 
         internal fun appendWithLimit(buffer: ArrayDeque<LogEntry>, entry: LogEntry, maxEntries: Int = MAX_LOG_ENTRIES) {
             if (buffer.size >= maxEntries) {
@@ -54,6 +64,47 @@ class LogViewModel : ViewModel() {
             val activeDevice = normalizedCaptureDevice(activeCaptureDevice) ?: return false
             return activeDevice != normalizedCaptureDevice(nextSelectedDevice)
         }
+
+        internal fun detectLikelyPackage(logs: List<LogEntry>): String? {
+            if (logs.isEmpty()) return null
+            val score = HashMap<String, Int>()
+            val sampleSize = 1200
+            val startIndex = (logs.size - sampleSize).coerceAtLeast(0)
+            for (i in startIndex until logs.size) {
+                val entry = logs[i]
+                PACKAGE_PATTERN.findAll(entry.tag).forEach { match ->
+                    val candidate = match.value
+                    if (!candidate.startsWith("android.") && !candidate.startsWith("java.")) {
+                        score[candidate] = (score[candidate] ?: 0) + 1
+                    }
+                }
+                PACKAGE_PATTERN.findAll(entry.message).forEach { match ->
+                    val candidate = match.value
+                    if (!candidate.startsWith("android.") && !candidate.startsWith("java.")) {
+                        score[candidate] = (score[candidate] ?: 0) + 1
+                    }
+                }
+            }
+            return score.maxByOrNull { it.value }?.key
+        }
+
+        internal fun parseLogcatTimestamp(time: String): Long {
+            if (time.length < 18) return System.currentTimeMillis()
+            return try {
+                val month = time.substring(0, 2).toInt()
+                val day = time.substring(3, 5).toInt()
+                val hour = time.substring(6, 8).toInt()
+                val minute = time.substring(9, 11).toInt()
+                val second = time.substring(12, 14).toInt()
+                val millis = time.substring(15, 18).toInt()
+                LocalDateTime.of(CURRENT_YEAR, month, day, hour, minute, second, millis * 1_000_000)
+                    .atZone(SYSTEM_ZONE)
+                    .toInstant()
+                    .toEpochMilli()
+            } catch (_: Exception) {
+                System.currentTimeMillis()
+            }
+        }
     }
 
     private val _logs = MutableStateFlow<List<LogEntry>>(emptyList())
@@ -77,6 +128,12 @@ class LogViewModel : ViewModel() {
     val filteredLogs: StateFlow<List<LogEntry>> = combine(_logs, _filter) { logs, filter ->
         applyFilters(logs, filter)
     }.debounce(100).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val likelyCurrentPackage: StateFlow<String?> = _logs
+        .debounce(300)
+        .map { logs -> detectLikelyPackage(logs) }
+        .flowOn(Dispatchers.Default)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
     private var logProcess: Process? = null
     private var activeCaptureDevice: String? = null
@@ -129,16 +186,12 @@ class LogViewModel : ViewModel() {
                 ChildProcessRegistry.register(logProcess!!)
 
                 logProcess?.inputStream?.bufferedReader()?.use { reader ->
-                    val dateFormat = SimpleDateFormat("MM-dd HH:mm:ss.SSS", Locale.getDefault())
-                    val structuredRegex = Regex("""^(\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}\.\d{3})\s+(\d+)\s+(\d+)\s+([VDIWEF])\s+(.+?):\s?(.*)$""")
-                    val legacyRegex = Regex("""^(\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}\.\d{3})\s+([VDIWEF])\/([^\(]+)\(\s*(\d+)\):\s(.*)$""")
-
                     while (_isCapturing.value) {
                         val line = reader.readLine() ?: break
                         val trimmed = line.trim()
 
                         val entry = run {
-                            val structuredMatch = structuredRegex.find(trimmed)
+                            val structuredMatch = STRUCTURED_REGEX.find(trimmed)
                             if (structuredMatch != null) {
                                 val (time, pidStr, tidStr, levelChar, tag, message) = structuredMatch.destructured
                                 createLogEntry(
@@ -147,11 +200,10 @@ class LogViewModel : ViewModel() {
                                     tag = tag.trim(),
                                     message = message.trim(),
                                     pid = pidStr.trim().toIntOrNull() ?: 0,
-                                    tid = tidStr.trim().toIntOrNull() ?: 0,
-                                    dateFormat = dateFormat
+                                    tid = tidStr.trim().toIntOrNull() ?: 0
                                 )
                             } else {
-                                val legacyMatch = legacyRegex.find(trimmed)
+                                val legacyMatch = LEGACY_REGEX.find(trimmed)
                                 if (legacyMatch != null) {
                                     val (time, levelChar, tag, pidStr, message) = legacyMatch.destructured
                                     createLogEntry(
@@ -160,8 +212,7 @@ class LogViewModel : ViewModel() {
                                         tag = tag.trim(),
                                         message = message.trim(),
                                         pid = pidStr.trim().toIntOrNull() ?: 0,
-                                        tid = 0,
-                                        dateFormat = dateFormat
+                                        tid = 0
                                     )
                                 } else {
                                     createLogEntry(
@@ -170,8 +221,7 @@ class LogViewModel : ViewModel() {
                                         tag = "logcat",
                                         message = trimmed,
                                         pid = 0,
-                                        tid = 0,
-                                        dateFormat = dateFormat
+                                        tid = 0
                                     )
                                 }
                             }
@@ -345,8 +395,7 @@ class LogViewModel : ViewModel() {
         tag: String,
         message: String,
         pid: Int,
-        tid: Int,
-        dateFormat: SimpleDateFormat
+        tid: Int
     ): LogEntry {
         val level = when (levelChar) {
             "V" -> LogLevel.VERBOSE
@@ -361,11 +410,7 @@ class LogViewModel : ViewModel() {
         val timestamp = if (time.isBlank()) {
             System.currentTimeMillis()
         } else {
-            try {
-                dateFormat.parse(time)?.time ?: System.currentTimeMillis()
-            } catch (_: Exception) {
-                System.currentTimeMillis()
-            }
+            parseLogcatTimestamp(time)
         }
 
         return LogEntry(
@@ -386,11 +431,10 @@ class LogViewModel : ViewModel() {
         keywordRegex: Regex?
     ): Boolean {
         if (keywordRaw.isBlank()) return true
-        val target = "${entry.tag} ${entry.message}"
         return if (isRegex) {
-            keywordRegex?.containsMatchIn(target) ?: false
+            keywordRegex?.let { it.containsMatchIn(entry.tag) || it.containsMatchIn(entry.message) } ?: false
         } else {
-            target.lowercase().contains(keywordLower)
+            entry.tag.contains(keywordLower, ignoreCase = true) || entry.message.contains(keywordLower, ignoreCase = true)
         }
     }
 }

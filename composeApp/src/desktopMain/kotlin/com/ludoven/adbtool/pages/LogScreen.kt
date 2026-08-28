@@ -31,6 +31,13 @@ import adbtool_desktop.composeapp.generated.resources.log_resume
 import adbtool_desktop.composeapp.generated.resources.log_subtitle
 import adbtool_desktop.composeapp.generated.resources.log_title
 import adbtool_desktop.composeapp.generated.resources.log_waiting
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -49,6 +56,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
@@ -56,6 +64,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.rememberScrollbarAdapter
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.VerticalScrollbar
@@ -78,6 +87,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.font.FontFamily
@@ -85,11 +95,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.TooltipArea
 import com.ludoven.adbtool.entity.LogEntry
 import com.ludoven.adbtool.entity.LogFilter
 import com.ludoven.adbtool.entity.LogLevel
 import com.ludoven.adbtool.UiTokens
 import com.ludoven.adbtool.QadbColors
+import com.ludoven.adbtool.QadbTokens
 import com.ludoven.adbtool.ui.icons.IconParkIcons
 import com.ludoven.adbtool.ui.mac.Button
 import com.ludoven.adbtool.ui.mac.ButtonDefaults
@@ -101,6 +113,7 @@ import com.ludoven.adbtool.ui.mac.Icon
 import com.ludoven.adbtool.ui.mac.IconButton
 import com.ludoven.adbtool.ui.mac.MaterialTheme
 import com.ludoven.adbtool.ui.mac.OutlinedButton
+import com.ludoven.adbtool.ui.mac.Surface
 import com.ludoven.adbtool.ui.mac.Text
 import com.ludoven.adbtool.ui.mac.bodyMedium
 import com.ludoven.adbtool.ui.mac.bodySmall
@@ -108,7 +121,9 @@ import com.ludoven.adbtool.ui.mac.labelLarge
 import com.ludoven.adbtool.ui.mac.labelSmall
 import com.ludoven.adbtool.ui.mac.titleMedium
 import com.ludoven.adbtool.viewmodel.LogViewModel
-import com.ludoven.adbtool.widget.EmptyStatePanel
+import com.ludoven.adbtool.widget.DiagnosticsEmptyKind
+import com.ludoven.adbtool.widget.DiagnosticsEmptyState
+import com.ludoven.adbtool.widget.FramedStateSurface
 import com.ludoven.adbtool.widget.InlineStatusBanner
 import com.ludoven.adbtool.widget.InlineStatusTone
 import org.jetbrains.compose.resources.stringResource
@@ -152,7 +167,7 @@ fun LogScreen(
     var selectedLogKey by remember { mutableStateOf<String?>(null) }
 
     val filteredLogs by viewModel.filteredLogs.collectAsState()
-    val likelyCurrentPackage = remember(logs) { detectLikelyPackage(logs) }
+    val likelyCurrentPackage by viewModel.likelyCurrentPackage.collectAsState()
     val captureDevice = selectedDevice?.takeIf { logCaptureActionsEnabled(it) }
 
     LaunchedEffect(selectedDevice) {
@@ -189,19 +204,21 @@ fun LogScreen(
             .padding(horizontal = UiTokens.PagePadding, vertical = UiTokens.SectionSpacingCompact),
         verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium)
     ) {
-        // Header row: title/subtitle on the left, capture status badge top-right, toolbar underneath.
-        Box(modifier = Modifier.fillMaxWidth()) {
+        // ── Header: title+subtitle on left, status dot + toolbar on right ────────
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             Column(
-                modifier = Modifier
-                    .align(Alignment.CenterStart)
-                    .padding(end = UiTokens.SpaceXXXLarge),
+                modifier = Modifier.weight(1f).padding(end = UiTokens.SpaceMedium),
                 verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceXSmall)
             ) {
                 Text(
                     text = stringResource(Res.string.log_title),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
-                    fontSize = UiTokens.TextSectionLarge
+                    fontSize = UiTokens.TextSection
                 )
                 Text(
                     text = stringResource(Res.string.log_subtitle),
@@ -210,258 +227,265 @@ fun LogScreen(
                 )
             }
 
-            Column(
-                modifier = Modifier.align(Alignment.TopEnd),
-                horizontalAlignment = Alignment.End,
-                verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceXSmall),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                CaptureStatusBadge(isCapturing = isCapturing)
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall),
-                    verticalAlignment = Alignment.CenterVertically
+                // Status dot + main action
+                CaptureStatusDot(isCapturing = isCapturing)
+                Spacer(modifier = Modifier.width(2.dp))
+                Button(
+                    onClick = {
+                        if (isCapturing) {
+                            viewModel.stopCapture()
+                        } else if (captureDevice != null) {
+                            viewModel.startCapture(captureDevice)
+                        }
+                    },
+                    enabled = (captureDevice != null || isCapturing) && !isLoading,
+                    modifier = Modifier.height(34.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = QadbColors.onPrimary
+                    )
                 ) {
-                    Button(
-                        onClick = {
-                            if (isCapturing) {
-                                viewModel.stopCapture()
-                            } else if (captureDevice != null) {
-                                viewModel.startCapture(captureDevice)
-                            }
-                        },
-                        enabled = (captureDevice != null || isCapturing) && !isLoading,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.primary,
-                            contentColor = QadbColors.onPrimary
-                        )
-                    ) {
-                        Icon(
-                            imageVector = if (isCapturing) Icons.Default.Pause else Icons.Default.PlayArrow,
-                            contentDescription = null,
-                            tint = QadbColors.onPrimary,
-                            modifier = Modifier.width(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(UiTokens.SpaceSmall))
-                        Text(
-                            text = if (isCapturing) stringResource(Res.string.log_pause) else stringResource(Res.string.log_resume),
-                            style = MaterialTheme.typography.labelLarge,
-                            color = QadbColors.onPrimary
-                        )
+                    Icon(
+                        imageVector = if (isCapturing) Icons.Default.Pause else Icons.Default.PlayArrow,
+                        contentDescription = null,
+                        tint = QadbColors.onPrimary,
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Spacer(modifier = Modifier.width(UiTokens.SpaceXSmall))
+                    Text(
+                        text = if (isCapturing) stringResource(Res.string.log_pause) else stringResource(Res.string.log_resume),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = QadbColors.onPrimary
+                    )
+                }
+
+                // Vertical separator
+                Box(
+                    modifier = Modifier
+                        .height(20.dp)
+                        .width(1.dp)
+                        .background(MaterialTheme.colorScheme.outlineVariant)
+                )
+
+                // Icon-only toolbar buttons
+                LogIconToolbarButton(
+                    icon = Icons.Default.DeleteSweep,
+                    tooltip = stringResource(Res.string.log_clear),
+                    onClick = { viewModel.clearLogs() }
+                )
+                LogIconToolbarButton(
+                    icon = IconParkIcons.Download,
+                    tooltip = stringResource(Res.string.log_export),
+                    onClick = {
+                        val dialog = FileDialog(null as Frame?, "Export Logs", FileDialog.SAVE)
+                        dialog.isVisible = true
+                        val dir = dialog.directory
+                        val filename = dialog.file
+                        if (dir != null && filename != null) {
+                            viewModel.exportLogs(File(dir, filename))
+                        }
                     }
+                )
+                LogIconToolbarButton(
+                    icon = Icons.Default.AutoAwesomeMotion,
+                    tooltip = stringResource(Res.string.log_auto_scroll),
+                    isActive = autoScroll,
+                    onClick = {
+                        autoScroll = !autoScroll
+                        if (autoScroll) userPinnedToBottom = true
+                    }
+                )
 
-                    ToolbarButton(
-                        text = stringResource(Res.string.log_clear),
-                        icon = Icons.Default.DeleteSweep,
-                        onClick = { viewModel.clearLogs() }
+                Box {
+                    LogIconToolbarButton(
+                        icon = IconParkIcons.More,
+                        tooltip = stringResource(Res.string.log_more),
+                        onClick = { showMoreMenu = true }
                     )
-
-                    ToolbarButton(
-                        text = stringResource(Res.string.log_export),
-                        icon = IconParkIcons.Download,
-                        onClick = {
-                            val dialog = FileDialog(null as Frame?, "Export Logs", FileDialog.SAVE)
-                            dialog.isVisible = true
-                            val dir = dialog.directory
-                            val filename = dialog.file
-                            if (dir != null && filename != null) {
-                                viewModel.exportLogs(File(dir, filename))
+                    DropdownMenu(
+                        expanded = showMoreMenu,
+                        onDismissRequest = { showMoreMenu = false }
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(Res.string.log_more_restart)) },
+                            leadingIcon = {
+                                Icon(IconParkIcons.Refresh, contentDescription = null)
+                            },
+                            enabled = captureDevice != null && !isLoading,
+                            onClick = {
+                                if (captureDevice != null) viewModel.restartCapture(captureDevice)
+                                showMoreMenu = false
                             }
-                        }
-                    )
-
-                    ToolbarButton(
-                        text = stringResource(Res.string.log_auto_scroll),
-                        icon = Icons.Default.AutoAwesomeMotion,
-                        isActive = autoScroll,
-                        onClick = {
-                            autoScroll = !autoScroll
-                            if (autoScroll) userPinnedToBottom = true
-                        }
-                    )
-
-                    Box {
-                        ToolbarButton(
-                            text = stringResource(Res.string.log_more),
-                            icon = IconParkIcons.More,
-                            onClick = { showMoreMenu = true }
                         )
-                        DropdownMenu(
-                            expanded = showMoreMenu,
-                            onDismissRequest = { showMoreMenu = false }
-                        ) {
-                            DropdownMenuItem(
-                                text = { Text(stringResource(Res.string.log_more_restart)) },
-                                leadingIcon = {
-                                    Icon(IconParkIcons.Refresh, contentDescription = null)
-                                },
-                                enabled = captureDevice != null && !isLoading,
-                                onClick = {
-                                    if (captureDevice != null) viewModel.restartCapture(captureDevice)
-                                    showMoreMenu = false
-                                }
-                            )
-                        }
                     }
                 }
             }
         }
 
-        Card(
+        // ── Filter zone: open layout, no Card wrapping ───────────────────────────
+        Column(
             modifier = Modifier.fillMaxWidth(),
-            shape = androidx.compose.foundation.shape.RoundedCornerShape(UiTokens.RadiusMedium)
+            verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(UiTokens.SpaceMedium),
-                verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    FilterInput(
-                        value = filter.keyword,
-                        onValueChange = {
-                            viewModel.updateFilter(filter.copy(keyword = it))
-                            selectedQuickChip = null
-                        },
-                        placeholder = stringResource(Res.string.log_filter_keyword),
-                        leadingIcon = IconParkIcons.Search,
-                        modifier = Modifier.weight(1f)
-                    )
+                FilterInput(
+                    value = filter.keyword,
+                    onValueChange = {
+                        viewModel.updateFilter(filter.copy(keyword = it))
+                        selectedQuickChip = null
+                    },
+                    placeholder = stringResource(Res.string.log_filter_keyword),
+                    leadingIcon = IconParkIcons.Search,
+                    modifier = Modifier.weight(1f)
+                )
 
-                    Box {
-                        FilterSelect(
-                            text = filter.level?.displayName ?: stringResource(Res.string.log_level_all),
-                            onClick = { showLevelMenu = true },
-                            modifier = Modifier.width(118.dp)
+                Box {
+                    FilterSelect(
+                        text = filter.level?.displayName ?: stringResource(Res.string.log_level_all),
+                        onClick = { showLevelMenu = true },
+                        modifier = Modifier.width(118.dp)
+                    )
+                    DropdownMenu(
+                        expanded = showLevelMenu,
+                        onDismissRequest = { showLevelMenu = false }
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(Res.string.log_level_all)) },
+                            onClick = {
+                                viewModel.updateFilter(filter.copy(level = null))
+                                showLevelMenu = false
+                            }
                         )
-                        DropdownMenu(
-                            expanded = showLevelMenu,
-                            onDismissRequest = { showLevelMenu = false }
-                        ) {
+                        LogLevel.values().forEach { logLevel ->
                             DropdownMenuItem(
-                                text = { Text(stringResource(Res.string.log_level_all)) },
+                                text = { Text(logLevel.displayName) },
                                 onClick = {
-                                    viewModel.updateFilter(filter.copy(level = null))
+                                    viewModel.updateFilter(filter.copy(level = logLevel))
                                     showLevelMenu = false
                                 }
                             )
-                            LogLevel.values().forEach { logLevel ->
-                                DropdownMenuItem(
-                                    text = { Text(logLevel.displayName) },
-                                    onClick = {
-                                        viewModel.updateFilter(filter.copy(level = logLevel))
-                                        showLevelMenu = false
-                                    }
-                                )
-                            }
                         }
                     }
+                }
 
-                    FilterInput(
-                        value = filter.packageName,
-                        onValueChange = {
-                            viewModel.updateFilter(filter.copy(packageName = it))
-                            selectedQuickChip = null
-                        },
-                        placeholder = stringResource(Res.string.log_filter_package),
-                        modifier = Modifier.width(190.dp)
-                    )
+                FilterInput(
+                    value = filter.packageName,
+                    onValueChange = {
+                        viewModel.updateFilter(filter.copy(packageName = it))
+                        selectedQuickChip = null
+                    },
+                    placeholder = stringResource(Res.string.log_filter_package),
+                    modifier = Modifier.width(190.dp)
+                )
 
-                    FilterInput(
-                        value = filter.pid,
-                        onValueChange = {
-                            viewModel.updateFilter(filter.copy(pid = it))
-                            selectedQuickChip = null
-                        },
-                        placeholder = stringResource(Res.string.log_filter_pid),
-                        modifier = Modifier.width(86.dp)
-                    )
+                FilterInput(
+                    value = filter.pid,
+                    onValueChange = {
+                        viewModel.updateFilter(filter.copy(pid = it))
+                        selectedQuickChip = null
+                    },
+                    placeholder = stringResource(Res.string.log_filter_pid),
+                    modifier = Modifier.width(86.dp)
+                )
 
-                    IconButton(
-                        onClick = {
+                // Clear-filter: round icon button
+                val filterActive = filter != LogFilter()
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(RoundedCornerShape(UiTokens.BadgeRadius))
+                        .background(
+                            if (filterActive) MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.55f)
+                            else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.50f)
+                        )
+                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(UiTokens.BadgeRadius))
+                        .clickable(enabled = filterActive) {
                             selectedQuickChip = null
                             viewModel.updateFilter(LogFilter())
                         },
-                        enabled = filter != LogFilter(),
-                        modifier = Modifier
-                            .width(34.dp)
-                            .clip(androidx.compose.foundation.shape.RoundedCornerShape(UiTokens.RadiusMedium))
-                            .background(MaterialTheme.colorScheme.surface)
-                            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, androidx.compose.foundation.shape.RoundedCornerShape(UiTokens.RadiusMedium))
-                    ) {
-                        Icon(
-                            Icons.Default.FilterAltOff,
-                            contentDescription = stringResource(Res.string.log_clear_filter),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-
-                Row(
-                    modifier = Modifier.horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall),
-                    verticalAlignment = Alignment.CenterVertically
+                    contentAlignment = Alignment.Center
                 ) {
-                    QuickFilterChip(
-                        text = stringResource(Res.string.log_filter_current_app),
-                        active = selectedQuickChip == QuickKeywordChip.CURRENT_APP,
-                        enabled = likelyCurrentPackage != null,
-                        onClick = {
-                            selectedQuickChip = QuickKeywordChip.CURRENT_APP
-                            viewModel.updateFilter(filter.copy(packageName = likelyCurrentPackage ?: ""))
-                        }
-                    )
-                    QuickFilterChip(
-                        text = stringResource(Res.string.log_filter_error),
-                        active = selectedQuickChip == QuickKeywordChip.ERROR,
-                        onClick = {
-                            selectedQuickChip = QuickKeywordChip.ERROR
-                            viewModel.updateFilter(filter.copy(level = null, onlyErrors = true))
-                        }
-                    )
-                    QuickFilterChip(
-                        text = stringResource(Res.string.log_keyword_chip_warning),
-                        active = selectedQuickChip == QuickKeywordChip.WARNING,
-                        onClick = {
-                            selectedQuickChip = QuickKeywordChip.WARNING
-                            viewModel.updateFilter(filter.copy(level = LogLevel.WARN, onlyErrors = false))
-                        }
-                    )
-                    QuickFilterChip(
-                        text = stringResource(Res.string.log_keyword_chip_crash),
-                        active = selectedQuickChip == QuickKeywordChip.CRASH,
-                        onClick = {
-                            selectedQuickChip = QuickKeywordChip.CRASH
-                            viewModel.updateFilter(
-                                filter.copy(
-                                    keyword = "FATAL EXCEPTION|AndroidRuntime",
-                                    isRegex = true,
-                                    onlyErrors = true
-                                )
-                            )
-                        }
-                    )
-                    QuickFilterChip(
-                        text = stringResource(Res.string.log_keyword_chip_anr),
-                        active = selectedQuickChip == QuickKeywordChip.ANR,
-                        onClick = {
-                            selectedQuickChip = QuickKeywordChip.ANR
-                            viewModel.updateFilter(
-                                filter.copy(
-                                    keyword = "ANR|Application Not Responding",
-                                    isRegex = true,
-                                    onlyErrors = false
-                                )
-                            )
-                        }
+                    Icon(
+                        Icons.Default.FilterAltOff,
+                        contentDescription = stringResource(Res.string.log_clear_filter),
+                        tint = if (filterActive) MaterialTheme.colorScheme.error
+                               else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f),
+                        modifier = Modifier.size(16.dp)
                     )
                 }
             }
+
+            // Quick-filter chips row
+            Row(
+                modifier = Modifier.horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                QuickFilterChip(
+                    text = stringResource(Res.string.log_filter_current_app),
+                    active = selectedQuickChip == QuickKeywordChip.CURRENT_APP,
+                    enabled = likelyCurrentPackage != null,
+                    onClick = {
+                        selectedQuickChip = QuickKeywordChip.CURRENT_APP
+                        viewModel.updateFilter(filter.copy(packageName = likelyCurrentPackage ?: ""))
+                    }
+                )
+                QuickFilterChip(
+                    text = stringResource(Res.string.log_filter_error),
+                    active = selectedQuickChip == QuickKeywordChip.ERROR,
+                    onClick = {
+                        selectedQuickChip = QuickKeywordChip.ERROR
+                        viewModel.updateFilter(filter.copy(level = null, onlyErrors = true))
+                    }
+                )
+                QuickFilterChip(
+                    text = stringResource(Res.string.log_keyword_chip_warning),
+                    active = selectedQuickChip == QuickKeywordChip.WARNING,
+                    onClick = {
+                        selectedQuickChip = QuickKeywordChip.WARNING
+                        viewModel.updateFilter(filter.copy(level = LogLevel.WARN, onlyErrors = false))
+                    }
+                )
+                QuickFilterChip(
+                    text = stringResource(Res.string.log_keyword_chip_crash),
+                    active = selectedQuickChip == QuickKeywordChip.CRASH,
+                    onClick = {
+                        selectedQuickChip = QuickKeywordChip.CRASH
+                        viewModel.updateFilter(
+                            filter.copy(
+                                keyword = "FATAL EXCEPTION|AndroidRuntime",
+                                isRegex = true,
+                                onlyErrors = true
+                            )
+                        )
+                    }
+                )
+                QuickFilterChip(
+                    text = stringResource(Res.string.log_keyword_chip_anr),
+                    active = selectedQuickChip == QuickKeywordChip.ANR,
+                    onClick = {
+                        selectedQuickChip = QuickKeywordChip.ANR
+                        viewModel.updateFilter(
+                            filter.copy(
+                                keyword = "ANR|Application Not Responding",
+                                isRegex = true,
+                                onlyErrors = false
+                            )
+                        )
+                    }
+                )
+            }
         }
 
+        // ── No-device warning banner ─────────────────────────────────────────────
         if (captureDevice == null && !isCapturing) {
             InlineStatusBanner(
                 text = stringResource(Res.string.log_no_device),
@@ -470,26 +494,39 @@ fun LogScreen(
             )
         }
 
-        Card(
+        // ── Log table (FramedStateSurface = transparent bg + thin border) ────────
+        FramedStateSurface(
             modifier = Modifier
                 .weight(1f)
-                .fillMaxWidth(),
-            shape = androidx.compose.foundation.shape.RoundedCornerShape(UiTokens.RadiusMedium)
+                .fillMaxWidth()
         ) {
             Column(modifier = Modifier.fillMaxSize()) {
                 LogTableHeader()
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.75f))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.60f))
 
-                if (filteredLogs.isEmpty()) {
-                    EmptyStatePanel(
-                        title = if (isCapturing) stringResource(Res.string.log_waiting) else stringResource(Res.string.log_empty),
-                        description = if (isCapturing) {
-                            "日志捕获已启动，等待设备输出新日志。"
-                        } else if (filter != LogFilter()) {
-                            "当前筛选条件没有匹配日志，清除筛选后可查看完整输出。"
-                        } else {
-                            "选择设备并启动捕获后，日志会显示在这里。"
-                        },
+                val emptyKind = when {
+                    captureDevice == null && !isCapturing -> DiagnosticsEmptyKind.NoDevice
+                    isCapturing && filteredLogs.isEmpty() -> DiagnosticsEmptyKind.WaitingForLogs
+                    filter != LogFilter() && filteredLogs.isEmpty() -> DiagnosticsEmptyKind.NoMatchingLogs
+                    else -> null
+                }
+
+                if (emptyKind != null || filteredLogs.isEmpty()) {
+                    val kind = emptyKind ?: DiagnosticsEmptyKind.NoDevice
+                    val titleRes = when (kind) {
+                        DiagnosticsEmptyKind.WaitingForLogs -> stringResource(Res.string.log_waiting)
+                        else -> stringResource(Res.string.log_empty)
+                    }
+                    val desc = when (kind) {
+                        DiagnosticsEmptyKind.NoDevice -> "选择设备并启动捕获后，日志会显示在这里。"
+                        DiagnosticsEmptyKind.WaitingForLogs -> "日志捕获已启动，等待设备输出新日志。"
+                        DiagnosticsEmptyKind.NoMatchingLogs -> "当前筛选条件没有匹配日志，清除筛选后可查看完整输出。"
+                        DiagnosticsEmptyKind.EmptyProcessList -> ""
+                    }
+                    DiagnosticsEmptyState(
+                        kind = kind,
+                        title = titleRes,
+                        description = desc,
                         modifier = Modifier.fillMaxSize()
                     )
                 } else {
@@ -525,6 +562,7 @@ fun LogScreen(
             }
         }
 
+        // ── Error toast ──────────────────────────────────────────────────────────
         errorMessage?.let { error ->
             Card(modifier = Modifier.fillMaxWidth()) {
                 Row(
@@ -548,63 +586,93 @@ fun LogScreen(
     }
 }
 
+// ── Capture status dot ────────────────────────────────────────────────────────
 @Composable
-private fun CaptureStatusBadge(isCapturing: Boolean) {
-    val background = if (isCapturing) QadbColors.primaryContainer.copy(alpha = 0.62f)
-        else MaterialTheme.colorScheme.surface
-    val textColor = if (isCapturing) QadbColors.primary else MaterialTheme.colorScheme.onSurfaceVariant
-
-    Box(
-        modifier = Modifier
-            .clip(androidx.compose.foundation.shape.RoundedCornerShape(UiTokens.BadgeRadius))
-            .background(background)
-            .border(
-                1.dp,
-                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f),
-                androidx.compose.foundation.shape.RoundedCornerShape(UiTokens.BadgeRadius)
-            )
-            .padding(horizontal = UiTokens.SpaceMedium, vertical = UiTokens.SpaceXSmall)
-    ) {
-        Text(
-            text = if (isCapturing) stringResource(Res.string.log_capture_running) else stringResource(Res.string.log_capture_paused),
-            color = textColor,
-            style = MaterialTheme.typography.labelSmall,
-            fontWeight = FontWeight.Medium
+private fun CaptureStatusDot(isCapturing: Boolean) {
+    val dotColor = if (isCapturing) QadbTokens.brand else QadbTokens.textMuted
+    val transition = rememberInfiniteTransition(label = "dot")
+    val pulseAlpha by if (isCapturing) {
+        transition.animateFloat(
+            initialValue = 0.35f, targetValue = 1f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(800, easing = LinearEasing),
+                repeatMode = RepeatMode.Reverse
+            ), label = "alpha"
         )
+    } else {
+        remember { mutableStateOf(0.55f) }
+    }
+
+    Canvas(modifier = Modifier.size(8.dp)) {
+        drawCircle(color = dotColor.copy(alpha = pulseAlpha))
     }
 }
 
+// ── Icon-only toolbar button with tooltip ────────────────────────────────────
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
-private fun ToolbarButton(
-    text: String,
+private fun LogIconToolbarButton(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
+    tooltip: String,
     onClick: () -> Unit,
-    isActive: Boolean = false,
-    enabled: Boolean = true
+    isActive: Boolean = false
 ) {
-    OutlinedButton(
-        onClick = onClick,
-        enabled = enabled,
-        colors = ButtonDefaults.outlinedButtonColors(
-            containerColor = if (isActive) MaterialTheme.colorScheme.primary.copy(alpha = 0.1f) else Color.Transparent,
-            contentColor = if (isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-        ),
-                        modifier = Modifier.height(UiTokens.ControlHeight)
+    TooltipArea(
+        tooltip = {
+            Surface(
+                shape = RoundedCornerShape(UiTokens.RadiusSmall),
+                color = MaterialTheme.colorScheme.inverseSurface
+            ) {
+                Text(
+                    text = tooltip,
+                    modifier = Modifier.padding(horizontal = UiTokens.SpaceSmall, vertical = 4.dp),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.inverseOnSurface
+                )
+            }
+        },
+        delayMillis = 350,
+        tooltipPlacement = androidx.compose.foundation.TooltipPlacement.CursorPoint(
+            offset = androidx.compose.ui.unit.DpOffset(0.dp, 10.dp)
+        )
     ) {
-        Icon(icon, contentDescription = null, modifier = Modifier.width(13.dp))
-        Spacer(modifier = Modifier.width(UiTokens.SpaceSmall))
-        Text(text = text, style = MaterialTheme.typography.bodySmall)
+        Box(
+            modifier = Modifier
+                .size(32.dp)
+                .clip(RoundedCornerShape(UiTokens.RadiusMedium))
+                .background(
+                    if (isActive) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+                    else Color.Transparent
+                )
+                .border(
+                    1.dp,
+                    if (isActive) MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)
+                    else Color.Transparent,
+                    RoundedCornerShape(UiTokens.RadiusMedium)
+                )
+                .clickable { onClick() },
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = tooltip,
+                tint = if (isActive) MaterialTheme.colorScheme.primary
+                       else MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(15.dp)
+            )
+        }
     }
 }
 
+// ── Filter controls ───────────────────────────────────────────────────────────
 @Composable
 private fun FilterSelect(text: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
     Row(
         modifier = modifier
-            .height(UiTokens.ControlHeight)
-            .clip(androidx.compose.foundation.shape.RoundedCornerShape(UiTokens.RadiusMedium))
-            .background(MaterialTheme.colorScheme.surface)
-            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, androidx.compose.foundation.shape.RoundedCornerShape(UiTokens.RadiusMedium))
+            .height(36.dp)
+            .clip(RoundedCornerShape(UiTokens.RadiusMedium))
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(UiTokens.RadiusMedium))
             .clickable { onClick() }
             .padding(horizontal = UiTokens.SpaceSmall),
         verticalAlignment = Alignment.CenterVertically,
@@ -617,7 +685,7 @@ private fun FilterSelect(text: String, onClick: () -> Unit, modifier: Modifier =
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f)
         )
-        Icon(IconParkIcons.ArrowDown, contentDescription = null)
+        Icon(IconParkIcons.ArrowDown, contentDescription = null, modifier = Modifier.size(13.dp))
     }
 }
 
@@ -631,10 +699,10 @@ private fun FilterInput(
 ) {
     Box(
         modifier = modifier
-            .height(UiTokens.ControlHeight)
-            .clip(androidx.compose.foundation.shape.RoundedCornerShape(UiTokens.RadiusMedium))
-            .background(MaterialTheme.colorScheme.surface)
-            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, androidx.compose.foundation.shape.RoundedCornerShape(UiTokens.RadiusMedium))
+            .height(36.dp)
+            .clip(RoundedCornerShape(UiTokens.RadiusMedium))
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(UiTokens.RadiusMedium))
             .padding(horizontal = UiTokens.SpaceSmall),
         contentAlignment = Alignment.CenterStart
     ) {
@@ -644,7 +712,7 @@ private fun FilterInput(
                     leadingIcon,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.width(14.dp)
+                    modifier = Modifier.size(13.dp)
                 )
                 Spacer(modifier = Modifier.width(UiTokens.SpaceSmall))
             }
@@ -679,40 +747,42 @@ private fun QuickFilterChip(
     onClick: () -> Unit,
     enabled: Boolean = true
 ) {
+    val shape = RoundedCornerShape(UiTokens.BadgeRadius)
     Box(
         modifier = Modifier
-            .clip(androidx.compose.foundation.shape.RoundedCornerShape(UiTokens.BadgeRadius))
+            .clip(shape)
             .background(
-                if (active) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f)
-                else MaterialTheme.colorScheme.surfaceVariant
+                if (active) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.72f)
+                else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.50f)
             )
             .border(
                 1.dp,
-                if (active) QadbColors.selectedBorder else MaterialTheme.colorScheme.outlineVariant,
-                androidx.compose.foundation.shape.RoundedCornerShape(UiTokens.BadgeRadius)
+                if (active) QadbColors.selectedBorder else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.70f),
+                shape
             )
             .clickable(enabled = enabled) { onClick() }
-            .padding(horizontal = UiTokens.SpaceSmall, vertical = UiTokens.SpaceSmall)
+            .padding(horizontal = UiTokens.SpaceSmall, vertical = 5.dp)
     ) {
         Text(
             text = text,
             style = MaterialTheme.typography.labelSmall,
-            color = if (enabled) {
-                if (active) QadbColors.primary else MaterialTheme.colorScheme.onSurfaceVariant
-            } else {
-                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+            color = when {
+                !enabled -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.40f)
+                active -> QadbColors.primary
+                else -> MaterialTheme.colorScheme.onSurfaceVariant
             }
         )
     }
 }
 
+// ── Log table ─────────────────────────────────────────────────────────────────
 @Composable
 private fun LogTableHeader() {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surfaceVariant)
-            .padding(horizontal = UiTokens.SpaceSmall, vertical = UiTokens.SpaceSmall),
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.50f))
+            .padding(horizontal = UiTokens.SpaceSmall, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         HeaderCell(text = stringResource(Res.string.log_header_time), width = 108.dp)
@@ -727,11 +797,14 @@ private fun LogTableHeader() {
 private fun HeaderCell(text: String, width: androidx.compose.ui.unit.Dp? = null, modifier: Modifier = Modifier) {
     val resolved = if (width != null) modifier.width(width) else modifier
     Text(
-        text = text,
+        text = text.uppercase(),
         modifier = resolved,
-        style = MaterialTheme.typography.labelSmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        fontWeight = FontWeight.SemiBold,
+        style = MaterialTheme.typography.labelSmall.copy(
+            fontSize = 10.sp,
+            letterSpacing = 0.6.sp
+        ),
+        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
+        fontWeight = FontWeight.Bold,
         maxLines = 1,
         overflow = TextOverflow.Ellipsis
     )
@@ -747,7 +820,7 @@ private fun LogTableRow(
     val interactionSource = remember { MutableInteractionSource() }
     val hovered by interactionSource.collectIsHoveredAsState()
     val rowBackground = when {
-        isSelected -> MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
+        isSelected -> MaterialTheme.colorScheme.primary.copy(alpha = 0.07f)
         entry.level == LogLevel.ERROR || entry.level == LogLevel.FATAL -> QadbColors.errorSurface
         entry.level == LogLevel.WARN -> QadbColors.warningSurface
         hovered -> QadbColors.surfaceHover
@@ -771,24 +844,15 @@ private fun LogTableRow(
                     .padding(end = UiTokens.SpaceSmall)
                     .background(
                         MaterialTheme.colorScheme.primary,
-                        androidx.compose.foundation.shape.RoundedCornerShape(UiTokens.RadiusSmall)
+                        RoundedCornerShape(UiTokens.RadiusSmall)
                     )
             )
         }
-        TableCell(
-            text = dateFormat.format(Date(entry.timestamp)),
-            width = 108.dp,
-            mono = true
-        )
+        TableCell(text = dateFormat.format(Date(entry.timestamp)), width = 108.dp, mono = true)
         LevelBadge(level = entry.level, modifier = Modifier.width(48.dp))
         TableCell(text = if (entry.pid > 0) entry.pid.toString() else "-", width = 58.dp, mono = true)
         TableCell(text = if (entry.tid > 0) entry.tid.toString() else "-", width = 58.dp, mono = true)
-        TableCell(
-            text = entry.message,
-            modifier = Modifier.weight(1f),
-            mono = true,
-            maxLines = Int.MAX_VALUE
-        )
+        TableCell(text = entry.message, modifier = Modifier.weight(1f), mono = true, maxLines = Int.MAX_VALUE)
     }
 }
 
@@ -812,48 +876,60 @@ private fun TableCell(
     )
 }
 
+// ── Level badge — semantic colour mapping via QadbTokens ──────────────────────
 @Composable
 private fun LevelBadge(level: LogLevel, modifier: Modifier = Modifier) {
-    val colorScheme = MaterialTheme.colorScheme
-    val colors = when (level) {
-        LogLevel.VERBOSE -> colorScheme.surfaceVariant to colorScheme.onSurfaceVariant
-        LogLevel.DEBUG -> colorScheme.primaryContainer to colorScheme.onPrimaryContainer
-        LogLevel.INFO -> colorScheme.tertiaryContainer to colorScheme.onTertiaryContainer
-        LogLevel.WARN -> colorScheme.secondaryContainer to colorScheme.onSecondaryContainer
-        LogLevel.ERROR -> colorScheme.errorContainer to colorScheme.onErrorContainer
-        LogLevel.FATAL -> colorScheme.errorContainer to colorScheme.onErrorContainer
+    // Resolve all @Composable color properties up front (inside @Composable context)
+    val brandColor      = QadbTokens.brand
+    val mutedColor      = QadbTokens.textMuted
+    val successBg       = QadbTokens.successContainer
+    val successFg       = QadbTokens.successText
+    val warningBg       = QadbTokens.warningContainer
+    val warningFg       = QadbTokens.warningText
+    val dangerBg        = QadbTokens.dangerContainer
+    val dangerFg        = QadbTokens.dangerText
+    val dangerSolid     = QadbTokens.danger
+
+    val bg = when (level) {
+        LogLevel.VERBOSE -> mutedColor.copy(alpha = 0.12f)
+        LogLevel.DEBUG   -> brandColor.copy(alpha = 0.14f)
+        LogLevel.INFO    -> successBg
+        LogLevel.WARN    -> warningBg
+        LogLevel.ERROR   -> dangerBg
+        LogLevel.FATAL   -> dangerSolid
     }
+    val fg = when (level) {
+        LogLevel.VERBOSE -> mutedColor
+        LogLevel.DEBUG   -> brandColor
+        LogLevel.INFO    -> successFg
+        LogLevel.WARN    -> warningFg
+        LogLevel.ERROR   -> dangerFg
+        LogLevel.FATAL   -> Color.White
+    }
+    val label = when (level) {
+        LogLevel.VERBOSE -> "V"
+        LogLevel.DEBUG   -> "D"
+        LogLevel.INFO    -> "I"
+        LogLevel.WARN    -> "W"
+        LogLevel.ERROR   -> "E"
+        LogLevel.FATAL   -> "F"
+    }
+
     Box(modifier = modifier, contentAlignment = Alignment.CenterStart) {
         Box(
             modifier = Modifier
-                .clip(androidx.compose.foundation.shape.RoundedCornerShape(UiTokens.RadiusSmall))
-                .background(colors.first)
-                .padding(horizontal = UiTokens.SpaceSmall, vertical = UiTokens.SpaceXSmall)
+                .clip(RoundedCornerShape(UiTokens.RadiusSmall))
+                .background(bg)
+                .padding(horizontal = 6.dp, vertical = UiTokens.SpaceXSmall)
         ) {
             Text(
-                text = level.displayName,
+                text = label,
                 style = MaterialTheme.typography.labelSmall,
-                color = colors.second,
+                color = fg,
                 fontFamily = FontFamily.Monospace,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
+                fontSize = 11.sp
             )
         }
     }
-}
-
-private fun detectLikelyPackage(logs: List<LogEntry>): String? {
-    if (logs.isEmpty()) return null
-    val regex = Regex("""([a-zA-Z][a-zA-Z0-9_]*(?:\\.[a-zA-Z0-9_]+){2,})""")
-    val score = linkedMapOf<String, Int>()
-
-    logs.takeLast(1200).forEach { entry ->
-        val source = "${entry.tag} ${entry.message}"
-        regex.findAll(source).forEach { match ->
-            val candidate = match.value
-            if (candidate.startsWith("android.") || candidate.startsWith("java.")) return@forEach
-            score[candidate] = (score[candidate] ?: 0) + 1
-        }
-    }
-
-    return score.maxByOrNull { it.value }?.key
 }

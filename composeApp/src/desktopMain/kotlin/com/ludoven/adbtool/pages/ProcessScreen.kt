@@ -1,6 +1,7 @@
 package com.ludoven.adbtool.pages
 
 import com.ludoven.adbtool.UiTokens
+import com.ludoven.adbtool.QadbTokens
 import com.ludoven.adbtool.ui.icons.IconParkIcons
 
 import com.ludoven.adbtool.ui.mac.*
@@ -18,9 +19,13 @@ import adbtool_desktop.composeapp.generated.resources.process_subtitle
 import adbtool_desktop.composeapp.generated.resources.process_title
 import adbtool_desktop.composeapp.generated.resources.process_user
 import adbtool_desktop.composeapp.generated.resources.refresh
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.TooltipArea
+import androidx.compose.foundation.TooltipPlacement
 import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -30,26 +35,19 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollbarAdapter
-import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.ArrowDropUp
 import androidx.compose.material.icons.filled.Search
-import com.ludoven.adbtool.ui.mac.CircularProgressIndicator
-import com.ludoven.adbtool.ui.mac.Icon
-import com.ludoven.adbtool.ui.mac.IconButton
-import com.ludoven.adbtool.ui.mac.MaterialTheme
-import com.ludoven.adbtool.ui.mac.Text
-import com.ludoven.adbtool.widget.EmptyStatePanel
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -67,9 +65,18 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.ludoven.adbtool.ui.mac.CircularProgressIndicator
+import com.ludoven.adbtool.ui.mac.Icon
+import com.ludoven.adbtool.ui.mac.MaterialTheme
+import com.ludoven.adbtool.ui.mac.Text
 import com.ludoven.adbtool.util.AdbTool
+import com.ludoven.adbtool.util.l10n
+import com.ludoven.adbtool.widget.DiagnosticsEmptyKind
+import com.ludoven.adbtool.widget.DiagnosticsEmptyState
+import com.ludoven.adbtool.widget.FramedStateSurface
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
@@ -102,45 +109,27 @@ fun ProcessScreen(selectedDevice: String?) {
     fun refresh(forceRefresh: Boolean = false) {
         val deviceId = selectedDevice?.trim()?.takeIf { it.isNotBlank() }
         if (deviceId == null) {
-            loadJob?.cancel()
-            loadJob = null
-            loadedDevice = null
-            processes = emptyList()
-            errorText = null
-            isLoading = false
+            loadJob?.cancel(); loadJob = null; loadedDevice = null
+            processes = emptyList(); errorText = null; isLoading = false
             return
         }
         if (!forceRefresh && loadedDevice == deviceId && loadJob?.isActive != true) {
-            isLoading = false
-            return
+            isLoading = false; return
         }
         loadJob?.cancel()
         loadJob = scope.launch {
-            isLoading = true
-            errorText = null
+            isLoading = true; errorText = null
             val result = loadProcessList(deviceId)
             if (selectedDevice?.trim() == deviceId) {
-                result.onSuccess {
-                    processes = it
-                    loadedDevice = deviceId
-                }.onFailure {
-                    errorText = it.message ?: "Failed to load process list."
-                }
+                result.onSuccess { processes = it; loadedDevice = deviceId }
+                    .onFailure { errorText = it.message ?: "Failed to load process list." }
                 isLoading = false
             }
         }
     }
 
-    LaunchedEffect(selectedDevice) {
-        refresh()
-    }
-    DisposableEffect(Unit) {
-        onDispose {
-            loadJob?.cancel()
-            loadJob = null
-            isLoading = false
-        }
-    }
+    LaunchedEffect(selectedDevice) { refresh() }
+    DisposableEffect(Unit) { onDispose { loadJob?.cancel(); loadJob = null; isLoading = false } }
 
     val filteredList = remember(processes, keyword, sortBy, sortDesc) {
         val base = if (keyword.isBlank()) processes
@@ -166,61 +155,70 @@ fun ProcessScreen(selectedDevice: String?) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = UiTokens.SpaceXXLarge, vertical = UiTokens.SpaceLarge),
+            .padding(horizontal = UiTokens.PagePadding, vertical = UiTokens.SectionSpacingCompact),
         verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium)
     ) {
-        DiagnosticsCompactHeader(
-            title = stringResource(Res.string.process_title),
-            subtitle = stringResource(Res.string.process_subtitle)
+        // ── Header: title+subtitle left, search+count+refresh right ──────────────
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            CompactRefreshButton(
-                onClick = { refresh(forceRefresh = true) },
-                enabled = !selectedDevice.isNullOrBlank() && !isLoading
-            )
+            Column(
+                modifier = Modifier.weight(1f).padding(end = UiTokens.SpaceMedium),
+                verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceXSmall)
+            ) {
+                Text(
+                    text = stringResource(Res.string.process_title),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontSize = UiTokens.TextSection,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = stringResource(Res.string.process_subtitle),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis
+                )
+            }
+
+            // Search + count pill + refresh — all in the header trailing area
+            if (!selectedDevice.isNullOrBlank()) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    ProcessSearchField(
+                        value = keyword,
+                        onValueChange = { keyword = it },
+                        placeholder = stringResource(Res.string.process_search_hint),
+                        modifier = Modifier.width(220.dp)
+                    )
+                    ProcessCountPill(count = filteredList.size)
+                    CompactRefreshButton(
+                        onClick = { refresh(forceRefresh = true) },
+                        enabled = !isLoading
+                    )
+                }
+            }
         }
 
         if (selectedDevice.isNullOrBlank()) {
-            EmptyStatePanel(
+            DiagnosticsEmptyState(
+                kind = DiagnosticsEmptyKind.NoDevice,
                 title = stringResource(Res.string.process_no_device),
                 description = "连接或选择设备后即可读取进程列表。",
-                icon = IconParkIcons.Refresh,
                 modifier = Modifier.fillMaxSize()
             )
             return
         }
 
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(UiTokens.RadiusMedium)
+        // ── Process table (FramedStateSurface: transparent + thin border) ────────
+        FramedStateSurface(
+            modifier = Modifier.weight(1f).fillMaxWidth()
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(UiTokens.SpaceMedium),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium)
-            ) {
-                ProcessSearchField(
-                    value = keyword,
-                    onValueChange = { keyword = it },
-                    placeholder = stringResource(Res.string.process_search_hint),
-                    modifier = Modifier.weight(1f)
-                )
-                ProcessCountPill(count = filteredList.size)
-            }
-        }
-
-        Card(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth(),
-            shape = RoundedCornerShape(UiTokens.RadiusMedium)
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(UiTokens.SpaceSmall)
-            ) {
+            Box(modifier = Modifier.fillMaxSize()) {
                 when {
                     isLoading -> {
                         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -229,7 +227,8 @@ fun ProcessScreen(selectedDevice: String?) {
                     }
 
                     errorText != null -> {
-                        EmptyStatePanel(
+                        DiagnosticsEmptyState(
+                            kind = DiagnosticsEmptyKind.EmptyProcessList,
                             title = "进程读取失败",
                             description = errorText.orEmpty(),
                             actionLabel = stringResource(Res.string.refresh),
@@ -239,7 +238,8 @@ fun ProcessScreen(selectedDevice: String?) {
                     }
 
                     filteredList.isEmpty() -> {
-                        EmptyStatePanel(
+                        DiagnosticsEmptyState(
+                            kind = DiagnosticsEmptyKind.EmptyProcessList,
                             title = stringResource(Res.string.process_empty),
                             description = if (keyword.isBlank()) "设备当前没有返回进程数据。" else "没有进程匹配当前搜索条件。",
                             modifier = Modifier.fillMaxSize()
@@ -249,9 +249,7 @@ fun ProcessScreen(selectedDevice: String?) {
                     else -> {
                         Box(modifier = Modifier.fillMaxSize()) {
                             LazyColumn(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .padding(end = UiTokens.SpaceMedium),
+                                modifier = Modifier.fillMaxSize().padding(end = UiTokens.SpaceMedium),
                                 state = listState
                             ) {
                                 item {
@@ -259,179 +257,94 @@ fun ProcessScreen(selectedDevice: String?) {
                                         Row(
                                             modifier = Modifier
                                                 .fillMaxWidth()
-                                                .background(
-                                                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.32f)
-                                                )
-                                                .padding(
-                                                    horizontal = UiTokens.SpaceMedium,
-                                                    vertical = UiTokens.SpaceSmall
-                                                ),
+                                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f))
+                                                .padding(horizontal = UiTokens.SpaceMedium, vertical = 6.dp),
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
-                                            // Spacer that aligns with the row's selection indicator.
                                             Spacer(modifier = Modifier.width(UiTokens.IndicatorWidth + UiTokens.SpaceSmall))
                                             SortableColumnHeader(
-                                                text = stringResource(Res.string.process_name),
-                                                width = 240.dp,
-                                                column = SortColumn.NAME,
-                                                currentSort = sortBy,
-                                                descending = sortDesc,
-                                                onClick = {
-                                                    if (sortBy == SortColumn.NAME) sortDesc = !sortDesc
-                                                    else { sortBy = SortColumn.NAME; sortDesc = true }
-                                                }
+                                                text = stringResource(Res.string.process_name), width = 240.dp,
+                                                column = SortColumn.NAME, currentSort = sortBy, descending = sortDesc,
+                                                onClick = { if (sortBy == SortColumn.NAME) sortDesc = !sortDesc else { sortBy = SortColumn.NAME; sortDesc = true } }
                                             )
-                                        SortableColumnHeader(
-                                            text = stringResource(Res.string.process_cpu),
-                                            width = 70.dp,
-                                            column = SortColumn.CPU,
-                                            currentSort = sortBy,
-                                            descending = sortDesc,
-                                            onClick = {
-                                                if (sortBy == SortColumn.CPU) sortDesc = !sortDesc
-                                                else { sortBy = SortColumn.CPU; sortDesc = true }
-                                            }
-                                        )
-                                        SortableColumnHeader(
-                                            text = stringResource(Res.string.process_cpu_time),
-                                            width = 100.dp,
-                                            column = SortColumn.CPU_TIME,
-                                            currentSort = sortBy,
-                                            descending = sortDesc,
-                                            onClick = {
-                                                if (sortBy == SortColumn.CPU_TIME) sortDesc = !sortDesc
-                                                else { sortBy = SortColumn.CPU_TIME; sortDesc = true }
-                                            }
-                                        )
-                                        SortableColumnHeader(
-                                            text = stringResource(Res.string.process_memory),
-                                            width = 82.dp,
-                                            column = SortColumn.MEMORY,
-                                            currentSort = sortBy,
-                                            descending = sortDesc,
-                                            onClick = {
-                                                if (sortBy == SortColumn.MEMORY) sortDesc = !sortDesc
-                                                else { sortBy = SortColumn.MEMORY; sortDesc = true }
-                                            }
-                                        )
-                                        SortableColumnHeader(
-                                            text = stringResource(Res.string.process_pid),
-                                            width = 70.dp,
-                                            column = SortColumn.PID,
-                                            currentSort = sortBy,
-                                            descending = sortDesc,
-                                            onClick = {
-                                                if (sortBy == SortColumn.PID) sortDesc = !sortDesc
-                                                else { sortBy = SortColumn.PID; sortDesc = false }
-                                            }
-                                        )
-                                        SortableColumnHeader(
-                                            text = stringResource(Res.string.process_user),
-                                            width = null,
-                                            column = SortColumn.USER,
-                                            currentSort = sortBy,
-                                            descending = sortDesc,
-                                            onClick = {
-                                                if (sortBy == SortColumn.USER) sortDesc = !sortDesc
-                                                else { sortBy = SortColumn.USER; sortDesc = true }
-                                            }
-                                        )
+                                            SortableColumnHeader(
+                                                text = stringResource(Res.string.process_cpu), width = 70.dp,
+                                                column = SortColumn.CPU, currentSort = sortBy, descending = sortDesc,
+                                                onClick = { if (sortBy == SortColumn.CPU) sortDesc = !sortDesc else { sortBy = SortColumn.CPU; sortDesc = true } }
+                                            )
+                                            SortableColumnHeader(
+                                                text = stringResource(Res.string.process_cpu_time), width = 100.dp,
+                                                column = SortColumn.CPU_TIME, currentSort = sortBy, descending = sortDesc,
+                                                onClick = { if (sortBy == SortColumn.CPU_TIME) sortDesc = !sortDesc else { sortBy = SortColumn.CPU_TIME; sortDesc = true } }
+                                            )
+                                            SortableColumnHeader(
+                                                text = stringResource(Res.string.process_memory), width = 82.dp,
+                                                column = SortColumn.MEMORY, currentSort = sortBy, descending = sortDesc,
+                                                onClick = { if (sortBy == SortColumn.MEMORY) sortDesc = !sortDesc else { sortBy = SortColumn.MEMORY; sortDesc = true } }
+                                            )
+                                            SortableColumnHeader(
+                                                text = stringResource(Res.string.process_pid), width = 70.dp,
+                                                column = SortColumn.PID, currentSort = sortBy, descending = sortDesc,
+                                                onClick = { if (sortBy == SortColumn.PID) sortDesc = !sortDesc else { sortBy = SortColumn.PID; sortDesc = false } }
+                                            )
+                                            SortableColumnHeader(
+                                                text = stringResource(Res.string.process_user), width = null,
+                                                column = SortColumn.USER, currentSort = sortBy, descending = sortDesc,
+                                                onClick = { if (sortBy == SortColumn.USER) sortDesc = !sortDesc else { sortBy = SortColumn.USER; sortDesc = true } }
+                                            )
                                         }
-                                        HorizontalDivider(
-                                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.78f)
-                                        )
+                                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.60f))
                                     }
                                 }
 
-                            items(filteredList) { item ->
-                                val isSelected = selectedPid == item.pid
-                                val rowBackground = when {
-                                    isSelected -> MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
-                                    else -> Color.Transparent
-                                }
-                                Column(modifier = Modifier.fillMaxWidth()) {
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .background(rowBackground)
-                                            .clickable { selectedPid = item.pid }
-                                            .padding(horizontal = UiTokens.SpaceMedium, vertical = UiTokens.SpaceSmall),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        if (isSelected) {
-                                            Box(
-                                                modifier = Modifier
-                                                    .width(UiTokens.IndicatorWidth)
-                                                    .height(20.dp)
-                                                    .padding(end = UiTokens.SpaceSmall)
-                                                    .background(
-                                                        MaterialTheme.colorScheme.primary,
-                                                        RoundedCornerShape(UiTokens.RadiusSmall)
-                                                    )
-                                            )
+                                items(filteredList) { item ->
+                                    val isSelected = selectedPid == item.pid
+                                    Column(modifier = Modifier.fillMaxWidth()) {
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .background(
+                                                    if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.07f)
+                                                    else Color.Transparent
+                                                )
+                                                .clickable { selectedPid = item.pid }
+                                                .padding(horizontal = UiTokens.SpaceMedium, vertical = UiTokens.SpaceSmall),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            if (isSelected) {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .width(UiTokens.IndicatorWidth)
+                                                        .height(20.dp)
+                                                        .padding(end = UiTokens.SpaceSmall)
+                                                        .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(UiTokens.RadiusSmall))
+                                                )
+                                            } else {
+                                                Spacer(modifier = Modifier.width(UiTokens.IndicatorWidth))
+                                            }
+                                            Text(text = item.name, modifier = Modifier.width(240.dp), style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                            Text(text = item.cpuPercent, modifier = Modifier.width(70.dp), style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                            Text(text = item.cpuTime, modifier = Modifier.width(100.dp), style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                            Text(text = item.memory, modifier = Modifier.width(82.dp), style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                            Text(text = item.pid, modifier = Modifier.width(70.dp), style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                            Text(text = item.user, style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace), maxLines = 1, overflow = TextOverflow.Ellipsis)
                                         }
-                                        Text(
-                                            text = item.name,
-                                            modifier = Modifier.width(240.dp),
-                                            style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                        Text(
-                                            text = item.cpuPercent,
-                                            modifier = Modifier.width(70.dp),
-                                            style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                        Text(
-                                            text = item.cpuTime,
-                                            modifier = Modifier.width(100.dp),
-                                            style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                        Text(
-                                            text = item.memory,
-                                            modifier = Modifier.width(82.dp),
-                                            style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                        Text(
-                                            text = item.pid,
-                                            modifier = Modifier.width(70.dp),
-                                            style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                        Text(
-                                            text = item.user,
-                                            style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
+                                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
                                     }
-                                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.62f))
                                 }
                             }
-                        }
 
-                        VerticalScrollbar(
-                            adapter = rememberScrollbarAdapter(listState),
-                            modifier = Modifier
-                                .align(Alignment.CenterEnd)
-                                .fillMaxHeight()
-                                .padding(end = UiTokens.SpaceXSmall)
-                        )
+                            VerticalScrollbar(
+                                adapter = rememberScrollbarAdapter(listState),
+                                modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight().padding(end = UiTokens.SpaceXSmall)
+                            )
+                        }
                     }
                 }
             }
         }
     }
 }
-}
-
 
 @Composable
 private fun ProcessSearchField(
@@ -443,9 +356,9 @@ private fun ProcessSearchField(
     val shape = RoundedCornerShape(UiTokens.RadiusMedium)
     Row(
         modifier = modifier
-            .height(UiTokens.ControlHeight)
+            .height(34.dp)
             .clip(shape)
-            .background(MaterialTheme.colorScheme.surface)
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
             .border(1.dp, MaterialTheme.colorScheme.outlineVariant, shape)
             .padding(horizontal = UiTokens.SpaceMedium),
         verticalAlignment = Alignment.CenterVertically,
@@ -455,7 +368,7 @@ private fun ProcessSearchField(
             imageVector = Icons.Default.Search,
             contentDescription = null,
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(UiTokens.IconSmall)
+            modifier = Modifier.size(13.dp)
         )
         BasicTextField(
             value = value,
@@ -463,16 +376,10 @@ private fun ProcessSearchField(
             modifier = Modifier.weight(1f),
             singleLine = true,
             cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-            textStyle = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface),
+            textStyle = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurface),
             decorationBox = { innerTextField ->
                 if (value.isBlank()) {
-                    Text(
-                        text = placeholder,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
+                    Text(text = placeholder, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
                 innerTextField()
             }
@@ -480,87 +387,74 @@ private fun ProcessSearchField(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun DiagnosticsCompactHeader(
-    title: String,
-    subtitle: String,
-    trailing: @Composable () -> Unit
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Column(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceXSmall)
-        ) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleMedium,
-                fontSize = UiTokens.TextSectionLarge,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Text(
-                text = subtitle,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
-        Box(modifier = Modifier.padding(start = UiTokens.SpaceMedium)) {
-            trailing()
-        }
-    }
-}
-
-@Composable
-private fun CompactRefreshButton(
-    onClick: () -> Unit,
-    enabled: Boolean
-) {
+private fun CompactRefreshButton(onClick: () -> Unit, enabled: Boolean) {
     val shape = RoundedCornerShape(UiTokens.RadiusMedium)
-    IconButton(
-        onClick = onClick,
-        enabled = enabled,
-        modifier = Modifier
-            .size(30.dp)
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.58f), shape)
-            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, shape)
-    ) {
-        Icon(
-            IconParkIcons.Refresh,
-            contentDescription = stringResource(Res.string.refresh),
-            modifier = Modifier.size(UiTokens.IconSmall),
-            tint = if (enabled) MaterialTheme.colorScheme.onSurfaceVariant
-            else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)
+    TooltipArea(
+        tooltip = {
+            Surface(
+                shape = RoundedCornerShape(UiTokens.RadiusSmall),
+                color = MaterialTheme.colorScheme.inverseSurface
+            ) {
+                Text(
+                    text = stringResource(Res.string.refresh),
+                    modifier = Modifier.padding(horizontal = UiTokens.SpaceSmall, vertical = 4.dp),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.inverseOnSurface
+                )
+            }
+        },
+        delayMillis = 350,
+        tooltipPlacement = TooltipPlacement.CursorPoint(
+            offset = DpOffset(0.dp, 10.dp)
         )
+    ) {
+        Box(
+            modifier = Modifier
+                .size(34.dp)
+                .clip(shape)
+                .background(if (enabled) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.48f) else Color.Transparent)
+                .border(
+                    1.dp,
+                    if (enabled) MaterialTheme.colorScheme.outlineVariant else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.40f),
+                    shape
+                )
+                .clickable(enabled = enabled, onClick = onClick),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                IconParkIcons.Refresh,
+                contentDescription = stringResource(Res.string.refresh),
+                modifier = Modifier.size(UiTokens.IconSmall),
+                tint = if (enabled) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.40f)
+            )
+        }
     }
 }
 
 @Composable
 private fun ProcessCountPill(count: Int) {
-    val shape = RoundedCornerShape(UiTokens.BadgeRadius)
+    val shape = RoundedCornerShape(UiTokens.RadiusMedium)
     Row(
         modifier = Modifier
-            .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f), shape)
-            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, shape)
-            .padding(horizontal = UiTokens.SpaceMedium, vertical = UiTokens.SpaceSmall),
+            .height(34.dp)
+            .clip(shape)
+            .background(QadbTokens.brandSoft)
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f), shape)
+            .padding(horizontal = UiTokens.SpaceMedium),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         Text(
             text = "$count",
             style = MaterialTheme.typography.titleMedium,
-            fontSize = UiTokens.TextBodyLarge,
+            fontSize = UiTokens.TextBody,
             fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.primary
+            color = QadbTokens.brand
         )
         Text(
-            text = stringResource(Res.string.process_title),
+            text = l10n("个进程", "processes"),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -571,80 +465,51 @@ private suspend fun loadProcessList(deviceId: String): Result<List<ProcessItem>>
     val topResult = AdbTool.execShellAsync("top -b -n 1", deviceId)
     if (topResult.success && topResult.output.isNotBlank()) {
         val parsedTop = runCatching { parseTopOutput(topResult.output) }.getOrNull().orEmpty()
-        if (parsedTop.isNotEmpty()) {
-            return Result.success(parsedTop)
-        }
+        if (parsedTop.isNotEmpty()) return Result.success(parsedTop)
     }
-
     val processResult = AdbTool.execShellAsync("ps -A", deviceId)
     val output = if (processResult.success && processResult.output.isNotBlank()) {
         processResult.output
     } else {
         val fallback = AdbTool.execShellAsync("ps", deviceId)
-        if (!fallback.success) {
-            return Result.failure(IllegalStateException(fallback.errorMessage ?: "Load process failed"))
-        }
+        if (!fallback.success) return Result.failure(IllegalStateException(fallback.errorMessage ?: "Load process failed"))
         fallback.output
     }
-
     return runCatching { parsePsOutput(output) }
 }
+
+private val SPACES_REGEX = Regex("\\s+")
 
 internal fun parseTopOutput(raw: String): List<ProcessItem> {
     val lines = raw.lines().map { it.trim() }.filter { it.isNotBlank() }
     if (lines.isEmpty()) return emptyList()
-
     val headerIndex = lines.indexOfFirst {
         val upper = it.uppercase()
         upper.contains("PID") && upper.contains("CPU") &&
             (upper.contains("NAME") || upper.contains("CMD") || upper.contains("COMMAND") || upper.contains("ARGS"))
     }
     if (headerIndex < 0 || headerIndex + 1 >= lines.size) return emptyList()
-
-    val header = lines[headerIndex].split(Regex("\\s+"))
+    val header = lines[headerIndex].split(SPACES_REGEX)
     val pidIndex = header.indexOfFirst { it.equals("PID", true) }
     val userIndex = header.indexOfFirst { it.equals("USER", true) || it.equals("UID", true) }
-    val cpuIndex = header.indexOfFirst {
-        it.equals("%CPU", true) || it.equals("CPU%", true) || it.equals("CPU", true) ||
-            it.contains("CPU", ignoreCase = true)
-    }
-    val timeIndex = header.indexOfFirst {
-        it.equals("TIME+", true) || it.equals("TIME", true) || it.equals("CPUTIME", true)
-    }
-    val memIndex = header.indexOfFirst {
-        it.equals("RES", true) || it.equals("RSS", true) || it.equals("%MEM", true) || it.equals("MEM", true)
-    }
-    val nameIndex = header.indexOfFirst {
-        it.equals("NAME", true) || it.equals("CMD", true) || it.equals("COMMAND", true)
-            || it.equals("ARGS", true)
-    }
-
+    val cpuIndex = header.indexOfFirst { it.equals("%CPU", true) || it.equals("CPU%", true) || it.equals("CPU", true) || it.contains("CPU", ignoreCase = true) }
+    val timeIndex = header.indexOfFirst { it.equals("TIME+", true) || it.equals("TIME", true) || it.equals("CPUTIME", true) }
+    val memIndex = header.indexOfFirst { it.equals("RES", true) || it.equals("RSS", true) || it.equals("%MEM", true) || it.equals("MEM", true) }
+    val nameIndex = header.indexOfFirst { it.equals("NAME", true) || it.equals("CMD", true) || it.equals("COMMAND", true) || it.equals("ARGS", true) }
     if (pidIndex < 0 || nameIndex < 0) return emptyList()
-    val mergedStateCpuIndex = header.indexOfFirst {
-        it.contains("CPU", ignoreCase = true) && it.contains("[") && it.contains("]")
-    }
-
+    val mergedStateCpuIndex = header.indexOfFirst { it.contains("CPU", ignoreCase = true) && it.contains("[") && it.contains("]") }
     fun dataIndex(headerIndex: Int): Int {
         if (headerIndex < 0) return headerIndex
-        return if (mergedStateCpuIndex >= 0 && headerIndex >= mergedStateCpuIndex) {
-            headerIndex + 1
-        } else {
-            headerIndex
-        }
+        return if (mergedStateCpuIndex >= 0 && headerIndex >= mergedStateCpuIndex) headerIndex + 1 else headerIndex
     }
-
     return lines.drop(headerIndex + 1).mapNotNull { line ->
-        val tokens = line.split(Regex("\\s+"))
-        val pidDataIndex = dataIndex(pidIndex)
-        val userDataIndex = dataIndex(userIndex)
-        val cpuDataIndex = dataIndex(cpuIndex)
-        val timeDataIndex = dataIndex(timeIndex)
-        val memDataIndex = dataIndex(memIndex)
-        val nameDataIndex = dataIndex(nameIndex)
+        val tokens = line.split(SPACES_REGEX)
+        val pidDataIndex = dataIndex(pidIndex); val userDataIndex = dataIndex(userIndex)
+        val cpuDataIndex = dataIndex(cpuIndex); val timeDataIndex = dataIndex(timeIndex)
+        val memDataIndex = dataIndex(memIndex); val nameDataIndex = dataIndex(nameIndex)
         if (tokens.size <= pidDataIndex || tokens.size <= nameDataIndex) return@mapNotNull null
-        val name = tokens.drop(nameDataIndex).joinToString(" ").ifBlank { "-" }
         ProcessItem(
-            name = name,
+            name = tokens.drop(nameDataIndex).joinToString(" ").ifBlank { "-" },
             cpuPercent = tokens.getOrNull(cpuDataIndex)?.let { normalizeCpuValue(it) } ?: "-",
             cpuTime = tokens.getOrNull(timeDataIndex) ?: "-",
             memory = tokens.getOrNull(memDataIndex) ?: "-",
@@ -657,42 +522,22 @@ internal fun parseTopOutput(raw: String): List<ProcessItem> {
 internal fun parsePsOutput(raw: String): List<ProcessItem> {
     val lines = raw.lines().map { it.trim() }.filter { it.isNotBlank() }
     if (lines.isEmpty()) return emptyList()
-
-    val header = lines.first().split(Regex("\\s+"))
+    val header = lines.first().split(SPACES_REGEX)
     val pidIndex = header.indexOfFirst { it.equals("PID", ignoreCase = true) }.takeIf { it >= 0 } ?: 1
-    val userIndex = header.indexOfFirst { it.equals("USER", ignoreCase = true) || it.equals("UID", ignoreCase = true) }
-        .takeIf { it >= 0 } ?: 0
-    val nameIndex = header.indexOfFirst {
-            it.equals("NAME", ignoreCase = true) ||
-            it.equals("CMD", ignoreCase = true) ||
-            it.equals("COMMAND", ignoreCase = true) ||
-            it.equals("CMDLINE", ignoreCase = true) ||
-            it.equals("ARGS", ignoreCase = true)
-    }.takeIf { it >= 0 } ?: (header.size - 1)
-    val residentMemoryIndex = header.indexOfFirst {
-        it.equals("RSS", ignoreCase = true) ||
-            it.equals("RES", ignoreCase = true)
-    }.takeIf { it >= 0 }
-    val virtualMemoryIndex = header.indexOfFirst {
-        it.equals("VSZ", ignoreCase = true) ||
-            it.equals("VSIZE", ignoreCase = true)
-    }.takeIf { it >= 0 }
+    val userIndex = header.indexOfFirst { it.equals("USER", ignoreCase = true) || it.equals("UID", ignoreCase = true) }.takeIf { it >= 0 } ?: 0
+    val nameIndex = header.indexOfFirst { it.equals("NAME", ignoreCase = true) || it.equals("CMD", ignoreCase = true) || it.equals("COMMAND", ignoreCase = true) || it.equals("CMDLINE", ignoreCase = true) || it.equals("ARGS", ignoreCase = true) }.takeIf { it >= 0 } ?: (header.size - 1)
+    val residentMemoryIndex = header.indexOfFirst { it.equals("RSS", ignoreCase = true) || it.equals("RES", ignoreCase = true) }.takeIf { it >= 0 }
+    val virtualMemoryIndex = header.indexOfFirst { it.equals("VSZ", ignoreCase = true) || it.equals("VSIZE", ignoreCase = true) }.takeIf { it >= 0 }
     val memoryIndex = residentMemoryIndex ?: virtualMemoryIndex
-
     return lines.drop(1).mapNotNull { line ->
-        val tokens = line.split(Regex("\\s+"))
+        val tokens = line.split(SPACES_REGEX)
         if (tokens.size <= pidIndex || tokens.size <= nameIndex) return@mapNotNull null
-        val pid = tokens[pidIndex]
-        val user = tokens.getOrNull(userIndex) ?: "-"
-        val name = tokens.drop(nameIndex).joinToString(" ").ifBlank { tokens.lastOrNull().orEmpty() }
-        val memory = memoryIndex?.let { tokens.getOrNull(it) } ?: "-"
         ProcessItem(
-            name = name,
-            cpuPercent = "-",
-            cpuTime = "-",
-            memory = memory,
-            pid = pid,
-            user = user,
+            name = tokens.drop(nameIndex).joinToString(" ").ifBlank { tokens.lastOrNull().orEmpty() },
+            cpuPercent = "-", cpuTime = "-",
+            memory = memoryIndex?.let { tokens.getOrNull(it) } ?: "-",
+            pid = tokens[pidIndex],
+            user = tokens.getOrNull(userIndex) ?: "-"
         )
     }.sortedBy { it.pid.toIntOrNull() ?: Int.MAX_VALUE }
 }
@@ -702,9 +547,7 @@ private fun normalizeCpuValue(raw: String): String {
     return if (cleaned.endsWith("%")) cleaned else "$cleaned%"
 }
 
-private fun parseCpuForSort(raw: String): Double {
-    return raw.removeSuffix("%").toDoubleOrNull() ?: -1.0
-}
+private fun parseCpuForSort(raw: String): Double = raw.removeSuffix("%").toDoubleOrNull() ?: -1.0
 
 private fun parseMemoryForSort(raw: String): Double {
     val cleaned = raw.trim().removeSuffix("K").removeSuffix("M").removeSuffix("G").removeSuffix("k").removeSuffix("m").removeSuffix("g")
@@ -713,24 +556,19 @@ private fun parseMemoryForSort(raw: String): Double {
 
 @Composable
 private fun SortableColumnHeader(
-    text: String,
-    width: Dp?,
-    column: SortColumn,
-    currentSort: SortColumn,
-    descending: Boolean,
-    onClick: () -> Unit
+    text: String, width: Dp?, column: SortColumn, currentSort: SortColumn, descending: Boolean, onClick: () -> Unit
 ) {
     val isActive = column == currentSort
     val modifier = if (width != null) Modifier.width(width) else Modifier
-    Row(
-        modifier = modifier.clickable(onClick = onClick),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
+    Row(modifier = modifier.clickable(onClick = onClick), verticalAlignment = Alignment.CenterVertically) {
         Text(
-            text = text,
-            style = MaterialTheme.typography.labelMedium,
-            fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal,
-            color = if (isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+            text = text.uppercase(),
+            style = MaterialTheme.typography.labelSmall.copy(
+                fontSize = 10.sp,
+                letterSpacing = 0.5.sp
+            ),
+            fontWeight = if (isActive) FontWeight.Bold else FontWeight.Medium,
+            color = if (isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f)
         )
         if (isActive) {
             Icon(

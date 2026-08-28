@@ -56,11 +56,29 @@ sealed class AppIconState {
     data class Failed(val reason: String) : AppIconState()
 }
 
+private val PROCESS_PATTERN = Regex("""ProcessRecord\{[^}]*\s(?:\d+:)?([A-Za-z0-9_.]+(?::[A-Za-z0-9_.-]+)?)/""")
+private val VERSION_CODE_PATTERN = Regex("""versionCode=(\d+)""")
+private val PACKAGE_LINE_REGEX = Regex("""package:(.+)=([A-Za-z0-9._]+)""")
+private val INVALID_FILE_CHARS_REGEX = Regex("[^A-Za-z0-9._-]")
+private val SPACES_REGEX = Regex("""\s+""")
+private val DRAWABLE_REF_REGEX = Regex("""android:drawable="@((?:mipmap|drawable)/[A-Za-z0-9_]+)"""")
+private val MIN_SDK_REGEX = Regex("""minSdk=([^\s]+)""")
+private val TARGET_SDK_REGEX = Regex("""targetSdk=([^\s]+)""")
+private val USER_ID_REGEX = Regex("""userId=([^\s]+)""")
+private val PERMISSION_PATTERN = Regex("""\b(?:[a-zA-Z0-9_]+\.)*permission\.[A-Za-z0-9_.]+\b""")
+private val DU_KB_REGEX = Regex("""^\s*(\d+)""")
+private val APP_LABEL_REGEXES = listOf(
+    Regex("""application-label-zh-CN:'([^']+)'"""),
+    Regex("""application-label-zh_CN:'([^']+)'"""),
+    Regex("""application-label-zh:'([^']+)'"""),
+    Regex("""application-label:'([^']+)'"""),
+    Regex("""application-label-[^:]+:'([^']+)'""")
+)
+
 internal fun parseRunningPackagesFromActivityProcesses(output: String): Set<String> {
-    val processPattern = Regex("""ProcessRecord\{[^}]*\s(?:\d+:)?([A-Za-z0-9_.]+(?::[A-Za-z0-9_.-]+)?)/""")
     return output.lineSequence()
         .mapNotNull { line ->
-            processPattern.find(line)
+            PROCESS_PATTERN.find(line)
                 ?.groupValues
                 ?.getOrNull(1)
                 ?.substringBefore(":")
@@ -75,7 +93,88 @@ internal fun appListLoadShouldApply(requestedDeviceId: String?, currentDeviceId:
     return requested.isNotEmpty() && requested == current
 }
 
-private val packageLineRegex = Regex("""package:(.+)=([A-Za-z0-9._]+)""")
+internal data class PackageSummary(
+    val packageName: String,
+    val versionName: String?,
+    val versionCode: String?,
+    val isSystemApp: Boolean?,
+    val isDebuggable: Boolean?,
+    val isDisabled: Boolean?,
+    val firstInstallTime: String?,
+    val lastUpdateTime: String?
+)
+
+internal fun parseDumpsysPackages(dumpsysOutput: String): Map<String, PackageSummary> {
+    val result = mutableMapOf<String, PackageSummary>()
+    var currentPackage: String? = null
+    var currentVersionName: String? = null
+    var currentVersionCode: String? = null
+    var isDebuggable: Boolean = false
+    var isSystem: Boolean = false
+    var isDisabled: Boolean = false
+    var firstInstallTime: String? = null
+    var lastUpdateTime: String? = null
+
+    fun flush() {
+        val pkg = currentPackage ?: return
+        result[pkg] = PackageSummary(
+            packageName = pkg,
+            versionName = currentVersionName,
+            versionCode = currentVersionCode,
+            isSystemApp = isSystem,
+            isDebuggable = isDebuggable,
+            isDisabled = isDisabled,
+            firstInstallTime = firstInstallTime,
+            lastUpdateTime = lastUpdateTime
+        )
+    }
+
+    dumpsysOutput.lineSequence().forEach { rawLine ->
+        val line = rawLine.trim()
+        if (line.startsWith("Package [") && line.contains("]")) {
+            flush()
+            currentPackage = line.substringAfter("Package [").substringBefore("]")
+            currentVersionName = null
+            currentVersionCode = null
+            isDebuggable = false
+            isSystem = false
+            isDisabled = false
+            firstInstallTime = null
+            lastUpdateTime = null
+        } else if (currentPackage != null) {
+            when {
+                line.startsWith("versionName=") -> {
+                    val v = line.removePrefix("versionName=").trim()
+                    if (v.isNotEmpty() && v != "null") currentVersionName = v
+                }
+                line.startsWith("versionCode=") || line.contains("versionCode=") -> {
+                    val code = VERSION_CODE_PATTERN.find(line)?.groupValues?.getOrNull(1)
+                    if (code != null) currentVersionCode = code
+                }
+                line.startsWith("pkgFlags=[") -> {
+                    if (line.contains("DEBUGGABLE", ignoreCase = true)) isDebuggable = true
+                    if (line.contains("SYSTEM", ignoreCase = true)) isSystem = true
+                }
+                line.startsWith("firstInstallTime=") -> {
+                    firstInstallTime = line.removePrefix("firstInstallTime=").trim().takeIf { it.isNotEmpty() }
+                }
+                line.startsWith("lastUpdateTime=") -> {
+                    lastUpdateTime = line.removePrefix("lastUpdateTime=").trim().takeIf { it.isNotEmpty() }
+                }
+                line.startsWith("enabled=") -> {
+                    val state = line.removePrefix("enabled=").trim().lowercase()
+                    if (state in setOf("2", "3", "4", "false", "disabled", "disabled-user", "disabled_until_used")) {
+                        isDisabled = true
+                    }
+                }
+            }
+        }
+    }
+    flush()
+    return result
+}
+
+private val packageLineRegex = PACKAGE_LINE_REGEX
 
 internal suspend fun loadInstalledAppsForDevice(): List<AppInfo> = coroutineScope {
     val allAppsDef = async { AdbTool.exec("pm list packages -f") }
@@ -155,6 +254,7 @@ class AppViewModel : BaseViewModel() {
     private var iconPrefetchJob: Job? = null
     private var runningStatusJob: Job? = null
     private var visibleAssetsJob: Job? = null
+    private var packageSummariesJob: Job? = null
     private val iconTraceLock = Any()
     private var iconTraceSessionId = 0L
     private var iconTraceDeviceId = ""
@@ -231,6 +331,7 @@ class AppViewModel : BaseViewModel() {
                 _appList.value = list
                 hydrateCachedLabels(list)
                 markAppListLoaded(traceSessionId, list.size, listStartedAt)
+                schedulePackageSummariesLoad(normalizedDeviceId)
                 if (isFullIconPrefetchEnabled()) {
                     scheduleAllIconPrefetch(traceSessionId, normalizedDeviceId, list)
                 }
@@ -251,6 +352,8 @@ class AppViewModel : BaseViewModel() {
         runningStatusJob = null
         visibleAssetsJob?.cancel()
         visibleAssetsJob = null
+        packageSummariesJob?.cancel()
+        packageSummariesJob = null
         synchronized(loadingPackages) {
             loadingPackages.clear()
         }
@@ -423,7 +526,7 @@ class AppViewModel : BaseViewModel() {
 
     private fun currentDeviceCacheKey(): String {
         val raw = AdbTool.selectDeviceId?.trim().orEmpty().ifBlank { "default" }
-        return raw.replace(Regex("[^A-Za-z0-9._-]"), "_")
+        return raw.replace(INVALID_FILE_CHARS_REGEX, "_")
     }
 
     private fun claimLoading(packageName: String): Boolean = synchronized(loadingPackages) {
@@ -677,10 +780,91 @@ class AppViewModel : BaseViewModel() {
                 }
             }
         }
+        val appsNeedingSize = apps.filter { it.size == "-" || it.sizeBytes == null }
+        if (appsNeedingSize.isNotEmpty()) {
+            val sizeMap = queryBatchAppSizes(appsNeedingSize)
+            if (sizeMap.isNotEmpty()) {
+                withContext(Dispatchers.Main) {
+                    _appList.value = _appList.value.map { current ->
+                        val bytes = sizeMap[current.packageName]
+                        if (bytes != null && bytes > 0L) {
+                            current.copy(
+                                sizeBytes = bytes,
+                                size = formatSize(bytes)
+                            )
+                        } else {
+                            current
+                        }
+                    }
+                }
+            }
+        }
+
         logIconTrace(
             "iconBatchEnd",
             "session=$traceSessionId trigger=$trigger size=${apps.size} success=$successCount failed=$failedCount elapsedMs=${System.currentTimeMillis() - batchStartedAt}"
         )
+    }
+
+    private fun queryBatchAppSizes(apps: List<AppInfo>): Map<String, Long> {
+        val validApps = apps.filter { it.apkPath.isNotBlank() }
+        if (validApps.isEmpty()) return emptyMap()
+
+        val pathArg = validApps.joinToString(" ") { AdbTool.shellQuote(it.apkPath) }
+        val statOutput = AdbTool.exec("stat -c '%s %n' $pathArg")
+        val sizeByPath = mutableMapOf<String, Long>()
+
+        statOutput.lineSequence().forEach { line ->
+            val trimmed = line.trim()
+            val parts = trimmed.split(SPACES_REGEX, limit = 2)
+            if (parts.size == 2) {
+                val bytes = parts[0].toLongOrNull()
+                val path = parts[1].trim()
+                if (bytes != null && bytes > 0L) {
+                    sizeByPath[path] = bytes
+                }
+            }
+        }
+
+        val result = mutableMapOf<String, Long>()
+        for (app in validApps) {
+            val size = sizeByPath[app.apkPath]
+            if (size != null) {
+                result[app.packageName] = size
+            }
+        }
+        return result
+    }
+
+    private fun schedulePackageSummariesLoad(deviceId: String) {
+        packageSummariesJob?.cancel()
+        packageSummariesJob = viewModelScope.launch(Dispatchers.IO) {
+            runCatching {
+                val dumpsys = AdbTool.exec(appPackageShellCommand("dumpsys", "package", "packages"))
+                if (!appListLoadShouldApply(deviceId, appListLoadDeviceId)) return@launch
+                val summaries = parseDumpsysPackages(dumpsys)
+                if (summaries.isEmpty()) return@launch
+
+                withContext(Dispatchers.Main) {
+                    if (!appListLoadShouldApply(deviceId, appListLoadDeviceId)) return@withContext
+                    _appList.value = _appList.value.map { app ->
+                        val summary = summaries[app.packageName]
+                        if (summary != null) {
+                            app.copy(
+                                versionName = summary.versionName ?: app.versionName,
+                                installTime = summary.firstInstallTime ?: app.installTime,
+                                installTimestamp = summary.firstInstallTime?.let { parseInstallTimestamp(it) } ?: app.installTimestamp,
+                                lastUsedTimestamp = summary.lastUpdateTime?.let { parseInstallTimestamp(it) } ?: app.lastUsedTimestamp,
+                                isDebuggable = summary.isDebuggable ?: app.isDebuggable,
+                                isDisabled = summary.isDisabled ?: app.isDisabled
+                            )
+                        } else {
+                            app
+                        }
+                    }
+                }
+            }
+        }
     }
 
     private fun readLabelCache(packageName: String): String? {
@@ -718,7 +902,19 @@ class AppViewModel : BaseViewModel() {
 
     private fun applyIconBatch(icons: Map<String, ImageBitmap>) {
         if (icons.isEmpty()) return
-        _appIcons.value = _appIcons.value.toMutableMap().apply { putAll(icons) }
+        val current = _appIcons.value
+        val updated = LinkedHashMap<String, ImageBitmap>(current.size + icons.size)
+        updated.putAll(current)
+        updated.putAll(icons)
+        val maxCached = 200
+        if (updated.size > maxCached) {
+            val iterator = updated.iterator()
+            while (updated.size > maxCached && iterator.hasNext()) {
+                iterator.next()
+                iterator.remove()
+            }
+        }
+        _appIcons.value = updated
     }
 
     private fun applyIconStateBatch(states: Map<String, AppIconState>) {
@@ -753,15 +949,7 @@ class AppViewModel : BaseViewModel() {
 
     private fun extractLabelFromApk(apkFile: File): String? {
         val output = runAaptBadging(apkFile) ?: return null
-        val labelPatterns = listOf(
-            Regex("""application-label-zh-CN:'([^']+)'"""),
-            Regex("""application-label-zh_CN:'([^']+)'"""),
-            Regex("""application-label-zh:'([^']+)'"""),
-            Regex("""application-label:'([^']+)'"""),
-            Regex("""application-label-[^:]+:'([^']+)'""")
-        )
-
-        return labelPatterns.asSequence()
+        return APP_LABEL_REGEXES.asSequence()
             .mapNotNull { it.find(output)?.groupValues?.getOrNull(1)?.trim() }
             .firstOrNull { it.isNotEmpty() }
     }
@@ -837,8 +1025,7 @@ class AppViewModel : BaseViewModel() {
                 } ?: return@use null
 
                 val xmlContent = zip.getInputStream(adaptiveXml).bufferedReader().use { it.readText() }
-                val refRegex = Regex("""android:drawable=\"@((?:mipmap|drawable)/[A-Za-z0-9_]+)\"""")
-                val resourceRefs = refRegex.findAll(xmlContent).map { it.groupValues[1] }.toList()
+                val resourceRefs = DRAWABLE_REF_REGEX.findAll(xmlContent).map { it.groupValues[1] }.toList()
                 val densityOrder = listOf("xxxhdpi", "xxhdpi", "xhdpi", "hdpi", "mdpi", "anydpi")
 
                 for (ref in resourceRefs) {
@@ -1027,89 +1214,84 @@ class AppViewModel : BaseViewModel() {
 
         viewModelScope.launch(Dispatchers.IO) {
             runCatching {
-                val dumpsys = AdbTool.exec(appPackageShellCommand("dumpsys", "package", packageName))
-                val versionName = parseVersionName(dumpsys) ?: "-"
-                val versionCode = Regex("versionCode=([^\\s]+)").find(dumpsys)?.groupValues?.get(1) ?: "-"
-                val minSdk = Regex("minSdk=([^\\s]+)").find(dumpsys)?.groupValues?.get(1) ?: "-"
-                val targetSdk = Regex("targetSdk=([^\\s]+)").find(dumpsys)?.groupValues?.get(1) ?: "-"
-                val uid = Regex("userId=([^\\s]+)").find(dumpsys)?.groupValues?.get(1) ?: "-"
-                val firstInstallTime = Regex("firstInstallTime=([^\n]+)").find(dumpsys)?.groupValues?.get(1)?.trim() ?: "-"
-                val lastUpdateTime = Regex("lastUpdateTime=([^\n]+)").find(dumpsys)?.groupValues?.get(1)?.trim() ?: "-"
-                val supportedAbi = Regex("primaryCpuAbi=([^\n]+)").find(dumpsys)?.groupValues?.get(1)?.trim() ?: "-"
-                val isSystemApp = dumpsys.contains("pkgFlags=[") && dumpsys.substringAfter("pkgFlags=[").substringBefore("]").contains("SYSTEM")
-                val packagePath = app?.apkPath?.takeIf { it.isNotBlank() }
-                    ?: AdbTool.exec(appPackageShellCommand("pm", "path", packageName)).lineSequence()
-                        .firstOrNull { it.startsWith("package:") }
-                        ?.removePrefix("package:")
-                        ?.trim()
-                        .orEmpty()
-                val sizeBytes = queryPackageSizeBytes(packagePath, packageName) ?: app?.sizeBytes
-                val sizeText = app?.size?.takeIf { it != "-" } ?: sizeBytes?.let { formatSize(it) } ?: "-"
-                val processId = AdbTool.exec(appPackageShellCommand("pidof", packageName)).trim().takeIf { it.isNotEmpty() } ?: "-"
-                val isRunning = processId != "-"
-                val permissionStats = parsePermissionStats(dumpsys)
-                val permissionDetails = parsePermissionDetails(dumpsys)
-                val activityDetails = parseActivityDetails(dumpsys, packageName)
-                val serviceDetails = parseServiceDetails(dumpsys, packageName)
-                val receiverDetails = parseReceiverDetails(dumpsys, packageName)
-                val providerDetails = parseProviderDetails(dumpsys, packageName)
-                val signatureDetails = parseSignatureDetails(dumpsys)
+                coroutineScope {
+                    val dumpsysDeferred = async { AdbTool.exec(appPackageShellCommand("dumpsys", "package", packageName)) }
+                    val pidDeferred = async { AdbTool.exec(appPackageShellCommand("pidof", packageName)).trim().takeIf { it.isNotEmpty() } ?: "-" }
+                    val pathDeferred = async {
+                        app?.apkPath?.takeIf { it.isNotBlank() }
+                            ?: AdbTool.exec(appPackageShellCommand("pm", "path", packageName)).lineSequence()
+                                .firstOrNull { it.startsWith("package:") }
+                                ?.removePrefix("package:")
+                                ?.trim()
+                                .orEmpty()
+                    }
 
-                val info = AppInfoData(
-                    appName = app?.appName ?: packageName,
-                    packageName = packageName,
-                    versionName = versionName,
-                    versionCode = versionCode,
-                    minSdk = minSdk,
-                    targetSdk = targetSdk,
-                    uid = uid,
-                    firstInstallTime = firstInstallTime,
-                    lastUpdateTime = lastUpdateTime,
-                    supportedAbi = supportedAbi,
-                    isSystemApp = isSystemApp,
-                    isRunning = isRunning,
-                    apkPath = packagePath,
-                    dataDir = "/data/user/0/$packageName",
-                    installLocation = if (isSystemApp) l10n("系统分区", "System partition") else l10n("内部存储", "Internal storage"),
-                    appSize = sizeText,
-                    totalSize = sizeText,
-                    processId = processId,
-                    memoryUsage = if (isRunning) l10n("运行中", "Running") else "-",
-                    startTime = if (isRunning) l10n("已启动", "Started") else "-",
-                    dangerousPermissionCount = permissionStats.dangerous,
-                    privacyPermissionCount = permissionStats.privacy,
-                    normalPermissionCount = permissionStats.normal,
-                    totalPermissionCount = permissionStats.total,
-                    permissionDetails = permissionDetails,
-                    activityDetails = activityDetails,
-                    serviceDetails = serviceDetails,
-                    receiverDetails = receiverDetails,
-                    providerDetails = providerDetails,
-                    signatureDetails = signatureDetails
-                )
+                    val dumpsys = dumpsysDeferred.await()
+                    val processId = pidDeferred.await()
+                    val packagePath = pathDeferred.await()
 
-                withContext(Dispatchers.Main) {
-                    if (app != null) {
-                        _appList.value = _appList.value.map { current ->
-                            if (current.packageName == packageName) {
-                                current.copy(
-                                    versionName = versionName,
-                                    installTime = firstInstallTime,
-                                    size = sizeText,
-                                    sizeBytes = sizeBytes,
-                                    installTimestamp = parseInstallTimestamp(firstInstallTime),
-                                    lastUsedTimestamp = parseInstallTimestamp(lastUpdateTime)
-                                        ?: parseInstallTimestamp(firstInstallTime),
-                                    isDebuggable = pkgFlagsContainsDebuggable(dumpsys) || current.isDebuggable,
-                                    isDisabled = parseDisabledState(dumpsys) || current.isDisabled,
-                                    isRunning = isRunning
-                                )
-                            } else {
-                                current
+                    val sizeBytesDeferred = async { queryPackageSizeBytes(packagePath, packageName) ?: app?.sizeBytes }
+                    val parsed = parseDumpsysPackageDetails(dumpsys, packageName)
+                    val sizeBytes = sizeBytesDeferred.await()
+                    val sizeText = app?.size?.takeIf { it != "-" } ?: sizeBytes?.let { formatSize(it) } ?: "-"
+                    val isRunning = processId != "-"
+
+                    val info = AppInfoData(
+                        appName = app?.appName ?: packageName,
+                        packageName = packageName,
+                        versionName = parsed.versionName,
+                        versionCode = parsed.versionCode,
+                        minSdk = parsed.minSdk,
+                        targetSdk = parsed.targetSdk,
+                        uid = parsed.uid,
+                        firstInstallTime = parsed.firstInstallTime,
+                        lastUpdateTime = parsed.lastUpdateTime,
+                        supportedAbi = parsed.supportedAbi,
+                        isSystemApp = parsed.isSystemApp,
+                        isRunning = isRunning,
+                        apkPath = packagePath,
+                        dataDir = "/data/user/0/$packageName",
+                        installLocation = if (parsed.isSystemApp) l10n("系统分区", "System partition") else l10n("内部存储", "Internal storage"),
+                        appSize = sizeText,
+                        totalSize = sizeText,
+                        processId = processId,
+                        memoryUsage = if (isRunning) l10n("运行中", "Running") else "-",
+                        startTime = if (isRunning) l10n("已启动", "Started") else "-",
+                        dangerousPermissionCount = parsed.dangerousPermissionCount,
+                        privacyPermissionCount = parsed.privacyPermissionCount,
+                        normalPermissionCount = parsed.normalPermissionCount,
+                        totalPermissionCount = parsed.totalPermissionCount,
+                        permissionDetails = parsed.permissionDetails,
+                        activityDetails = parsed.activityDetails,
+                        serviceDetails = parsed.serviceDetails,
+                        receiverDetails = parsed.receiverDetails,
+                        providerDetails = parsed.providerDetails,
+                        signatureDetails = parsed.signatureDetails
+                    )
+
+                    withContext(Dispatchers.Main) {
+                        if (app != null) {
+                            _appList.value = _appList.value.map { current ->
+                                if (current.packageName == packageName) {
+                                    current.copy(
+                                        versionName = parsed.versionName,
+                                        installTime = parsed.firstInstallTime,
+                                        size = sizeText,
+                                        sizeBytes = sizeBytes,
+                                        installTimestamp = parseInstallTimestamp(parsed.firstInstallTime),
+                                        lastUsedTimestamp = parseInstallTimestamp(parsed.lastUpdateTime)
+                                            ?: parseInstallTimestamp(parsed.firstInstallTime),
+                                        isDebuggable = parsed.isDebuggable || current.isDebuggable,
+                                        isDisabled = parsed.isDisabled || current.isDisabled,
+                                        isRunning = isRunning
+                                    )
+                                } else {
+                                    current
+                                }
                             }
                         }
+                        _appInfo.value = info
                     }
-                    _appInfo.value = info
                 }
             }.onFailure {
                 // Keep initial detail page visible even if deep dumpsys parsing fails.
@@ -1117,116 +1299,176 @@ class AppViewModel : BaseViewModel() {
         }
     }
 
-    private data class PermissionStats(
-        val dangerous: Int,
-        val privacy: Int,
-        val normal: Int,
-        val total: Int
+    internal data class ParsedDumpsysApp(
+        val versionName: String,
+        val versionCode: String,
+        val minSdk: String,
+        val targetSdk: String,
+        val uid: String,
+        val firstInstallTime: String,
+        val lastUpdateTime: String,
+        val supportedAbi: String,
+        val isSystemApp: Boolean,
+        val isDebuggable: Boolean,
+        val isDisabled: Boolean,
+        val permissionDetails: List<String>,
+        val dangerousPermissionCount: Int,
+        val privacyPermissionCount: Int,
+        val normalPermissionCount: Int,
+        val totalPermissionCount: Int,
+        val activityDetails: List<String>,
+        val serviceDetails: List<String>,
+        val receiverDetails: List<String>,
+        val providerDetails: List<String>,
+        val signatureDetails: List<String>
     )
 
-    private fun parsePermissionStats(dumpsys: String): PermissionStats {
-        val permissions = parsePermissionDetails(dumpsys).toSet()
-        val dangerousKeywords = listOf(
-            "CAMERA",
-            "LOCATION",
-            "RECORD_AUDIO",
-            "CONTACTS",
-            "SMS",
-            "PHONE",
-            "CALENDAR",
-            "BODY_SENSORS",
-            "STORAGE",
-            "BLUETOOTH"
-        )
-        val dangerous = permissions.count { permission ->
-            dangerousKeywords.any { keyword -> permission.contains(keyword) }
-        }
-        val privacy = permissions.count { permission ->
-            listOf("CAMERA", "LOCATION", "RECORD_AUDIO", "CONTACTS", "SMS", "PHONE").any { keyword ->
-                permission.contains(keyword)
-            }
-        }
-        val normal = (permissions.size - dangerous).coerceAtLeast(0)
-        return PermissionStats(
-            dangerous = dangerous,
-            privacy = privacy,
-            normal = normal,
-            total = permissions.size
-        )
-    }
+    private fun parseDumpsysPackageDetails(dumpsys: String, packageName: String): ParsedDumpsysApp {
+        var versionName = "-"
+        var versionCode = "-"
+        var minSdk = "-"
+        var targetSdk = "-"
+        var uid = "-"
+        var firstInstallTime = "-"
+        var lastUpdateTime = "-"
+        var supportedAbi = "-"
+        var isSystemApp = false
+        var isDebuggable = false
+        var isDisabled = false
 
-    private fun pkgFlagsContainsDebuggable(dumpsys: String): Boolean {
-        val flags = Regex("pkgFlags=\\[([^\\]]+)]").find(dumpsys)?.groupValues?.get(1).orEmpty()
-        return flags.contains("DEBUGGABLE", ignoreCase = true)
-    }
-
-    private fun parseVersionName(dumpsys: String): String? {
-        return Regex("""(?m)^\s*versionName=(.*)$""")
-            .find(dumpsys)
-            ?.groupValues
-            ?.getOrNull(1)
-            ?.trim()
-            ?.takeIf { it.isNotEmpty() && it != "null" }
-    }
-
-    private fun parseDisabledState(dumpsys: String): Boolean {
-        val enabledToken = Regex("enabled=(\\S+)").find(dumpsys)?.groupValues?.get(1)?.lowercase()
-        return enabledToken == "2" ||
-            enabledToken == "3" ||
-            enabledToken == "4" ||
-            enabledToken == "false" ||
-            enabledToken == "disabled" ||
-            enabledToken == "disabled-user" ||
-            enabledToken == "disabled_until_used"
-    }
-
-    private fun parsePermissionDetails(dumpsys: String): List<String> {
-        val permissionPattern = Regex("""\b(?:[a-zA-Z0-9_]+\.)*permission\.[A-Za-z0-9_\.]+\b""")
-        return permissionPattern.findAll(dumpsys)
-            .map { it.value.trim() }
-            .filter { it.isNotEmpty() }
-            .toSet()
-            .sorted()
-    }
-
-    private fun parseActivityDetails(dumpsys: String, packageName: String): List<String> {
-        return parseComponentDetails(dumpsys, packageName, listOf("activity", "launcheractivity", "resumedactivity"))
-    }
-
-    private fun parseServiceDetails(dumpsys: String, packageName: String): List<String> {
-        return parseComponentDetails(dumpsys, packageName, listOf("service"))
-    }
-
-    private fun parseReceiverDetails(dumpsys: String, packageName: String): List<String> {
-        return parseComponentDetails(dumpsys, packageName, listOf("receiver"))
-    }
-
-    private fun parseProviderDetails(dumpsys: String, packageName: String): List<String> {
-        return parseComponentDetails(dumpsys, packageName, listOf("provider", "contentprovider"))
-    }
-
-    private fun parseComponentDetails(
-        dumpsys: String,
-        packageName: String,
-        keywords: List<String>
-    ): List<String> {
         val pkgEscaped = Regex.escape(packageName)
         val slashPattern = Regex("""\b$pkgEscaped/[A-Za-z0-9_.$]+\b""")
         val classPattern = Regex("""\b$pkgEscaped\.[A-Za-z0-9_.$]+\b""")
-        val candidates = linkedSetOf<String>()
 
-        dumpsys.lineSequence().forEach { line ->
+        val permissions = linkedSetOf<String>()
+        val activities = linkedSetOf<String>()
+        val services = linkedSetOf<String>()
+        val receivers = linkedSetOf<String>()
+        val providers = linkedSetOf<String>()
+        val signatures = linkedSetOf<String>()
+
+        val signatureKeywords = listOf("signature", "signing", "cert", "certificate", "sha-256", "sha1", "md5")
+        val dangerousKeywords = listOf(
+            "CAMERA", "LOCATION", "RECORD_AUDIO", "CONTACTS", "SMS",
+            "PHONE", "CALENDAR", "BODY_SENSORS", "STORAGE", "BLUETOOTH"
+        )
+        val privacyKeywords = listOf("CAMERA", "LOCATION", "RECORD_AUDIO", "CONTACTS", "SMS", "PHONE")
+
+        dumpsys.lineSequence().forEach { rawLine ->
+            val line = rawLine.trim()
+            if (line.isEmpty()) return@forEach
             val lower = line.lowercase()
-            if (keywords.none { lower.contains(it) }) return@forEach
-            slashPattern.findAll(line).forEach { match ->
-                normalizeComponentName(packageName, match.value)?.let { candidates.add(it) }
+
+            when {
+                line.startsWith("versionName=") -> {
+                    val v = line.removePrefix("versionName=").trim()
+                    if (v.isNotEmpty() && v != "null") versionName = v
+                }
+                line.startsWith("versionCode=") || (versionCode == "-" && line.contains("versionCode=")) -> {
+                    VERSION_CODE_PATTERN.find(line)?.groupValues?.getOrNull(1)?.let { versionCode = it }
+                }
+                line.startsWith("minSdk=") || (minSdk == "-" && line.contains("minSdk=")) -> {
+                    MIN_SDK_REGEX.find(line)?.groupValues?.getOrNull(1)?.let { minSdk = it }
+                }
+                line.startsWith("targetSdk=") || (targetSdk == "-" && line.contains("targetSdk=")) -> {
+                    TARGET_SDK_REGEX.find(line)?.groupValues?.getOrNull(1)?.let { targetSdk = it }
+                }
+                line.startsWith("userId=") || line.startsWith("appId=") || (uid == "-" && line.contains("userId=")) -> {
+                    USER_ID_REGEX.find(line)?.groupValues?.getOrNull(1)?.let { uid = it }
+                }
+                line.startsWith("firstInstallTime=") -> {
+                    firstInstallTime = line.removePrefix("firstInstallTime=").trim().ifBlank { "-" }
+                }
+                line.startsWith("lastUpdateTime=") -> {
+                    lastUpdateTime = line.removePrefix("lastUpdateTime=").trim().ifBlank { "-" }
+                }
+                line.startsWith("primaryCpuAbi=") -> {
+                    supportedAbi = line.removePrefix("primaryCpuAbi=").trim().ifBlank { "-" }
+                }
+                line.startsWith("pkgFlags=[") || line.contains("pkgFlags=[") -> {
+                    if (line.contains("SYSTEM", ignoreCase = true)) isSystemApp = true
+                    if (line.contains("DEBUGGABLE", ignoreCase = true)) isDebuggable = true
+                }
+                line.startsWith("enabled=") -> {
+                    val token = line.removePrefix("enabled=").trim().lowercase()
+                    if (token in setOf("2", "3", "4", "false", "disabled", "disabled-user", "disabled_until_used")) {
+                        isDisabled = true
+                    }
+                }
             }
-            classPattern.findAll(line).forEach { match ->
-                normalizeComponentName(packageName, match.value)?.let { candidates.add(it) }
+
+            // Permissions extraction
+            PERMISSION_PATTERN.findAll(line).forEach { match ->
+                permissions.add(match.value.trim())
+            }
+
+            // Components extraction
+            if (lower.contains("activity") || lower.contains("resumedactivity") || lower.contains("launcheractivity")) {
+                slashPattern.findAll(line).forEach { match ->
+                    normalizeComponentName(packageName, match.value)?.let { activities.add(it) }
+                }
+                classPattern.findAll(line).forEach { match ->
+                    normalizeComponentName(packageName, match.value)?.let { activities.add(it) }
+                }
+            }
+            if (lower.contains("service")) {
+                slashPattern.findAll(line).forEach { match ->
+                    normalizeComponentName(packageName, match.value)?.let { services.add(it) }
+                }
+                classPattern.findAll(line).forEach { match ->
+                    normalizeComponentName(packageName, match.value)?.let { services.add(it) }
+                }
+            }
+            if (lower.contains("receiver")) {
+                slashPattern.findAll(line).forEach { match ->
+                    normalizeComponentName(packageName, match.value)?.let { receivers.add(it) }
+                }
+                classPattern.findAll(line).forEach { match ->
+                    normalizeComponentName(packageName, match.value)?.let { receivers.add(it) }
+                }
+            }
+            if (lower.contains("provider") || lower.contains("contentprovider")) {
+                slashPattern.findAll(line).forEach { match ->
+                    normalizeComponentName(packageName, match.value)?.let { providers.add(it) }
+                }
+                classPattern.findAll(line).forEach { match ->
+                    normalizeComponentName(packageName, match.value)?.let { providers.add(it) }
+                }
+            }
+
+            // Signature extraction
+            if (signatures.size < 50 && signatureKeywords.any { lower.contains(it) }) {
+                signatures.add(line)
             }
         }
 
-        return candidates.toList().sorted()
+        val dangerous = permissions.count { perm -> dangerousKeywords.any { perm.contains(it) } }
+        val privacy = permissions.count { perm -> privacyKeywords.any { perm.contains(it) } }
+        val normal = (permissions.size - dangerous).coerceAtLeast(0)
+
+        return ParsedDumpsysApp(
+            versionName = versionName,
+            versionCode = versionCode,
+            minSdk = minSdk,
+            targetSdk = targetSdk,
+            uid = uid,
+            firstInstallTime = firstInstallTime,
+            lastUpdateTime = lastUpdateTime,
+            supportedAbi = supportedAbi,
+            isSystemApp = isSystemApp,
+            isDebuggable = isDebuggable,
+            isDisabled = isDisabled,
+            permissionDetails = permissions.toList().sorted(),
+            dangerousPermissionCount = dangerous,
+            privacyPermissionCount = privacy,
+            normalPermissionCount = normal,
+            totalPermissionCount = permissions.size,
+            activityDetails = activities.toList().sorted(),
+            serviceDetails = services.toList().sorted(),
+            receiverDetails = receivers.toList().sorted(),
+            providerDetails = providers.toList().sorted(),
+            signatureDetails = signatures.toList()
+        )
     }
 
     private fun normalizeComponentName(packageName: String, raw: String): String? {
@@ -1241,20 +1483,6 @@ class AppViewModel : BaseViewModel() {
         } else {
             classPart
         }
-    }
-
-    private fun parseSignatureDetails(dumpsys: String): List<String> {
-        val signatureKeywords = listOf("signature", "signing", "cert", "certificate", "sha-256", "sha1", "md5")
-        val lines = dumpsys.lineSequence()
-            .map { it.trim() }
-            .filter { it.isNotEmpty() }
-            .filter { line ->
-                val lower = line.lowercase()
-                signatureKeywords.any { lower.contains(it) }
-            }
-            .toList()
-
-        return if (lines.isEmpty()) emptyList() else lines.distinct().take(50)
     }
 
     private fun queryPackageSizeBytes(packagePath: String, packageName: String): Long? {
@@ -1289,7 +1517,7 @@ class AppViewModel : BaseViewModel() {
 
     private fun queryRemoteDuSizeBytes(path: String): Long? {
         val duOutput = AdbTool.exec(appPathShellCommand("du", "-k", path))
-        val kb = Regex("""^\s*(\d+)""").find(duOutput)?.groupValues?.getOrNull(1)?.toLongOrNull()
+        val kb = DU_KB_REGEX.find(duOutput)?.groupValues?.getOrNull(1)?.toLongOrNull()
         return kb?.takeIf { it > 0L }?.let { it * 1024L }
     }
 

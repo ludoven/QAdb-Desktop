@@ -56,6 +56,8 @@ class AgentProviderRepository(
         legacy.loadApiKey()?.let { secrets.write(providerSecretAccount(profile.id), it) }
         saveProfiles(listOf(profile))
         saveBindings(AgentRoleBindings(AgentModelRole.entries.associateWith { profile.id }))
+        val tier = if (profile.capabilities.vision) AgentCapabilityTier.L3_VISUAL_AGENT else AgentCapabilityTier.L2_SEMANTIC_AGENT
+        capabilityAttestations.save(profile, tier)
     }
 
     /** Keeps the existing single-provider settings dialog backward compatible. */
@@ -71,6 +73,8 @@ class AgentProviderRepository(
             )
             // The legacy dialog treats a blank key as "keep the stored key".
             upsertLocked(updated, apiKey?.trim()?.takeIf { it.isNotEmpty() }, secretHeadersJson = null)
+            val tier = if (updated.capabilities.vision) AgentCapabilityTier.L3_VISUAL_AGENT else AgentCapabilityTier.L2_SEMANTIC_AGENT
+            capabilityAttestations.save(updated, tier)
         }
     }
 

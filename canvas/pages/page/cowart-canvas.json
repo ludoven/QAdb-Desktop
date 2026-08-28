@@ -1,0 +1,94 @@
+{
+  "schema": {
+    "schemaVersion": 2,
+    "sequences": {
+      "com.tldraw.store": 5,
+      "com.tldraw.asset": 1,
+      "com.tldraw.camera": 1,
+      "com.tldraw.document": 2,
+      "com.tldraw.instance": 26,
+      "com.tldraw.instance_page_state": 5,
+      "com.tldraw.page": 1,
+      "com.tldraw.instance_presence": 6,
+      "com.tldraw.pointer": 1,
+      "com.tldraw.shape": 4,
+      "com.tldraw.user": 1,
+      "com.tldraw.asset.image": 6,
+      "com.tldraw.asset.video": 5,
+      "com.tldraw.asset.bookmark": 2,
+      "com.tldraw.shape.arrow": 8,
+      "com.tldraw.shape.bookmark": 2,
+      "com.tldraw.shape.draw": 4,
+      "com.tldraw.shape.embed": 4,
+      "com.tldraw.shape.frame": 1,
+      "com.tldraw.shape.geo": 11,
+      "com.tldraw.shape.group": 0,
+      "com.tldraw.shape.highlight": 3,
+      "com.tldraw.shape.image": 5,
+      "com.tldraw.shape.line": 5,
+      "com.tldraw.shape.note": 12,
+      "com.tldraw.shape.text": 4,
+      "com.tldraw.shape.video": 4,
+      "com.tldraw.binding.arrow": 1
+    }
+  },
+  "store": {
+    "document:document": {
+      "gridSize": 10,
+      "name": "",
+      "meta": {},
+      "id": "document:document",
+      "typeName": "document"
+    },
+    "page:page": {
+      "meta": {},
+      "id": "page:page",
+      "name": "首页设计",
+      "index": "a1",
+      "typeName": "page"
+    },
+    "asset:qadb-home-premium-20260805": {
+      "id": "asset:qadb-home-premium-20260805",
+      "typeName": "asset",
+      "type": "image",
+      "props": {
+        "name": "qadb-home-premium-20260805.png",
+        "src": "/page-assets/page/qadb-home-premium-20260805.png",
+        "w": 1586,
+        "h": 992,
+        "fileSize": 1117996,
+        "mimeType": "image/png",
+        "isAnimated": false
+      },
+      "meta": {}
+    },
+    "shape:qadb-home-premium-20260805": {
+      "x": 0,
+      "y": 0,
+      "rotation": 0,
+      "isLocked": false,
+      "opacity": 1,
+      "meta": {
+        "cowartGeneratedStandalone": true,
+        "designType": "qadb-homepage-redesign",
+        "aspectRatio": "16:10"
+      },
+      "id": "shape:qadb-home-premium-20260805",
+      "type": "image",
+      "props": {
+        "w": 960,
+        "h": 600,
+        "assetId": "asset:qadb-home-premium-20260805",
+        "playing": true,
+        "url": "",
+        "crop": null,
+        "flipX": false,
+        "flipY": false,
+        "altText": "QADB 高级感桌面首页设计图，包含设备概览、状态指标、快捷操作、前台应用、执行记录与设备信息"
+      },
+      "parentId": "page:page",
+      "index": "a0",
+      "typeName": "shape"
+    }
+  }
+}

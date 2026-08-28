@@ -108,6 +108,10 @@ import adbtool_desktop.composeapp.generated.resources.settings_adb_version_desc
 import adbtool_desktop.composeapp.generated.resources.settings_pref_auto_detect_desc
 import adbtool_desktop.composeapp.generated.resources.settings_pref_auto_detect_title
 import adbtool_desktop.composeapp.generated.resources.settings_pref_language_desc
+import adbtool_desktop.composeapp.generated.resources.settings_pref_minimize_on_close_desc
+import adbtool_desktop.composeapp.generated.resources.settings_pref_minimize_on_close_title
+import adbtool_desktop.composeapp.generated.resources.settings_pref_minimize_on_launch_desc
+import adbtool_desktop.composeapp.generated.resources.settings_pref_minimize_on_launch_title
 import adbtool_desktop.composeapp.generated.resources.settings_pref_remember_device_desc
 import adbtool_desktop.composeapp.generated.resources.settings_pref_remember_device_title
 import adbtool_desktop.composeapp.generated.resources.settings_pref_theme_desc
@@ -129,10 +133,22 @@ import adbtool_desktop.composeapp.generated.resources.update_download_failed
 import adbtool_desktop.composeapp.generated.resources.update_download_success
 import adbtool_desktop.composeapp.generated.resources.update_section_title
 import adbtool_desktop.composeapp.generated.resources.update_up_to_date
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -153,6 +169,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
@@ -173,8 +190,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -220,6 +241,7 @@ import com.ludoven.adbtool.ui.mac.bodySmall
 import com.ludoven.adbtool.ui.mac.headlineSmall
 import com.ludoven.adbtool.ui.mac.titleMedium
 import com.ludoven.adbtool.util.AdbPathManager
+import com.ludoven.adbtool.util.AppBehaviorPreferences
 import com.ludoven.adbtool.util.FileUtils
 import com.ludoven.adbtool.util.GitHubUpdateManager
 import com.ludoven.adbtool.widget.FeedbackToast
@@ -231,7 +253,31 @@ import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
 import java.awt.Desktop
 import java.io.File
-import java.util.prefs.Preferences
+
+private enum class SettingSection {
+    OVERVIEW,
+    GENERAL,
+    ADB,
+    AI_AGENT,
+    ABOUT
+}
+
+@Composable
+private fun SettingSection.label(): String = when (this) {
+    SettingSection.OVERVIEW -> l10n("概览", "Overview")
+    SettingSection.GENERAL -> l10n("通用", "General")
+    SettingSection.ADB -> stringResource(Res.string.adb_path_setting)
+    SettingSection.AI_AGENT -> l10n("实验功能", "Experimental")
+    SettingSection.ABOUT -> l10n("关于与更新", "About & Updates")
+}
+
+private fun SettingSection.icon(): ImageVector = when (this) {
+    SettingSection.OVERVIEW -> IconParkIcons.List
+    SettingSection.GENERAL -> IconParkIcons.Setting
+    SettingSection.ADB -> IconParkIcons.Usb
+    SettingSection.AI_AGENT -> IconParkIcons.Sparkles
+    SettingSection.ABOUT -> IconParkIcons.Info
+}
 
 private object SettingColors {
     val PageBackground: Color @Composable get() = QadbColors.background
@@ -252,6 +298,113 @@ private object SettingColors {
 }
 
 @Composable
+private fun SettingsSectionTabs(
+    selectedSection: SettingSection,
+    onSectionSelected: (SettingSection) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(44.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        SettingSection.entries.forEach { section ->
+            val isSelected = section == selectedSection
+            val onSelect = remember(section, onSectionSelected) {
+                { onSectionSelected(section) }
+            }
+            SettingsSectionTab(
+                section = section,
+                selected = isSelected,
+                onClick = onSelect
+            )
+        }
+    }
+}
+
+@Composable
+private fun SettingsSectionTab(
+    section: SettingSection,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val hovered by interactionSource.collectIsHoveredAsState()
+
+    val foreground = when {
+        selected -> SettingColors.Primary
+        hovered -> SettingColors.Text
+        else -> SettingColors.SecondaryText
+    }
+    val background = when {
+        hovered && !selected -> SettingColors.SoftSurface
+        else -> Color.Transparent
+    }
+    val indicatorColor = SettingColors.Primary
+
+    Box(
+        modifier = modifier
+            .height(44.dp)
+            .clip(RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp))
+            .background(background)
+            .hoverable(interactionSource)
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onClick
+            )
+            .drawBehind {
+                if (selected) {
+                    val strokeWidth = 2.dp.toPx()
+                    val y = size.height - strokeWidth / 2
+                    drawLine(
+                        color = indicatorColor,
+                        start = Offset(0f, y),
+                        end = Offset(size.width, y),
+                        strokeWidth = strokeWidth
+                    )
+                }
+            }
+            .padding(horizontal = 12.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(7.dp)
+        ) {
+            Icon(
+                imageVector = section.icon(),
+                contentDescription = null,
+                tint = foreground,
+                modifier = Modifier.size(15.dp)
+            )
+            Text(
+                text = section.label(),
+                color = foreground,
+                fontSize = 13.sp,
+                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                maxLines = 1
+            )
+            if (section == SettingSection.AI_AGENT) {
+                Text(
+                    text = "Beta",
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(999.dp))
+                        .background(if (selected) SettingColors.PrimarySoft else SettingColors.SoftSurface)
+                        .padding(horizontal = 5.dp, vertical = 1.dp),
+                    color = if (selected) SettingColors.Primary else SettingColors.Muted,
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+        }
+    }
+}
+
+@Composable
 private fun SettingActionButton(
     text: String,
     icon: ImageVector,
@@ -261,25 +414,71 @@ private fun SettingActionButton(
     enabled: Boolean = true,
     loading: Boolean = false
 ) {
+    val shape = RoundedCornerShape(6.dp)
+    val interactionSource = remember { MutableInteractionSource() }
+    val isHovered by interactionSource.collectIsHoveredAsState()
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val clickable = enabled && !loading
+
+    val containerColor by animateColorAsState(
+        targetValue = when {
+            !clickable -> (if (primary) SettingColors.Primary else SettingColors.SoftSurface).copy(alpha = 0.45f)
+            primary && isPressed -> Color(0xFF0039CB)
+            primary && isHovered -> Color(0xFF1E53E5)
+            primary -> SettingColors.Primary
+            isPressed -> SettingColors.SoftSurface
+            isHovered -> SettingColors.SoftSurface.copy(alpha = 0.85f)
+            else -> SettingColors.Surface
+        },
+        animationSpec = tween(UiTokens.HoverDurationMillis)
+    )
+    val borderColor by animateColorAsState(
+        targetValue = when {
+            !clickable -> Color.Transparent
+            primary -> containerColor
+            isHovered -> SettingColors.Primary.copy(alpha = 0.45f)
+            else -> SettingColors.Border
+        },
+        animationSpec = tween(UiTokens.HoverDurationMillis)
+    )
+
     val contentColor = when {
-        !enabled -> SettingColors.Muted
+        !clickable -> SettingColors.Muted
         primary -> QadbColors.onPrimary
+        isHovered -> SettingColors.Primary
         else -> SettingColors.Text
     }
     val iconColor = when {
-        !enabled -> SettingColors.Muted
+        !clickable -> SettingColors.Muted
         primary -> QadbColors.onPrimary
-        else -> SettingColors.Muted
+        isHovered -> SettingColors.Primary
+        else -> SettingColors.SecondaryText
     }
 
-    val content: @Composable () -> Unit = {
+    Box(
+        modifier = modifier
+            .height(28.dp)
+            .clip(shape)
+            .background(containerColor)
+            .border(1.dp, borderColor, shape)
+            .hoverable(interactionSource)
+            .pointerHoverIcon(if (clickable) PointerIcon.Hand else PointerIcon.Default)
+            .clickable(
+                enabled = clickable,
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onClick
+            )
+            .padding(horizontal = 10.dp),
+        contentAlignment = Alignment.Center
+    ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
+            horizontalArrangement = Arrangement.spacedBy(5.dp)
         ) {
             if (loading) {
                 CircularProgressIndicator(
-                    modifier = Modifier.size(14.dp),
+                    modifier = Modifier.size(12.dp),
                     strokeWidth = 2.dp,
                     color = if (primary && enabled) QadbColors.onPrimary else SettingColors.Primary
                 )
@@ -288,58 +487,476 @@ private fun SettingActionButton(
                     imageVector = icon,
                     contentDescription = null,
                     tint = iconColor,
-                    modifier = Modifier.size(UiTokens.IconSmall)
+                    modifier = Modifier.size(13.dp)
                 )
             }
             Text(
                 text = text,
                 color = contentColor,
                 style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.SemiBold,
-                fontSize = UiTokens.TextBody,
+                fontWeight = FontWeight.Medium,
+                fontSize = 12.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
         }
     }
+}
 
-    if (primary) {
-        Button(
-            onClick = onClick,
-            modifier = modifier.height(36.dp),
-            enabled = enabled,
-            shape = RoundedCornerShape(UiTokens.RadiusMedium),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = SettingColors.Primary,
-                contentColor = QadbColors.onPrimary,
-                disabledContainerColor = SettingColors.ControlBackground,
-                disabledContentColor = SettingColors.Muted
-            ),
-            contentPadding = PaddingValues(horizontal = UiTokens.SpaceMedium, vertical = 0.dp)
+@Composable
+private fun SettingHeaderTrailingWidget(
+    currentVersionLabel: String,
+    updateStatus: UpdateStatus,
+    releaseUrl: String?,
+    downloadableAsset: GitHubUpdateManager.GitHubAssetResponse?,
+    isCheckingUpdate: Boolean,
+    isDownloadingUpdate: Boolean,
+    onCheckUpdate: () -> Unit,
+    onDownloadAndInstall: () -> Unit,
+    onOpenReleasePage: () -> Unit
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        // Version badge
+        Box(
+            modifier = Modifier
+                .height(26.dp)
+                .clip(RoundedCornerShape(6.dp))
+                .background(SettingColors.SoftSurface.copy(alpha = 0.7f))
+                .border(1.dp, SettingColors.Border.copy(alpha = 0.6f), RoundedCornerShape(6.dp))
+                .padding(horizontal = 8.dp),
+            contentAlignment = Alignment.Center
         ) {
-            content()
+            Text(
+                text = "v$currentVersionLabel",
+                color = SettingColors.SecondaryText,
+                fontSize = 11.5.sp,
+                fontWeight = FontWeight.Medium
+            )
         }
-    } else {
-        OutlinedButton(
-            onClick = onClick,
-            modifier = modifier.height(36.dp),
-            enabled = enabled,
-            shape = RoundedCornerShape(UiTokens.RadiusMedium),
-            border = BorderStroke(1.dp, SettingColors.ButtonBorder.copy(alpha = 0.72f)),
-            colors = ButtonDefaults.outlinedButtonColors(
-                containerColor = SettingColors.Surface,
-                contentColor = SettingColors.Text,
-                disabledContentColor = SettingColors.Muted
-            ),
-            contentPadding = PaddingValues(horizontal = UiTokens.SpaceMedium, vertical = 0.dp)
+
+        // Update actions / status indicator
+        when (val status = updateStatus) {
+            is UpdateStatus.Checking -> {
+                Row(
+                    modifier = Modifier
+                        .height(28.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(SettingColors.SoftSurface)
+                        .padding(horizontal = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(5.dp)
+                ) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(11.dp),
+                        strokeWidth = 2.dp,
+                        color = SettingColors.Primary
+                    )
+                    Text(
+                        text = stringResource(Res.string.update_checking),
+                        color = SettingColors.SecondaryText,
+                        fontSize = 11.5.sp
+                    )
+                }
+            }
+            is UpdateStatus.Downloading -> {
+                Row(
+                    modifier = Modifier
+                        .height(28.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(SettingColors.PrimarySoft)
+                        .padding(horizontal = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(5.dp)
+                ) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(11.dp),
+                        strokeWidth = 2.dp,
+                        color = SettingColors.Primary
+                    )
+                    Text(
+                        text = stringResource(Res.string.downloading_update),
+                        color = SettingColors.Primary,
+                        fontSize = 11.5.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
+            is UpdateStatus.UpdateAvailable -> {
+                if (downloadableAsset != null) {
+                    SettingActionButton(
+                        text = "${stringResource(Res.string.download_and_install)} (${status.latestVersion})",
+                        icon = IconParkIcons.Download,
+                        onClick = onDownloadAndInstall,
+                        primary = true,
+                        enabled = !isCheckingUpdate && !isDownloadingUpdate,
+                        loading = isDownloadingUpdate
+                    )
+                } else if (!releaseUrl.isNullOrBlank()) {
+                    SettingActionButton(
+                        text = "${stringResource(Res.string.open_release_page)} (${status.latestVersion})",
+                        icon = Icons.AutoMirrored.Filled.OpenInNew,
+                        onClick = onOpenReleasePage,
+                        primary = true
+                    )
+                }
+            }
+            is UpdateStatus.DownloadSuccess -> {
+                Box(
+                    modifier = Modifier
+                        .height(28.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(SettingColors.Success.copy(alpha = 0.12f))
+                        .padding(horizontal = 8.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = stringResource(Res.string.update_download_success, status.path),
+                        color = SettingColors.Success,
+                        fontSize = 11.5.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
+            is UpdateStatus.UpToDate -> {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .height(26.dp)
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(SettingColors.Success.copy(alpha = 0.1f))
+                            .padding(horizontal = 7.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = l10n("已是最新版", "Up to date"),
+                            color = SettingColors.Success,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                    SettingActionButton(
+                        text = stringResource(Res.string.check_update),
+                        icon = IconParkIcons.Refresh,
+                        onClick = onCheckUpdate,
+                        enabled = !isCheckingUpdate && !isDownloadingUpdate,
+                        loading = isCheckingUpdate
+                    )
+                }
+            }
+            else -> {
+                SettingActionButton(
+                    text = stringResource(Res.string.check_update),
+                    icon = IconParkIcons.Refresh,
+                    onClick = onCheckUpdate,
+                    enabled = !isCheckingUpdate && !isDownloadingUpdate,
+                    loading = isCheckingUpdate
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SettingsGroup(
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(10.dp),
+        color = SettingColors.SoftSurface.copy(alpha = 0.45f),
+        border = BorderStroke(1.dp, SettingColors.Border.copy(alpha = 0.6f)),
+        tonalElevation = 0.dp,
+        shadowElevation = 0.dp
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            content = content
+        )
+    }
+}
+
+@Composable
+private fun SettingsSectionTitle(text: String) {
+    Text(
+        text = text,
+        color = SettingColors.Text,
+        fontSize = 14.sp,
+        fontWeight = FontWeight.SemiBold
+    )
+}
+
+@Composable
+private fun SettingsNavigationRow(
+    title: String,
+    description: String,
+    value: String,
+    onClick: () -> Unit,
+    tone: StatusTone? = null
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val hovered by interactionSource.collectIsHoveredAsState()
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .hoverable(interactionSource)
+            .pointerHoverIcon(PointerIcon.Hand)
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onClick
+            )
+            .padding(horizontal = 16.dp, vertical = 11.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(2.dp)
         ) {
-            content()
+            Text(
+                text = title,
+                color = if (hovered) SettingColors.Primary else SettingColors.Text,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Medium
+            )
+            Text(
+                text = description,
+                color = SettingColors.SecondaryText,
+                fontSize = 11.5.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+        if (tone != null) {
+            StatusPill(statusText = value, tone = tone)
+        } else {
+            Text(
+                text = value,
+                color = SettingColors.SecondaryText,
+                fontSize = 12.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+        Icon(
+            imageVector = IconParkIcons.Right,
+            contentDescription = null,
+            tint = if (hovered) SettingColors.Primary else SettingColors.Muted,
+            modifier = Modifier.size(15.dp)
+        )
+    }
+}
+
+@Composable
+private fun SettingsValueRow(
+    title: String,
+    description: String,
+    value: String
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 11.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
+            Text(title, color = SettingColors.Text, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+            Text(description, color = SettingColors.SecondaryText, fontSize = 11.5.sp)
+        }
+        Spacer(Modifier.width(16.dp))
+        Text(value, color = SettingColors.SecondaryText, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+    }
+}
+
+@Composable
+private fun updateStatusSummary(status: UpdateStatus): String = when (status) {
+    UpdateStatus.Idle -> l10n("尚未检查", "Not checked")
+    UpdateStatus.Checking -> stringResource(Res.string.update_checking)
+    UpdateStatus.Downloading -> stringResource(Res.string.downloading_update)
+    is UpdateStatus.UpToDate -> stringResource(Res.string.update_up_to_date, status.latestVersion)
+    is UpdateStatus.UpdateAvailable -> if (status.hasAutoInstall) {
+        stringResource(Res.string.update_available_with_version, status.latestVersion)
+    } else {
+        stringResource(Res.string.update_available_no_asset, status.latestVersion)
+    }
+    is UpdateStatus.DownloadSuccess -> stringResource(Res.string.update_download_success, status.path)
+    is UpdateStatus.CheckFailed -> stringResource(Res.string.update_check_failed, status.reason)
+    is UpdateStatus.DownloadFailed -> stringResource(Res.string.update_download_failed, status.reason)
+}
+
+@Composable
+private fun SettingsOverviewContent(
+    selectedDeviceId: String?,
+    adbEnvironment: AdbPathManager.AdbEnvironment,
+    agentFeatureEnabled: Boolean,
+    updateStatus: UpdateStatus,
+    autoDetectDeviceOnLaunch: Boolean,
+    rememberLastDevice: Boolean,
+    onAutoDetectDeviceOnLaunchChange: (Boolean) -> Unit,
+    onRememberLastDeviceChange: (Boolean) -> Unit,
+    onOpenAdb: () -> Unit,
+    onOpenAgent: () -> Unit,
+    onOpenUpdates: () -> Unit,
+    onAutoDetectAdb: () -> Unit
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        SettingsSectionTitle(l10n("应用健康", "App health"))
+        SettingsGroup {
+            SettingsNavigationRow(
+                title = if (adbEnvironment.isReady) l10n("一切正常", "Everything is ready") else l10n("需要处理", "Needs attention"),
+                description = if (adbEnvironment.isReady) {
+                    l10n("ADB 环境可用，各项核心功能已就绪", "ADB is available and core features are ready")
+                } else {
+                    adbEnvironment.message ?: stringResource(Res.string.adb_environment_failed)
+                },
+                value = if (adbEnvironment.isReady) l10n("正常", "Healthy") else l10n("未就绪", "Not ready"),
+                tone = if (adbEnvironment.isReady) StatusTone.Positive else StatusTone.Danger,
+                onClick = onOpenAdb
+            )
+        }
+
+        SettingsSectionTitle(l10n("常用设置", "Common settings"))
+        SettingsGroup {
+            SettingSwitchRow(
+                title = stringResource(Res.string.settings_pref_auto_detect_title),
+                description = stringResource(Res.string.settings_pref_auto_detect_desc),
+                checked = autoDetectDeviceOnLaunch,
+                onCheckedChange = onAutoDetectDeviceOnLaunchChange
+            )
+            SectionDivider()
+            SettingSwitchRow(
+                title = stringResource(Res.string.settings_pref_remember_device_title),
+                description = stringResource(Res.string.settings_pref_remember_device_desc),
+                checked = rememberLastDevice,
+                onCheckedChange = onRememberLastDeviceChange
+            )
+        }
+
+        SettingsSectionTitle(l10n("系统状态", "System status"))
+        SettingsGroup {
+            SettingsNavigationRow(
+                title = stringResource(Res.string.adb_path_setting),
+                description = adbEnvironment.path ?: stringResource(Res.string.not_set),
+                value = settingAdbSourceText(adbEnvironment.source),
+                tone = if (adbEnvironment.isReady) StatusTone.Positive else StatusTone.Danger,
+                onClick = onOpenAdb
+            )
+            SectionDivider()
+            SettingsNavigationRow(
+                title = l10n("AI Agent（Beta）", "AI Agent (Beta)"),
+                description = if (agentFeatureEnabled) {
+                    stringResource(Res.string.ai_agent_beta_enabled_desc)
+                } else {
+                    stringResource(Res.string.ai_agent_beta_disabled_desc)
+                },
+                value = if (agentFeatureEnabled) l10n("已启用", "Enabled") else l10n("未启用", "Disabled"),
+                tone = if (agentFeatureEnabled) StatusTone.Positive else StatusTone.Neutral,
+                onClick = onOpenAgent
+            )
+            SectionDivider()
+            SettingsNavigationRow(
+                title = l10n("更新", "Updates"),
+                description = l10n("查看当前版本与最近检查结果", "Review the installed version and latest check"),
+                value = updateStatusSummary(updateStatus),
+                onClick = onOpenUpdates
+            )
+        }
+
+        SettingsSectionTitle(l10n("快速操作", "Quick actions"))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)
+        ) {
+            SettingActionButton(
+                text = stringResource(Res.string.adb_auto_detect),
+                icon = IconParkIcons.Refresh,
+                onClick = onAutoDetectAdb
+            )
+            SettingActionButton(
+                text = stringResource(Res.string.adb_path_setting),
+                icon = IconParkIcons.Usb,
+                onClick = onOpenAdb
+            )
+            SettingActionButton(
+                text = l10n("配置 AI Agent", "Configure AI Agent"),
+                icon = IconParkIcons.Sparkles,
+                onClick = onOpenAgent,
+                primary = true
+            )
+        }
+
+        if (selectedDeviceId == null) {
+            Text(
+                text = l10n("当前未连接设备，设备相关设置将在连接后生效。", "No device is connected. Device-specific settings apply after connection."),
+                color = SettingColors.Muted,
+                fontSize = 11.5.sp
+            )
+        }
+    }
+}
+
+@Composable
+private fun SettingsAboutContent(
+    currentVersionLabel: String,
+    updateStatus: UpdateStatus,
+    isCheckingUpdate: Boolean,
+    isDownloadingUpdate: Boolean,
+    onCheckUpdate: () -> Unit
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        SettingsSectionTitle(l10n("关于 QADB", "About QADB"))
+        SettingsGroup {
+            SettingsValueRow(
+                title = l10n("当前版本", "Current version"),
+                description = stringResource(Res.string.settings_update_current_version_desc),
+                value = "v$currentVersionLabel"
+            )
+            SectionDivider()
+            SettingsValueRow(
+                title = stringResource(Res.string.settings_update_status),
+                description = stringResource(Res.string.settings_update_status_desc),
+                value = updateStatusSummary(updateStatus)
+            )
+            SectionDivider()
+            SettingsValueRow(
+                title = l10n("更新通道", "Update channel"),
+                description = l10n("接收稳定版本更新", "Receive stable releases"),
+                value = l10n("稳定版", "Stable")
+            )
+        }
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+            SettingActionButton(
+                text = stringResource(Res.string.check_update),
+                icon = IconParkIcons.Refresh,
+                onClick = onCheckUpdate,
+                primary = true,
+                enabled = !isCheckingUpdate && !isDownloadingUpdate,
+                loading = isCheckingUpdate
+            )
         }
     }
 }
 
 @Composable
 fun SettingScreen(selectedDeviceId: String? = null) {
+    var selectedSection by remember { mutableStateOf(SettingSection.OVERVIEW) }
     val notSetText = stringResource(Res.string.not_set)
     val adbEnvironment by AdbPathManager.adbEnvironment.collectAsState()
     var showLanguageDialog by remember { mutableStateOf(false) }
@@ -358,28 +975,76 @@ fun SettingScreen(selectedDeviceId: String? = null) {
     val supportedLanguages = LanguageManager.getSupportedLanguages()
     val supportedThemeModes = ThemeManager.ThemeMode.entries
     val currentVersionLabel = AppVersion.CURRENT
+    val behaviorPreferences = remember { AppBehaviorPreferences.store }
+    val autoDetectDeviceOnLaunch by behaviorPreferences.autoDetectDeviceOnLaunch.collectAsState()
+    val rememberLastDevice by behaviorPreferences.rememberLastDevice.collectAsState()
+    val minimizeToTrayOnLaunch by behaviorPreferences.minimizeToTrayOnLaunch.collectAsState()
+    val minimizeToTrayOnClose by behaviorPreferences.minimizeToTrayOnClose.collectAsState()
+    val agentFeaturePreferences = remember { AgentFeatureRuntime.preferences }
+    val agentFeatureEnabled by agentFeaturePreferences.enabled.collectAsState()
 
-    val userPrefs = remember { Preferences.userNodeForPackage(AdbPathManager::class.java) }
-    var autoDetectDeviceOnLaunch by remember {
-        mutableStateOf(userPrefs.getBoolean("setting.auto_detect_device_on_launch", true))
-    }
-    var rememberLastDevice by remember {
-        mutableStateOf(userPrefs.getBoolean("setting.remember_last_device", true))
-    }
-
-    val updateStatusText = when (val status = updateStatus) {
-        UpdateStatus.Idle -> stringResource(Res.string.settings_update_status_latest)
-        UpdateStatus.Checking -> stringResource(Res.string.update_checking)
-        UpdateStatus.Downloading -> stringResource(Res.string.downloading_update)
-        is UpdateStatus.UpToDate -> stringResource(Res.string.update_up_to_date, status.latestVersion)
-        is UpdateStatus.UpdateAvailable -> if (status.hasAutoInstall) {
-            stringResource(Res.string.update_available_with_version, status.latestVersion)
-        } else {
-            stringResource(Res.string.update_available_no_asset, status.latestVersion)
+    val triggerCheckUpdate: () -> Unit = {
+        coroutineScope.launch {
+            isCheckingUpdate = true
+            updateStatus = UpdateStatus.Checking
+            val result = GitHubUpdateManager.checkForUpdate(currentVersionLabel)
+            when (result) {
+                is GitHubUpdateManager.CheckResult.UpToDate -> {
+                    latestVersion = result.latestVersion
+                    releaseUrl = null
+                    downloadableAsset = null
+                    updateStatus = UpdateStatus.UpToDate(result.latestVersion)
+                }
+                is GitHubUpdateManager.CheckResult.UpdateAvailable -> {
+                    latestVersion = result.latestVersion
+                    releaseUrl = result.htmlUrl
+                    downloadableAsset = result.asset
+                    updateStatus = UpdateStatus.UpdateAvailable(
+                        result.latestVersion,
+                        hasAutoInstall = true
+                    )
+                }
+                is GitHubUpdateManager.CheckResult.UpdateAvailableNoAsset -> {
+                    latestVersion = result.latestVersion
+                    releaseUrl = result.htmlUrl
+                    downloadableAsset = null
+                    updateStatus = UpdateStatus.UpdateAvailable(
+                        result.latestVersion,
+                        hasAutoInstall = false
+                    )
+                }
+                is GitHubUpdateManager.CheckResult.Error -> {
+                    updateStatus = UpdateStatus.CheckFailed(result.message)
+                }
+            }
+            isCheckingUpdate = false
         }
-        is UpdateStatus.DownloadSuccess -> stringResource(Res.string.update_download_success, status.path)
-        is UpdateStatus.CheckFailed -> stringResource(Res.string.update_check_failed, status.reason)
-        is UpdateStatus.DownloadFailed -> stringResource(Res.string.update_download_failed, status.reason)
+    }
+
+    val triggerDownloadAndInstall: () -> Unit = {
+        val asset = downloadableAsset
+        if (asset != null) {
+            coroutineScope.launch {
+                isDownloadingUpdate = true
+                updateStatus = UpdateStatus.Downloading
+                val result = GitHubUpdateManager.downloadAndInstall(asset)
+                result.onSuccess { path ->
+                    updateStatus = UpdateStatus.DownloadSuccess(path.toString())
+                }.onFailure { error ->
+                    updateStatus = UpdateStatus.DownloadFailed(error.message ?: "Unknown error")
+                }
+                isDownloadingUpdate = false
+            }
+        }
+    }
+
+    val triggerOpenReleasePage: () -> Unit = {
+        val url = releaseUrl
+        if (!url.isNullOrBlank()) {
+            GitHubUpdateManager.openReleasePage(url).onFailure { error ->
+                updateStatus = UpdateStatus.CheckFailed(error.message ?: "Unknown error")
+            }
+        }
     }
 
     Box(
@@ -390,106 +1055,162 @@ fun SettingScreen(selectedDeviceId: String? = null) {
         Column(
             modifier = Modifier
                 .align(Alignment.TopCenter)
-                .widthIn(max = 760.dp)
+                .widthIn(max = 816.dp)
                 .fillMaxWidth()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = UiTokens.PagePadding, vertical = UiTokens.PagePaddingCompact),
-            verticalArrangement = Arrangement.spacedBy(UiTokens.SectionSpacing)
+                .fillMaxSize()
+                .padding(horizontal = 32.dp, vertical = 20.dp)
         ) {
             PageHeader(
                 title = stringResource(Res.string.set),
-                subtitle = stringResource(Res.string.settings_subtitle)
+                subtitle = stringResource(Res.string.settings_subtitle),
+                trailing = {
+                    SettingHeaderTrailingWidget(
+                        currentVersionLabel = currentVersionLabel,
+                        updateStatus = updateStatus,
+                        releaseUrl = releaseUrl,
+                        downloadableAsset = downloadableAsset,
+                        isCheckingUpdate = isCheckingUpdate,
+                        isDownloadingUpdate = isDownloadingUpdate,
+                        onCheckUpdate = triggerCheckUpdate,
+                        onDownloadAndInstall = triggerDownloadAndInstall,
+                        onOpenReleasePage = triggerOpenReleasePage
+                    )
+                }
             )
 
-            val agentFeaturePreferences = remember { AgentFeatureRuntime.preferences }
-            val agentFeatureEnabled by agentFeaturePreferences.enabled.collectAsState()
-            AgentFeatureSettingsSection(
-                enabled = agentFeatureEnabled,
-                onEnabledChange = agentFeaturePreferences::setEnabled
+            Spacer(Modifier.height(10.dp))
+
+            SettingsSectionTabs(
+                selectedSection = selectedSection,
+                onSectionSelected = { selectedSection = it }
             )
 
-            SettingsColumns(
-                mainContent = {
-                    SettingsSection(title = stringResource(Res.string.preferences_setting)) {
-                        val currentThemeText = when (currentThemeMode) {
-                            ThemeManager.ThemeMode.SYSTEM -> stringResource(Res.string.theme_mode_system)
-                            ThemeManager.ThemeMode.LIGHT -> stringResource(Res.string.theme_mode_light)
-                            ThemeManager.ThemeMode.DARK -> stringResource(Res.string.theme_mode_dark)
+            HorizontalDivider(color = SettingColors.Divider.copy(alpha = 0.7f))
+
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState())
+                    .padding(top = 16.dp, bottom = 20.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                AnimatedContent(
+                    targetState = selectedSection,
+                    transitionSpec = {
+                        (fadeIn(animationSpec = tween(160)) + slideInVertically(animationSpec = tween(160)) { 6 }) togetherWith
+                            fadeOut(animationSpec = tween(120))
+                    },
+                    label = "SettingSectionContent"
+                ) { targetSection ->
+                    when (targetSection) {
+                        SettingSection.OVERVIEW -> {
+                            SettingsOverviewContent(
+                                selectedDeviceId = selectedDeviceId,
+                                adbEnvironment = adbEnvironment,
+                                agentFeatureEnabled = agentFeatureEnabled,
+                                updateStatus = updateStatus,
+                                autoDetectDeviceOnLaunch = autoDetectDeviceOnLaunch,
+                                rememberLastDevice = rememberLastDevice,
+                                onAutoDetectDeviceOnLaunchChange = behaviorPreferences::setAutoDetectDeviceOnLaunch,
+                                onRememberLastDeviceChange = behaviorPreferences::setRememberLastDevice,
+                                onOpenAdb = { selectedSection = SettingSection.ADB },
+                                onOpenAgent = { selectedSection = SettingSection.AI_AGENT },
+                                onOpenUpdates = { selectedSection = SettingSection.ABOUT },
+                                onAutoDetectAdb = { coroutineScope.launch { AdbPathManager.autoDetect() } }
+                            )
                         }
 
-                        SettingsDropdownRow(
-                            title = stringResource(Res.string.select_language),
-                            description = stringResource(Res.string.settings_pref_language_desc),
-                            value = currentLanguage.displayName,
-                            expanded = showLanguageDropdown,
-                            onExpandedChange = { showLanguageDropdown = it }
-                        ) {
-                            supportedLanguages.forEach { language ->
-                                DropdownMenuItem(
-                                    text = { Text(language.displayName) },
-                                    onClick = {
-                                        LanguageManager.setLanguage(language)
-                                        showLanguageDropdown = false
-                                        showLanguageDialog = true
-                                    }
-                                )
+                        SettingSection.GENERAL -> {
+                        SettingsGroup {
+                            val currentThemeText = when (currentThemeMode) {
+                                ThemeManager.ThemeMode.SYSTEM -> stringResource(Res.string.theme_mode_system)
+                                ThemeManager.ThemeMode.LIGHT -> stringResource(Res.string.theme_mode_light)
+                                ThemeManager.ThemeMode.DARK -> stringResource(Res.string.theme_mode_dark)
                             }
-                        }
 
-                        SectionDivider()
-
-                        SettingsDropdownRow(
-                            title = stringResource(Res.string.select_theme),
-                            description = stringResource(Res.string.settings_pref_theme_desc),
-                            value = currentThemeText,
-                            expanded = showThemeDropdown,
-                            onExpandedChange = { showThemeDropdown = it }
-                        ) {
-                            supportedThemeModes.forEach { themeMode ->
-                                val text = when (themeMode) {
-                                    ThemeManager.ThemeMode.SYSTEM -> stringResource(Res.string.theme_mode_system)
-                                    ThemeManager.ThemeMode.LIGHT -> stringResource(Res.string.theme_mode_light)
-                                    ThemeManager.ThemeMode.DARK -> stringResource(Res.string.theme_mode_dark)
+                            SettingsDropdownRow(
+                                title = stringResource(Res.string.select_language),
+                                description = stringResource(Res.string.settings_pref_language_desc),
+                                value = currentLanguage.displayName,
+                                expanded = showLanguageDropdown,
+                                onExpandedChange = { showLanguageDropdown = it }
+                            ) {
+                                supportedLanguages.forEach { language ->
+                                    DropdownMenuItem(
+                                        text = { Text(language.displayName) },
+                                        onClick = {
+                                            LanguageManager.setLanguage(language)
+                                            showLanguageDropdown = false
+                                            showLanguageDialog = true
+                                        }
+                                    )
                                 }
-                                DropdownMenuItem(
-                                    text = { Text(text) },
-                                    onClick = {
-                                        ThemeManager.setThemeMode(themeMode)
-                                        showThemeDropdown = false
+                            }
+
+                            SectionDivider()
+
+                            SettingsDropdownRow(
+                                title = stringResource(Res.string.select_theme),
+                                description = stringResource(Res.string.settings_pref_theme_desc),
+                                value = currentThemeText,
+                                expanded = showThemeDropdown,
+                                onExpandedChange = { showThemeDropdown = it }
+                            ) {
+                                supportedThemeModes.forEach { themeMode ->
+                                    val text = when (themeMode) {
+                                        ThemeManager.ThemeMode.SYSTEM -> stringResource(Res.string.theme_mode_system)
+                                        ThemeManager.ThemeMode.LIGHT -> stringResource(Res.string.theme_mode_light)
+                                        ThemeManager.ThemeMode.DARK -> stringResource(Res.string.theme_mode_dark)
                                     }
-                                )
+                                    DropdownMenuItem(
+                                        text = { Text(text) },
+                                        onClick = {
+                                            ThemeManager.setThemeMode(themeMode)
+                                            showThemeDropdown = false
+                                        }
+                                    )
+                                }
                             }
+
+                            SectionDivider()
+
+                            SettingSwitchRow(
+                                title = stringResource(Res.string.settings_pref_auto_detect_title),
+                                description = stringResource(Res.string.settings_pref_auto_detect_desc),
+                                checked = autoDetectDeviceOnLaunch,
+                                onCheckedChange = behaviorPreferences::setAutoDetectDeviceOnLaunch
+                            )
+
+                            SectionDivider()
+
+                            SettingSwitchRow(
+                                title = stringResource(Res.string.settings_pref_remember_device_title),
+                                description = stringResource(Res.string.settings_pref_remember_device_desc),
+                                checked = rememberLastDevice,
+                                onCheckedChange = behaviorPreferences::setRememberLastDevice
+                            )
+
+                            SectionDivider()
+
+                            SettingSwitchRow(
+                                title = stringResource(Res.string.settings_pref_minimize_on_launch_title),
+                                description = stringResource(Res.string.settings_pref_minimize_on_launch_desc),
+                                checked = minimizeToTrayOnLaunch,
+                                onCheckedChange = behaviorPreferences::setMinimizeToTrayOnLaunch
+                            )
+
+                            SectionDivider()
+
+                            SettingSwitchRow(
+                                title = stringResource(Res.string.settings_pref_minimize_on_close_title),
+                                description = stringResource(Res.string.settings_pref_minimize_on_close_desc),
+                                checked = minimizeToTrayOnClose,
+                                onCheckedChange = behaviorPreferences::setMinimizeToTrayOnClose
+                            )
                         }
-
-                        SectionDivider()
-
-                        SettingSwitchRow(
-                            title = stringResource(Res.string.settings_pref_auto_detect_title),
-                            description = stringResource(Res.string.settings_pref_auto_detect_desc),
-                            checked = autoDetectDeviceOnLaunch,
-                            onCheckedChange = {
-                                autoDetectDeviceOnLaunch = it
-                                userPrefs.putBoolean("setting.auto_detect_device_on_launch", it)
-                            }
-                        )
-
-                        SectionDivider()
-
-                        SettingSwitchRow(
-                            title = stringResource(Res.string.settings_pref_remember_device_title),
-                            description = stringResource(Res.string.settings_pref_remember_device_desc),
-                            checked = rememberLastDevice,
-                            onCheckedChange = {
-                                rememberLastDevice = it
-                                userPrefs.putBoolean("setting.remember_last_device", it)
-                            }
-                        )
                     }
 
-                },
-                sideContent = {
-                    val adbSettingsContent: @Composable () -> Unit = {
-                        SettingsSection(title = stringResource(Res.string.adb_path_setting)) {
+                    SettingSection.ADB -> {
                         val sourceText = settingAdbSourceText(adbEnvironment.source)
                         val isCheckingAdb = !adbEnvironment.isReady &&
                             adbEnvironment.source == AdbPathManager.AdbSource.NONE &&
@@ -502,45 +1223,206 @@ fun SettingScreen(selectedDeviceId: String? = null) {
                             adbEnvironment.message ?: stringResource(Res.string.adb_environment_failed)
                         }
 
-                        AdbEnvironmentSummary(
-                            statusLabel = stringResource(Res.string.settings_status_label),
-                            statusText = statusText,
-                            tone = when {
-                                adbEnvironment.isReady -> StatusTone.Positive
-                                isCheckingAdb -> StatusTone.Neutral
-                                else -> StatusTone.Danger
-                            },
-                            sourceLabel = stringResource(Res.string.adb_current_using),
-                            sourceDescription = stringResource(Res.string.settings_adb_source_desc),
-                            sourceValue = sourceText,
-                            pathLabel = stringResource(Res.string.adb_path_label),
-                            pathDescription = stringResource(Res.string.settings_adb_path_desc),
-                            pathValue = adbEnvironment.path ?: notSetText,
-                            versionLabel = stringResource(Res.string.adb_version_label),
-                            versionDescription = stringResource(Res.string.settings_adb_version_desc),
-                            versionValue = adbEnvironment.version ?: notSetText,
-                            trailingIcon = IconParkIcons.FolderOpen,
-                            trailingIconDescription = stringResource(Res.string.adb_path_label),
-                            onTrailingAction = { openPathLocation(adbEnvironment.path) }
-                        )
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(14.dp)
+                        ) {
+                            SettingsGroup {
+                                // 1. Status & Source Row
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 16.dp, vertical = 11.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                        Text(
+                                            text = stringResource(Res.string.settings_status_label),
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = SettingColors.Text,
+                                            fontWeight = FontWeight.Medium,
+                                            fontSize = 13.sp
+                                        )
+                                        Text(
+                                            text = stringResource(Res.string.settings_adb_source_desc),
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = SettingColors.SecondaryText,
+                                            fontSize = 11.5.sp
+                                        )
+                                    }
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        StatusPill(
+                                            statusText = statusText,
+                                            tone = when {
+                                                adbEnvironment.isReady -> StatusTone.Positive
+                                                isCheckingAdb -> StatusTone.Neutral
+                                                else -> StatusTone.Danger
+                                            }
+                                        )
+                                        Box(
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(6.dp))
+                                                .background(SettingColors.Surface)
+                                                .border(1.dp, SettingColors.Border.copy(alpha = 0.6f), RoundedCornerShape(6.dp))
+                                                .padding(horizontal = 7.dp, vertical = 2.dp)
+                                        ) {
+                                            Text(
+                                                text = sourceText,
+                                                color = SettingColors.SecondaryText,
+                                                fontSize = 11.5.sp,
+                                                fontWeight = FontWeight.Medium
+                                            )
+                                        }
+                                    }
+                                }
 
-                        SettingsActionArea {
+                                SectionDivider()
+
+                                // 2. ADB Path Row
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 16.dp, vertical = 11.dp),
+                                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                            Text(
+                                                text = stringResource(Res.string.adb_path_label),
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                color = SettingColors.Text,
+                                                fontWeight = FontWeight.Medium,
+                                                fontSize = 13.sp
+                                            )
+                                            Text(
+                                                text = stringResource(Res.string.settings_adb_path_desc),
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = SettingColors.SecondaryText,
+                                                fontSize = 11.5.sp
+                                            )
+                                        }
+
+                                        // Finder action
+                                        val revealInteraction = remember { MutableInteractionSource() }
+                                        val isRevealHovered by revealInteraction.collectIsHoveredAsState()
+                                        Row(
+                                            modifier = Modifier
+                                                .height(26.dp)
+                                                .clip(RoundedCornerShape(6.dp))
+                                                .background(if (isRevealHovered) SettingColors.Primary.copy(alpha = 0.08f) else SettingColors.Surface)
+                                                .border(
+                                                    1.dp,
+                                                    if (isRevealHovered) SettingColors.Primary.copy(alpha = 0.35f) else SettingColors.Border,
+                                                    RoundedCornerShape(6.dp)
+                                                )
+                                                .hoverable(revealInteraction)
+                                                .pointerHoverIcon(PointerIcon.Hand)
+                                                .clickable(
+                                                    interactionSource = revealInteraction,
+                                                    indication = null,
+                                                    onClick = { openPathLocation(adbEnvironment.path) }
+                                                )
+                                                .padding(horizontal = 8.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = IconParkIcons.FolderOpen,
+                                                contentDescription = null,
+                                                tint = if (isRevealHovered) SettingColors.Primary else SettingColors.SecondaryText,
+                                                modifier = Modifier.size(12.dp)
+                                            )
+                                            Text(
+                                                text = l10n("在访达中显示", "Reveal in Finder"),
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = if (isRevealHovered) SettingColors.Primary else SettingColors.SecondaryText,
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.Medium
+                                            )
+                                        }
+                                    }
+
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(RoundedCornerShape(6.dp))
+                                            .background(SettingColors.Surface)
+                                            .border(1.dp, SettingColors.Border.copy(alpha = 0.5f), RoundedCornerShape(6.dp))
+                                            .padding(horizontal = 10.dp, vertical = 6.dp)
+                                    ) {
+                                        SelectionContainer {
+                                            Text(
+                                                text = adbEnvironment.path ?: notSetText,
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = SettingColors.Text,
+                                                fontSize = 11.5.sp,
+                                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                                maxLines = 2,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                        }
+                                    }
+                                }
+
+                                SectionDivider()
+
+                                // 3. ADB Version Row
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 16.dp, vertical = 11.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                        Text(
+                                            text = stringResource(Res.string.adb_version_label),
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = SettingColors.Text,
+                                            fontWeight = FontWeight.Medium,
+                                            fontSize = 13.sp
+                                        )
+                                        Text(
+                                            text = stringResource(Res.string.settings_adb_version_desc),
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = SettingColors.SecondaryText,
+                                            fontSize = 11.5.sp
+                                        )
+                                    }
+                                    Text(
+                                        text = adbEnvironment.version ?: notSetText,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = SettingColors.Text,
+                                        fontWeight = FontWeight.Medium,
+                                        fontSize = 12.5.sp
+                                    )
+                                }
+                            }
+
+                            // 4. Action Buttons Toolbar
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
+                                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
                                 SettingActionButton(
-                                    text = stringResource(Res.string.adb_auto_detect),
-                                    icon = IconParkIcons.Refresh,
-                                    onClick = {
-                                        coroutineScope.launch {
-                                            AdbPathManager.autoDetect()
-                                        }
-                                    },
-                                    modifier = Modifier.weight(1f),
-                                    primary = true
+                                    text = stringResource(Res.string.adb_open_help),
+                                    icon = Icons.AutoMirrored.Filled.OpenInNew,
+                                    onClick = { AdbPathManager.openHelp().onFailure { _ -> } }
                                 )
-
+                                SettingActionButton(
+                                    text = stringResource(Res.string.adb_restore_bundled),
+                                    icon = IconParkIcons.Setting,
+                                    onClick = { coroutineScope.launch { AdbPathManager.useBundledAdb() } }
+                                )
                                 SettingActionButton(
                                     text = stringResource(Res.string.adb_select_adb),
                                     icon = IconParkIcons.File,
@@ -551,154 +1433,58 @@ fun SettingScreen(selectedDeviceId: String? = null) {
                                                 AdbPathManager.setAdbPath(newPath)
                                             }
                                         }
-                                    },
-                                    modifier = Modifier.weight(1f)
-                                )
-                            }
-
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
-                            ) {
-                                SettingActionButton(
-                                    text = stringResource(Res.string.adb_restore_bundled),
-                                    icon = IconParkIcons.Setting,
-                                    onClick = {
-                                        coroutineScope.launch {
-                                            AdbPathManager.useBundledAdb()
-                                        }
-                                    },
-                                    modifier = Modifier.weight(1.4f)
-                                )
-
-                                SettingActionButton(
-                                    text = stringResource(Res.string.adb_open_help),
-                                    icon = Icons.AutoMirrored.Filled.OpenInNew,
-                                    onClick = {
-                                        AdbPathManager.openHelp().onFailure { _ -> }
-                                    },
-                                    modifier = Modifier.weight(0.6f)
-                                )
-                            }
-                        }
-                        }
-                    }
-
-                    SettingsSection(title = stringResource(Res.string.update_section_title)) {
-                        SideSettingValueRow(
-                            title = stringResource(Res.string.current_version, "").trim().trimEnd(':', '：'),
-                            description = stringResource(Res.string.settings_update_current_version_desc),
-                            value = currentVersionLabel
-                        )
-                        SectionDivider()
-                        SideSettingValueRow(
-                            title = stringResource(Res.string.settings_update_status),
-                            description = stringResource(Res.string.settings_update_status_desc),
-                            value = updateStatusText,
-                            valueColor = updateStatusColor(updateStatus)
-                        )
-
-                        SettingsActionArea {
-                            SettingActionButton(
-                                text = stringResource(Res.string.check_update),
-                                icon = IconParkIcons.Refresh,
-                                onClick = {
-                                    coroutineScope.launch {
-                                        isCheckingUpdate = true
-                                        updateStatus = UpdateStatus.Checking
-                                        val result = GitHubUpdateManager.checkForUpdate(currentVersionLabel)
-                                        when (result) {
-                                            is GitHubUpdateManager.CheckResult.UpToDate -> {
-                                                latestVersion = result.latestVersion
-                                                releaseUrl = null
-                                                downloadableAsset = null
-                                                updateStatus = UpdateStatus.UpToDate(result.latestVersion)
-                                            }
-                                            is GitHubUpdateManager.CheckResult.UpdateAvailable -> {
-                                                latestVersion = result.latestVersion
-                                                releaseUrl = result.htmlUrl
-                                                downloadableAsset = result.asset
-                                                updateStatus = UpdateStatus.UpdateAvailable(
-                                                    result.latestVersion,
-                                                    hasAutoInstall = true
-                                                )
-                                            }
-                                            is GitHubUpdateManager.CheckResult.UpdateAvailableNoAsset -> {
-                                                latestVersion = result.latestVersion
-                                                releaseUrl = result.htmlUrl
-                                                downloadableAsset = null
-                                                updateStatus = UpdateStatus.UpdateAvailable(
-                                                    result.latestVersion,
-                                                    hasAutoInstall = false
-                                                )
-                                            }
-                                            is GitHubUpdateManager.CheckResult.Error -> {
-                                                updateStatus = UpdateStatus.CheckFailed(result.message)
-                                            }
-                                        }
-                                        isCheckingUpdate = false
                                     }
-                                },
-                                modifier = Modifier.fillMaxWidth(),
-                                enabled = !isCheckingUpdate && !isDownloadingUpdate,
-                                loading = isCheckingUpdate,
-                                primary = true
-                            )
-
-                            if (downloadableAsset != null) {
-                                SettingActionButton(
-                                    text = stringResource(Res.string.download_and_install),
-                                    icon = IconParkIcons.Download,
-                                    onClick = {
-                                        val asset = downloadableAsset
-                                        if (asset != null) {
-                                            coroutineScope.launch {
-                                                isDownloadingUpdate = true
-                                                updateStatus = UpdateStatus.Downloading
-                                                val result = GitHubUpdateManager.downloadAndInstall(asset)
-                                                result.onSuccess { path ->
-                                                    updateStatus = UpdateStatus.DownloadSuccess(path.toString())
-                                                }.onFailure { error ->
-                                                    updateStatus = UpdateStatus.DownloadFailed(
-                                                        error.message ?: "Unknown error"
-                                                    )
-                                                }
-                                                isDownloadingUpdate = false
-                                            }
-                                        }
-                                    },
-                                    modifier = Modifier.fillMaxWidth(),
-                                    enabled = !isCheckingUpdate && !isDownloadingUpdate,
-                                    loading = isDownloadingUpdate
                                 )
-                            }
-
-                            if (!releaseUrl.isNullOrBlank() && latestVersion != null) {
                                 SettingActionButton(
-                                    text = stringResource(Res.string.open_release_page),
-                                    icon = Icons.AutoMirrored.Filled.OpenInNew,
-                                    onClick = {
-                                        val url = releaseUrl
-                                        if (!url.isNullOrBlank()) {
-                                            GitHubUpdateManager.openReleasePage(url).onFailure { error ->
-                                                updateStatus = UpdateStatus.CheckFailed(
-                                                    error.message ?: "Unknown error"
-                                                )
-                                            }
-                                        }
-                                    },
-                                    modifier = Modifier.fillMaxWidth()
+                                    text = stringResource(Res.string.adb_auto_detect),
+                                    icon = IconParkIcons.Refresh,
+                                    onClick = { coroutineScope.launch { AdbPathManager.autoDetect() } },
+                                    primary = true
                                 )
                             }
                         }
                     }
 
-                    adbSettingsContent()
-                }
-            )
+                    SettingSection.AI_AGENT -> {
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(14.dp)
+                        ) {
+                            SettingsGroup {
+                                SettingSwitchRow(
+                                    title = stringResource(Res.string.ai_agent_beta_title),
+                                    description = stringResource(
+                                        if (agentFeatureEnabled) Res.string.ai_agent_beta_enabled_desc
+                                        else Res.string.ai_agent_beta_disabled_desc
+                                    ),
+                                    checked = agentFeatureEnabled,
+                                    onCheckedChange = agentFeaturePreferences::setEnabled
+                                )
+                            }
 
-            if (agentFeatureEnabled) {
-                AiModelSettingsSection()
+                            if (agentFeatureEnabled) {
+                                SettingsGroup {
+                                    AiModelSettingsSection()
+                                    SectionDivider()
+                                    AgentApprovalSettingsSection()
+                                    SectionDivider()
+                                    AgentInputHelperSettingsSection(selectedDeviceId = selectedDeviceId)
+                                }
+                            }
+                        }
+                    }
+
+                    SettingSection.ABOUT -> {
+                        SettingsAboutContent(
+                            currentVersionLabel = currentVersionLabel,
+                            updateStatus = updateStatus,
+                            isCheckingUpdate = isCheckingUpdate,
+                            isDownloadingUpdate = isDownloadingUpdate,
+                            onCheckUpdate = triggerCheckUpdate
+                        )
+                    }
+                }
+            }
             }
         }
     }
@@ -715,41 +1501,6 @@ fun SettingScreen(selectedDeviceId: String? = null) {
 }
 
 @Composable
-private fun SettingsColumns(
-    mainContent: @Composable ColumnScope.() -> Unit,
-    sideContent: @Composable ColumnScope.() -> Unit
-) {
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(UiTokens.SectionSpacing)
-    ) {
-        sideContent()
-        mainContent()
-    }
-}
-
-@Composable
-private fun AgentFeatureSettingsSection(
-    enabled: Boolean,
-    onEnabledChange: (Boolean) -> Unit
-) {
-    SettingsSection(title = stringResource(Res.string.ai_agent_beta_settings)) {
-        SettingSwitchRow(
-            title = stringResource(Res.string.ai_agent_beta_title),
-            description = stringResource(
-                if (enabled) {
-                    Res.string.ai_agent_beta_enabled_desc
-                } else {
-                    Res.string.ai_agent_beta_disabled_desc
-                }
-            ),
-            checked = enabled,
-            onCheckedChange = onEnabledChange
-        )
-    }
-}
-
-@Composable
 private fun AgentApprovalSettingsSection() {
     val preferences = remember { AgentApprovalRuntime.preferences }
     val policy by preferences.policy.collectAsState()
@@ -761,50 +1512,49 @@ private fun AgentApprovalSettingsSection() {
         }
     )
 
-    SettingsSection(title = stringResource(Res.string.agent_approval_settings)) {
-        SettingsDropdownRow(
-            title = stringResource(Res.string.agent_approval_policy),
-            description = stringResource(
-                when (policy) {
-                    AgentApprovalPolicy.SMART -> Res.string.agent_approval_smart_desc
-                    AgentApprovalPolicy.CAUTIOUS -> Res.string.agent_approval_cautious_desc
-                }
-            ),
-            value = policyLabel,
-            expanded = expanded,
-            onExpandedChange = { expanded = it }
-        ) {
-            AgentApprovalPolicy.entries.forEach { candidate ->
-                val title = stringResource(
-                    if (candidate == AgentApprovalPolicy.SMART) {
-                        Res.string.agent_approval_smart
-                    } else {
-                        Res.string.agent_approval_cautious
-                    }
-                )
-                val description = stringResource(
-                    if (candidate == AgentApprovalPolicy.SMART) {
-                        Res.string.agent_approval_smart_desc
-                    } else {
-                        Res.string.agent_approval_cautious_desc
-                    }
-                )
-                DropdownMenuItem(
-                    text = {
-                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                            Text(title, color = SettingColors.Text, fontSize = UiTokens.TextBody)
-                            Text(description, color = SettingColors.Muted, fontSize = UiTokens.TextCaption)
-                        }
-                    },
-                    onClick = {
-                        preferences.setPolicy(candidate)
-                        expanded = false
-                    }
-                )
+    SettingsDropdownRow(
+        title = stringResource(Res.string.agent_approval_policy),
+        description = stringResource(
+            when (policy) {
+                AgentApprovalPolicy.SMART -> Res.string.agent_approval_smart_desc
+                AgentApprovalPolicy.CAUTIOUS -> Res.string.agent_approval_cautious_desc
             }
+        ),
+        value = policyLabel,
+        expanded = expanded,
+        onExpandedChange = { expanded = it }
+    ) {
+        AgentApprovalPolicy.entries.forEach { candidate ->
+            val title = stringResource(
+                if (candidate == AgentApprovalPolicy.SMART) {
+                    Res.string.agent_approval_smart
+                } else {
+                    Res.string.agent_approval_cautious
+                }
+            )
+            val description = stringResource(
+                if (candidate == AgentApprovalPolicy.SMART) {
+                    Res.string.agent_approval_smart_desc
+                } else {
+                    Res.string.agent_approval_cautious_desc
+                }
+            )
+            DropdownMenuItem(
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text(title, color = SettingColors.Text, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                        Text(description, color = SettingColors.SecondaryText, fontSize = 11.5.sp)
+                    }
+                },
+                onClick = {
+                    preferences.setPolicy(candidate)
+                    expanded = false
+                }
+            )
         }
     }
 }
+
 @Composable
 private fun AgentInputHelperSettingsSection(selectedDeviceId: String?) {
     val helper = remember { AgentInputHelper() }
@@ -831,64 +1581,99 @@ private fun AgentInputHelperSettingsSection(selectedDeviceId: String?) {
         status?.installed == true -> stringResource(Res.string.ai_input_helper_installed)
         else -> stringResource(Res.string.ai_input_helper_missing)
     }
-    SettingsSection(title = stringResource(Res.string.ai_input_helper_settings)) {
-        SettingValueRow(
-            title = stringResource(Res.string.ai_input_helper_title),
-            description = description,
-            value = if (status?.installed == true) {
-                stringResource(Res.string.set)
-            } else {
-                stringResource(Res.string.not_set)
-            },
-            valueColor = if (status?.installed == true) SettingColors.Success else SettingColors.Muted
-        )
-        ActionButtonRow {
-            SettingActionButton(
-                text = stringResource(Res.string.ai_input_helper_install),
-                icon = CompatIconVectors.Keyboard,
-                onClick = {
-                    val deviceId = selectedDeviceId ?: return@SettingActionButton
-                    coroutineScope.launch {
-                        isBusy = true
-                        val result = helper.install(deviceId)
-                        statusMessage = result.output
-                        isBusy = false
-                        refresh()
-                    }
-                },
-                enabled = selectedDeviceId != null && !isBusy,
-                loading = isBusy
-            )
-            SettingActionButton(
-                text = stringResource(Res.string.ai_input_helper_test),
-                icon = Icons.AutoMirrored.Filled.OpenInNew,
-                onClick = {
-                    val deviceId = selectedDeviceId ?: return@SettingActionButton
-                    coroutineScope.launch { statusMessage = helper.openTestScreen(deviceId).output }
-                },
-                enabled = selectedDeviceId != null && status?.installed == true && !isBusy
-            )
-            SettingActionButton(
-                text = stringResource(Res.string.ai_input_helper_uninstall),
-                icon = CompatIconVectors.Delete,
-                onClick = {
-                    val deviceId = selectedDeviceId ?: return@SettingActionButton
-                    coroutineScope.launch {
-                        isBusy = true
-                        statusMessage = helper.uninstall(deviceId).output
-                        isBusy = false
-                        refresh()
-                    }
-                },
-                enabled = selectedDeviceId != null && status?.installed == true && !isBusy
-            )
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 11.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = stringResource(Res.string.ai_input_helper_title),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = SettingColors.Text,
+                        fontWeight = FontWeight.Medium,
+                        fontSize = 13.sp
+                    )
+                    StatusPill(
+                        statusText = if (status?.installed == true) stringResource(Res.string.set) else stringResource(Res.string.not_set),
+                        tone = if (status?.installed == true) StatusTone.Positive else StatusTone.Neutral
+                    )
+                }
+                Text(
+                    text = description,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = SettingColors.SecondaryText,
+                    fontSize = 11.5.sp
+                )
+            }
+
+            Spacer(Modifier.width(16.dp))
+
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                SettingActionButton(
+                    text = stringResource(Res.string.ai_input_helper_install),
+                    icon = CompatIconVectors.Keyboard,
+                    onClick = {
+                        val deviceId = selectedDeviceId ?: return@SettingActionButton
+                        coroutineScope.launch {
+                            isBusy = true
+                            val result = helper.install(deviceId)
+                            statusMessage = result.output
+                            isBusy = false
+                            refresh()
+                        }
+                    },
+                    enabled = selectedDeviceId != null && !isBusy,
+                    loading = isBusy
+                )
+                if (status?.installed == true) {
+                    SettingActionButton(
+                        text = stringResource(Res.string.ai_input_helper_test),
+                        icon = Icons.AutoMirrored.Filled.OpenInNew,
+                        onClick = {
+                            val deviceId = selectedDeviceId ?: return@SettingActionButton
+                            coroutineScope.launch { statusMessage = helper.openTestScreen(deviceId).output }
+                        },
+                        enabled = selectedDeviceId != null && !isBusy
+                    )
+                    SettingActionButton(
+                        text = stringResource(Res.string.ai_input_helper_uninstall),
+                        icon = CompatIconVectors.Delete,
+                        onClick = {
+                            val deviceId = selectedDeviceId ?: return@SettingActionButton
+                            coroutineScope.launch {
+                                isBusy = true
+                                statusMessage = helper.uninstall(deviceId).output
+                                isBusy = false
+                                refresh()
+                            }
+                        },
+                        enabled = selectedDeviceId != null && !isBusy
+                    )
+                }
+            }
         }
+
         statusMessage?.let {
             Text(
                 text = it,
-                modifier = Modifier.padding(horizontal = UiTokens.SpaceLarge),
+                modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
                 color = SettingColors.SecondaryText,
-                fontSize = UiTokens.TextBody
+                fontSize = 11.5.sp
             )
         }
     }
@@ -934,91 +1719,67 @@ private fun AiModelSettingsSection() {
         stringResource(Res.string.ai_model_not_configured_desc)
     }
 
-    SettingsSection(title = stringResource(Res.string.ai_model_settings)) {
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(UiTokens.RadiusLarge),
-            color = SettingColors.SoftSurface,
-            tonalElevation = 0.dp,
-            shadowElevation = 0.dp
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 11.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = UiTokens.SpaceLarge, vertical = UiTokens.SpaceMedium),
-                horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium),
-                verticalAlignment = Alignment.CenterVertically
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(2.dp)
             ) {
-                Surface(
-                    modifier = Modifier.size(38.dp),
-                    shape = CircleShape,
-                    color = SettingColors.PrimarySoft,
-                    border = BorderStroke(1.dp, SettingColors.PrimaryBorder)
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = IconParkIcons.Setting,
-                            contentDescription = null,
-                            modifier = Modifier.size(UiTokens.IconMedium),
-                            tint = SettingColors.Primary
-                        )
-                    }
-                }
-
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceXSmall)
-                ) {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = summaryTitle,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = SettingColors.Text,
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = UiTokens.TextBodyLarge,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        if (isConfigured) {
-                            StatusPill(
-                                statusText = stringResource(Res.string.ai_model_configured),
-                                tone = StatusTone.Positive
-                            )
-                        }
-                    }
                     Text(
-                        text = summaryDescription,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = SettingColors.Muted,
-                        fontSize = UiTokens.TextCaption,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
+                        text = stringResource(Res.string.ai_model_settings),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = SettingColors.Text,
+                        fontWeight = FontWeight.Medium,
+                        fontSize = 13.sp
                     )
+                    if (isConfigured) {
+                        StatusPill(
+                            statusText = summaryTitle,
+                            tone = StatusTone.Positive
+                        )
+                    }
                 }
-
-                SettingActionButton(
-                    text = stringResource(
-                        if (isConfigured) Res.string.ai_edit_model else Res.string.ai_add_model
-                    ),
-                    icon = if (isConfigured) CompatIconVectors.Edit else CompatIconVectors.Add,
-                    onClick = {
-                        statusMessage = null
-                        showModelDialog = true
-                    },
-                    primary = true
+                Text(
+                    text = summaryDescription,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = SettingColors.SecondaryText,
+                    fontSize = 11.5.sp,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
+
+            Spacer(Modifier.width(16.dp))
+
+            SettingActionButton(
+                text = stringResource(
+                    if (isConfigured) Res.string.ai_edit_model else Res.string.ai_add_model
+                ),
+                icon = if (isConfigured) CompatIconVectors.Edit else CompatIconVectors.Add,
+                onClick = {
+                    statusMessage = null
+                    showModelDialog = true
+                },
+                primary = !isConfigured
+            )
         }
 
         statusMessage?.let { message ->
             Text(
                 text = message,
-                modifier = Modifier.padding(horizontal = UiTokens.SpaceLarge),
+                modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
                 color = if (statusIsError) SettingColors.Danger else SettingColors.Success,
-                fontSize = UiTokens.TextBody
+                fontSize = 11.5.sp
             )
         }
     }
@@ -1082,8 +1843,8 @@ internal fun AiModelConfigDialog(
 
     Dialog(onDismissRequest = { if (!isBusy) onDismiss() }) {
         Surface(
-            modifier = Modifier.width(560.dp),
-            shape = RoundedCornerShape(UiTokens.RadiusLarge),
+            modifier = Modifier.width(540.dp),
+            shape = RoundedCornerShape(14.dp),
             color = SettingColors.Surface,
             border = BorderStroke(1.dp, SettingColors.Border),
             tonalElevation = 0.dp,
@@ -1093,13 +1854,8 @@ internal fun AiModelConfigDialog(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(
-                            start = UiTokens.SpaceLarge,
-                            top = UiTokens.SpaceMedium,
-                            end = UiTokens.SpaceMedium,
-                            bottom = UiTokens.SpaceMedium
-                        ),
-                    horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall),
+                        .padding(start = 20.dp, top = 16.dp, end = 16.dp, bottom = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
@@ -1113,43 +1869,44 @@ internal fun AiModelConfigDialog(
                         style = MaterialTheme.typography.titleMedium,
                         color = SettingColors.Text,
                         fontWeight = FontWeight.SemiBold,
-                        fontSize = UiTokens.TextSection
+                        fontSize = 15.sp
                     )
                     Surface(
-                        shape = RoundedCornerShape(UiTokens.BadgeRadius),
+                        shape = RoundedCornerShape(999.dp),
                         color = SettingColors.SoftSurface
                     ) {
                         Text(
                             text = stringResource(Res.string.ai_openai_compatible_badge),
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp),
                             color = SettingColors.SecondaryText,
-                            fontSize = UiTokens.TextCaption
+                            fontSize = 11.sp
                         )
                     }
                     Spacer(Modifier.weight(1f))
                     Box(
                         modifier = Modifier
-                            .size(28.dp)
+                            .size(26.dp)
                             .clip(CircleShape)
+                            .pointerHoverIcon(PointerIcon.Hand)
                             .clickable(enabled = !isBusy, onClick = onDismiss),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             imageVector = IconParkIcons.Close,
                             contentDescription = stringResource(Res.string.cancel),
-                            modifier = Modifier.size(UiTokens.IconSmall),
+                            modifier = Modifier.size(15.dp),
                             tint = SettingColors.Muted
                         )
                     }
                 }
 
-                HorizontalDivider(color = SettingColors.Divider)
+                HorizontalDivider(color = SettingColors.Divider.copy(alpha = 0.6f))
 
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = UiTokens.SpaceLarge, vertical = UiTokens.SpaceMedium),
-                    verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium)
+                        .padding(horizontal = 20.dp, vertical = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     AiDialogTextField(
                         label = stringResource(Res.string.ai_base_url),
@@ -1183,8 +1940,9 @@ internal fun AiModelConfigDialog(
                         trailingContent = {
                             Box(
                                 modifier = Modifier
-                                    .size(32.dp)
+                                    .size(30.dp)
                                     .clip(CircleShape)
+                                    .pointerHoverIcon(PointerIcon.Hand)
                                     .clickable { showApiKey = !showApiKey },
                                 contentAlignment = Alignment.Center
                             ) {
@@ -1197,7 +1955,7 @@ internal fun AiModelConfigDialog(
                                     contentDescription = stringResource(
                                         if (showApiKey) Res.string.ai_hide_key else Res.string.ai_show_key
                                     ),
-                                    modifier = Modifier.size(UiTokens.IconSmall),
+                                    modifier = Modifier.size(15.dp),
                                     tint = SettingColors.Muted
                                 )
                             }
@@ -1214,27 +1972,56 @@ internal fun AiModelConfigDialog(
                         placeholder = stringResource(Res.string.ai_model_name_hint)
                     )
 
-                    SideSettingValueRow(
-                        title = l10n("视觉能力", "Vision capability"),
-                        description = l10n(
-                            "Agent 每一步都需要最新截图，不能切换为纯文本模式。",
-                            "Every Agent step requires a fresh screenshot; text-only mode is unavailable."
-                        ),
-                        value = l10n("强制开启", "Required")
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Text(
+                                text = l10n("视觉能力", "Vision capability"),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = SettingColors.Text,
+                                fontWeight = FontWeight.Medium,
+                                fontSize = 12.5.sp
+                            )
+                            Text(
+                                text = l10n(
+                                    "Agent 每一步都需要最新截图，不能切换为纯文本模式。",
+                                    "Every Agent step requires a fresh screenshot; text-only mode is unavailable."
+                                ),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = SettingColors.SecondaryText,
+                                fontSize = 11.5.sp
+                            )
+                        }
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(SettingColors.Primary.copy(alpha = 0.1f))
+                                .padding(horizontal = 7.dp, vertical = 2.dp)
+                        ) {
+                            Text(
+                                text = l10n("强制开启", "Required"),
+                                color = SettingColors.Primary,
+                                fontSize = 11.5.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                    }
 
                     Surface(
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(UiTokens.RadiusMedium),
+                        shape = RoundedCornerShape(8.dp),
                         color = SettingColors.SoftSurface,
                         tonalElevation = 0.dp,
                         shadowElevation = 0.dp
                     ) {
                         Text(
                             text = stringResource(Res.string.ai_privacy_notice),
-                            modifier = Modifier.padding(UiTokens.SpaceMedium),
+                            modifier = Modifier.padding(10.dp),
                             color = SettingColors.SecondaryText,
-                            fontSize = UiTokens.TextCaption
+                            fontSize = 11.5.sp
                         )
                     }
 
@@ -1242,18 +2029,18 @@ internal fun AiModelConfigDialog(
                         Text(
                             text = message,
                             color = if (statusIsError) SettingColors.Danger else SettingColors.Success,
-                            fontSize = UiTokens.TextBody
+                            fontSize = 12.sp
                         )
                     }
                 }
 
-                HorizontalDivider(color = SettingColors.Divider)
+                HorizontalDivider(color = SettingColors.Divider.copy(alpha = 0.6f))
 
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = UiTokens.SpaceLarge, vertical = UiTokens.SpaceMedium),
-                    horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall),
+                        .padding(horizontal = 20.dp, vertical = 14.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     if (keyAvailable) {
@@ -1270,20 +2057,22 @@ internal fun AiModelConfigDialog(
                                     }
                                 }
                             },
-                            modifier = Modifier.height(36.dp),
+                            modifier = Modifier
+                                .height(32.dp)
+                                .pointerHoverIcon(PointerIcon.Hand),
                             enabled = !isBusy,
-                            shape = RoundedCornerShape(UiTokens.RadiusMedium),
+                            shape = RoundedCornerShape(6.dp),
                             border = BorderStroke(1.dp, SettingColors.Border),
                             colors = ButtonDefaults.outlinedButtonColors(
                                 containerColor = SettingColors.Surface,
                                 contentColor = SettingColors.Danger
                             ),
-                            contentPadding = PaddingValues(horizontal = UiTokens.SpaceMedium, vertical = 0.dp)
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
                         ) {
                             Text(
                                 text = stringResource(Res.string.ai_clear_key),
                                 color = SettingColors.Danger,
-                                fontSize = UiTokens.TextBody
+                                fontSize = 12.sp
                             )
                         }
                     }
@@ -1316,47 +2105,51 @@ internal fun AiModelConfigDialog(
                                 isTesting = false
                             }
                         },
-                        modifier = Modifier.height(36.dp),
+                        modifier = Modifier
+                            .height(32.dp)
+                            .pointerHoverIcon(if (!isBusy && (apiKey.isNotBlank() || keyAvailable)) PointerIcon.Hand else PointerIcon.Default),
                         enabled = !isBusy && (apiKey.isNotBlank() || keyAvailable),
-                        shape = RoundedCornerShape(UiTokens.RadiusMedium),
+                        shape = RoundedCornerShape(6.dp),
                         border = BorderStroke(1.dp, SettingColors.Border),
                         colors = ButtonDefaults.outlinedButtonColors(
                             containerColor = SettingColors.Surface,
                             contentColor = SettingColors.Text
                         ),
-                        contentPadding = PaddingValues(horizontal = UiTokens.SpaceMedium, vertical = 0.dp)
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
                     ) {
                         if (isTesting) {
                             CircularProgressIndicator(
-                                modifier = Modifier.size(14.dp),
+                                modifier = Modifier.size(12.dp),
                                 strokeWidth = 2.dp,
                                 color = SettingColors.Primary
                             )
-                            Spacer(Modifier.width(UiTokens.SpaceSmall))
+                            Spacer(Modifier.width(6.dp))
                         }
                         Text(
                             text = stringResource(Res.string.ai_test_connection),
                             color = if (isBusy && !isTesting) SettingColors.Muted else SettingColors.Text,
-                            fontSize = UiTokens.TextBody
+                            fontSize = 12.sp
                         )
                     }
 
                     OutlinedButton(
                         onClick = onDismiss,
-                        modifier = Modifier.height(36.dp),
+                        modifier = Modifier
+                            .height(32.dp)
+                            .pointerHoverIcon(PointerIcon.Hand),
                         enabled = !isBusy,
-                        shape = RoundedCornerShape(UiTokens.RadiusMedium),
+                        shape = RoundedCornerShape(6.dp),
                         border = BorderStroke(1.dp, SettingColors.Border),
                         colors = ButtonDefaults.outlinedButtonColors(
                             containerColor = SettingColors.Surface,
                             contentColor = SettingColors.Text
                         ),
-                        contentPadding = PaddingValues(horizontal = UiTokens.SpaceMedium, vertical = 0.dp)
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
                     ) {
                         Text(
                             text = stringResource(Res.string.cancel),
                             color = SettingColors.Text,
-                            fontSize = UiTokens.TextBody
+                            fontSize = 12.sp
                         )
                     }
 
@@ -1369,40 +2162,46 @@ internal fun AiModelConfigDialog(
                                 statusMessage = result.exceptionOrNull()?.message
                                 if (result.isSuccess) {
                                     providerRepository.syncLegacy(currentConfig(), apiKey)
-                                    capabilityReport?.let { report ->
-                                        providerRepository.resolve(AgentModelRole.BRAIN)
-                                            ?.let { provider ->
-                                                providerRepository.attestCapabilities(provider.profile, report.tier)
-                                            }
+                                    val report = capabilityReport
+                                    val tier = report?.tier ?: if (currentConfig().visionMode != VisionMode.DISABLED) {
+                                        AgentCapabilityTier.L3_VISUAL_AGENT
+                                    } else {
+                                        AgentCapabilityTier.L2_SEMANTIC_AGENT
                                     }
+                                    providerRepository.resolve(AgentModelRole.BRAIN)
+                                        ?.let { provider ->
+                                            providerRepository.attestCapabilities(provider.profile, tier)
+                                        }
                                     onSaved()
                                 }
                                 isSaving = false
                             }
                         },
-                        modifier = Modifier.height(36.dp),
+                        modifier = Modifier
+                            .height(32.dp)
+                            .pointerHoverIcon(if (!isBusy) PointerIcon.Hand else PointerIcon.Default),
                         enabled = !isBusy,
-                        shape = RoundedCornerShape(UiTokens.RadiusMedium),
+                        shape = RoundedCornerShape(6.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = SettingColors.Primary,
                             contentColor = QadbColors.onPrimary,
                             disabledContainerColor = SettingColors.ControlBackground,
                             disabledContentColor = SettingColors.Muted
                         ),
-                        contentPadding = PaddingValues(horizontal = UiTokens.SpaceLarge, vertical = 0.dp)
+                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 0.dp)
                     ) {
                         if (isSaving) {
                             CircularProgressIndicator(
-                                modifier = Modifier.size(14.dp),
+                                modifier = Modifier.size(12.dp),
                                 strokeWidth = 2.dp,
                                 color = QadbColors.onPrimary
                             )
-                            Spacer(Modifier.width(UiTokens.SpaceSmall))
+                            Spacer(Modifier.width(6.dp))
                         }
                         Text(
                             text = stringResource(Res.string.ai_save_config),
                             color = if (isBusy && !isSaving) SettingColors.Muted else QadbColors.onPrimary,
-                            fontSize = UiTokens.TextBody,
+                            fontSize = 12.sp,
                             fontWeight = FontWeight.SemiBold
                         )
                     }
@@ -1421,13 +2220,13 @@ private fun AiDialogTextField(
     visualTransformation: VisualTransformation = VisualTransformation.None,
     trailingContent: (@Composable () -> Unit)? = null
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text(
             text = label,
             style = MaterialTheme.typography.bodyMedium,
             color = SettingColors.Text,
             fontWeight = FontWeight.Medium,
-            fontSize = UiTokens.TextBody
+            fontSize = 12.5.sp
         )
         OutlinedTextField(
             value = value,
@@ -1437,118 +2236,13 @@ private fun AiDialogTextField(
                 Text(
                     text = placeholder,
                     color = SettingColors.Muted,
-                    fontSize = UiTokens.TextBody
+                    fontSize = 12.sp
                 )
             },
             trailingIcon = trailingContent,
             visualTransformation = visualTransformation,
             singleLine = true,
-            shape = RoundedCornerShape(UiTokens.RadiusMedium)
-        )
-    }
-}
-
-@Composable
-private fun AiDialogSelectField(
-    label: String,
-    value: String,
-    expanded: Boolean,
-    onExpandedChange: (Boolean) -> Unit,
-    menuContent: @Composable ColumnScope.() -> Unit
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodyMedium,
-            color = SettingColors.Text,
-            fontWeight = FontWeight.Medium,
-            fontSize = UiTokens.TextBody
-        )
-        Box(modifier = Modifier.fillMaxWidth()) {
-            Surface(
-                onClick = { onExpandedChange(!expanded) },
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(UiTokens.RadiusMedium),
-                color = SettingColors.Surface,
-                border = BorderStroke(1.dp, SettingColors.Border),
-                tonalElevation = 0.dp,
-                shadowElevation = 0.dp
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(UiTokens.ControlHeight)
-                        .padding(horizontal = UiTokens.SpaceMedium),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = value,
-                        color = SettingColors.Text,
-                        fontSize = UiTokens.TextBody
-                    )
-                    Icon(
-                        imageVector = IconParkIcons.ArrowDown,
-                        contentDescription = null,
-                        modifier = Modifier.size(UiTokens.IconSmall),
-                        tint = SettingColors.Muted
-                    )
-                }
-            }
-            DropdownMenu(
-                expanded = expanded,
-                onDismissRequest = { onExpandedChange(false) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.surface),
-                content = menuContent
-            )
-        }
-    }
-}
-
-@Composable
-private fun visionModeText(mode: VisionMode): String = stringResource(
-    when (mode) {
-        VisionMode.AUTO -> Res.string.ai_vision_auto
-        VisionMode.ENABLED -> Res.string.ai_vision_enabled
-        VisionMode.DISABLED -> Res.string.ai_vision_disabled
-    }
-)
-
-@Composable
-private fun SettingsSection(
-    title: String,
-    modifier: Modifier = Modifier,
-    content: @Composable ColumnScope.() -> Unit
-) {
-    Column(
-        modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .width(3.dp)
-                    .height(16.dp)
-                    .clip(RoundedCornerShape(UiTokens.BadgeRadius))
-                    .background(SettingColors.Primary)
-            )
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleMedium,
-                color = SettingColors.Text,
-                fontWeight = FontWeight.SemiBold,
-                fontSize = UiTokens.TextSection
-            )
-        }
-        Column(
-            modifier = Modifier.fillMaxWidth(),
-            content = content
+            shape = RoundedCornerShape(6.dp)
         )
     }
 }
@@ -1556,303 +2250,33 @@ private fun SettingsSection(
 @Composable
 private fun SectionDivider() {
     HorizontalDivider(
-        modifier = Modifier.padding(horizontal = UiTokens.SpaceLarge),
-        color = SettingColors.Divider
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp),
+        color = SettingColors.Divider.copy(alpha = 0.45f)
     )
-}
-
-@Composable
-private fun ActionButtonRow(content: @Composable () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .horizontalScroll(rememberScrollState())
-            .padding(horizontal = UiTokens.SpaceLarge, vertical = UiTokens.SpaceMedium),
-        horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        content()
-    }
-}
-
-@Composable
-private fun SettingsActionArea(content: @Composable ColumnScope.() -> Unit) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = UiTokens.SpaceLarge, vertical = UiTokens.SpaceMedium),
-        verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall),
-        content = content
-    )
-}
-
-@Composable
-private fun SideSettingValueRow(
-    title: String,
-    description: String,
-    value: String,
-    valueColor: Color = Color.Unspecified
-) {
-    val resolvedValueColor = if (valueColor == Color.Unspecified) SettingColors.Text else valueColor
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = UiTokens.SpaceLarge, vertical = UiTokens.SpaceMedium),
-        verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceXSmall)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium),
-            verticalAlignment = Alignment.Top
-        ) {
-            Text(
-                text = title,
-                modifier = Modifier.weight(0.4f),
-                style = MaterialTheme.typography.bodyMedium,
-                color = SettingColors.Text,
-                fontWeight = FontWeight.Medium,
-                fontSize = UiTokens.TextBodyLarge
-            )
-            Text(
-                text = value,
-                modifier = Modifier.weight(0.6f),
-                style = MaterialTheme.typography.bodyMedium,
-                color = resolvedValueColor,
-                fontSize = UiTokens.TextBodyLarge,
-                textAlign = androidx.compose.ui.text.style.TextAlign.End,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
-        Text(
-            text = description,
-            style = MaterialTheme.typography.bodySmall,
-            color = SettingColors.Muted,
-            fontSize = UiTokens.TextCaption,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
-    }
-}
-
-@Composable
-private fun AdbEnvironmentSummary(
-    statusLabel: String,
-    statusText: String,
-    tone: StatusTone,
-    sourceLabel: String,
-    sourceDescription: String,
-    sourceValue: String,
-    pathLabel: String,
-    pathDescription: String,
-    pathValue: String,
-    versionLabel: String,
-    versionDescription: String,
-    versionValue: String,
-    trailingIcon: ImageVector,
-    trailingIconDescription: String,
-    onTrailingAction: () -> Unit
-) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(0.dp),
-        color = Color.Transparent,
-        tonalElevation = 0.dp,
-        shadowElevation = 0.dp
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = UiTokens.SpaceLarge, vertical = UiTokens.SpaceMedium),
-            verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceXSmall)) {
-                    Text(
-                        text = statusLabel,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = SettingColors.Text,
-                        fontWeight = FontWeight.Medium,
-                        fontSize = UiTokens.TextBodyLarge
-                    )
-                }
-                StatusPill(statusText = statusText, tone = tone)
-            }
-
-            HorizontalDivider(color = SettingColors.Divider)
-
-            Column {
-                SummaryInfoRow(
-                    title = sourceLabel,
-                    description = sourceDescription,
-                    value = sourceValue
-                )
-                HorizontalDivider(color = SettingColors.Divider)
-                SummaryInfoRow(
-                    title = pathLabel,
-                    description = pathDescription,
-                    value = pathValue,
-                    stackedValue = true,
-                    trailingIcon = trailingIcon,
-                    trailingIconDescription = trailingIconDescription,
-                    onTrailingAction = onTrailingAction
-                )
-                HorizontalDivider(color = SettingColors.Divider)
-                SummaryInfoRow(
-                    title = versionLabel,
-                    description = versionDescription,
-                    value = versionValue
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun SummaryInfoRow(
-    title: String,
-    description: String,
-    value: String,
-    stackedValue: Boolean = false,
-    trailingIcon: ImageVector? = null,
-    trailingIconDescription: String? = null,
-    onTrailingAction: (() -> Unit)? = null
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = UiTokens.SpaceMedium),
-        verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
-    ) {
-        if (stackedValue) {
-            SummaryInfoLabel(
-                title = title,
-                description = description,
-                modifier = Modifier.fillMaxWidth()
-            )
-            SummaryInfoValue(
-                value = value,
-                modifier = Modifier.fillMaxWidth(),
-                maxLines = 2,
-                trailingIcon = trailingIcon,
-                trailingIconDescription = trailingIconDescription,
-                onTrailingAction = onTrailingAction
-            )
-        } else {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                SummaryInfoLabel(
-                    title = title,
-                    description = description,
-                    modifier = Modifier.weight(0.46f)
-                )
-                SummaryInfoValue(
-                    value = value,
-                    modifier = Modifier.weight(0.54f),
-                    maxLines = 1,
-                    trailingIcon = trailingIcon,
-                    trailingIconDescription = trailingIconDescription,
-                    onTrailingAction = onTrailingAction
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun SummaryInfoLabel(title: String, description: String, modifier: Modifier) {
-    Column(
-        modifier = modifier,
-        verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceXSmall)
-    ) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.bodyMedium,
-            color = SettingColors.Text,
-            fontWeight = FontWeight.Medium,
-            fontSize = UiTokens.TextBodyLarge
-        )
-        Text(
-            text = description,
-            style = MaterialTheme.typography.bodySmall,
-            color = SettingColors.Muted,
-            fontSize = UiTokens.TextCaption,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
-    }
-}
-
-@Composable
-private fun SummaryInfoValue(
-    value: String,
-    modifier: Modifier,
-    maxLines: Int,
-    trailingIcon: ImageVector?,
-    trailingIconDescription: String?,
-    onTrailingAction: (() -> Unit)?
-) {
-    Row(
-        modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = value,
-            modifier = Modifier.weight(1f),
-            style = MaterialTheme.typography.bodyMedium,
-            color = SettingColors.Text,
-            fontWeight = FontWeight.Medium,
-            fontSize = UiTokens.TextBodyLarge,
-            maxLines = maxLines,
-            overflow = TextOverflow.Ellipsis
-        )
-        if (trailingIcon != null && onTrailingAction != null) {
-            OutlinedButton(
-                onClick = onTrailingAction,
-                modifier = Modifier.height(30.dp),
-                shape = RoundedCornerShape(UiTokens.RadiusMedium),
-                border = BorderStroke(1.dp, SettingColors.ButtonBorder.copy(alpha = 0.72f)),
-                colors = ButtonDefaults.outlinedButtonColors(
-                    containerColor = SettingColors.Surface,
-                    contentColor = SettingColors.Muted
-                ),
-                contentPadding = PaddingValues(horizontal = UiTokens.SpaceSmall, vertical = 0.dp)
-            ) {
-                Icon(
-                    imageVector = trailingIcon,
-                    contentDescription = trailingIconDescription,
-                    tint = SettingColors.Muted,
-                    modifier = Modifier.size(14.dp)
-                )
-            }
-        }
-    }
 }
 
 @Composable
 private fun StatusPill(statusText: String, tone: StatusTone) {
-    val color = when (tone) {
-        StatusTone.Positive -> SettingColors.Success
-        StatusTone.Neutral -> SettingColors.Muted
-        StatusTone.Danger -> SettingColors.Danger
+    val (color, bgColor) = when (tone) {
+        StatusTone.Positive -> Pair(SettingColors.Success, SettingColors.Success.copy(alpha = 0.12f))
+        StatusTone.Neutral -> Pair(SettingColors.SecondaryText, SettingColors.SoftSurface)
+        StatusTone.Danger -> Pair(SettingColors.Danger, SettingColors.Danger.copy(alpha = 0.12f))
     }
 
     Row(
-        modifier = Modifier.widthIn(max = 360.dp),
-        horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall),
+        modifier = Modifier
+            .clip(RoundedCornerShape(999.dp))
+            .background(bgColor)
+            .border(1.dp, color.copy(alpha = 0.25f), RoundedCornerShape(999.dp))
+            .padding(horizontal = 8.dp, vertical = 2.dp),
+        horizontalArrangement = Arrangement.spacedBy(5.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(
             modifier = Modifier
-                .size(7.dp)
+                .size(5.dp)
                 .clip(CircleShape)
                 .background(color)
         )
@@ -1861,81 +2285,10 @@ private fun StatusPill(statusText: String, tone: StatusTone) {
             style = MaterialTheme.typography.bodySmall,
             color = color,
             fontWeight = FontWeight.SemiBold,
-            fontSize = UiTokens.TextCaption,
+            fontSize = 11.5.sp,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
-    }
-}
-
-@Composable
-private fun SettingValueRow(
-    title: String,
-    description: String,
-    value: String,
-    valueColor: Color = Color.Unspecified,
-    trailingIcon: ImageVector? = null,
-    trailingIconDescription: String? = null,
-    onTrailingAction: (() -> Unit)? = null
-) {
-    val resolvedValueColor = if (valueColor == Color.Unspecified) SettingColors.Text else valueColor
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(56.dp)
-            .padding(horizontal = UiTokens.SpaceLarge),
-        horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Column(modifier = Modifier.weight(0.62f), verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceXSmall)) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.bodyMedium,
-                color = SettingColors.Text,
-                fontWeight = FontWeight.Medium,
-                fontSize = UiTokens.TextBodyLarge
-            )
-            Text(
-                text = description,
-                style = MaterialTheme.typography.bodySmall,
-                color = SettingColors.Muted,
-                fontSize = UiTokens.TextCaption
-            )
-        }
-        Column(
-            modifier = Modifier.weight(0.38f),
-            horizontalAlignment = Alignment.End,
-            verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceXSmall)
-        ) {
-            Text(
-                text = value,
-                style = MaterialTheme.typography.bodyMedium,
-                color = resolvedValueColor,
-                fontSize = UiTokens.TextBodyLarge,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis
-            )
-            if (trailingIcon != null && onTrailingAction != null) {
-                OutlinedButton(
-                    onClick = onTrailingAction,
-                    modifier = Modifier.height(30.dp),
-                    shape = RoundedCornerShape(UiTokens.RadiusMedium),
-                    border = BorderStroke(1.dp, SettingColors.ButtonBorder.copy(alpha = 0.72f)),
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        containerColor = SettingColors.Surface,
-                        contentColor = SettingColors.Muted
-                    ),
-                    contentPadding = PaddingValues(horizontal = UiTokens.SpaceSmall, vertical = 0.dp)
-                ) {
-                    Icon(
-                        imageVector = trailingIcon,
-                        contentDescription = trailingIconDescription,
-                        tint = SettingColors.Muted,
-                        modifier = Modifier.size(14.dp)
-                    )
-                }
-            }
-        }
     }
 }
 
@@ -1948,65 +2301,84 @@ private fun SettingsDropdownRow(
     onExpandedChange: (Boolean) -> Unit,
     menuContent: @Composable ColumnScope.() -> Unit
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isHovered by interactionSource.collectIsHoveredAsState()
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(56.dp)
-            .padding(horizontal = UiTokens.SpaceLarge),
+            .padding(horizontal = 16.dp, vertical = 11.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium)
+        horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceXSmall)) {
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
             Text(
                 text = title,
                 style = MaterialTheme.typography.bodyMedium,
                 color = SettingColors.Text,
                 fontWeight = FontWeight.Medium,
-                fontSize = UiTokens.TextBodyLarge
+                fontSize = 13.sp
             )
             Text(
                 text = description,
                 style = MaterialTheme.typography.bodySmall,
-                color = SettingColors.Muted,
-                fontSize = UiTokens.TextCaption
+                color = SettingColors.SecondaryText,
+                fontSize = 11.5.sp
             )
         }
 
+        Spacer(Modifier.width(16.dp))
+
         Box {
-            Surface(
-                onClick = { onExpandedChange(!expanded) },
-                shape = RoundedCornerShape(UiTokens.RadiusMedium),
-                color = SettingColors.Surface,
-                border = BorderStroke(1.dp, SettingColors.ButtonBorder.copy(alpha = 0.72f)),
-                tonalElevation = 0.dp,
-                shadowElevation = 0.dp
+            val triggerBorder by animateColorAsState(
+                targetValue = if (isHovered || expanded) SettingColors.Primary.copy(alpha = 0.5f) else SettingColors.Border,
+                animationSpec = tween(UiTokens.HoverDurationMillis)
+            )
+            val triggerBg by animateColorAsState(
+                targetValue = if (isHovered || expanded) SettingColors.SoftSurface else SettingColors.Surface,
+                animationSpec = tween(UiTokens.HoverDurationMillis)
+            )
+
+            Row(
+                modifier = Modifier
+                    .height(28.dp)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(triggerBg)
+                    .border(1.dp, triggerBorder, RoundedCornerShape(6.dp))
+                    .hoverable(interactionSource)
+                    .pointerHoverIcon(PointerIcon.Hand)
+                    .clickable(
+                        interactionSource = interactionSource,
+                        indication = null,
+                        onClick = { onExpandedChange(!expanded) }
+                    )
+                    .padding(horizontal = 9.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                Row(
-                    modifier = Modifier
-                        .height(32.dp)
-                        .padding(horizontal = UiTokens.SpaceSmall),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = value,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = SettingColors.Text,
-                        fontSize = UiTokens.TextBodyLarge,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Icon(
-                        imageVector = IconParkIcons.ArrowDown,
-                        contentDescription = null,
-                        tint = SettingColors.Muted,
-                        modifier = Modifier.size(UiTokens.IconSmall)
-                    )
-                }
+                Text(
+                    text = value,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = SettingColors.Text,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Icon(
+                    imageVector = IconParkIcons.ArrowDown,
+                    contentDescription = null,
+                    tint = if (isHovered || expanded) SettingColors.Primary else SettingColors.Muted,
+                    modifier = Modifier.size(12.dp)
+                )
             }
             DropdownMenu(
                 expanded = expanded,
                 onDismissRequest = { onExpandedChange(false) },
-                modifier = Modifier.background(MaterialTheme.colorScheme.surface),
+                modifier = Modifier.background(SettingColors.Surface),
                 content = menuContent
             )
         }
@@ -2024,46 +2396,45 @@ private fun SettingSwitchRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(56.dp)
-            .padding(horizontal = UiTokens.SpaceLarge),
+            .padding(horizontal = 16.dp, vertical = 10.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceXSmall)) {
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
             Text(
                 text = title,
                 style = MaterialTheme.typography.bodyMedium,
                 color = SettingColors.Text,
                 fontWeight = FontWeight.Medium,
-                fontSize = UiTokens.TextBodyLarge
+                fontSize = 13.sp
             )
             Text(
                 text = description,
                 style = MaterialTheme.typography.bodySmall,
-                color = SettingColors.Muted,
-                fontSize = UiTokens.TextCaption
+                color = SettingColors.SecondaryText,
+                fontSize = 11.5.sp
             )
         }
+        Spacer(Modifier.width(16.dp))
         Switch(
             checked = checked,
-            onCheckedChange = { value -> if (enabled) onCheckedChange(value) }
+            onCheckedChange = { value -> if (enabled) onCheckedChange(value) },
+            modifier = Modifier.pointerHoverIcon(PointerIcon.Hand)
         )
     }
 }
 
 @Composable
-private fun updateStatusColor(status: UpdateStatus): Color {
-    return when (status) {
-        UpdateStatus.Idle -> SettingColors.Text
-        UpdateStatus.Checking,
-        UpdateStatus.Downloading -> SettingColors.Primary
-        is UpdateStatus.UpToDate,
-        is UpdateStatus.DownloadSuccess -> SettingColors.Success
-        is UpdateStatus.UpdateAvailable -> SettingColors.Primary
-        is UpdateStatus.CheckFailed,
-        is UpdateStatus.DownloadFailed -> SettingColors.Danger
+private fun visionModeText(mode: VisionMode): String = stringResource(
+    when (mode) {
+        VisionMode.AUTO -> Res.string.ai_vision_auto
+        VisionMode.ENABLED -> Res.string.ai_vision_enabled
+        VisionMode.DISABLED -> Res.string.ai_vision_disabled
     }
-}
+)
 
 @Composable
 private fun settingAdbSourceText(source: AdbPathManager.AdbSource): String {

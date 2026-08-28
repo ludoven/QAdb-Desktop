@@ -2,13 +2,15 @@ package com.ludoven.adbtool.pages
 
 import com.ludoven.adbtool.ui.mac.*
 
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -22,10 +24,13 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.runtime.Composable
@@ -37,20 +42,31 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.ludoven.adbtool.QadbColors
 import com.ludoven.adbtool.QadbPalette
+import com.ludoven.adbtool.QadbTokens
 import com.ludoven.adbtool.UiTokens
 import com.ludoven.adbtool.entity.DeviceMirrorSettings
+import com.ludoven.adbtool.entity.MsgContent
 import com.ludoven.adbtool.ui.icons.IconParkIcons
+import com.ludoven.adbtool.util.copyPlainTextToClipboard
 import com.ludoven.adbtool.util.isWirelessAdbConnection
 import com.ludoven.adbtool.util.l10n
 import com.ludoven.adbtool.viewmodel.DeviceMirrorViewModel
 import com.ludoven.adbtool.viewmodel.KeyEventViewModel
+import com.ludoven.adbtool.widget.FramedStateSurface
 
 enum class DeviceControlTab {
     Mirror,
@@ -75,6 +91,7 @@ fun DeviceControlScreen(
     val mirrorErrorText = resolveMessageText(mirrorErrorMessage)
     val hasDevice = !selectedDevice.isNullOrBlank()
     var showSettingsDialog by remember { mutableStateOf(false) }
+    var copyToastVisible by remember { mutableStateOf(false) }
 
     val maxSizeOptions = listOf(
         IntOption("720", 720),
@@ -101,7 +118,7 @@ fun DeviceControlScreen(
     Box(modifier = Modifier.fillMaxSize()) {
         Surface(
             modifier = Modifier.fillMaxSize(),
-            color = MaterialTheme.colorScheme.surface
+            color = ControlVisualTokens.Surface
         ) {
             Column(
                 modifier = Modifier
@@ -110,22 +127,32 @@ fun DeviceControlScreen(
                     .padding(horizontal = UiTokens.PagePadding, vertical = UiTokens.ItemSpacing),
                 verticalArrangement = Arrangement.spacedBy(UiTokens.SectionSpacing)
             ) {
-                DeviceOverviewCard(
-                    deviceDisplayName = selectedDevice?.let { deviceDisplayNames[it] },
-                    deviceId = selectedDevice,
-                    connectionType = resolveConnectionType(selectedDevice),
-                    mirrorRunning = mirrorRunning,
-                    settings = settings,
-                    errorMessage = mirrorErrorText,
-                    onOpenSettings = { showSettingsDialog = true },
-                    onMirrorAction = {
-                        if (mirrorRunning) {
-                            mirrorViewModel.stopMirror()
-                        } else {
-                            mirrorViewModel.openMirror(selectedDevice)
+                if (hasDevice) {
+                    DeviceControlHeroCard(
+                        deviceDisplayName = selectedDevice?.let { deviceDisplayNames[it] },
+                        deviceId = selectedDevice,
+                        connectionType = resolveConnectionType(selectedDevice),
+                        mirrorRunning = mirrorRunning,
+                        settings = settings,
+                        errorMessage = mirrorErrorText,
+                        onOpenSettings = { showSettingsDialog = true },
+                        onCopySerial = { serial ->
+                            copyPlainTextToClipboard(serial)
+                            copyToastVisible = true
+                        },
+                        onMirrorAction = {
+                            if (mirrorRunning) {
+                                mirrorViewModel.stopMirror()
+                            } else {
+                                mirrorViewModel.openMirror(selectedDevice)
+                            }
                         }
-                    }
-                )
+                    )
+                } else {
+                    DeviceControlEmptyState(
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
 
                 KeyEventScreen(
                     viewModel = keyEventViewModel,
@@ -141,6 +168,10 @@ fun DeviceControlScreen(
         }
 
         MirrorToast(visible = showMirrorDialog, message = mirrorDialogMessage)
+        MirrorToast(
+            visible = copyToastVisible,
+            message = MsgContent.Text(l10n("设备序列号已复制到剪贴板", "Device serial copied to clipboard"))
+        )
     }
 
     if (showSettingsDialog) {
@@ -156,8 +187,10 @@ fun DeviceControlScreen(
     }
 }
 
+// ── Device Control Hero Card ──────────────────────────────────────────────────
+
 @Composable
-private fun DeviceOverviewCard(
+private fun DeviceControlHeroCard(
     deviceDisplayName: String?,
     deviceId: String?,
     connectionType: String,
@@ -165,333 +198,525 @@ private fun DeviceOverviewCard(
     settings: DeviceMirrorSettings,
     errorMessage: String?,
     onOpenSettings: () -> Unit,
+    onCopySerial: (String) -> Unit,
     onMirrorAction: () -> Unit
 ) {
-    val hasDevice = !deviceId.isNullOrBlank()
+    val isWireless = connectionType.contains("Wi", ignoreCase = true)
 
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(UiTokens.RadiusLarge),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        ),
-        border = BorderStroke(
-            width = UiTokens.BorderWidth,
-            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+    FramedStateSurface(
+        modifier = Modifier.fillMaxWidth()
     ) {
         Column(
-            modifier = Modifier.padding(UiTokens.SpaceLarge),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(UiTokens.SpaceLarge),
             verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium)
         ) {
+            // Top Row: Identity + Badges + Action Button
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Text(
-                    text = l10n("设备概览", "Device overview"),
-                    modifier = Modifier.weight(1f),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = UiTokens.TextSection
-                )
+                Row(
+                    modifier = Modifier.weight(1f).padding(end = UiTokens.SpaceMedium),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium)
+                ) {
+                    // Avatar Box
+                    Box(
+                        modifier = Modifier
+                            .size(46.dp)
+                            .clip(RoundedCornerShape(UiTokens.RadiusMedium))
+                            .background(ControlVisualTokens.Primary.copy(alpha = 0.12f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = IconParkIcons.Devices,
+                            contentDescription = null,
+                            tint = ControlVisualTokens.Primary,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(3.dp),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text(
+                                text = deviceDisplayName?.takeIf { it.isNotBlank() }
+                                    ?: deviceId
+                                    ?: l10n("未知设备", "Unknown Device"),
+                                color = ControlVisualTokens.Text,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 15.5.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+
+                            // Status Pill
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(UiTokens.BadgeRadius))
+                                    .background(ControlVisualTokens.Success.copy(alpha = 0.12f))
+                                    .padding(horizontal = 7.dp, vertical = 2.dp)
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(6.dp)
+                                            .clip(CircleShape)
+                                            .background(ControlVisualTokens.Success)
+                                    )
+                                    Text(
+                                        text = l10n("就绪", "Ready"),
+                                        color = ControlVisualTokens.Success,
+                                        fontSize = 10.5.sp,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
+                            }
+
+                            // Connection Type Pill
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(UiTokens.BadgeRadius))
+                                    .background(ControlVisualTokens.Soft.copy(alpha = 0.8f))
+                                    .padding(horizontal = 7.dp, vertical = 2.dp)
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = if (isWireless) IconParkIcons.Wifi else IconParkIcons.Usb,
+                                        contentDescription = null,
+                                        tint = ControlVisualTokens.Muted,
+                                        modifier = Modifier.size(11.dp)
+                                    )
+                                    Text(
+                                        text = connectionType,
+                                        color = ControlVisualTokens.Muted,
+                                        fontSize = 10.5.sp,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
+                            }
+                        }
+
+                        // Serial number pill with copy
+                        if (!deviceId.isNullOrBlank()) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(UiTokens.RadiusSmall))
+                                    .clickable { onCopySerial(deviceId) }
+                                    .padding(horizontal = 4.dp, vertical = 1.dp)
+                            ) {
+                                Text(
+                                    text = deviceId,
+                                    style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                                    color = ControlVisualTokens.Tertiary,
+                                    fontSize = 12.sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Icon(
+                                    imageVector = Icons.Default.ContentCopy,
+                                    contentDescription = l10n("复制序列号", "Copy Serial"),
+                                    tint = ControlVisualTokens.Tertiary,
+                                    modifier = Modifier.size(12.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // Action button (Open/Stop mirror)
                 Button(
                     onClick = onMirrorAction,
-                    enabled = mirrorRunning || hasDevice,
-                    modifier = Modifier.height(UiTokens.ControlHeight),
+                    modifier = Modifier.height(34.dp).widthIn(min = 108.dp),
                     shape = RoundedCornerShape(UiTokens.RadiusMedium),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        contentColor = MaterialTheme.colorScheme.onPrimary,
-                        disabledContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.45f),
-                        disabledContentColor = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f)
+                        containerColor = if (mirrorRunning) ControlVisualTokens.Danger else ControlVisualTokens.Primary,
+                        contentColor = QadbColors.onPrimary
                     )
                 ) {
                     Icon(
                         imageVector = if (mirrorRunning) Icons.Default.Stop else Icons.Default.PlayArrow,
                         contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(UiTokens.IconSmall)
+                        tint = QadbColors.onPrimary,
+                        modifier = Modifier.size(15.dp)
                     )
-                    Spacer(Modifier.width(UiTokens.SpaceSmall))
+                    Spacer(Modifier.width(6.dp))
                     Text(
-                        text = if (mirrorRunning) {
-                            l10n("停止镜像", "Stop Mirror")
-                        } else {
-                            l10n("打开镜像", "Open Mirror")
-                        },
-                        color = Color.White,
+                        text = if (mirrorRunning) l10n("停止镜像", "Stop Mirror") else l10n("打开镜像", "Open Mirror"),
+                        color = QadbColors.onPrimary,
                         fontWeight = FontWeight.SemiBold,
-                        fontSize = UiTokens.TextBody
+                        fontSize = 12.5.sp
                     )
                 }
             }
-            if (errorMessage != null) {
-                Text(
-                    text = errorMessage,
-                    color = QadbColors.danger,
-                    style = MaterialTheme.typography.bodySmall,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
+
+            // Error banner if any
+            if (!errorMessage.isNullOrBlank()) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(UiTokens.RadiusMedium))
+                        .background(ControlVisualTokens.Danger.copy(alpha = 0.10f))
+                        .border(1.dp, ControlVisualTokens.Danger.copy(alpha = 0.25f), RoundedCornerShape(UiTokens.RadiusMedium))
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(
+                        imageVector = IconParkIcons.ShieldAlert,
+                        contentDescription = null,
+                        tint = ControlVisualTokens.Danger,
+                        modifier = Modifier.size(15.dp)
+                    )
+                    Text(
+                        text = errorMessage,
+                        color = ControlVisualTokens.Danger,
+                        style = MaterialTheme.typography.bodySmall,
+                        fontSize = 12.sp,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
             }
 
-            BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-                if (maxWidth >= 720.dp) {
-                    // Wide: single row with 4 groups
-                    Row(
+            // Bottom Overview Metrics Row
+            HorizontalDivider(color = ControlVisualTokens.Divider.copy(alpha = 0.5f))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 44.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Metric 1: Mirror Status
+                Row(
+                    modifier = Modifier.weight(1f).padding(horizontal = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Box(
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(min = 52.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        DeviceIdentityCell(
-                            modifier = Modifier.weight(1.4f),
-                            deviceDisplayName = deviceDisplayName,
-                            deviceId = deviceId,
-                            hasDevice = hasDevice
+                            .size(7.dp)
+                            .clip(CircleShape)
+                            .background(if (mirrorRunning) ControlVisualTokens.Success else ControlVisualTokens.Tertiary)
+                    )
+                    Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                        Text(
+                            text = l10n("镜像状态", "Mirror Status"),
+                            color = ControlVisualTokens.Muted,
+                            fontSize = 11.sp
                         )
-                        OverviewDivider()
-                        OverviewMetric(
-                            modifier = Modifier.weight(0.75f),
-                            icon = IconParkIcons.Wifi,
-                            label = l10n("连接方式", "Connection"),
-                            value = if (hasDevice) connectionType else "--"
-                        )
-                        OverviewDivider()
-                        OverviewMetric(
-                            modifier = Modifier.weight(0.75f),
-                            icon = IconParkIcons.CastScreen,
-                            label = l10n("镜像状态", "Mirror status"),
-                            value = if (mirrorRunning) l10n("已启动", "Running") else l10n("未启动", "Not started")
-                        )
-                        OverviewDivider()
-                        MirrorSettingsCell(
-                            modifier = Modifier.weight(1.1f),
-                            summary = mirrorSettingsSummary(settings),
-                            onClick = onOpenSettings
+                        Text(
+                            text = if (mirrorRunning) l10n("运行中 (Scrcpy)", "Running (Scrcpy)") else l10n("未启动", "Stopped"),
+                            color = if (mirrorRunning) ControlVisualTokens.Success else ControlVisualTokens.Text,
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 12.sp
                         )
                     }
-                } else {
-                    // Compact: 2x2 grid
-                    Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium)
+                }
+
+                OverviewDivider()
+
+                // Metric 2: Connection Type
+                Row(
+                    modifier = Modifier.weight(1f).padding(horizontal = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(
+                        imageVector = if (isWireless) IconParkIcons.Wifi else IconParkIcons.Usb,
+                        contentDescription = null,
+                        tint = ControlVisualTokens.Primary,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                        Text(
+                            text = l10n("连接协议", "Connection"),
+                            color = ControlVisualTokens.Muted,
+                            fontSize = 11.sp
+                        )
+                        Text(
+                            text = connectionType,
+                            color = ControlVisualTokens.Text,
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 12.sp
+                        )
+                    }
+                }
+
+                OverviewDivider()
+
+                // Metric 3: Quick Settings Cell (Clickable)
+                val interactionSource = remember { MutableInteractionSource() }
+                val isHovered by interactionSource.collectIsHoveredAsState()
+                Row(
+                    modifier = Modifier
+                        .weight(1.3f)
+                        .clip(RoundedCornerShape(UiTokens.RadiusMedium))
+                        .background(
+                            if (isHovered) ControlVisualTokens.Soft.copy(alpha = 0.8f)
+                            else ControlVisualTokens.Soft.copy(alpha = 0.4f)
+                        )
+                        .clickable(interactionSource = interactionSource, indication = null, onClick = onOpenSettings)
+                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.weight(1f)
                     ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            DeviceIdentityCell(
-                                modifier = Modifier.weight(1f),
-                                deviceDisplayName = deviceDisplayName,
-                                deviceId = deviceId,
-                                hasDevice = hasDevice
+                        Icon(
+                            imageVector = IconParkIcons.Setting,
+                            contentDescription = null,
+                            tint = ControlVisualTokens.Primary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                            Text(
+                                text = l10n("镜像画质参数", "Mirror Settings"),
+                                color = ControlVisualTokens.Muted,
+                                fontSize = 11.sp
                             )
-                            OverviewMetric(
-                                modifier = Modifier.weight(1f),
-                                icon = IconParkIcons.Wifi,
-                                label = l10n("连接方式", "Connection"),
-                                value = if (hasDevice) connectionType else "--"
-                            )
-                        }
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            OverviewMetric(
-                                modifier = Modifier.weight(1f),
-                                icon = IconParkIcons.CastScreen,
-                                label = l10n("镜像状态", "Mirror status"),
-                                value = if (mirrorRunning) l10n("已启动", "Running") else l10n("未启动", "Not started")
-                            )
-                            MirrorSettingsCell(
-                                modifier = Modifier.weight(1f),
-                                summary = mirrorSettingsSummary(settings),
-                                onClick = onOpenSettings
+                            Text(
+                                text = mirrorSettingsSummary(settings),
+                                style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                                color = ControlVisualTokens.Text,
+                                fontWeight = FontWeight.Medium,
+                                fontSize = 11.5.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
                         }
                     }
+                    Icon(
+                        imageVector = IconParkIcons.Right,
+                        contentDescription = null,
+                        tint = ControlVisualTokens.Muted,
+                        modifier = Modifier.size(14.dp)
+                    )
                 }
             }
         }
     }
 }
 
+// ── Empty State & Illustration ────────────────────────────────────────────────
+
 @Composable
-private fun DeviceIdentityCell(
-    deviceDisplayName: String?,
-    deviceId: String?,
-    hasDevice: Boolean,
+private fun EmptyDeviceControlIllustration() {
+    val brand = QadbTokens.brand
+    val muted = QadbTokens.textMuted
+    val success = QadbTokens.success
+
+    Canvas(modifier = Modifier.size(96.dp, 72.dp)) {
+        val w = size.width
+        val h = size.height
+        val stroke = Stroke(width = 2f, cap = StrokeCap.Round)
+
+        // 1. Laptop / Desktop Screen on the Left
+        val screenW = w * 0.44f
+        val screenH = h * 0.54f
+        val screenX = w * 0.08f
+        val screenY = h * 0.16f
+
+        drawRoundRect(
+            color = brand.copy(alpha = 0.85f),
+            topLeft = Offset(screenX, screenY),
+            size = Size(screenW, screenH),
+            cornerRadius = CornerRadius(6f),
+            style = stroke
+        )
+        // Laptop base
+        drawLine(
+            color = brand.copy(alpha = 0.5f),
+            start = Offset(screenX - 8f, screenY + screenH + 6f),
+            end = Offset(screenX + screenW + 8f, screenY + screenH + 6f),
+            strokeWidth = 2.5f,
+            cap = StrokeCap.Round
+        )
+        // Inner screen playback icon / wireframe
+        drawRoundRect(
+            color = brand.copy(alpha = 0.15f),
+            topLeft = Offset(screenX + 5f, screenY + 5f),
+            size = Size(screenW - 10f, screenH - 10f),
+            cornerRadius = CornerRadius(3f)
+        )
+
+        // 2. Smartphone on the Right
+        val phoneW = w * 0.28f
+        val phoneH = h * 0.64f
+        val phoneX = w * 0.64f
+        val phoneY = h * 0.12f
+
+        drawRoundRect(
+            color = success.copy(alpha = 0.85f),
+            topLeft = Offset(phoneX, phoneY),
+            size = Size(phoneW, phoneH),
+            cornerRadius = CornerRadius(6f),
+            style = stroke
+        )
+        // Phone speaker notch
+        drawRoundRect(
+            color = success.copy(alpha = 0.5f),
+            topLeft = Offset(phoneX + phoneW * 0.32f, phoneY + 4f),
+            size = Size(phoneW * 0.36f, 2f),
+            cornerRadius = CornerRadius(1f)
+        )
+        // Phone home line
+        drawLine(
+            color = success.copy(alpha = 0.5f),
+            start = Offset(phoneX + phoneW * 0.3f, phoneY + phoneH - 5f),
+            end = Offset(phoneX + phoneW * 0.7f, phoneY + phoneH - 5f),
+            strokeWidth = 1.5f,
+            cap = StrokeCap.Round
+        )
+
+        // 3. Wireless transmission waves / Data packets between Laptop and Phone
+        val midY = h * 0.42f
+        val startX = screenX + screenW + 4f
+        val endX = phoneX - 4f
+
+        drawCircle(
+            color = brand.copy(alpha = 0.7f),
+            radius = 2.2f,
+            center = Offset(startX + (endX - startX) * 0.25f, midY - 6f)
+        )
+        drawCircle(
+            color = brand.copy(alpha = 0.9f),
+            radius = 2.8f,
+            center = Offset(startX + (endX - startX) * 0.5f, midY)
+        )
+        drawCircle(
+            color = success.copy(alpha = 0.7f),
+            radius = 2.2f,
+            center = Offset(startX + (endX - startX) * 0.75f, midY + 6f)
+        )
+    }
+}
+
+@Composable
+private fun DeviceControlEmptyState(
     modifier: Modifier = Modifier
 ) {
+    FramedStateSurface(
+        modifier = modifier
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = UiTokens.SpaceXXLarge, vertical = 28.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium)
+        ) {
+            EmptyDeviceControlIllustration()
+
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    text = l10n("未连接 Android 设备", "No Android Device Connected"),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = ControlVisualTokens.Text,
+                    fontSize = 15.sp
+                )
+                Text(
+                    text = l10n(
+                        "通过 USB 数据线或无线调试 (Wi‑Fi) 将设备连接至电脑，即可进行实时屏幕镜像与物理按键协同调试",
+                        "Connect your Android device via USB or Wi‑Fi debugging to enable real-time mirror and hardware key controls"
+                    ),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = ControlVisualTokens.Muted,
+                    fontSize = 12.sp
+                )
+            }
+
+            // Quick Guidance Checklist
+            Row(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(UiTokens.RadiusMedium))
+                    .background(ControlVisualTokens.Soft.copy(alpha = 0.6f))
+                    .border(1.dp, ControlVisualTokens.Border, RoundedCornerShape(UiTokens.RadiusMedium))
+                    .padding(horizontal = 16.dp, vertical = 10.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                GuidanceStepItem(step = "1", text = l10n("开启「USB 调试」", "Enable USB debugging"))
+                GuidanceStepDivider()
+                GuidanceStepItem(step = "2", text = l10n("授权电脑 ADB 密钥", "Authorize ADB key"))
+                GuidanceStepDivider()
+                GuidanceStepItem(step = "3", text = l10n("在顶部选择目标设备", "Select device in top bar"))
+            }
+        }
+    }
+}
+
+@Composable
+private fun GuidanceStepItem(step: String, text: String) {
     Row(
-        modifier = modifier,
-        verticalAlignment = Alignment.CenterVertically
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
     ) {
         Box(
             modifier = Modifier
-                .size(44.dp)
-                .background(
-                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f),
-                    shape = RoundedCornerShape(UiTokens.RadiusMedium)
-                ),
+                .size(18.dp)
+                .clip(CircleShape)
+                .background(ControlVisualTokens.Primary.copy(alpha = 0.15f)),
             contentAlignment = Alignment.Center
         ) {
-            Icon(
-                imageVector = IconParkIcons.Devices,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(22.dp)
-            )
-        }
-        Spacer(Modifier.width(UiTokens.SpaceMedium))
-        Column(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceXSmall)
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = deviceDisplayName?.takeIf { it.isNotBlank() }
-                        ?: deviceId
-                        ?: l10n("未选择设备", "No device selected"),
-                    modifier = Modifier.weight(1f, fill = false),
-                    color = MaterialTheme.colorScheme.onSurface,
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = UiTokens.TextBodyLarge,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                if (hasDevice) {
-                    Spacer(Modifier.width(UiTokens.SpaceSmall))
-                    Text(
-                        text = l10n("已连接", "Connected"),
-                        modifier = Modifier
-                            .background(
-                                color = QadbPalette.Green.copy(alpha = 0.12f),
-                                shape = RoundedCornerShape(UiTokens.RadiusSmall)
-                            )
-                            .padding(horizontal = UiTokens.SpaceSmall, vertical = UiTokens.SpaceXSmall),
-                        color = QadbPalette.Green,
-                        fontSize = UiTokens.TextCaption,
-                        fontWeight = FontWeight.Medium
-                    )
-                }
-            }
             Text(
-                text = deviceId ?: "--",
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                fontSize = UiTokens.TextBody,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+                text = step,
+                color = ControlVisualTokens.Primary,
+                fontSize = 10.5.sp,
+                fontWeight = FontWeight.Bold
             )
         }
+        Text(
+            text = text,
+            color = ControlVisualTokens.Text,
+            fontSize = 11.5.sp,
+            fontWeight = FontWeight.Medium
+        )
     }
 }
 
 @Composable
-private fun MirrorSettingsCell(
-    summary: String,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val interactionSource = remember { MutableInteractionSource() }
-    val hovered by interactionSource.collectIsHoveredAsState()
-    val background by animateColorAsState(
-        targetValue = if (hovered) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f) else Color.Transparent,
-        animationSpec = tween(UiTokens.HoverDurationMillis),
-        label = "settingsCellBg"
+private fun GuidanceStepDivider() {
+    Box(
+        modifier = Modifier
+            .width(1.dp)
+            .height(14.dp)
+            .background(ControlVisualTokens.Divider.copy(alpha = 0.6f))
     )
-    Row(
-        modifier = modifier
-            .clip(RoundedCornerShape(UiTokens.RadiusMedium))
-            .background(background)
-            .clickable(interactionSource = interactionSource, indication = null, onClick = onClick)
-            .padding(horizontal = UiTokens.SpaceMedium, vertical = UiTokens.SpaceSmall),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(
-            imageVector = IconParkIcons.Setting,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(UiTokens.IconLarge)
-        )
-        Spacer(Modifier.width(UiTokens.SpaceMedium))
-        Column(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceXSmall)
-        ) {
-            Text(
-                text = l10n("镜像设置", "Mirror settings"),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                fontSize = UiTokens.TextBody
-            )
-            Text(
-                text = summary,
-                color = MaterialTheme.colorScheme.onSurface,
-                fontSize = UiTokens.TextBody,
-                fontWeight = FontWeight.Medium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
-        Icon(
-            imageVector = IconParkIcons.Right,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(UiTokens.IconMedium)
-        )
-    }
 }
 
-@Composable
-private fun OverviewMetric(
-    label: String,
-    value: String,
-    icon: ImageVector,
-    modifier: Modifier = Modifier
-) {
-    Row(
-        modifier = modifier
-            .padding(horizontal = UiTokens.SpaceMedium, vertical = UiTokens.SpaceSmall),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.Center
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(UiTokens.IconLarge)
-        )
-        Spacer(Modifier.width(UiTokens.SpaceMedium))
-        Column(verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceXSmall)) {
-            Text(
-                text = label,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                fontSize = UiTokens.TextBody,
-                maxLines = 1
-            )
-            Text(
-                text = value,
-                color = MaterialTheme.colorScheme.onSurface,
-                fontWeight = FontWeight.Medium,
-                fontSize = UiTokens.TextBody,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
-    }
-}
+// ── Metrics & Helpers ─────────────────────────────────────────────────────────
 
 @Composable
 private fun OverviewDivider() {
     Box(
         modifier = Modifier
-            .width(UiTokens.BorderWidth)
-            .height(40.dp)
-            .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
+            .width(1.dp)
+            .height(30.dp)
+            .background(ControlVisualTokens.Divider.copy(alpha = 0.5f))
     )
 }
 

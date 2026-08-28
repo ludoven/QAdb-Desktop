@@ -11,7 +11,7 @@ import compose.icons.tablericons.*
  * every vector is supplied by Tabler Icons (MIT, outline style).
  */
 object IconParkIcons {
-    val AiAssistant: ImageVector get() = TablerIcons.MessageCircle2
+    val AiAssistant: ImageVector get() = TablerIcons.Stars
     val Application: ImageVector get() = TablerIcons.Apps
     val ArrowDown: ImageVector get() = TablerIcons.ChevronDown
     val BatteryFull: ImageVector get() = TablerIcons.Battery4
@@ -19,7 +19,12 @@ object IconParkIcons {
     val CastScreen: ImageVector get() = TablerIcons.Cast
     val ChartLine: ImageVector get() = TablerIcons.ChartLine
     val CheckCircle: ImageVector get() = TablerIcons.CircleCheck
+    val ChevronUp: ImageVector get() = TablerIcons.ChevronUp
+    val ChevronLeft: ImageVector get() = TablerIcons.ChevronLeft
     val Close: ImageVector get() = TablerIcons.X
+    val Eye: ImageVector get() = TablerIcons.Eye
+    val ShieldAlert: ImageVector get() = TablerIcons.ShieldX
+    val Star: ImageVector get() = TablerIcons.Star
     val Code: ImageVector get() = TablerIcons.Code
     val Command: ImageVector get() = TablerIcons.Command
     val Cpu: ImageVector get() = TablerIcons.Server
@@ -51,4 +56,10 @@ object IconParkIcons {
     val Time: ImageVector get() = TablerIcons.Clock
     val Video: ImageVector get() = TablerIcons.Video
     val Wifi: ImageVector get() = TablerIcons.Wifi
+    val Usb: ImageVector get() = TablerIcons.Plug
+    val ShieldCheck: ImageVector get() = TablerIcons.ShieldCheck
+    val Bulb: ImageVector get() = TablerIcons.Bulb
+    val Help: ImageVector get() = TablerIcons.Help
+    val Sparkles: ImageVector get() = TablerIcons.Wand
+    val Plug: ImageVector get() = TablerIcons.Plug
 }

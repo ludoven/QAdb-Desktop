@@ -50,7 +50,7 @@
     <string name="file_browser_empty">This folder is empty</string>
     <string name="file_browser_retry">Retry</string>
     <string name="install_apk_short">Install APK</string>
-    <string name="select_device_hint">Please select a device to view its information.</string>
+    <string name="select_device_hint">Connect a device to get started</string>
     <string name="no_device_info">Unable to retrieve device details.</string>
     <string name="recent_activity">Recent Activity</string>
     <string name="activity_installed_apk">Installed app.apk</string>
@@ -276,6 +276,10 @@
     <string name="settings_pref_auto_detect_desc">Run device detection automatically when app starts</string>
     <string name="settings_pref_remember_device_title">Remember last connected device</string>
     <string name="settings_pref_remember_device_desc">Prefer restoring the last device on next launch</string>
+    <string name="settings_pref_minimize_on_launch_title">Minimize to tray after launch</string>
+    <string name="settings_pref_minimize_on_launch_desc">Hide the main window next time and reopen it from the system tray</string>
+    <string name="settings_pref_minimize_on_close_title">Minimize to tray when closing</string>
+    <string name="settings_pref_minimize_on_close_desc">Keep QADB running in the background when the window is closed</string>
     <string name="settings_status_label">Status</string>
     <string name="settings_adb_source_desc">Current active ADB source</string>
     <string name="settings_adb_path_desc">Current executable path</string>
@@ -839,4 +843,45 @@
     <string name="wireless_error_authentication">The device rejected authentication. Remove the old pairing and pair again.</string>
     <string name="wireless_error_resolution">The device address could not be resolved. Check the host name or use an IP address.</string>
     <string name="wireless_error_command">ADB could not complete the operation. Use the raw message below to troubleshoot.</string>
+
+    <!-- AI Agent Workbench (Linear-Class) -->
+    <string name="agent_topbar_android">Android %1$s · API %2$s</string>
+    <string name="agent_topbar_android_unknown">Android --</string>
+    <string name="agent_obs_mode_title">Vision observation mode</string>
+    <string name="agent_obs_watching">AI is watching your screen</string>
+    <string name="agent_obs_paused">Observation paused</string>
+    <string name="agent_obs_on">On</string>
+    <string name="agent_obs_off">Off</string>
+    <string name="agent_obs_recent">Last observed %1$s · %2$s</string>
+    <string name="agent_obs_ago">%1$s ago</string>
+    <string name="agent_obs_freq">A frame every %1$s</string>
+    <string name="agent_obs_observing">Observing</string>
+    <string name="agent_obs_switch_desc">Toggle vision observation mode</string>
+    <string name="agent_page_id">Page id: %1$s</string>
+    <string name="agent_changed">changed</string>
+    <string name="agent_stable">stable</string>
+    <string name="agent_token_title">Token usage</string>
+    <string name="agent_token_compacted">Compacted %1$d times</string>
+    <string name="agent_token_usage">%1$s / %2$s tokens</string>
+    <string name="agent_token_remaining">Remaining %1$s</string>
+    <string name="agent_token_meter_desc">Token usage %1$s / %2$s, %3$s remaining</string>
+    <string name="agent_think_title">Thinking</string>
+    <string name="agent_confirm_title">%1$s is a sensitive operation</string>
+    <string name="agent_confirm_send">Confirm and send</string>
+    <string name="agent_confirm_execute">Confirm and execute</string>
+    <string name="agent_activity_progress">Task progress</string>
+    <string name="agent_activity_steps_done">%1$d steps · %2$d done</string>
+    <string name="agent_badge_completed">Completed</string>
+    <string name="agent_badge_in_progress">In progress</string>
+    <string name="agent_badge_waiting">Needs confirmation</string>
+    <string name="agent_badge_failed">Failed</string>
+    <string name="agent_badge_cancelled">Cancelled</string>
+    <string name="agent_tool_done">Executed</string>
+    <string name="agent_expand">Expand</string>
+    <string name="agent_collapse">Collapse</string>
+    <string name="agent_cmd_prefix">$ adb shell %1$s</string>
+    <string name="agent_cmd_result">→ %1$s</string>
+    <string name="agent_collapse_panel">Collapse panel</string>
+    <string name="agent_expand_panel">Expand device panel</string>
+    <string name="agent_avatar_desc">AI assistant</string>
 </resources>

@@ -247,10 +247,11 @@ fun CommonScreen(
     val selectedCommand = filteredCommands.firstOrNull { it.id == selectedCommandId }
         ?: mergedCommands.firstOrNull { it.id == selectedCommandId }
         ?: filteredCommands.firstOrNull()
-        ?: mergedCommands.first()
+        ?: mergedCommands.firstOrNull()
 
     val resolvedCommandPreview by remember(selectedCommand, selectedDevice, packageNameInput, shellCommandInput, textInput) {
         derivedStateOf {
+            if (selectedCommand == null) return@derivedStateOf ""
             when (selectedCommand.trigger) {
                 CommandTrigger.PACKAGE_INPUT -> {
                     val pkg = packageNameInput.trim().ifEmpty { "com.example.app" }
@@ -605,7 +606,10 @@ private fun rememberCommandLibrary(): List<CommandItemUi> {
 
 private fun loadCommandLibraryFromConfig(): List<CommandItemUi> {
     val fileName = if (l10n("zh", "en") == "en") "adb_commands_en.json" else "adb_commands.json"
-    val stream = Thread.currentThread().contextClassLoader.getResourceAsStream(fileName)
+    val stream = CommonModel::class.java.classLoader?.getResourceAsStream(fileName)
+        ?: CommonModel::class.java.getResourceAsStream("/$fileName")
+        ?: Thread.currentThread().contextClassLoader?.getResourceAsStream(fileName)
+        ?: ClassLoader.getSystemResourceAsStream(fileName)
         ?: return emptyList()
 
     val jsonText = InputStreamReader(stream).use { it.readText() }
@@ -1174,7 +1178,7 @@ private fun CommandListItem(
 
 @Composable
 private fun CommandDetailPanel(
-    selectedCommand: CommandItemUi,
+    selectedCommand: CommandItemUi?,
     resolvedCommandPreview: String,
     selectedDevice: String?,
     packageNameInput: String,
@@ -1190,6 +1194,20 @@ private fun CommandDetailPanel(
     canRunCommand: Boolean,
     modifier: Modifier = Modifier
 ) {
+    if (selectedCommand == null) {
+        Box(
+            modifier = modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = l10n("请从左侧选择一条命令", "Select a command from the left"),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        return
+    }
+
     Column(
         modifier = modifier.fillMaxHeight(),
         verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium)

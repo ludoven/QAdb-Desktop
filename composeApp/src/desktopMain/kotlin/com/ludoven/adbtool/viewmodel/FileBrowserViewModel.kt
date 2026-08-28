@@ -33,6 +33,7 @@ internal fun fileListLoadShouldApply(
 class FileBrowserViewModel : BaseViewModel() {
 
     companion object {
+        private val SPACES_REGEX = Regex("\\s+")
         val QUICK_PATHS = listOf(
             "/" to "根目录",
             "/sdcard" to "内部存储",
@@ -457,7 +458,7 @@ class FileBrowserViewModel : BaseViewModel() {
             // Skip total line and empty lines
             if (trimmed.isBlank() || trimmed.startsWith("total")) continue
 
-            val parts = trimmed.split(Regex("\\s+"))
+            val parts = trimmed.split(SPACES_REGEX)
             if (parts.size < 7) continue
 
             val perms = parts[0]

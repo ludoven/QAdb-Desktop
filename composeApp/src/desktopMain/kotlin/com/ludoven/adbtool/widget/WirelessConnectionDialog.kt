@@ -1,8 +1,10 @@
 package com.ludoven.adbtool.widget
 
 import adbtool_desktop.composeapp.generated.resources.*
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
@@ -55,6 +57,8 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -69,6 +73,7 @@ import com.ludoven.adbtool.ui.icons.IconParkIcons
 import com.ludoven.adbtool.util.WirelessAdbIssue
 import com.ludoven.adbtool.util.WirelessAdbOperation
 import com.ludoven.adbtool.util.WirelessAdbOperationResult
+import com.ludoven.adbtool.util.l10n
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
 
@@ -96,21 +101,21 @@ private data class WirelessDialogColors(
 )
 
 private val DialogTitleStyle = TextStyle(
-    fontSize = 17.sp,
+    fontSize = 16.sp,
     lineHeight = 22.sp,
-    fontWeight = FontWeight.SemiBold
+    fontWeight = FontWeight.Bold
 )
 private val SectionLabelStyle = TextStyle(
     fontSize = 12.sp,
     lineHeight = 16.sp,
-    fontWeight = FontWeight.Medium
+    fontWeight = FontWeight.SemiBold
 )
 private val BodyStyle = TextStyle(fontSize = 13.sp, lineHeight = 19.sp)
 private val CaptionStyle = TextStyle(fontSize = 12.sp, lineHeight = 17.sp)
 private val ActionStyle = TextStyle(
     fontSize = 13.sp,
     lineHeight = 18.sp,
-    fontWeight = FontWeight.Medium
+    fontWeight = FontWeight.SemiBold
 )
 
 @Composable
@@ -189,28 +194,35 @@ fun WirelessConnectionDialog(
     }
 
     Dialog(onDismissRequest = { if (!isRunning) onDismiss() }) {
+        val shape = RoundedCornerShape(16.dp)
         Column(
             modifier = Modifier
-                .width(560.dp)
-                .heightIn(max = 720.dp)
-                .shadow(18.dp, RoundedCornerShape(UiTokens.RadiusLarge))
-                .background(colors.surface, RoundedCornerShape(UiTokens.RadiusLarge))
-                .border(UiTokens.BorderWidth, colors.border, RoundedCornerShape(UiTokens.RadiusLarge))
+                .width(520.dp)
+                .heightIn(max = 680.dp)
+                .shadow(24.dp, shape)
+                .clip(shape)
+                .background(colors.surface)
+                .border(1.dp, colors.border, shape)
         ) {
+            // 1. Dialog Header
             WirelessDialogHeader(
                 colors = colors,
                 enabled = !isRunning,
                 onDismiss = onDismiss
             )
-            WirelessDivider(colors.border)
+
+            WirelessDivider(colors.border.copy(alpha = 0.6f))
+
+            // 2. Dialog Content Body
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(max = 570.dp)
+                    .heightIn(max = 520.dp)
                     .verticalScroll(rememberScrollState())
-                    .padding(UiTokens.SpaceXLarge),
-                verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceLarge)
+                    .padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
+                // Mode Segmented Capsule Selector
                 WirelessModeSelector(
                     selectedMode = mode,
                     enabled = !isRunning,
@@ -234,6 +246,15 @@ fun WirelessConnectionDialog(
                         enabled = !isRunning,
                         colors = colors
                     )
+
+                    WirelessHelperTip(
+                        text = l10n(
+                            "提示：手机与电脑需连接同一 Wi-Fi。在手机「设置 > 开发者选项 > 无线调试」中查看 IP 地址与端口号。",
+                            "Tip: Connect phone and PC to same Wi-Fi. View IP & port in Settings > Developer Options > Wireless Debugging."
+                        ),
+                        colors = colors
+                    )
+
                     if (history.isNotEmpty()) {
                         WirelessConnectionHistory(
                             history = history,
@@ -264,15 +285,27 @@ fun WirelessConnectionDialog(
                         },
                         label = stringResource(Res.string.wireless_pairing_code_label),
                         placeholder = stringResource(Res.string.wireless_pairing_code_hint),
+                        icon = IconParkIcons.Code,
                         enabled = !isRunning,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        colors = colors
+                    )
+
+                    WirelessHelperTip(
+                        text = l10n(
+                            "提示：在手机「无线调试 > 使用配对码配对设备」弹窗中，查看 6 位配对码以及对应的配对端口号。",
+                            "Tip: Tap 'Pair device with pairing code' in Wireless Debugging to view 6-digit code and pairing port."
+                        ),
                         colors = colors
                     )
                 }
 
                 result?.let { WirelessOperationStatus(it, colors) }
             }
-            WirelessDivider(colors.border)
+
+            WirelessDivider(colors.border.copy(alpha = 0.6f))
+
+            // 3. Dialog Footer
             WirelessDialogFooter(
                 mode = mode,
                 isRunning = isRunning,
@@ -299,24 +332,27 @@ private fun WirelessDialogHeader(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(
-                start = UiTokens.SpaceXLarge,
-                top = UiTokens.SpaceLarge,
-                end = UiTokens.SpaceMedium,
-                bottom = UiTokens.SpaceLarge
-            ),
+            .padding(horizontal = 20.dp, vertical = 16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        WirelessIcon(
-            imageVector = IconParkIcons.Wifi,
-            contentDescription = null,
-            tint = colors.accent,
-            modifier = Modifier.size(UiTokens.IconLarge)
-        )
+        Box(
+            modifier = Modifier
+                .size(38.dp)
+                .clip(RoundedCornerShape(10.dp))
+                .background(colors.accent.copy(alpha = 0.12f)),
+            contentAlignment = Alignment.Center
+        ) {
+            WirelessIcon(
+                imageVector = IconParkIcons.Wifi,
+                contentDescription = null,
+                tint = colors.accent,
+                modifier = Modifier.size(20.dp)
+            )
+        }
         Column(
             modifier = Modifier
                 .weight(1f)
-                .padding(horizontal = UiTokens.SpaceMedium),
+                .padding(horizontal = 14.dp),
             verticalArrangement = Arrangement.spacedBy(2.dp)
         ) {
             BasicText(
@@ -340,6 +376,9 @@ private fun WirelessDialogHeader(
     }
 }
 
+/**
+ * Modern Segmented Capsule Switcher (iOS / macOS style).
+ */
 @Composable
 private fun WirelessModeSelector(
     selectedMode: WirelessDialogMode,
@@ -347,15 +386,19 @@ private fun WirelessModeSelector(
     colors: WirelessDialogColors,
     onSelected: (WirelessDialogMode) -> Unit
 ) {
+    val shape = RoundedCornerShape(10.dp)
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .border(UiTokens.BorderWidth, colors.border, RoundedCornerShape(UiTokens.RadiusSmall))
-            .padding(horizontal = UiTokens.SpaceXSmall),
-        horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceXSmall)
+            .clip(shape)
+            .background(colors.surfaceHover.copy(alpha = 0.6f))
+            .border(1.dp, colors.border.copy(alpha = 0.5f), shape)
+            .padding(3.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         WirelessModeTab(
             text = stringResource(Res.string.wireless_mode_connect),
+            icon = IconParkIcons.Wifi,
             selected = selectedMode == WirelessDialogMode.CONNECT,
             enabled = enabled,
             colors = colors,
@@ -364,6 +407,7 @@ private fun WirelessModeSelector(
         )
         WirelessModeTab(
             text = stringResource(Res.string.wireless_mode_pair),
+            icon = IconParkIcons.ShieldCheck,
             selected = selectedMode == WirelessDialogMode.PAIR,
             enabled = enabled,
             colors = colors,
@@ -376,6 +420,7 @@ private fun WirelessModeSelector(
 @Composable
 private fun WirelessModeTab(
     text: String,
+    icon: ImageVector,
     selected: Boolean,
     enabled: Boolean,
     colors: WirelessDialogColors,
@@ -384,17 +429,33 @@ private fun WirelessModeTab(
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val hovered by interactionSource.collectIsHoveredAsState()
+    val tabShape = RoundedCornerShape(8.dp)
+
+    val background = when {
+        selected -> colors.surface
+        hovered && enabled -> colors.surface.copy(alpha = 0.5f)
+        else -> Color.Transparent
+    }
     val textColor = when {
         !enabled -> colors.textDisabled
         selected -> colors.accent
         else -> colors.textSecondary
     }
-    Column(
+    val borderModifier = if (selected) {
+        Modifier.border(1.dp, colors.border.copy(alpha = 0.4f), tabShape)
+    } else {
+        Modifier
+    }
+
+    Box(
         modifier = modifier
-            .height(38.dp)
-            .clip(RoundedCornerShape(UiTokens.RadiusSmall))
-            .background(if (hovered && enabled) colors.surfaceHover else Color.Transparent)
+            .height(34.dp)
+            .shadow(if (selected) 2.dp else 0.dp, tabShape, clip = false)
+            .clip(tabShape)
+            .background(background)
+            .then(borderModifier)
             .hoverable(interactionSource, enabled)
+            .pointerHoverIcon(if (enabled) PointerIcon.Hand else PointerIcon.Default)
             .clickable(
                 interactionSource = interactionSource,
                 indication = null,
@@ -402,17 +463,26 @@ private fun WirelessModeTab(
                 role = Role.Tab,
                 onClick = onClick
             ),
-        horizontalAlignment = Alignment.CenterHorizontally
+        contentAlignment = Alignment.Center
     ) {
-        Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
-            BasicText(text = text, style = ActionStyle.copy(color = textColor))
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            WirelessIcon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = textColor,
+                modifier = Modifier.size(15.dp)
+            )
+            BasicText(
+                text = text,
+                style = ActionStyle.copy(
+                    color = textColor,
+                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium
+                )
+            )
         }
-        Box(
-            modifier = Modifier
-                .width(44.dp)
-                .height(2.dp)
-                .background(if (selected) colors.accent else Color.Transparent)
-        )
     }
 }
 
@@ -430,12 +500,18 @@ private fun DesktopTextField(
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val focused by interactionSource.collectIsFocusedAsState()
-    val shape = RoundedCornerShape(UiTokens.RadiusSmall)
-    val borderColor = when {
-        !enabled -> colors.border.copy(alpha = 0.55f)
-        focused -> colors.accent
-        else -> colors.borderStrong
-    }
+    val hovered by interactionSource.collectIsHoveredAsState()
+    val shape = RoundedCornerShape(10.dp)
+
+    val borderColor by animateColorAsState(
+        targetValue = when {
+            !enabled -> colors.border.copy(alpha = 0.4f)
+            focused -> colors.accent
+            hovered -> colors.accent.copy(alpha = 0.45f)
+            else -> colors.borderStrong.copy(alpha = 0.65f)
+        },
+        animationSpec = tween(UiTokens.HoverDurationMillis)
+    )
     val textColor = if (enabled) colors.textPrimary else colors.textDisabled
 
     Column(
@@ -445,7 +521,7 @@ private fun DesktopTextField(
         BasicText(
             text = label,
             style = SectionLabelStyle.copy(
-                color = if (focused && enabled) colors.accent else colors.textSecondary
+                color = if (focused && enabled) colors.accent else colors.textPrimary
             )
         )
         BasicTextField(
@@ -453,10 +529,11 @@ private fun DesktopTextField(
             onValueChange = onValueChange,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(UiTokens.InputHeight)
+                .height(42.dp)
                 .clip(shape)
                 .background(if (enabled) colors.surface else colors.surfaceDisabled)
-                .border(UiTokens.BorderWidth, borderColor, shape),
+                .border(if (focused) 1.5.dp else 1.dp, borderColor, shape)
+                .hoverable(interactionSource),
             enabled = enabled,
             singleLine = true,
             interactionSource = interactionSource,
@@ -467,17 +544,17 @@ private fun DesktopTextField(
                 Row(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(horizontal = UiTokens.SpaceMedium),
+                        .padding(horizontal = 12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     icon?.let {
                         WirelessIcon(
                             imageVector = it,
                             contentDescription = null,
-                            tint = if (enabled) colors.textSecondary else colors.textDisabled,
-                            modifier = Modifier.size(UiTokens.IconSmall)
+                            tint = if (focused && enabled) colors.accent else (if (enabled) colors.textSecondary else colors.textDisabled),
+                            modifier = Modifier.size(16.dp)
                         )
-                        Spacer(Modifier.width(UiTokens.SpaceSmall))
+                        Spacer(Modifier.width(10.dp))
                     }
                     Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
                         if (value.isEmpty()) {
@@ -497,6 +574,34 @@ private fun DesktopTextField(
 }
 
 @Composable
+private fun WirelessHelperTip(
+    text: String,
+    colors: WirelessDialogColors
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(8.dp))
+            .background(colors.surfaceHover.copy(alpha = 0.45f))
+            .border(1.dp, colors.border.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        WirelessIcon(
+            imageVector = IconParkIcons.Bulb,
+            contentDescription = null,
+            tint = Color(0xFFFF9F0A),
+            modifier = Modifier.size(14.dp)
+        )
+        BasicText(
+            text = text,
+            style = CaptionStyle.copy(color = colors.textSecondary, lineHeight = 16.sp)
+        )
+    }
+}
+
+@Composable
 private fun WirelessConnectionHistory(
     history: List<String>,
     enabled: Boolean,
@@ -504,6 +609,7 @@ private fun WirelessConnectionHistory(
     onReconnect: (String) -> Unit,
     onRemove: (String) -> Unit
 ) {
+    val shape = RoundedCornerShape(10.dp)
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         BasicText(
             text = stringResource(Res.string.wireless_recent_title),
@@ -512,27 +618,29 @@ private fun WirelessConnectionHistory(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .border(UiTokens.BorderWidth, colors.border, RoundedCornerShape(UiTokens.RadiusSmall))
+                .clip(shape)
+                .background(colors.surface)
+                .border(1.dp, colors.border.copy(alpha = 0.6f), shape)
         ) {
             history.forEachIndexed { index, endpoint ->
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .heightIn(min = UiTokens.ListRowHeight)
-                        .padding(horizontal = UiTokens.SpaceMedium, vertical = 6.dp),
+                        .heightIn(min = 40.dp)
+                        .padding(horizontal = 12.dp, vertical = 6.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     WirelessIcon(
                         imageVector = IconParkIcons.Time,
                         contentDescription = null,
                         tint = colors.textSecondary,
-                        modifier = Modifier.size(UiTokens.IconSmall)
+                        modifier = Modifier.size(14.dp)
                     )
                     BasicText(
                         text = endpoint,
                         modifier = Modifier
                             .weight(1f)
-                            .padding(horizontal = UiTokens.SpaceMedium),
+                            .padding(horizontal = 10.dp),
                         style = BodyStyle.copy(color = colors.textPrimary),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
@@ -544,7 +652,7 @@ private fun WirelessConnectionHistory(
                         disabledColor = colors.textDisabled,
                         onClick = { onReconnect(endpoint) }
                     )
-                    Spacer(Modifier.width(UiTokens.SpaceSmall))
+                    Spacer(Modifier.width(8.dp))
                     DesktopLinkAction(
                         text = stringResource(Res.string.wireless_remove_history),
                         enabled = enabled,
@@ -553,7 +661,9 @@ private fun WirelessConnectionHistory(
                         onClick = { onRemove(endpoint) }
                     )
                 }
-                if (index < history.lastIndex) WirelessDivider(colors.border)
+                if (index < history.lastIndex) {
+                    WirelessDivider(colors.border.copy(alpha = 0.4f))
+                }
             }
         }
     }
@@ -566,6 +676,7 @@ private fun WirelessOperationStatus(
 ) {
     val containerColor = if (result.success) colors.successSurface else colors.dangerSurface
     val contentColor = if (result.success) colors.success else colors.danger
+    val shape = RoundedCornerShape(10.dp)
     val message = when {
         result.success && result.operation == WirelessAdbOperation.CONNECT ->
             stringResource(Res.string.wireless_connect_success, result.endpoint.orEmpty())
@@ -573,29 +684,38 @@ private fun WirelessOperationStatus(
         else -> wirelessIssueMessage(result.issue)
     }
 
-    Column(
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(containerColor, RoundedCornerShape(UiTokens.RadiusSmall))
-            .border(
-                UiTokens.BorderWidth,
-                contentColor.copy(alpha = 0.22f),
-                RoundedCornerShape(UiTokens.RadiusSmall)
-            )
-            .padding(UiTokens.SpaceMedium),
-        verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceXSmall)
+            .clip(shape)
+            .background(containerColor)
+            .border(1.dp, contentColor.copy(alpha = 0.25f), shape)
+            .padding(14.dp),
+        verticalAlignment = Alignment.Top,
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        BasicText(
-            text = message,
-            style = BodyStyle.copy(color = contentColor, fontWeight = FontWeight.Medium)
+        WirelessIcon(
+            imageVector = if (result.success) IconParkIcons.CheckCircle else IconParkIcons.ShieldAlert,
+            contentDescription = null,
+            tint = contentColor,
+            modifier = Modifier.size(18.dp)
         )
-        if (!result.success && result.detail.isNotBlank()) {
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
             BasicText(
-                text = result.detail,
-                style = CaptionStyle.copy(color = colors.textSecondary),
-                maxLines = 4,
-                overflow = TextOverflow.Ellipsis
+                text = message,
+                style = BodyStyle.copy(color = contentColor, fontWeight = FontWeight.SemiBold)
             )
+            if (!result.success && result.detail.isNotBlank()) {
+                BasicText(
+                    text = result.detail,
+                    style = CaptionStyle.copy(color = colors.textSecondary),
+                    maxLines = 4,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
         }
     }
 }
@@ -611,7 +731,7 @@ private fun WirelessDialogFooter(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = UiTokens.SpaceXLarge, vertical = UiTokens.SpaceMedium),
+            .padding(horizontal = 20.dp, vertical = 14.dp),
         horizontalArrangement = Arrangement.End,
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -622,7 +742,7 @@ private fun WirelessDialogFooter(
             colors = colors,
             onClick = onDismiss
         )
-        Spacer(Modifier.width(UiTokens.SpaceSmall))
+        Spacer(Modifier.width(10.dp))
         DesktopActionButton(
             text = stringResource(
                 if (mode == WirelessDialogMode.CONNECT) {
@@ -652,52 +772,69 @@ private fun DesktopActionButton(
     val interactionSource = remember { MutableInteractionSource() }
     val hovered by interactionSource.collectIsHoveredAsState()
     val pressed by interactionSource.collectIsPressedAsState()
-    val shape = RoundedCornerShape(UiTokens.RadiusSmall)
-    val background = when {
-        !enabled -> colors.surfaceDisabled
-        primary && pressed -> colors.accent.copy(alpha = 0.82f)
-        primary && hovered -> colors.accent.copy(alpha = 0.90f)
-        primary -> colors.accent
-        pressed -> colors.surfaceHover.copy(alpha = 0.82f)
-        hovered -> colors.surfaceHover
-        else -> colors.surface
-    }
+    val shape = RoundedCornerShape(10.dp)
+
+    val background by animateColorAsState(
+        targetValue = when {
+            !enabled -> colors.surfaceDisabled
+            primary && pressed -> colors.accent.copy(alpha = 0.78f)
+            primary && hovered -> colors.accent.copy(alpha = 0.88f)
+            primary -> colors.accent
+            pressed -> colors.accent.copy(alpha = 0.14f)
+            hovered -> colors.accent.copy(alpha = 0.08f)
+            else -> colors.surface
+        },
+        animationSpec = tween(UiTokens.HoverDurationMillis)
+    )
+    val borderColor by animateColorAsState(
+        targetValue = when {
+            !enabled -> colors.border.copy(alpha = 0.4f)
+            primary -> colors.accent
+            hovered -> colors.accent.copy(alpha = 0.65f)
+            else -> colors.borderStrong.copy(alpha = 0.7f)
+        },
+        animationSpec = tween(UiTokens.HoverDurationMillis)
+    )
+    val elevation by animateDpAsState(
+        targetValue = if (hovered && enabled && !loading) (if (primary) 3.dp else 1.dp) else 0.dp,
+        animationSpec = tween(UiTokens.HoverDurationMillis)
+    )
+
     val contentColor = when {
         !enabled -> colors.textDisabled
         primary -> colors.onAccent
+        hovered -> colors.accent
         else -> colors.textPrimary
     }
 
     Row(
         modifier = Modifier
-            .widthIn(min = 88.dp)
-            .height(36.dp)
+            .widthIn(min = 92.dp)
+            .height(38.dp)
+            .shadow(elevation, shape, clip = false)
             .clip(shape)
             .background(background)
-            .border(
-                UiTokens.BorderWidth,
-                if (primary && enabled) colors.accent else colors.borderStrong,
-                shape
-            )
+            .border(1.dp, borderColor, shape)
             .hoverable(interactionSource, enabled)
+            .pointerHoverIcon(if (enabled && !loading) PointerIcon.Hand else PointerIcon.Default)
             .focusable(enabled, interactionSource)
             .clickable(
                 interactionSource = interactionSource,
                 indication = null,
-                enabled = enabled,
+                enabled = enabled && !loading,
                 role = Role.Button,
                 onClick = onClick
             )
-            .padding(horizontal = UiTokens.SpaceLarge),
+            .padding(horizontal = 18.dp),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically
     ) {
         if (loading) {
             DesktopLoadingIndicator(
                 color = contentColor,
-                modifier = Modifier.size(UiTokens.IconSmall)
+                modifier = Modifier.size(15.dp)
             )
-            Spacer(Modifier.width(UiTokens.SpaceSmall))
+            Spacer(Modifier.width(8.dp))
         }
         BasicText(text = text, style = ActionStyle.copy(color = contentColor))
     }
@@ -713,12 +850,19 @@ private fun DesktopLinkAction(
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val hovered by interactionSource.collectIsHoveredAsState()
-    BasicText(
-        text = text,
+    val shape = RoundedCornerShape(6.dp)
+
+    Box(
         modifier = Modifier
-            .clip(RoundedCornerShape(UiTokens.RadiusSmall))
+            .clip(shape)
             .background(if (hovered && enabled) color.copy(alpha = 0.08f) else Color.Transparent)
+            .border(
+                1.dp,
+                if (hovered && enabled) color.copy(alpha = 0.3f) else Color.Transparent,
+                shape
+            )
             .hoverable(interactionSource, enabled)
+            .pointerHoverIcon(if (enabled) PointerIcon.Hand else PointerIcon.Default)
             .clickable(
                 interactionSource = interactionSource,
                 indication = null,
@@ -726,12 +870,17 @@ private fun DesktopLinkAction(
                 role = Role.Button,
                 onClick = onClick
             )
-            .padding(horizontal = 6.dp, vertical = 4.dp),
-        style = CaptionStyle.copy(
-            color = if (enabled) color else disabledColor,
-            fontWeight = FontWeight.Medium
+            .padding(horizontal = 8.dp, vertical = 4.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        BasicText(
+            text = text,
+            style = CaptionStyle.copy(
+                color = if (enabled) color else disabledColor,
+                fontWeight = FontWeight.SemiBold
+            )
         )
-    )
+    }
 }
 
 @Composable
@@ -744,12 +893,15 @@ private fun DesktopIconButton(
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val hovered by interactionSource.collectIsHoveredAsState()
+    val shape = RoundedCornerShape(8.dp)
+
     Box(
         modifier = Modifier
-            .size(30.dp)
-            .clip(RoundedCornerShape(UiTokens.RadiusSmall))
+            .size(32.dp)
+            .clip(shape)
             .background(if (hovered && enabled) colors.surfaceHover else Color.Transparent)
             .hoverable(interactionSource, enabled)
+            .pointerHoverIcon(if (enabled) PointerIcon.Hand else PointerIcon.Default)
             .clickable(
                 interactionSource = interactionSource,
                 indication = null,
@@ -762,8 +914,8 @@ private fun DesktopIconButton(
         WirelessIcon(
             imageVector = icon,
             contentDescription = contentDescription,
-            tint = if (enabled) colors.textSecondary else colors.textDisabled,
-            modifier = Modifier.size(UiTokens.IconMedium)
+            tint = if (hovered && enabled) colors.textPrimary else (if (enabled) colors.textSecondary else colors.textDisabled),
+            modifier = Modifier.size(16.dp)
         )
     }
 }
@@ -813,7 +965,7 @@ private fun WirelessDivider(color: Color) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(UiTokens.CompactDividerWidth)
+            .height(1.dp)
             .background(color)
     )
 }

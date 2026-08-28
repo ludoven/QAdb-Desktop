@@ -149,7 +149,11 @@ class AiAgentViewModel(
                 initialState.publicActivity,
                 adapter.startEvent()
             )
-            _state.value = initialState.copy(
+            // The accepted user message must be part of the state handed to the runner.
+            // Otherwise the first orchestrator snapshot (built from this pre-send state)
+            // would erase the optimistic user message from the conversation as soon as
+            // the engine publishes (mergeAgentOrchestratorSnapshot replaces _state).
+            val acceptedState = initialState.copy(
                 messages = initialState.messages + AgentMessage(
                     id = UUID.randomUUID().toString(),
                     role = AgentMessageRole.USER,
@@ -172,13 +176,14 @@ class AiAgentViewModel(
                 latestScreenshot = null,
                 publicActivity = startedActivity
             )
+            _state.value = acceptedState
             val firstFeedbackMs = (System.currentTimeMillis() - acceptedAtMs).coerceAtLeast(0)
             val runHandle = taskRunHandles.begin(runId, adapter, firstFeedbackMs)
             viewModelScope.launch(Dispatchers.IO, start = CoroutineStart.LAZY) {
                 executeTask(
                     task = task,
                     executionDeviceId = executionDeviceId,
-                    initialState = initialState,
+                    initialState = acceptedState,
                     runHandle = runHandle,
                     acceptedAtMs = acceptedAtMs,
                     firstFeedbackMs = runHandle.firstFeedbackMs

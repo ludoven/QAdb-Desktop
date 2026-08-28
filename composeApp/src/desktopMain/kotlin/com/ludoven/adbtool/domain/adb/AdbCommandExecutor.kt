@@ -5,8 +5,10 @@ import java.io.BufferedWriter
 import java.io.OutputStreamWriter
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.buffer
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.launch
@@ -47,56 +49,62 @@ class AdbCommandExecutor(
         val outputs = callbackFlow {
             val startedAt = System.currentTimeMillis()
             val adbPath = adbPathProvider.resolveAdbPath().getOrElse { error ->
-                trySend(CommandOutput.Stderr(error.message ?: "未找到 ADB，请在设置中配置 ADB 路径，或启用 QADB 内置 ADB。"))
-                trySend(CommandOutput.Exit(code = -1, durationMs = 0L))
+                send(CommandOutput.Stderr(error.message ?: "未找到 ADB，请在设置中配置 ADB 路径，或启用 QADB 内置 ADB。"))
+                send(CommandOutput.Exit(code = -1, durationMs = 0L))
                 close()
                 return@callbackFlow
             }
 
             val fullCommand = listOf(adbPath) + command.args
-            trySend(CommandOutput.Command("$ ${fullCommand.joinToString(" ")}"))
+            send(CommandOutput.Command("$ ${fullCommand.joinToString(" ")}"))
 
             process = ProcessBuilder(fullCommand).start()
             ChildProcessRegistry.register(process!!)
             stdin = BufferedWriter(OutputStreamWriter(process!!.outputStream))
 
             val stdoutJob = launch(Dispatchers.IO) {
-                process!!.inputStream.bufferedReader().useLines { lines ->
-                    lines.forEach { line ->
-                        trySend(CommandOutput.Stdout(line))
+                runCatching {
+                    process!!.inputStream.bufferedReader().useLines { lines ->
+                        lines.forEach { line ->
+                            runCatching { send(CommandOutput.Stdout(line)) }
+                        }
                     }
                 }
             }
 
             val stderrJob = launch(Dispatchers.IO) {
-                process!!.errorStream.bufferedReader().useLines { lines ->
-                    lines.forEach { line ->
-                        trySend(CommandOutput.Stderr(line))
+                runCatching {
+                    process!!.errorStream.bufferedReader().useLines { lines ->
+                        lines.forEach { line ->
+                            runCatching { send(CommandOutput.Stderr(line)) }
+                        }
                     }
                 }
             }
 
             launch(Dispatchers.IO) {
-                val finished = if (timeoutMs != null) {
-                    process!!.waitFor(timeoutMs, TimeUnit.MILLISECONDS)
-                } else {
-                    process!!.waitFor()
-                    true
-                }
-
-                if (!finished) {
-                    trySend(CommandOutput.Stderr("命令超时（${timeoutMs}ms），已终止。"))
-                    process!!.destroy()
-                    if (process!!.isAlive) {
-                        process!!.destroyForcibly()
+                runCatching {
+                    val finished = if (timeoutMs != null) {
+                        process!!.waitFor(timeoutMs, TimeUnit.MILLISECONDS)
+                    } else {
+                        process!!.waitFor()
+                        true
                     }
+
+                    if (!finished) {
+                        runCatching { send(CommandOutput.Stderr("命令超时（${timeoutMs}ms），已终止。")) }
+                        process!!.destroy()
+                        if (process!!.isAlive) {
+                            process!!.destroyForcibly()
+                        }
+                    }
+
+                    stdoutJob.join()
+                    stderrJob.join()
+
+                    val exitCode = runCatching { process!!.exitValue() }.getOrDefault(-1)
+                    runCatching { send(CommandOutput.Exit(code = exitCode, durationMs = System.currentTimeMillis() - startedAt)) }
                 }
-
-                stdoutJob.join()
-                stderrJob.join()
-
-                val exitCode = runCatching { process!!.exitValue() }.getOrDefault(-1)
-                trySend(CommandOutput.Exit(code = exitCode, durationMs = System.currentTimeMillis() - startedAt))
                 ChildProcessRegistry.unregister(process)
                 close()
             }
@@ -111,7 +119,7 @@ class AdbCommandExecutor(
                 }
                 ChildProcessRegistry.unregister(process)
             }
-        }.flowOn(Dispatchers.IO)
+        }.buffer(Channel.UNLIMITED).flowOn(Dispatchers.IO)
 
         return RunningProcess(
             outputs = outputs,

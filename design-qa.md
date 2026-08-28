@@ -1,3 +1,56 @@
+# Settings Top Tabs Design QA
+
+- Source visual truth: `/var/folders/fc/2_jp4kws2zjgl9k27_p0zd180000gn/T/codex-clipboard-e511a1b6-5a3a-4292-9bd0-f163f220f02f.png`
+- Implementation capture: `/tmp/qadb-settings-top-tabs-general-final.png`
+- Combined comparison: `/tmp/qadb-settings-top-tabs-comparison-final.png`
+- Source pixels: 1200 x 800
+- Implementation capture: 1264 x 864 including window shadow, normalized to 1200 x 800 app content
+- State: light theme, general settings selected, 1200 x 800 window
+
+## Final comparison
+
+The settings navigation is restored to the top of the content area. It exposes Overview, General, ADB, Experimental, and About/Update as one compact horizontal tab row while preserving the expanded settings functionality from the earlier iteration.
+
+The implementation retains the original screen's centered 752 px content measure, system typography, project icons, restrained blue selection, bottom tab indicator, low-contrast dividers, and existing settings group surface. All five tabs fit at 1200 x 800, with horizontal scrolling available for narrower windows. General settings fit in the first viewport without clipping.
+
+## Functional coverage
+
+- Overview aggregates ADB, AI Agent, update, common preference, and quick-action status.
+- General adds real startup detection, remembered-device, minimize-on-launch, and minimize-on-close behavior.
+- ADB and Experimental preserve their existing controls and callbacks.
+- About/Update exposes the installed version, update status/channel, and update action.
+- AI Agent remains default-off and requires explicit enablement.
+
+## Findings and comparison history
+
+- P1 fixed: the previous iteration placed settings navigation in a secondary left rail, contrary to the requested top-Tab structure.
+- P2 found in iteration 1: removing the rail initially stretched settings rows across almost the entire content area, drifting from the original centered measure.
+- P2 fix: capped the outer settings column at 816 dp with 32 dp internal gutters, restoring the original approximately 752 dp content width.
+- Post-fix evidence: `/tmp/qadb-settings-top-tabs-comparison-final.png` shows aligned header, tab baseline, card width, row rhythm, and control placement.
+- No unresolved P0, P1, or P2 visual issue remains.
+
+## Fidelity surfaces
+
+- Typography: existing system font, weights, line heights, and hierarchy are preserved without wrapping or truncation.
+- Spacing and layout: the centered content measure and original header-to-tab rhythm are restored; the two new tray rows extend the card without clipping.
+- Colors and tokens: existing QADB blue, neutral text, borders, and switch colors are unchanged.
+- Image quality: the existing transparent QADB logo and project icon set are retained; no new raster or placeholder asset is used.
+- Copy and content: the original language/theme/device preferences remain, with Overview, tray behavior, and About/Update added as requested functionality.
+
+No focused crop was required because labels, indicators, switches, and card boundaries remain readable in the normalized full-view comparison.
+
+## Verification
+
+- `./gradlew :composeApp:compileKotlinDesktop`
+- `./gradlew :composeApp:desktopTest --tests "*AppBehaviorPreferencesTest"`
+- Native Compose Desktop implementation captured at 1200 x 800.
+- Source and implementation reviewed together in `/tmp/qadb-settings-top-tabs-comparison-final.png`.
+- The full desktop test suite has one unrelated pre-existing `AiAgentScreenLayoutTest` failure; the new settings preference tests pass.
+
+final result: passed
+
+---
+
 # Device Control Design QA
 
 - Source: `/var/folders/fc/2_jp4kws2zjgl9k27_p0zd180000gn/T/codex-clipboard-7dde6fa1-ecf6-4270-ae06-3d017bc3e802.png`

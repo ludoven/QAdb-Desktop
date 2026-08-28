@@ -112,7 +112,7 @@ QADB is suitable for:
 | Key Events | Simulate Android device key operations |
 | Apps | App list, install, uninstall, clear data, force stop, etc. |
 | Diagnostics | View and filter Logcat, then search, sort, and inspect device processes |
-| Settings | Configure tool behavior, ADB path, and related options |
+| Settings | Overview plus General, ADB, Experimental, and About sections; configure startup detection, remembered devices, tray behavior, ADB sources, and updates |
 | AI Agent Beta | Off by default; screenshot-first single-engine execution with local safety confirmation |
 
 ---

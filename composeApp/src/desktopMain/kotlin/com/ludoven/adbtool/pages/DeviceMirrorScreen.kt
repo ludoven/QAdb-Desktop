@@ -59,6 +59,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.text.font.FontFamily
+import com.ludoven.adbtool.QadbTokens
+import com.ludoven.adbtool.widget.FramedStateSurface
 import com.ludoven.adbtool.entity.DeviceMirrorSettings
 import com.ludoven.adbtool.QadbColors
 import com.ludoven.adbtool.UiTokens
@@ -98,6 +102,25 @@ private object MirrorKeyCode {
     const val VOLUME_DOWN = 25
 }
 
+internal object ControlVisualTokens {
+    val Primary: Color @Composable get() = QadbTokens.brand
+    val BrandAction: Color @Composable get() = QadbTokens.brandAction
+    val BrandSoft: Color @Composable get() = QadbTokens.brandSoft
+    val Text: Color @Composable get() = QadbTokens.textPrimary
+    val Muted: Color @Composable get() = QadbTokens.textSecondary
+    val Tertiary: Color @Composable get() = QadbTokens.textTertiary
+    val Border: Color @Composable get() = QadbTokens.border
+    val BorderStrong: Color @Composable get() = QadbTokens.borderStrong
+    val Divider: Color @Composable get() = QadbTokens.divider
+    val Surface: Color @Composable get() = QadbTokens.bg1
+    val Soft: Color @Composable get() = QadbTokens.bg2
+    val Inset: Color @Composable get() = QadbTokens.bg3
+    val Selected: Color @Composable get() = QadbTokens.brandSoft
+    val Success: Color @Composable get() = QadbTokens.success
+    val Warning: Color @Composable get() = QadbTokens.warning
+    val Danger: Color @Composable get() = QadbTokens.danger
+}
+
 private data class MirrorColorsData(
     val PageBackground: Color,
     val ContentBackground: Color,
@@ -114,17 +137,17 @@ private data class MirrorColorsData(
 
 @Composable
 private fun mirrorColors() = MirrorColorsData(
-    PageBackground = QadbColors.background,
-    ContentBackground = QadbColors.surface,
-    PrimaryText = QadbColors.textPrimary,
-    SecondaryText = QadbColors.textSecondary,
-    Divider = QadbColors.divider,
-    Primary = QadbColors.primary,
-    SelectedBackground = QadbColors.surfaceSelected,
-    DisabledText = QadbColors.textDisabled,
-    DisabledBackground = QadbColors.disabledSurface,
-    Danger = QadbColors.danger,
-    Success = QadbColors.success
+    PageBackground = ControlVisualTokens.Surface,
+    ContentBackground = ControlVisualTokens.Surface,
+    PrimaryText = ControlVisualTokens.Text,
+    SecondaryText = ControlVisualTokens.Muted,
+    Divider = ControlVisualTokens.Divider,
+    Primary = ControlVisualTokens.Primary,
+    SelectedBackground = ControlVisualTokens.Selected,
+    DisabledText = ControlVisualTokens.Tertiary,
+    DisabledBackground = ControlVisualTokens.Soft,
+    Danger = ControlVisualTokens.Danger,
+    Success = ControlVisualTokens.Success
 )
 
 internal data class IntOption(
@@ -350,93 +373,315 @@ internal fun MirrorSettingsSections(
     onSelectProfile: (MirrorLaunchProfile) -> Unit,
     onUpdateSettings: (DeviceMirrorSettings) -> Unit
 ) {
-    var MirrorColors = mirrorColors()
-    Section(title = l10n("镜像模式", "Mirror Mode")) {
-        MirrorProfileSegmentedControl(
-            selectedProfile = settings.launchProfile,
-            onSelectProfile = onSelectProfile,
-            modifier = Modifier.fillMaxWidth()
-        )
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceLarge)
+    ) {
+        // Preset Profile Cards Section
+        MirrorSettingsGroupCard(
+            title = l10n("镜像画质模式", "Mirror Quality Mode"),
+            subtitle = l10n("选择预设的画质与性能策略，或手动自定义核心参数", "Select a preset quality strategy or configure manually"),
+            icon = IconParkIcons.CastScreen
+        ) {
+            MirrorProfileCards(
+                selectedProfile = settings.launchProfile,
+                onSelectProfile = onSelectProfile,
+                modifier = Modifier.fillMaxWidth()
+            )
 
-        Text(
-            text = profileHint(settings.launchProfile),
-            color = MirrorColors.SecondaryText,
-            style = MaterialTheme.typography.bodyMedium,
-            fontSize = UiTokens.TextBody
-        )
+            if (settings.launchProfile == MirrorLaunchProfile.CUSTOM) {
+                CustomAdvancedParameters(
+                    maxSize = settings.maxSize,
+                    maxFps = settings.maxFps,
+                    bitRate = settings.videoBitRate,
+                    maxSizeOptions = maxSizeOptions,
+                    maxFpsOptions = maxFpsOptions,
+                    bitRateOptions = bitRateOptions,
+                    onMaxSizeSelected = {
+                        onUpdateSettings(settings.copy(maxSize = it, launchProfile = MirrorLaunchProfile.CUSTOM))
+                    },
+                    onMaxFpsSelected = {
+                        onUpdateSettings(settings.copy(maxFps = it, launchProfile = MirrorLaunchProfile.CUSTOM))
+                    },
+                    onBitRateSelected = {
+                        onUpdateSettings(settings.copy(videoBitRate = it, launchProfile = MirrorLaunchProfile.CUSTOM))
+                    }
+                )
+            }
+        }
 
-        if (settings.launchProfile == MirrorLaunchProfile.CUSTOM) {
-            CustomAdvancedParameters(
-                maxSize = settings.maxSize,
-                maxFps = settings.maxFps,
-                bitRate = settings.videoBitRate,
-                maxSizeOptions = maxSizeOptions,
-                maxFpsOptions = maxFpsOptions,
-                bitRateOptions = bitRateOptions,
-                onMaxSizeSelected = {
-                    onUpdateSettings(settings.copy(maxSize = it, launchProfile = MirrorLaunchProfile.CUSTOM))
-                },
-                onMaxFpsSelected = {
-                    onUpdateSettings(settings.copy(maxFps = it, launchProfile = MirrorLaunchProfile.CUSTOM))
-                },
-                onBitRateSelected = {
-                    onUpdateSettings(settings.copy(videoBitRate = it, launchProfile = MirrorLaunchProfile.CUSTOM))
-                }
+        // Basic experience options
+        MirrorSettingsGroupCard(
+            title = l10n("基础与交互选项", "Basic Experience"),
+            subtitle = l10n("桌面窗口与 Android 设备基础交互协同行为", "Basic desktop and device interaction settings"),
+            icon = IconParkIcons.Setting
+        ) {
+            MirrorSwitchPairRow(
+                title = l10n("始终置顶窗口", "Always on top"),
+                description = l10n("镜像窗口始终保持在其他桌面窗口上方", "Keep mirror window above all other windows."),
+                checked = settings.alwaysOnTop,
+                onCheckedChange = { onUpdateSettings(settings.copy(alwaysOnTop = it)) },
+                second = MirrorSwitchItemData(
+                    title = l10n("同步设备音频", "Sync device audio"),
+                    description = l10n("镜像时将设备声音同步至电脑端播放", "Stream device audio to desktop speakers."),
+                    checked = settings.audioEnabled,
+                    onCheckedChange = { onUpdateSettings(settings.copy(audioEnabled = it)) }
+                )
+            )
+            MirrorSwitchPairRow(
+                title = l10n("保持设备亮屏", "Keep device awake"),
+                description = l10n("镜像运行期间防止设备自动休眠息屏", "Prevent screen timeout while mirroring."),
+                checked = settings.stayAwake,
+                onCheckedChange = { onUpdateSettings(settings.copy(stayAwake = it)) },
+                second = MirrorSwitchItemData(
+                    title = l10n("显示触摸轨迹", "Show touch feedback"),
+                    description = l10n("在设备屏幕上显示手指触摸圆点轨迹", "Show touch position dots on device."),
+                    checked = settings.showTouches,
+                    onCheckedChange = { onUpdateSettings(settings.copy(showTouches = it)) }
+                )
+            )
+        }
+
+        // Window behavior options
+        MirrorSettingsGroupCard(
+            title = l10n("窗口显示选项", "Window Behavior"),
+            subtitle = l10n("配置镜像窗口启动时的展现形式与边框风格", "Window appearance and fullscreen behavior"),
+            icon = IconParkIcons.CastScreen
+        ) {
+            MirrorSwitchPairRow(
+                title = l10n("启动后全屏显示", "Start in fullscreen"),
+                description = l10n("打开镜像窗口后自动进入全屏显示模式", "Automatically expand mirror to fullscreen."),
+                checked = settings.fullscreen,
+                onCheckedChange = { onUpdateSettings(settings.copy(fullscreen = it)) },
+                second = MirrorSwitchItemData(
+                    title = l10n("隐藏窗口边框", "Hide window borders"),
+                    description = l10n("移除窗口原生标题栏与系统外边框", "Borderless clean window presentation."),
+                    checked = settings.borderless,
+                    onCheckedChange = { onUpdateSettings(settings.copy(borderless = it)) }
+                )
+            )
+        }
+
+        // Power and screen options
+        MirrorSettingsGroupCard(
+            title = l10n("设备屏幕与电源", "Device Screen & Power"),
+            subtitle = l10n("镜像期间设备端屏幕的电源与熄屏策略", "Control device screen power state during mirroring"),
+            icon = Icons.Default.PowerSettingsNew
+        ) {
+            MirrorSwitchPairRow(
+                title = l10n("镜像时关闭设备屏幕", "Turn off screen while mirroring"),
+                description = l10n("镜像开启后自动关闭设备屏幕以省电降温", "Turn off device display to save battery."),
+                checked = settings.turnScreenOffOnStart,
+                onCheckedChange = { onUpdateSettings(settings.copy(turnScreenOffOnStart = it)) },
+                second = MirrorSwitchItemData(
+                    title = l10n("结束后关闭设备屏幕", "Power off screen when mirror ends"),
+                    description = l10n("关闭镜像窗口时自动将设备锁屏", "Automatically lock device on mirror close."),
+                    checked = settings.powerOffOnClose,
+                    onCheckedChange = { onUpdateSettings(settings.copy(powerOffOnClose = it)) }
+                )
             )
         }
     }
+}
 
-    Section(title = l10n("基础选项", "Basic Options")) {
-        MirrorSwitchPairRow(
-            title = l10n("始终置顶", "Always on top"),
-            description = l10n("镜像窗口保持在其他窗口上方", "Keep the mirror window above others."),
-            checked = settings.alwaysOnTop,
-            onCheckedChange = { onUpdateSettings(settings.copy(alwaysOnTop = it)) },
-            second = MirrorSwitchItemData(
-                title = l10n("同步设备音频", "Sync device audio"),
-                description = l10n("镜像时同步设备声音到桌面", "Play device audio on desktop."),
-                checked = settings.audioEnabled,
-                onCheckedChange = { onUpdateSettings(settings.copy(audioEnabled = it)) }
-            )
+@Composable
+internal fun MirrorProfileCards(
+    selectedProfile: MirrorLaunchProfile,
+    onSelectProfile: (MirrorLaunchProfile) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val profiles = listOf(
+        Triple(
+            MirrorLaunchProfile.SMOOTH,
+            Pair(l10n("流畅优先", "Smooth"), l10n("推荐日常", "Recommended")),
+            Pair("1280 × 720 · 60 fps · 8M", IconParkIcons.Speed)
+        ),
+        Triple(
+            MirrorLaunchProfile.CLEAR,
+            Pair(l10n("清晰优先", "Clear"), l10n("高清演示", "High Def")),
+            Pair("1920 × 1080 · 60 fps · 16M", IconParkIcons.Eye)
+        ),
+        Triple(
+            MirrorLaunchProfile.LOW_LATENCY,
+            Pair(l10n("低延迟", "Low latency"), l10n("Wi‑Fi 优选", "Wi‑Fi")),
+            Pair("1280 × 720 · 60 fps · 4M", IconParkIcons.Wifi)
+        ),
+        Triple(
+            MirrorLaunchProfile.CUSTOM,
+            Pair(l10n("自定义参数", "Custom"), l10n("高级配置", "Advanced")),
+            Pair(l10n("手动调整分辨率、帧率与码率", "Manual resolution, FPS, bitrate"), IconParkIcons.Setting)
         )
-        MirrorSwitchPairRow(
-            title = l10n("保持设备亮屏", "Keep device awake"),
-            description = l10n("镜像期间尽量防止设备息屏", "Prevent screen sleep while mirroring."),
-            checked = settings.stayAwake,
-            onCheckedChange = { onUpdateSettings(settings.copy(stayAwake = it)) },
-            second = MirrorSwitchItemData(
-                title = l10n("显示触摸反馈", "Show touches"),
-                description = l10n("在设备端显示触摸位置反馈", "Show touch indicators on device."),
-                checked = settings.showTouches,
-                onCheckedChange = { onUpdateSettings(settings.copy(showTouches = it)) }
-            )
-        )
+    )
+
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
+    ) {
+        val rows = profiles.chunked(2)
+        rows.forEach { row ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
+            ) {
+                row.forEach { (profile, labels, meta) ->
+                    val (title, tag) = labels
+                    val (subtitle, icon) = meta
+                    val selected = selectedProfile == profile
+                    val shape = RoundedCornerShape(UiTokens.RadiusMedium)
+                    val interactionSource = remember { MutableInteractionSource() }
+                    val isHovered by interactionSource.collectIsHoveredAsState()
+
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(shape)
+                            .background(
+                                when {
+                                    selected -> ControlVisualTokens.BrandSoft
+                                    isHovered -> ControlVisualTokens.Soft.copy(alpha = 0.7f)
+                                    else -> ControlVisualTokens.Soft.copy(alpha = 0.4f)
+                                }
+                            )
+                            .border(
+                                1.dp,
+                                when {
+                                    selected -> ControlVisualTokens.Primary.copy(alpha = 0.55f)
+                                    isHovered -> ControlVisualTokens.Primary.copy(alpha = 0.3f)
+                                    else -> ControlVisualTokens.Border
+                                },
+                                shape
+                            )
+                            .clickable(interactionSource = interactionSource, indication = null) {
+                                onSelectProfile(profile)
+                            }
+                            .padding(horizontal = 14.dp, vertical = 12.dp)
+                    ) {
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(6.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(24.dp)
+                                            .clip(RoundedCornerShape(UiTokens.RadiusSmall))
+                                            .background(
+                                                if (selected) ControlVisualTokens.Primary.copy(alpha = 0.15f)
+                                                else ControlVisualTokens.Soft
+                                            ),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = icon,
+                                            contentDescription = null,
+                                            tint = if (selected) ControlVisualTokens.Primary else ControlVisualTokens.Muted,
+                                            modifier = Modifier.size(13.dp)
+                                        )
+                                    }
+                                    Text(
+                                        text = title,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = if (selected) FontWeight.Bold else FontWeight.SemiBold,
+                                        color = if (selected) ControlVisualTokens.Primary else ControlVisualTokens.Text,
+                                        fontSize = 13.sp
+                                    )
+                                }
+
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(UiTokens.BadgeRadius))
+                                        .background(
+                                            if (selected) ControlVisualTokens.Primary.copy(alpha = 0.12f)
+                                            else ControlVisualTokens.Soft.copy(alpha = 0.8f)
+                                        )
+                                        .padding(horizontal = 6.dp, vertical = 1.5.dp)
+                                ) {
+                                    Text(
+                                        text = tag,
+                                        fontSize = 10.5.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = if (selected) ControlVisualTokens.Primary else ControlVisualTokens.Muted
+                                    )
+                                }
+                            }
+
+                            Text(
+                                text = subtitle,
+                                style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                                fontSize = 11.5.sp,
+                                color = if (selected) ControlVisualTokens.Text.copy(alpha = 0.85f) else ControlVisualTokens.Muted,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+                }
+            }
+        }
     }
+}
 
-    Section(title = l10n("窗口选项", "Window Options")) {
-        MirrorSwitchPairRow(
-            title = l10n("启动后全屏", "Start fullscreen"),
-            checked = settings.fullscreen,
-            onCheckedChange = { onUpdateSettings(settings.copy(fullscreen = it)) },
-            second = MirrorSwitchItemData(
-                title = l10n("隐藏窗口边框", "Hide window border"),
-                checked = settings.borderless,
-                onCheckedChange = { onUpdateSettings(settings.copy(borderless = it)) }
-            )
-        )
-    }
-
-    Section(title = l10n("设备屏幕选项", "Device Screen Options")) {
-        MirrorSwitchPairRow(
-            title = l10n("镜像时关闭设备屏幕", "Turn off screen while mirroring"),
-            checked = settings.turnScreenOffOnStart,
-            onCheckedChange = { onUpdateSettings(settings.copy(turnScreenOffOnStart = it)) },
-            second = MirrorSwitchItemData(
-                title = l10n("结束后关闭设备屏幕", "Turn off screen when mirror ends"),
-                checked = settings.powerOffOnClose,
-                onCheckedChange = { onUpdateSettings(settings.copy(powerOffOnClose = it)) }
-            )
-        )
+@Composable
+internal fun MirrorSettingsGroupCard(
+    title: String,
+    subtitle: String? = null,
+    icon: ImageVector? = null,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    FramedStateSurface(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(UiTokens.SpaceLarge),
+            verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                if (icon != null) {
+                    Box(
+                        modifier = Modifier
+                            .size(24.dp)
+                            .clip(RoundedCornerShape(UiTokens.RadiusSmall))
+                            .background(ControlVisualTokens.Primary.copy(alpha = 0.12f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = icon,
+                            contentDescription = null,
+                            tint = ControlVisualTokens.Primary,
+                            modifier = Modifier.size(13.dp)
+                        )
+                    }
+                }
+                Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = ControlVisualTokens.Text,
+                        fontSize = 13.5.sp
+                    )
+                    if (subtitle != null) {
+                        Text(
+                            text = subtitle,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = ControlVisualTokens.Muted,
+                            fontSize = 11.5.sp
+                        )
+                    }
+                }
+            }
+            HorizontalDivider(color = ControlVisualTokens.Divider.copy(alpha = 0.4f))
+            content()
+        }
     }
 }
 
@@ -450,85 +695,86 @@ private fun MirrorStatusSettingsPanel(
     settings: DeviceMirrorSettings,
     onOpenSettings: () -> Unit
 ) {
-    val cardText = Color(0xFF172033)
-    val cardSecondaryText = Color(0xFF667085)
-    val cardBorder = Color(0xFFE4E9F0)
-    val shape = RoundedCornerShape(14.dp)
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = shape,
-        color = Color.White,
-        border = androidx.compose.foundation.BorderStroke(1.dp, cardBorder),
-        shadowElevation = 2.dp
+    FramedStateSurface(
+        modifier = Modifier.fillMaxWidth()
     ) {
         Column(
-            modifier = Modifier.padding(horizontal = 24.dp, vertical = 18.dp),
-            verticalArrangement = Arrangement.spacedBy(18.dp)
+            modifier = Modifier.padding(horizontal = UiTokens.SpaceLarge, vertical = 14.dp),
+            verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium)
         ) {
-            Text(
-                text = l10n("设备概览", "Device overview"),
-                color = cardText,
-                fontWeight = FontWeight.Bold,
-                fontSize = 16.sp
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = l10n("设备概览", "Device overview"),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = ControlVisualTokens.Text,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp
+                )
+                if (hasDevice) {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(UiTokens.BadgeRadius))
+                            .background(ControlVisualTokens.Success.copy(alpha = 0.12f))
+                            .padding(horizontal = 8.dp, vertical = 2.5.dp)
+                    ) {
+                        Text(
+                            text = l10n("已连接 · $connectionType", "Connected · $connectionType"),
+                            color = ControlVisualTokens.Success,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
+            }
 
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(min = 64.dp),
+                    .heightIn(min = 54.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Row(
-                    modifier = Modifier.weight(1.52f),
-                    verticalAlignment = Alignment.CenterVertically
+                    modifier = Modifier.weight(1.5f),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium)
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(52.dp)
-                            .background(Color(0xFFF6F7F9), RoundedCornerShape(12.dp)),
+                            .size(44.dp)
+                            .clip(RoundedCornerShape(UiTokens.RadiusMedium))
+                            .background(ControlVisualTokens.Primary.copy(alpha = 0.10f)),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             imageVector = IconParkIcons.Devices,
                             contentDescription = null,
-                            tint = cardText,
-                            modifier = Modifier.size(26.dp)
+                            tint = ControlVisualTokens.Primary,
+                            modifier = Modifier.size(22.dp)
                         )
                     }
-                    Spacer(Modifier.width(16.dp))
                     Column(
                         modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(5.dp)
+                        verticalArrangement = Arrangement.spacedBy(2.dp)
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                text = deviceDisplayName?.takeIf { it.isNotBlank() }
-                                    ?: currentDevice
-                                    ?: l10n("未选择设备", "No device selected"),
-                                modifier = Modifier.weight(1f, fill = false),
-                                color = cardText,
-                                fontWeight = FontWeight.SemiBold,
-                                fontSize = 16.sp,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            if (hasDevice) {
-                                Spacer(Modifier.width(10.dp))
-                                Text(
-                                    text = l10n("已连接", "Connected"),
-                                    modifier = Modifier
-                                        .background(Color(0xFFE5F8EC), RoundedCornerShape(6.dp))
-                                        .padding(horizontal = 9.dp, vertical = 4.dp),
-                                    color = Color(0xFF21A453),
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Medium
-                                )
-                            }
-                        }
+                        Text(
+                            text = deviceDisplayName?.takeIf { it.isNotBlank() }
+                                ?: currentDevice
+                                ?: l10n("未选择设备", "No device selected"),
+                            color = ControlVisualTokens.Text,
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 14.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
                         Text(
                             text = currentDevice ?: "--",
-                            color = cardSecondaryText,
-                            fontSize = 13.sp,
+                            style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                            color = ControlVisualTokens.Tertiary,
+                            fontSize = 12.sp,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -537,53 +783,56 @@ private fun MirrorStatusSettingsPanel(
 
                 OverviewDivider()
                 OverviewMetric(
-                    modifier = Modifier.weight(0.72f),
+                    modifier = Modifier.weight(0.75f),
                     icon = IconParkIcons.Wifi,
                     label = l10n("连接方式", "Connection"),
                     value = if (hasDevice) connectionType else "--",
-                    cardText = cardText,
-                    secondaryText = cardSecondaryText
+                    cardText = ControlVisualTokens.Text,
+                    secondaryText = ControlVisualTokens.Muted
                 )
 
                 OverviewDivider()
                 OverviewMetric(
-                    modifier = Modifier.weight(0.72f),
+                    modifier = Modifier.weight(0.75f),
                     icon = Icons.Default.ViewAgenda,
                     label = l10n("镜像状态", "Mirror status"),
                     value = if (mirrorRunning) l10n("已启动", "Running") else l10n("未启动", "Not started"),
-                    cardText = cardText,
-                    secondaryText = cardSecondaryText
+                    cardText = if (mirrorRunning) ControlVisualTokens.Success else ControlVisualTokens.Text,
+                    secondaryText = ControlVisualTokens.Muted
                 )
 
                 OverviewDivider()
                 Row(
                     modifier = Modifier
-                        .weight(1.18f)
+                        .weight(1.2f)
+                        .clip(RoundedCornerShape(UiTokens.RadiusMedium))
+                        .background(ControlVisualTokens.Soft.copy(alpha = 0.5f))
                         .clickable(onClick = onOpenSettings)
-                        .padding(horizontal = 24.dp, vertical = 8.dp),
+                        .padding(horizontal = 14.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(
                         imageVector = IconParkIcons.Setting,
                         contentDescription = null,
-                        tint = cardText,
-                        modifier = Modifier.size(20.dp)
+                        tint = ControlVisualTokens.Primary,
+                        modifier = Modifier.size(18.dp)
                     )
-                    Spacer(Modifier.width(12.dp))
+                    Spacer(Modifier.width(10.dp))
                     Column(
                         modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                        verticalArrangement = Arrangement.spacedBy(1.dp)
                     ) {
                         Text(
                             text = l10n("镜像设置", "Mirror settings"),
-                            color = cardSecondaryText,
-                            fontSize = 13.sp
+                            color = ControlVisualTokens.Muted,
+                            fontSize = 11.5.sp
                         )
                         Text(
                             text = mirrorSettingsSummary(settings),
-                            color = cardText,
-                            fontSize = 13.sp,
+                            style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                            color = ControlVisualTokens.Text,
                             fontWeight = FontWeight.Medium,
+                            fontSize = 12.sp,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -591,8 +840,8 @@ private fun MirrorStatusSettingsPanel(
                     Icon(
                         imageVector = IconParkIcons.Right,
                         contentDescription = null,
-                        tint = cardSecondaryText,
-                        modifier = Modifier.size(18.dp)
+                        tint = ControlVisualTokens.Muted,
+                        modifier = Modifier.size(15.dp)
                     )
                 }
             }
@@ -611,29 +860,29 @@ private fun OverviewMetric(
 ) {
     Row(
         modifier = modifier
-            .padding(horizontal = 24.dp, vertical = 8.dp),
+            .padding(horizontal = 16.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center
     ) {
         Icon(
             imageVector = icon,
             contentDescription = null,
-            tint = cardText,
-            modifier = Modifier.size(20.dp)
+            tint = ControlVisualTokens.Primary,
+            modifier = Modifier.size(18.dp)
         )
-        Spacer(Modifier.width(12.dp))
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Spacer(Modifier.width(10.dp))
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(
                 text = label,
                 color = secondaryText,
-                fontSize = 13.sp,
+                fontSize = 11.5.sp,
                 maxLines = 1
             )
             Text(
                 text = value,
                 color = cardText,
-                fontWeight = FontWeight.Medium,
-                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 12.5.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -646,8 +895,8 @@ private fun OverviewDivider() {
     Box(
         modifier = Modifier
             .width(1.dp)
-            .height(48.dp)
-            .background(Color(0xFFE6E9EE))
+            .height(36.dp)
+            .background(ControlVisualTokens.Divider.copy(alpha = 0.5f))
     )
 }
 
@@ -667,7 +916,6 @@ internal fun MirrorSettingsDialog(
     onUpdateSettings: (DeviceMirrorSettings) -> Unit,
     onDismiss: () -> Unit
 ) {
-    var MirrorColors = mirrorColors()
     val dialogScrollState = rememberScrollState()
 
     LaunchedEffect(settings.launchProfile) {
@@ -677,55 +925,75 @@ internal fun MirrorSettingsDialog(
     Dialog(onDismissRequest = onDismiss) {
         Surface(
             modifier = Modifier
-                .width(620.dp)
-                .height(620.dp),
-            shape = RoundedCornerShape(UiTokens.RadiusLarge),
-            color = MaterialTheme.colorScheme.surface,
-            border = androidx.compose.foundation.BorderStroke(1.dp, MirrorColors.Divider),
+                .width(680.dp)
+                .heightIn(max = 680.dp),
+            shape = RoundedCornerShape(UiTokens.RadiusXLarge),
+            color = ControlVisualTokens.Surface,
+            border = androidx.compose.foundation.BorderStroke(1.dp, ControlVisualTokens.Border),
             shadowElevation = 0.dp
         ) {
             Column(modifier = Modifier.fillMaxSize()) {
-                // Header: title + close button
+                // Header: title + subtitle + close button
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(start = UiTokens.SpaceXXLarge, top = UiTokens.SpaceLarge, end = UiTokens.SpaceLarge, bottom = UiTokens.SpaceMedium),
-                    verticalAlignment = Alignment.CenterVertically
+                        .padding(horizontal = UiTokens.SpaceXXLarge, vertical = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = l10n("镜像设置", "Mirror settings"),
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MirrorColors.PrimaryText,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = UiTokens.TextSection
-                        )
-                        Spacer(Modifier.height(UiTokens.SpaceXSmall))
-                        Text(
-                            text = l10n("调整镜像画质、窗口与设备行为", "Adjust mirror quality, window and device behavior"),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MirrorColors.SecondaryText,
-                            fontSize = UiTokens.TextCaption
-                        )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(RoundedCornerShape(UiTokens.RadiusMedium))
+                                .background(ControlVisualTokens.Primary.copy(alpha = 0.12f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = IconParkIcons.CastScreen,
+                                contentDescription = null,
+                                tint = ControlVisualTokens.Primary,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                        Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                            Text(
+                                text = l10n("镜像与控制配置", "Mirror & Control Settings"),
+                                style = MaterialTheme.typography.titleMedium,
+                                color = ControlVisualTokens.Text,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 15.5.sp
+                            )
+                            Text(
+                                text = l10n("调整画质预设、分辨率码率与窗口设备协同行为", "Adjust quality presets, resolution, bitrate, and window behavior"),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = ControlVisualTokens.Muted,
+                                fontSize = 12.sp
+                            )
+                        }
                     }
                     Box(
                         modifier = Modifier
-                            .size(28.dp)
+                            .size(30.dp)
                             .clip(RoundedCornerShape(UiTokens.RadiusSmall))
+                            .background(ControlVisualTokens.Soft.copy(alpha = 0.6f))
                             .clickable(onClick = onDismiss),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             imageVector = Icons.Default.Close,
                             contentDescription = l10n("关闭", "Close"),
-                            tint = MirrorColors.SecondaryText,
-                            modifier = Modifier.size(UiTokens.IconMedium)
+                            tint = ControlVisualTokens.Muted,
+                            modifier = Modifier.size(15.dp)
                         )
                     }
                 }
-                HorizontalDivider(color = MirrorColors.Divider)
+                HorizontalDivider(color = ControlVisualTokens.Divider.copy(alpha = 0.6f))
 
-                // Content
+                // Scrollable Content
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -737,7 +1005,7 @@ internal fun MirrorSettingsDialog(
                             .fillMaxSize()
                             .verticalScroll(dialogScrollState)
                             .padding(vertical = UiTokens.SpaceLarge),
-                        verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceXLarge)
+                        verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceLarge)
                     ) {
                         MirrorSettingsSections(
                             settings = settings,
@@ -751,27 +1019,38 @@ internal fun MirrorSettingsDialog(
                 }
 
                 // Footer action bar
-                HorizontalDivider(color = MirrorColors.Divider)
+                HorizontalDivider(color = ControlVisualTokens.Divider.copy(alpha = 0.6f))
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = UiTokens.SpaceXXLarge, vertical = UiTokens.SpaceMedium),
-                    horizontalArrangement = Arrangement.End,
+                        .padding(horizontal = UiTokens.SpaceXXLarge, vertical = 12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    TextButton(
+                        onClick = { onSelectProfile(MirrorLaunchProfile.SMOOTH) }
+                    ) {
+                        Text(
+                            text = l10n("恢复默认", "Reset Default"),
+                            color = ControlVisualTokens.Muted,
+                            fontSize = 12.5.sp
+                        )
+                    }
+
                     Button(
                         onClick = onDismiss,
-                        modifier = Modifier.height(UiTokens.ControlHeight).widthIn(min = 96.dp),
+                        modifier = Modifier.height(34.dp).widthIn(min = 90.dp),
                         shape = RoundedCornerShape(UiTokens.RadiusMedium),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = MirrorColors.Primary,
+                            containerColor = ControlVisualTokens.Primary,
                             contentColor = QadbColors.onPrimary
                         )
                     ) {
                         Text(
                             text = l10n("完成", "Done"),
                             fontWeight = FontWeight.SemiBold,
-                            fontSize = UiTokens.TextBodyLarge
+                            color = QadbColors.onPrimary,
+                            fontSize = 12.5.sp
                         )
                     }
                 }
@@ -1078,14 +1357,34 @@ internal fun CustomAdvancedParameters(
     onMaxFpsSelected: (Int?) -> Unit,
     onBitRateSelected: (String) -> Unit
 ) {
-    var MirrorColors = mirrorColors()
-    Column(verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium)) {
-        Text(
-            text = l10n("高级参数", "Advanced Parameters"),
-            style = MaterialTheme.typography.titleMedium,
-            color = MirrorColors.PrimaryText,
-            fontWeight = FontWeight.Medium
-        )
+    val shape = RoundedCornerShape(UiTokens.RadiusMedium)
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .background(ControlVisualTokens.Soft.copy(alpha = 0.4f))
+            .border(1.dp, ControlVisualTokens.Border, shape)
+            .padding(UiTokens.SpaceMedium),
+        verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Icon(
+                imageVector = IconParkIcons.Setting,
+                contentDescription = null,
+                tint = ControlVisualTokens.Primary,
+                modifier = Modifier.size(13.dp)
+            )
+            Text(
+                text = l10n("高级分辨率与码率微调", "Advanced Resolution & Bitrate Tuning"),
+                style = MaterialTheme.typography.bodySmall,
+                fontWeight = FontWeight.SemiBold,
+                color = ControlVisualTokens.Text
+            )
+        }
 
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -1116,12 +1415,12 @@ internal fun CustomAdvancedParameters(
 
         Text(
             text = l10n(
-                "推荐默认使用 1280 分辨率、60 帧、8M 码率，可在流畅度和清晰度之间取得较好平衡。",
-                "The default 1280 / 60 / 8M setting provides a practical balance between smoothness and clarity."
+                "💡 推荐使用 1280 分辨率、60 帧、8M 码率，可在流畅度与清晰度之间取得最佳平衡。",
+                "💡 Recommended 1280 / 60fps / 8M provides the ideal balance between low latency and sharp text."
             ),
-            color = MirrorColors.SecondaryText,
-            style = MaterialTheme.typography.bodyMedium,
-            fontSize = UiTokens.TextBody
+            color = ControlVisualTokens.Muted,
+            style = MaterialTheme.typography.bodySmall,
+            fontSize = 11.sp
         )
     }
 }
@@ -1133,14 +1432,13 @@ private fun RuntimeControls(
     enabled: Boolean,
     viewModel: DeviceMirrorViewModel
 ) {
-    var MirrorColors = mirrorColors()
     if (!enabled) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(min = 44.dp)
-                .background(MirrorColors.DisabledBackground, RoundedCornerShape(UiTokens.RadiusMedium))
-                .border(1.dp, MirrorColors.Divider, RoundedCornerShape(UiTokens.RadiusMedium))
+                .heightIn(min = 40.dp)
+                .background(ControlVisualTokens.Soft.copy(alpha = 0.5f), RoundedCornerShape(UiTokens.RadiusMedium))
+                .border(1.dp, ControlVisualTokens.Border, RoundedCornerShape(UiTokens.RadiusMedium))
                 .padding(horizontal = UiTokens.SpaceMedium, vertical = UiTokens.SpaceSmall),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
@@ -1148,7 +1446,7 @@ private fun RuntimeControls(
             Icon(
                 imageVector = Icons.Default.PlayArrow,
                 contentDescription = null,
-                tint = MirrorColors.DisabledText,
+                tint = ControlVisualTokens.Tertiary,
                 modifier = Modifier.size(UiTokens.IconSmall)
             )
             Text(
@@ -1156,9 +1454,9 @@ private fun RuntimeControls(
                     "连接设备并启动镜像后，可使用返回、主页、截图等快捷控制。",
                     "Connect a device and start mirroring to use back, home, screenshot, and other controls."
                 ),
-                color = MirrorColors.SecondaryText,
+                color = ControlVisualTokens.Muted,
                 style = MaterialTheme.typography.bodySmall,
-                fontSize = UiTokens.TextCaption,
+                fontSize = 12.sp,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis
             )
@@ -1213,20 +1511,19 @@ private fun MirrorControlButton(
     enabled: Boolean,
     onClick: () -> Unit
 ) {
-    var MirrorColors = mirrorColors()
     TooltipArea(
         tooltip = {
             Surface(
-                color = MirrorColors.ContentBackground,
+                color = ControlVisualTokens.Surface,
                 shape = RoundedCornerShape(UiTokens.RadiusMedium),
-                border = androidx.compose.foundation.BorderStroke(1.dp, MirrorColors.Divider)
+                border = androidx.compose.foundation.BorderStroke(1.dp, ControlVisualTokens.Border)
             ) {
                 Text(
                     text = label,
                     modifier = Modifier.padding(horizontal = UiTokens.SpaceSmall, vertical = UiTokens.SpaceSmall),
                     style = MaterialTheme.typography.bodySmall,
-                    color = MirrorColors.PrimaryText,
-                    fontSize = UiTokens.TextCaption
+                    color = ControlVisualTokens.Text,
+                    fontSize = 11.5.sp
                 )
             }
         }
@@ -1236,9 +1533,9 @@ private fun MirrorControlButton(
             enabled = enabled,
             modifier = modifier
                 .heightIn(min = 36.dp)
-                .border(1.dp, MirrorColors.Divider, RoundedCornerShape(UiTokens.RadiusMedium))
+                .border(1.dp, ControlVisualTokens.Border, RoundedCornerShape(UiTokens.RadiusMedium))
                 .background(
-                    color = if (enabled) MirrorColors.ContentBackground else MaterialTheme.colorScheme.surfaceVariant,
+                    color = if (enabled) ControlVisualTokens.Surface else ControlVisualTokens.Soft,
                     shape = RoundedCornerShape(UiTokens.RadiusMedium)
                 )
         ) {
@@ -1246,7 +1543,7 @@ private fun MirrorControlButton(
                 icon,
                 contentDescription = label,
                 modifier = Modifier.size(17.dp),
-                tint = if (enabled) MirrorColors.PrimaryText else MirrorColors.SecondaryText.copy(alpha = 0.55f)
+                tint = if (enabled) ControlVisualTokens.Text else ControlVisualTokens.Tertiary
             )
         }
     }
@@ -1271,8 +1568,8 @@ internal fun MirrorSwitchPairRow(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(min = 48.dp),
-            horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceXXLarge),
+                .heightIn(min = 44.dp),
+            horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium),
             verticalAlignment = Alignment.CenterVertically
         ) {
             MirrorSwitchCell(
@@ -1305,40 +1602,47 @@ internal fun MirrorSwitchCell(
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit
 ) {
-    var MirrorColors = mirrorColors()
     val interactionSource = remember { MutableInteractionSource() }
     val hovered by interactionSource.collectIsHoveredAsState()
+    val shape = RoundedCornerShape(UiTokens.RadiusMedium)
     val background by animateColorAsState(
-        targetValue = if (hovered) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f) else Color.Transparent,
+        targetValue = if (hovered) ControlVisualTokens.Soft.copy(alpha = 0.8f) else ControlVisualTokens.Soft.copy(alpha = 0.35f),
         animationSpec = tween(UiTokens.HoverDurationMillis),
         label = "switchRowBg"
     )
     Row(
         modifier = modifier
-            .clip(RoundedCornerShape(UiTokens.RadiusMedium))
+            .clip(shape)
             .background(background)
+            .border(
+                1.dp,
+                if (hovered) ControlVisualTokens.Primary.copy(alpha = 0.35f) else ControlVisualTokens.Border,
+                shape
+            )
             .clickable(interactionSource = interactionSource, indication = null) { onCheckedChange(!checked) }
-            .padding(horizontal = UiTokens.SpaceMedium, vertical = UiTokens.SpaceSmall),
+            .padding(horizontal = 12.dp, vertical = 10.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceXSmall)
+            modifier = Modifier.weight(1f).padding(end = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp)
         ) {
             Text(
                 text = title,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MirrorColors.PrimaryText,
+                style = MaterialTheme.typography.bodySmall,
+                color = ControlVisualTokens.Text,
                 fontWeight = FontWeight.Medium,
-                fontSize = UiTokens.TextBody
+                fontSize = 12.5.sp
             )
             if (!description.isNullOrBlank()) {
                 Text(
                     text = description,
                     style = MaterialTheme.typography.bodySmall,
-                    color = MirrorColors.SecondaryText,
-                    fontSize = UiTokens.TextCaption
+                    color = ControlVisualTokens.Muted,
+                    fontSize = 11.sp,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
         }
@@ -1355,7 +1659,7 @@ internal fun IntSelectField(
     onSelected: (Int?) -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
         FieldLabel(label)
         Box {
             SelectFieldTrigger(
@@ -1366,7 +1670,7 @@ internal fun IntSelectField(
             DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
                 options.forEach { option ->
                     DropdownMenuItem(
-                        text = { Text(option.label, fontSize = UiTokens.TextBody) },
+                        text = { Text(option.label, fontSize = 12.sp) },
                         onClick = {
                             expanded = false
                             onSelected(option.value)
@@ -1387,7 +1691,7 @@ internal fun StringSelectField(
     onSelected: (String) -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
         FieldLabel(label)
         Box {
             SelectFieldTrigger(
@@ -1398,7 +1702,7 @@ internal fun StringSelectField(
             DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
                 options.forEach { option ->
                     DropdownMenuItem(
-                        text = { Text(option.label, fontSize = UiTokens.TextBody) },
+                        text = { Text(option.label, fontSize = 12.sp) },
                         onClick = {
                             expanded = false
                             onSelected(option.value)
@@ -1416,14 +1720,13 @@ private fun SelectFieldTrigger(
     expanded: Boolean,
     onClick: () -> Unit
 ) {
-    var MirrorColors = mirrorColors()
     val interactionSource = remember { MutableInteractionSource() }
     val hovered by interactionSource.collectIsHoveredAsState()
     val borderColor by animateColorAsState(
         targetValue = when {
-            expanded -> MirrorColors.Primary
-            hovered -> MirrorColors.Primary.copy(alpha = 0.45f)
-            else -> MirrorColors.Divider
+            expanded -> ControlVisualTokens.Primary
+            hovered -> ControlVisualTokens.Primary.copy(alpha = 0.45f)
+            else -> ControlVisualTokens.Border
         },
         animationSpec = tween(UiTokens.HoverDurationMillis),
         label = "selectBorder"
@@ -1431,20 +1734,20 @@ private fun SelectFieldTrigger(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(UiTokens.ControlHeight)
+            .height(34.dp)
             .clip(RoundedCornerShape(UiTokens.RadiusMedium))
-            .background(MirrorColors.ContentBackground)
+            .background(ControlVisualTokens.Surface)
             .border(1.dp, borderColor, RoundedCornerShape(UiTokens.RadiusMedium))
             .clickable(interactionSource = interactionSource, indication = null, onClick = onClick)
-            .padding(horizontal = UiTokens.SpaceMedium),
+            .padding(horizontal = 10.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
             text = text,
-            style = MaterialTheme.typography.bodyMedium,
-            fontSize = UiTokens.TextBody,
-            color = MirrorColors.PrimaryText,
+            style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+            fontSize = 12.sp,
+            color = ControlVisualTokens.Text,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
@@ -1452,19 +1755,19 @@ private fun SelectFieldTrigger(
             imageVector = CompatIconVectors.KeyboardArrowDown,
             contentDescription = null,
             modifier = Modifier.size(UiTokens.IconSmall),
-            tint = MirrorColors.SecondaryText
+            tint = ControlVisualTokens.Muted
         )
     }
 }
 
 @Composable
 internal fun FieldLabel(text: String) {
-    var MirrorColors = mirrorColors()
     Text(
         text = text,
-        style = MaterialTheme.typography.bodyMedium,
-        color = MirrorColors.SecondaryText,
-        fontSize = UiTokens.TextBody
+        style = MaterialTheme.typography.bodySmall,
+        color = ControlVisualTokens.Muted,
+        fontSize = 11.5.sp,
+        fontWeight = FontWeight.Medium
     )
 }
 

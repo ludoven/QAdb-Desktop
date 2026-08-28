@@ -102,7 +102,7 @@ private class MacOsKeychainSecretStore : SecretStore {
             passwordData = passwordData,
             itemRef = null
         )
-        if (status == ERR_SEC_ITEM_NOT_FOUND) return null
+        if (status == ERR_SEC_ITEM_NOT_FOUND || status == ERR_SEC_USER_CANCELED || status == ERR_SEC_AUTH_FAILED) return null
         checkStatus(operation = "read API key", status = status)
         require(passwordLength.value >= 0) { "Unable to read secret from macOS Keychain: invalid data length" }
         val data = passwordData.value
@@ -410,6 +410,8 @@ private const val SERVICE_NAME = "com.ludoven.adbtool.ai"
 private const val COMMAND_TIMEOUT_SECONDS = 15L
 private const val ERR_SEC_SUCCESS = 0
 private const val ERR_SEC_ITEM_NOT_FOUND = -25300
+private const val ERR_SEC_USER_CANCELED = -128
+private const val ERR_SEC_AUTH_FAILED = -25293
 private const val SECRET_TOOL_NOT_FOUND_EXIT_CODE = 1
 private const val WINDOWS_ERROR_NOT_FOUND = 1168
 private const val CRED_TYPE_GENERIC = 1

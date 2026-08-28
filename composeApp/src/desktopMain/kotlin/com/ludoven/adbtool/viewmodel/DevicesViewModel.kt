@@ -11,6 +11,9 @@ import com.ludoven.adbtool.entity.DeviceCenterInfoData
 import com.ludoven.adbtool.entity.BatteryStatus
 import com.ludoven.adbtool.entity.MsgContent
 import com.ludoven.adbtool.util.AdbTool
+import com.ludoven.adbtool.util.AppBehaviorPreferences
+import com.ludoven.adbtool.util.AppBehaviorPreferencesStore
+import com.ludoven.adbtool.util.l10n
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -37,7 +40,8 @@ internal fun deviceInfoLoadShouldCancelForSelectionChange(
 }
 
 class DevicesViewModel(
-    private val deviceStatusRepository: DeviceStatusRepository = DeviceStatusRuntime.repository
+    private val deviceStatusRepository: DeviceStatusRepository = DeviceStatusRuntime.repository,
+    private val behaviorPreferences: AppBehaviorPreferencesStore = AppBehaviorPreferences.store
 ) : BaseViewModel() {
     companion object {
         internal fun normalizedDeviceId(deviceId: String?): String? =
@@ -71,23 +75,35 @@ class DevicesViewModel(
     private var deviceInfoLoadDeviceId: String? = null
 
     fun refreshDevices() {
+        // Avoid re-entry: ignore duplicate refresh requests while one is active.
+        if (_isLoading.value) return
         viewModelScope.launch {
             _isLoading.value = true
-            val newDevices = withContext(Dispatchers.IO) { AdbTool.getConnectedDevices() }
-            _devices.value = newDevices
-            _deviceDisplayNames.value = withContext(Dispatchers.IO) {
-                buildDeviceDisplayNameMap(newDevices)
+            try {
+                val newDevices = withContext(Dispatchers.IO) { AdbTool.getConnectedDevices() }
+                _devices.value = newDevices
+                _deviceDisplayNames.value = withContext(Dispatchers.IO) {
+                    buildDeviceDisplayNameMap(newDevices)
+                }
+                val preferredDeviceId = behaviorPreferences.preferredDeviceId()
+                _selectedDevice.value = when {
+                    _selectedDevice.value == null && preferredDeviceId in newDevices -> preferredDeviceId
+                    _selectedDevice.value == null && newDevices.isNotEmpty() -> newDevices.first()
+                    _selectedDevice.value != null && _selectedDevice.value !in newDevices -> newDevices.firstOrNull()
+                    else -> _selectedDevice.value
+                }
+                selectDevice(_selectedDevice.value)
+                if (_selectedDevice.value == null) {
+                    updateLastRefreshTime()
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (e: Exception) {
+                // Keep the current state on failure and let the user choose whether to retry.
+                showToast(MsgContent.Text(l10n("设备刷新失败，请重试", "Device refresh failed, try again")))
+            } finally {
+                _isLoading.value = false
             }
-            _selectedDevice.value = when {
-                _selectedDevice.value == null && newDevices.isNotEmpty() -> newDevices.first()
-                _selectedDevice.value != null && _selectedDevice.value !in newDevices -> newDevices.firstOrNull()
-                else -> _selectedDevice.value
-            }
-            selectDevice(_selectedDevice.value)
-            if (_selectedDevice.value == null) {
-                updateLastRefreshTime()
-            }
-            _isLoading.value = false
         }
     }
 
@@ -101,6 +117,7 @@ class DevicesViewModel(
         }
         _selectedDevice.value = normalizedDeviceId
         if (normalizedDeviceId != null) {
+            behaviorPreferences.recordSelectedDevice(normalizedDeviceId)
             AdbTool.selectDeviceId = normalizedDeviceId
             loadDeviceInfo(normalizedDeviceId)
         } else {

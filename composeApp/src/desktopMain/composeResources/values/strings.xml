@@ -44,7 +44,7 @@
     <string name="file_manager">文件管理</string>
     <string name="file_manager_desc">浏览和管理文件</string>
     <string name="install_apk_short">安装 APK</string>
-    <string name="select_device_hint">请选择一个设备以查看其信息。</string>
+    <string name="select_device_hint">连接设备后即可开始使用</string>
     <string name="no_device_info">未能获取到设备详细信息。</string>
     <string name="recent_activity">最近活动</string>
     <string name="activity_installed_apk">已安装 app.apk</string>
@@ -272,6 +272,10 @@
     <string name="settings_pref_auto_detect_desc">应用启动后自动执行设备检测</string>
     <string name="settings_pref_remember_device_title">记住上次连接设备</string>
     <string name="settings_pref_remember_device_desc">下次启动时优先恢复上次设备</string>
+    <string name="settings_pref_minimize_on_launch_title">启动后最小化到托盘</string>
+    <string name="settings_pref_minimize_on_launch_desc">下次启动时隐藏主窗口，可从系统托盘重新打开</string>
+    <string name="settings_pref_minimize_on_close_title">关闭窗口时最小化到托盘</string>
+    <string name="settings_pref_minimize_on_close_desc">点击关闭按钮时保持 QADB 在后台运行</string>
     <string name="settings_status_label">状态</string>
     <string name="settings_adb_source_desc">当前有效 ADB 来源</string>
     <string name="settings_adb_path_desc">当前可执行文件路径</string>
@@ -842,4 +846,45 @@
     <string name="wireless_error_authentication">设备拒绝认证。请删除旧配对记录后重新配对。</string>
     <string name="wireless_error_resolution">无法解析设备地址，请检查主机名或改用 IP 地址。</string>
     <string name="wireless_error_command">ADB 未能完成操作，请根据下方原始信息排查。</string>
+
+    <!-- AI Agent Workbench (Linear-Class) 三栏工作台 -->
+    <string name="agent_topbar_android">Android %1$s · API %2$s</string>
+    <string name="agent_topbar_android_unknown">Android --</string>
+    <string name="agent_obs_mode_title">视觉观察模式</string>
+    <string name="agent_obs_watching">AI 正在看你的屏幕</string>
+    <string name="agent_obs_paused">已暂停观察</string>
+    <string name="agent_obs_on">开启</string>
+    <string name="agent_obs_off">关闭</string>
+    <string name="agent_obs_recent">最近观察 %1$s · %2$s</string>
+    <string name="agent_obs_ago">%1$s 前</string>
+    <string name="agent_obs_freq">每 %1$s 一帧</string>
+    <string name="agent_obs_observing">观察中</string>
+    <string name="agent_obs_switch_desc">切换视觉观察模式</string>
+    <string name="agent_page_id">Page id: %1$s</string>
+    <string name="agent_changed">changed</string>
+    <string name="agent_stable">stable</string>
+    <string name="agent_token_title">Token 消耗</string>
+    <string name="agent_token_compacted">压缩 %1$d 次</string>
+    <string name="agent_token_usage">%1$s / %2$s tokens</string>
+    <string name="agent_token_remaining">剩余 %1$s</string>
+    <string name="agent_token_meter_desc">Token 消耗 %1$s / %2$s，剩余 %3$s</string>
+    <string name="agent_think_title">思考过程</string>
+    <string name="agent_confirm_title">%1$s为敏感操作</string>
+    <string name="agent_confirm_send">确认发送</string>
+    <string name="agent_confirm_execute">确认执行</string>
+    <string name="agent_activity_progress">任务进度</string>
+    <string name="agent_activity_steps_done">%1$d 步 · 已完成 %2$d</string>
+    <string name="agent_badge_completed">已完成</string>
+    <string name="agent_badge_in_progress">进行中</string>
+    <string name="agent_badge_waiting">需确认</string>
+    <string name="agent_badge_failed">失败</string>
+    <string name="agent_badge_cancelled">已取消</string>
+    <string name="agent_tool_done">已执行</string>
+    <string name="agent_expand">展开</string>
+    <string name="agent_collapse">收起</string>
+    <string name="agent_cmd_prefix">$ adb shell %1$s</string>
+    <string name="agent_cmd_result">→ %1$s</string>
+    <string name="agent_collapse_panel">收起面板</string>
+    <string name="agent_expand_panel">展开设备面板</string>
+    <string name="agent_avatar_desc">AI 助手</string>
 </resources>

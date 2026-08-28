@@ -390,9 +390,9 @@ private fun parseDisplay(sizeOutput: String?, densityOutput: String?, fontScaleO
 
 private fun parseBattery(output: String?): DeviceBatteryStatus? {
     val text = output.orEmpty()
-    val level = Regex("(?m)^\\s*level:\\s*(\\d+)").find(text)?.groupValues?.getOrNull(1)?.toIntOrNull()
-    val statusCode = Regex("(?m)^\\s*status:\\s*(\\d+)").find(text)?.groupValues?.getOrNull(1)?.toIntOrNull()
-    val temperatureTenths = Regex("(?m)^\\s*temperature:\\s*(-?\\d+)")
+    val level = BATTERY_LEVEL_PATTERN.find(text)?.groupValues?.getOrNull(1)?.toIntOrNull()
+    val statusCode = BATTERY_STATUS_PATTERN.find(text)?.groupValues?.getOrNull(1)?.toIntOrNull()
+    val temperatureTenths = BATTERY_TEMP_PATTERN
         .find(text)?.groupValues?.getOrNull(1)?.toIntOrNull()
     if (level == null && statusCode == null && temperatureTenths == null) return null
     return DeviceBatteryStatus(
@@ -426,7 +426,7 @@ private fun parseCpuCounters(output: String): CpuCounters? {
     val values = output.lineSequence()
         .firstOrNull { it.startsWith("cpu ") }
         ?.trim()
-        ?.split(Regex("\\s+"))
+        ?.split(SPACES_PATTERN)
         ?.drop(1)
         ?.mapNotNull(String::toLongOrNull)
         ?: return null
@@ -438,9 +438,9 @@ private fun parseCpuCounters(output: String): CpuCounters? {
 
 private fun parseMemory(output: String?): DeviceMemoryStatus? {
     val text = output.orEmpty()
-    val totalKb = Regex("(?m)^MemTotal:\\s+(\\d+)").find(text)?.groupValues?.getOrNull(1)?.toLongOrNull()
+    val totalKb = MEM_TOTAL_PATTERN.find(text)?.groupValues?.getOrNull(1)?.toLongOrNull()
         ?: return null
-    val availableKb = Regex("(?m)^MemAvailable:\\s+(\\d+)").find(text)?.groupValues?.getOrNull(1)?.toLongOrNull()
+    val availableKb = MEM_AVAILABLE_PATTERN.find(text)?.groupValues?.getOrNull(1)?.toLongOrNull()
         ?: return null
     if (totalKb <= 0) return null
     val available = availableKb.coerceIn(0, totalKb)
@@ -455,7 +455,7 @@ private fun parseStorage(output: String?): DeviceStorageStatus? {
     val parts = output.orEmpty().lineSequence()
         .map(String::trim)
         .filter(String::isNotEmpty)
-        .map { it.split(Regex("\\s+")) }
+        .map { it.split(SPACES_PATTERN) }
         .firstOrNull { tokens -> tokens.size >= 4 && tokens[1].toLongOrNull() != null }
         ?: return null
     val totalKb = parts[1].toLongOrNull() ?: return null
@@ -481,9 +481,14 @@ private fun parseForeground(output: String?): DeviceForegroundStatus? {
 }
 
 private fun parseWmMetric(output: String, metric: String): String? {
-    val override = Regex("Override $metric:\\s*([^\\n\\r]+)").find(output)?.groupValues?.getOrNull(1)?.trim()
+    val (overridePattern, physicalPattern) = when (metric) {
+        "size" -> WM_OVERRIDE_SIZE_PATTERN to WM_PHYSICAL_SIZE_PATTERN
+        "density" -> WM_OVERRIDE_DENSITY_PATTERN to WM_PHYSICAL_DENSITY_PATTERN
+        else -> Regex("Override $metric:\\s*([^\\n\\r]+)") to Regex("Physical $metric:\\s*([^\\n\\r]+)")
+    }
+    val override = overridePattern.find(output)?.groupValues?.getOrNull(1)?.trim()
     if (!override.isNullOrBlank()) return override
-    return Regex("Physical $metric:\\s*([^\\n\\r]+)").find(output)?.groupValues?.getOrNull(1)?.trim()
+    return physicalPattern.find(output)?.groupValues?.getOrNull(1)?.trim()
 }
 
 private fun String?.cleanOrNull(): String? = this
@@ -527,6 +532,16 @@ private val WIFI_ENABLED_PATTERN = Regex("(?im)^\\s*Wi-?Fi is enabled\\s*$")
 private val WIFI_DISABLED_PATTERN = Regex("(?im)^\\s*Wi-?Fi is disabled\\s*$")
 private val WIFI_CONNECTED_PATTERN = Regex("(?im)^\\s*Wi-?Fi is connected(?:\\s+to)?(?:\\s|$)")
 private val WIFI_NOT_CONNECTED_PATTERN = Regex("(?im)^\\s*Wi-?Fi is not connected(?:\\s|$)")
+private val BATTERY_LEVEL_PATTERN = Regex("(?m)^\\s*level:\\s*(\\d+)")
+private val BATTERY_STATUS_PATTERN = Regex("(?m)^\\s*status:\\s*(\\d+)")
+private val BATTERY_TEMP_PATTERN = Regex("(?m)^\\s*temperature:\\s*(-?\\d+)")
+private val SPACES_PATTERN = Regex("\\s+")
+private val MEM_TOTAL_PATTERN = Regex("(?m)^MemTotal:\\s+(\\d+)")
+private val MEM_AVAILABLE_PATTERN = Regex("(?m)^MemAvailable:\\s+(\\d+)")
+private val WM_OVERRIDE_SIZE_PATTERN = Regex("Override size:\\s*([^\\n\\r]+)")
+private val WM_PHYSICAL_SIZE_PATTERN = Regex("Physical size:\\s*([^\\n\\r]+)")
+private val WM_OVERRIDE_DENSITY_PATTERN = Regex("Override density:\\s*([^\\n\\r]+)")
+private val WM_PHYSICAL_DENSITY_PATTERN = Regex("Physical density:\\s*([^\\n\\r]+)")
 private const val KIBIBYTE = 1_024L
 private const val CPU_SAMPLE_INTERVAL_MS = 150L
 private const val MAX_FAILURE_REASON_LENGTH = 160

@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "source": "cowart",
+  "pages": [
+    {
+      "id": "page:page",
+      "name": "首页设计",
+      "index": "a1",
+      "path": "pages/page/cowart-canvas.json"
+    }
+  ]
+}

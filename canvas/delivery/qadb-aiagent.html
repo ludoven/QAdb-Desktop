@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<!--
+  QADB AI Agent 页面原型 · 单文件 · 无外部依赖
+  设计系统: design-tokens.md — QADB Workbench (Linear-Class) / Light + Dark 双主题
+  骨架: 顶部 44px 通栏 + 左导航 220px / 中央对话区(弹性, 文本列≤720px) / 右设备面板 400px
+  JS 仅用于: 主题切换 · 卡片折叠/展开 · 视觉观察开关 · 右侧面板收合
+-->
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QADB · AI Agent</title>
+<style>
+/* ============ 0. Design Tokens (design-tokens.md) ============ */
+:root{
+  --bg-0:#F6F7F9; --bg-1:#FFFFFF; --bg-2:#FBFCFD; --bg-3:#EFF1F4;
+  --text-primary:#16181D; --text-secondary:#4B505A; --text-tertiary:#717684; --text-muted:#9AA0AC;
+  --border:#E4E6EA; --border-strong:#D3D6DC; --divider:#EDEFF2;
+  --brand:#2196F3; --brand-action:#1976D2; --brand-hover:#1565C0;
+  --brand-300:#64B5F6; --brand-900:#0D47A1; --brand-soft:#E3F2FD;
+  --success:#1E8E3E; --warning:#B45309; --danger:#D93025; --info:#1976D2;
+  --ai:#7C3AED; --ai-border:#DCD1F8; --ai-card-bg:#FBF9FE;
+  --success-bg:#E7F4EC; --success-text:#135C28;
+  --warning-bg:#FDF0D9; --warning-text:#7C4A03;
+  --danger-bg:#FCEBEA; --danger-text:#A11C12;
+  --info-bg:#E8F1FC; --info-text:#0B4FA0;
+  --ai-bg:#EFEAFE; --ai-text:#4C1D95;
+  --font-ui:"Inter","SF Pro Text","Segoe UI","Roboto","Noto Sans SC","PingFang SC","Microsoft YaHei",sans-serif;
+  --font-mono:"JetBrains Mono","SF Mono","Cascadia Code","Consolas","Roboto Mono",monospace;
+  --radius-sm:6px; --radius-md:8px; --radius-lg:12px; --radius-xl:16px; --radius-full:999px;
+  --shadow-raised:0 1px 2px rgba(15,18,25,.05),0 1px 3px rgba(15,18,25,.04);
+  --shadow-floating:0 4px 8px rgba(15,18,25,.08),0 2px 4px rgba(15,18,25,.06);
+}
+[data-theme="dark"]{
+  --bg-0:#0F0F12; --bg-1:#141418; --bg-2:#1A1A1F; --bg-3:#212127;
+  --text-primary:#ECEDEF; --text-secondary:#A9ADB5; --text-tertiary:#80858F; --text-muted:#565B64;
+  --border:#26262C; --border-strong:#35353D; --divider:#1E1E23;
+  --brand:#2196F3; --brand-action:#42A5F5; --brand-hover:#64B5F6;
+  --brand-300:#64B5F6; --brand-900:#90CAF9; --brand-soft:rgba(33,150,243,.16);
+  --success:#3FB950; --warning:#F0A020; --danger:#F2555A; --info:#42A5F5;
+  --ai:#A78BFA; --ai-border:#3A2F5E; --ai-card-bg:#1A1622;
+  --success-bg:#12301F; --success-text:#7EE2A0;
+  --warning-bg:#3A2B0C; --warning-text:#FFD28A;
+  --danger-bg:#3A1A1E; --danger-text:#FF9C96;
+  --info-bg:#0E2A47; --info-text:#9ECBEF;
+  --ai-bg:#241A3D; --ai-text:#C4B5FD;
+}
+
+/* ============ 1. Base ============ */
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{font-family:var(--font-ui);font-size:14px;line-height:1.55;color:var(--text-primary);background:var(--bg-0);-webkit-font-smoothing:antialiased}
+button{font-family:inherit}
+svg{display:block}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-thumb{background:var(--border-strong);border-radius:6px;border:3px solid transparent;background-clip:padding-box}
+::-webkit-scrollbar-track{background:transparent}
+
+.app{display:flex;flex-direction:column;height:100vh;min-width:1024px}
+.main{display:flex;flex:1;min-height:0}
+
+/* ============ 2. Top Status Bar (44px) ============ */
+.topbar{height:44px;flex-shrink:0;background:var(--bg-2);border-bottom:1px solid var(--divider);display:flex;align-items:center;padding:0 14px;gap:12px}
+.tb-left{display:flex;align-items:center;gap:10px;min-width:0}
+.tb-device{font-family:var(--font-mono);font-size:12px;font-weight:500;color:var(--text-primary)}
+.tb-sep{width:1px;height:14px;background:var(--border)}
+.tb-item{display:flex;align-items:center;gap:6px;font-family:var(--font-mono);font-size:12px;color:var(--text-tertiary)}
+.tb-right{margin-left:auto;display:flex;align-items:center;gap:14px}
+.adb{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text-secondary)}
+
+/* ============ 3. Status Dot & Breathing ============ */
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block;flex-shrink:0}
+.dot.ok{background:var(--success)}
+.dot.busy{background:var(--brand);animation:breathe 1.5s ease-in-out infinite}
+.dot.idle{background:var(--text-muted)}
+.dot.warn{background:var(--warning)}
+.dot.fail{background:var(--danger)}
+.dot.ai{background:var(--ai)}
+@keyframes breathe{0%,100%{box-shadow:0 0 0 0 rgba(33,150,243,.35);opacity:1}50%{box-shadow:0 0 0 4px rgba(33,150,243,0);opacity:.7}}
+@media (prefers-reduced-motion: reduce){.dot.busy{animation:none;box-shadow:0 0 0 0 rgba(33,150,243,.35)}.card-body{transition:none}}
+
+/* ============ 4. Left Nav (220px) ============ */
+.sidebar{width:220px;flex-shrink:0;background:var(--bg-2);border-right:1px solid var(--divider);display:flex;flex-direction:column;min-height:0}
+.logo{height:44px;display:flex;align-items:center;gap:8px;padding:0 14px;border-bottom:1px solid var(--divider);flex-shrink:0}
+.logo-mark{width:22px;height:22px;border-radius:7px;background:var(--brand);color:#fff;font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:center}
+.logo-name{font-size:14px;font-weight:600;letter-spacing:.2px}
+.logo-sub{font-size:10px;color:var(--text-tertiary);margin-left:auto;font-family:var(--font-mono)}
+.nav{flex:1;overflow-y:auto;padding:8px;display:flex;flex-direction:column;gap:2px}
+.nav-item{position:relative;display:flex;align-items:center;gap:10px;height:36px;padding:0 12px;border-radius:var(--radius-sm);color:var(--text-tertiary);font-size:13px;white-space:nowrap;user-select:none}
+.nav-item svg{width:16px;height:16px;stroke:currentColor;flex-shrink:0}
+.nav-item:hover{background:var(--bg-3);color:var(--text-primary)}
+.nav-item.selected{background:var(--bg-3);color:var(--text-primary);font-weight:500}
+.nav-item.selected::before{content:'';position:absolute;left:-8px;top:9px;bottom:9px;width:3px;border-radius:3px;background:var(--brand)}
+.nav-item .badge{margin-left:auto}
+.sidebar-foot{padding:8px;flex-shrink:0}
+.device-card{background:var(--bg-1);border:1px solid var(--border);border-radius:var(--radius-md);padding:10px 12px}
+.device-card .dc-top{display:flex;align-items:center;gap:8px}
+.device-card .dname{font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.device-card .dmeta{margin-top:6px;font-size:11px;color:var(--text-tertiary);font-family:var(--font-mono);line-height:1.6}
+
+/* ============ 5. Badge / Switch / Button / Icon ============ */
+.badge{display:inline-flex;align-items:center;gap:6px;padding:3px 9px;border-radius:var(--radius-full);font-size:11px;font-weight:500;line-height:1.4;white-space:nowrap}
+.badge.info{background:var(--info-bg);color:var(--info-text)}
+.badge.success{background:var(--success-bg);color:var(--success-text)}
+.badge.warn{background:var(--warning-bg);color:var(--warning-text)}
+.badge.ai{background:var(--ai-bg);color:var(--ai-text)}
+.switch{width:36px;height:20px;border-radius:var(--radius-full);background:var(--brand);position:relative;border:none;cursor:pointer;flex-shrink:0;transition:background .15s}
+.switch::after{content:'';position:absolute;top:2px;right:2px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.2)}
+.switch.off{background:var(--bg-3);border:1px solid var(--border)}
+.switch.off::after{right:auto;left:1px;top:1px}
+.switch.sm{width:30px;height:18px}
+.switch.sm::after{width:14px;height:14px;top:2px;right:2px}
+.switch.sm.off::after{top:1px;left:1px}
+.btn{height:32px;padding:0 14px;border-radius:var(--radius-sm);font-size:13px;font-weight:500;display:inline-flex;align-items:center;gap:6px;cursor:pointer;border:1px solid transparent;user-select:none}
+.btn.primary{background:var(--brand-action);color:#fff}
+.btn.primary:hover{background:var(--brand-hover)}
+.btn.secondary{background:var(--bg-1);border-color:var(--border);color:var(--text-primary)}
+.btn.secondary:hover{background:var(--bg-3)}
+.btn.ghost{background:transparent;border-color:transparent;color:var(--text-secondary)}
+.btn.ghost:hover{background:var(--bg-3);color:var(--text-primary)}
+.btn.danger{background:var(--danger);color:#fff}
+.btn.danger:hover{filter:brightness(.94)}
+.btn:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+.icon-btn:focus-visible,.switch:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+.icon-btn{width:32px;height:32px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:transparent;border:none;color:var(--text-secondary);cursor:pointer;flex-shrink:0}
+.icon-btn:hover{background:var(--bg-3);color:var(--text-primary)}
+.icon-btn svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+.theme-toggle .icon-sun{display:none}
+[data-theme="dark"] .theme-toggle .icon-sun{display:block}
+[data-theme="dark"] .theme-toggle .icon-moon{display:none}
+
+/* ============ 6. Center Chat ============ */
+.center{flex:1;min-width:480px;background:var(--bg-1);display:flex;flex-direction:column;min-height:0}
+.session-bar{flex-shrink:0;display:flex;align-items:center;justify-content:space-between;padding:10px 24px;border-bottom:1px solid var(--divider);gap:12px}
+.session-title{font-size:17px;font-weight:600;display:flex;align-items:center;gap:10px;min-width:0}
+.session-title .st{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.session-sub{font-size:12px;color:var(--text-tertiary);margin-top:3px}
+.chat-scroll{flex:1;overflow-y:auto;display:flex;justify-content:center}
+.chat-col{width:100%;max-width:720px;padding:20px 28px 96px}
+
+.msg{margin-bottom:18px}
+.msg.user{display:flex;justify-content:flex-end}
+.msg.user .meta{text-align:right}
+.meta{font-size:11px;color:var(--text-tertiary);margin-top:5px}
+.bubble-user{max-width:72%;background:var(--brand-soft);color:var(--brand-900);border-radius:12px 12px 4px 12px;padding:9px 14px;font-size:14px;line-height:1.55;word-break:break-all}
+.msg.assistant{display:flex;gap:10px}
+.avatar-ai{width:24px;height:24px;border-radius:50%;background:var(--ai);color:#fff;font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px}
+.bubble-assistant{flex:1;min-width:0;background:var(--bg-1);border:1px solid var(--border);border-radius:var(--radius-lg);padding:12px 16px;font-size:14px;line-height:1.65}
+.ab-text{margin-bottom:4px}
+.ab-note{font-size:12px;color:var(--text-tertiary);line-height:1.6}
+
+/* ============ 7. Tool Call / Thinking Card ============ */
+.card{border:1px solid var(--ai-border);background:var(--ai-card-bg);border-radius:var(--radius-md);margin-bottom:14px;overflow:hidden}
+.card-head{display:flex;align-items:center;gap:8px;padding:8px 12px;cursor:pointer;user-select:none}
+.card-head:hover{background:var(--bg-3)}
+.card-body{max-height:0;overflow:hidden;transition:max-height .18s ease-out}
+.card.open .card-body,.card:hover .card-body{max-height:340px}
+.card-body-inner{padding:2px 12px 12px}
+.caret{margin-left:auto;width:14px;height:14px;color:var(--text-tertiary);transition:transform .15s;flex-shrink:0}
+.card.open .caret,.card:hover .caret{transform:rotate(180deg)}
+.card-icon{width:16px;height:16px;color:var(--ai);flex-shrink:0;stroke:currentColor;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.tool-name{font-family:var(--font-mono);font-size:13px;color:var(--text-primary);white-space:nowrap}
+.tool-args{font-family:var(--font-mono);font-size:12px;color:var(--text-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:38%}
+.tool-status{margin-left:auto;display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:500;white-space:nowrap}
+.tool-status.ok{color:var(--success)}
+.tool-status.busy{color:var(--info)}
+.tool-status.wait{color:var(--text-muted)}
+.tool-status.fail{color:var(--danger)}
+.tool-time{font-size:11px;color:var(--text-tertiary);font-family:var(--font-mono);flex-shrink:0}
+.think-title{font-size:12px;color:var(--text-secondary);font-weight:500;white-space:nowrap}
+.think-summary{font-size:12px;color:var(--text-tertiary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:52%}
+.cmdblock{background:var(--bg-3);border-radius:var(--radius-sm);padding:8px 12px;font-family:var(--font-mono);font-size:12px;color:var(--text-secondary);line-height:1.6;margin:6px 0;white-space:pre-wrap;word-break:break-all}
+.cmdblock + .cmd-out{margin-top:-2px}
+.cmd-out{font-size:11px;color:var(--text-tertiary);font-family:var(--font-mono);margin-top:6px}
+.think-body{font-size:13px;color:var(--text-secondary);line-height:1.7}
+.confirm-card{border:1px solid var(--danger);background:var(--danger-bg);border-radius:var(--radius-md);padding:12px 16px;margin-bottom:14px}
+.confirm-head{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.confirm-title{font-size:13px;font-weight:600;color:var(--danger-text)}
+.confirm-body{font-size:13px;color:var(--danger-text);line-height:1.6}
+.confirm-actions{display:flex;gap:8px;margin-top:10px}
+.confirm-icon{width:16px;height:16px;color:var(--danger);flex-shrink:0;stroke:currentColor;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+
+/* ============ 8. Activity Card ============ */
+.activity{border:1px solid var(--border);background:var(--bg-1);border-radius:var(--radius-md);padding:12px 16px;margin-bottom:14px}
+.activity-title{font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px;margin-bottom:12px}
+.step{display:flex;gap:10px}
+.step-col{display:flex;flex-direction:column;align-items:center;width:12px}
+.step-col .dot{margin-top:4px}
+.step-col .line{flex:1;width:1px;background:var(--divider);min-height:16px}
+.step:last-child .step-col .line{display:none}
+.step-text{font-size:13px;color:var(--text-primary);padding-bottom:12px}
+.step.done .step-text{color:var(--text-secondary)}
+.step .st-sub{font-size:11px;color:var(--text-tertiary);font-family:var(--font-mono);margin-left:8px}
+
+/* ============ 9. Bottom Input (pinned) ============ */
+.chat-input{flex-shrink:0;border-top:1px solid var(--divider);background:var(--bg-1);padding:12px 24px 14px}
+.input-row{display:flex;align-items:center;gap:8px}
+.chat-input .inp{flex:1;height:44px;border:1px solid var(--border);border-radius:var(--radius-md);background:var(--bg-1);padding:0 14px;font-size:14px;font-family:var(--font-ui);color:var(--text-primary);outline:none;transition:border-color .12s,box-shadow .12s}
+.chat-input .inp::placeholder{color:var(--text-muted)}
+.chat-input .inp:focus{border-color:var(--brand);box-shadow:0 0 0 2px rgba(33,150,243,.22)}
+.input-meta{display:flex;align-items:center;gap:16px;margin-top:8px;font-size:12px;color:var(--text-tertiary)}
+.meta-item{display:flex;align-items:center;gap:6px}
+.input-hint{display:flex;justify-content:flex-end;margin-top:4px;font-size:11px;color:var(--text-tertiary)}
+
+/* ============ 10. Right Panel (400px) ============ */
+.rightpanel{width:400px;flex-shrink:0;background:var(--bg-2);border-left:1px solid var(--divider);display:flex;flex-direction:column;overflow-y:auto;min-height:0;transition:width .2s ease}
+.rightpanel.collapsed{width:0;min-width:0;overflow:hidden;border-left:none}
+.panel-head{display:flex;align-items:center;justify-content:space-between;padding:14px 16px 10px;flex-shrink:0}
+.panel-head h2{font-size:15px;font-weight:600}
+.panel-sec{padding:0 16px 16px}
+.devscreen-wrap{position:relative;padding:0 16px 14px}
+.devscreen{position:relative;background:var(--bg-0);border:1px solid var(--border);border-radius:var(--radius-lg);padding:12px;display:flex;justify-content:center}
+.devscreen svg{width:224px;height:auto}
+.pagepill{position:absolute;top:10px;left:12px;background:rgba(15,18,25,.82);color:#E8EAED;font-family:var(--font-mono);font-size:11px;padding:4px 8px;border-radius:var(--radius-sm);letter-spacing:.2px;max-width:72%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;z-index:2}
+.changedbadge{position:absolute;top:10px;right:12px;background:var(--info-bg);color:var(--info-text);font-size:11px;font-weight:500;padding:3px 8px;border-radius:var(--radius-full);z-index:2}
+.obs-card{border:1px solid var(--border);border-radius:var(--radius-md);background:var(--bg-1);padding:12px 14px;margin-bottom:14px;transition:border-color .15s}
+.obs-card.on{border-color:var(--brand)}
+.obs-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;gap:8px}
+.obs-title{font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px}
+.obs-switch-row{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.obs-status{font-size:12px;color:var(--text-secondary);display:flex;align-items:center;gap:6px;line-height:1.5}
+.obs-caption{font-size:11px;color:var(--text-tertiary);margin-top:10px;font-family:var(--font-mono);line-height:1.6}
+.token-card{border:1px solid var(--border);border-radius:var(--radius-md);background:var(--bg-1);padding:12px 14px;margin-bottom:14px}
+.token-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;gap:8px}
+.token-title{font-size:13px;font-weight:600}
+.meter{height:4px;border-radius:var(--radius-full);background:var(--bg-3);overflow:hidden}
+.meter>i{display:block;height:100%;background:var(--brand);border-radius:var(--radius-full)}
+.token-nums{display:flex;justify-content:space-between;margin-top:8px;font-size:11px;color:var(--text-tertiary);font-family:var(--font-mono)}
+.panel-foot{padding:4px 16px 14px;flex-shrink:0}
+.panel-foot .btn{width:100%;justify-content:center}
+.reopen-tab{position:fixed;right:0;top:50%;transform:translateY(-50%);width:20px;height:56px;border-radius:6px 0 0 6px;background:var(--bg-1);border:1px solid var(--border);border-right:none;color:var(--text-secondary);cursor:pointer;z-index:100;font-size:14px;display:flex;align-items:center;justify-content:center}
+
+@media (max-width:1279px){.rightpanel{width:320px}}
+@media (max-width:1079px){.sidebar{width:64px}.logo-name,.logo-sub,.nav-item span,.sidebar-foot{display:none}.nav-item{justify-content:center;padding:0}.nav-item.selected::before{left:-8px}.device-card{display:none}}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ===== 顶部状态栏 (44px 通栏) ===== -->
+  <header class="topbar">
+    <div class="tb-left">
+      <span class="tb-device">2304FPN6DC</span>
+      <span class="tb-sep"></span>
+      <span class="tb-item">Android 16 · API 36</span>
+      <span class="tb-sep"></span>
+      <span class="tb-item">
+        <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2.5 6.5a8.5 8.5 0 0 1 11 0M4.5 9a5.5 5.5 0 0 1 7 0M6.5 11.5a2.5 2.5 0 0 1 3 0"/><circle cx="8" cy="13" r="1" fill="currentColor" stroke="none"/></svg>
+        Wi-Fi
+      </span>
+      <span class="tb-sep"></span>
+      <span class="tb-item">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="6" width="10" height="5" rx="1.5"/><path d="M13 8v1"/></svg>
+        72%
+      </span>
+    </div>
+    <div class="tb-right">
+      <button class="icon-btn theme-toggle" id="themeToggle" title="切换深浅主题" aria-label="切换深浅主题">
+        <svg class="icon-moon" viewBox="0 0 16 16"><path d="M13.2 9.2A5.6 5.6 0 1 1 6.8 2.8a4.6 4.6 0 0 0 6.4 6.4z"/></svg>
+        <svg class="icon-sun" viewBox="0 0 16 16"><circle cx="8" cy="8" r="3"/><path d="M8 1.5v1.6M8 12.9v1.6M1.5 8h1.6M12.9 8h1.6M3.4 3.4l1.1 1.1M11.5 11.5l1.1 1.1M3.4 12.6l1.1-1.1M11.5 4.5l1.1-1.1"/></svg>
+      </button>
+      <span class="adb"><span class="dot ok"></span>ADB 在线</span>
+    </div>
+  </header>
+
+  <div class="main">
+
+    <!-- ===== 左侧导航 (220px) ===== -->
+    <aside class="sidebar">
+      <div class="logo">
+        <span class="logo-mark">Q</span>
+        <span class="logo-name">QADB</span>
+        <span class="logo-sub">v0.9.0</span>
+      </div>
+      <nav class="nav">
+        <div class="nav-item"><svg viewBox="0 0 16 16"><path d="M3 9.5 8 5l5 4.5M4.5 8.5V13a1 1 0 0 0 1 1h5a1 1 0 0 0 1-1V8.5"/></svg><span>首页</span></div>
+        <div class="nav-item"><svg viewBox="0 0 16 16"><rect x="3" y="3" width="10" height="10" rx="2"/><path d="M6 6.5l3 3-3 3"/></svg><span>命令</span></div>
+        <div class="nav-item"><svg viewBox="0 0 16 16"><rect x="4.5" y="2.5" width="7" height="11" rx="1.5"/><path d="M7.5 11.5h1"/></svg><span>设备控制</span></div>
+        <div class="nav-item"><svg viewBox="0 0 16 16"><rect x="3" y="3" width="4" height="4" rx="1"/><rect x="9" y="3" width="4" height="4" rx="1"/><rect x="3" y="9" width="4" height="4" rx="1"/><rect x="9" y="9" width="4" height="4" rx="1"/></svg><span>应用</span></div>
+        <div class="nav-item"><svg viewBox="0 0 16 16"><path d="M3 5.5h3.5L8 7.5h5a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1v-6a1 1 0 0 1 1-1z"/></svg><span>文件</span></div>
+        <div class="nav-item"><svg viewBox="0 0 16 16"><path d="M2 8h3l2-4.5L9.5 12 12 7.5H14"/></svg><span>诊断</span></div>
+        <div class="nav-item"><svg viewBox="0 0 16 16"><rect x="2.5" y="3" width="11" height="8" rx="1.5"/><path d="M5 6l2 2-2 2M9 10h2.5M8 11v2M5.5 13h5"/></svg><span>终端</span></div>
+        <div class="nav-item selected"><svg viewBox="0 0 16 16"><path d="M8 2.5l1.6 3.9 3.9 1.6-3.9 1.6L8 13.5 6.4 9.6 2.5 8l3.9-1.6z"/></svg><span>AI Agent</span><span class="badge ai">BETA</span></div>
+        <div class="nav-item"><svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="2.4"/><path d="M8 2.4v1.8M8 11.8v1.8M2.4 8h1.8M11.8 8h1.8M4.1 4.1l1.3 1.3M10.6 10.6l1.3 1.3M4.1 11.9l1.3-1.3M10.6 5.4l1.3-1.3"/></svg><span>设置</span></div>
+      </nav>
+      <div class="sidebar-foot">
+        <div class="device-card">
+          <div class="dc-top"><span class="dot ok"></span><span class="dname">2304FPN6DC</span></div>
+          <div class="dmeta">Xiaomi 14 · Android 16 (API 36)<br>192.168.1.7:5555 · adb</div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ===== 中央对话区 ===== -->
+    <main class="center">
+      <div class="session-bar">
+        <div>
+          <div class="session-title"><span class="st">「给奶娃发微信 123」</span><span class="badge info"><span class="dot busy"></span>进行中</span></div>
+          <div class="session-sub">AI Agent · 会话 #2 · 4 个工具调用 · 2 次视觉观察</div>
+        </div>
+        <button class="btn ghost"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6"/><path d="M8 5v3l2 2"/></svg>会话历史</button>
+      </div>
+
+      <div class="chat-scroll">
+        <div class="chat-col">
+
+          <!-- 用户消息 -->
+          <div class="msg user">
+            <div>
+              <div class="bubble-user">给奶娃发微信 123</div>
+              <div class="meta">12:03:41 · 用户</div>
+            </div>
+          </div>
+
+          <!-- 思考链卡（默认展开，演示两种状态） -->
+          <div class="card open">
+            <div class="card-head">
+              <svg class="card-icon" viewBox="0 0 16 16"><path d="M8 2.5l1.6 3.9 3.9 1.6-3.9 1.6L8 13.5 6.4 9.6 2.5 8l3.9-1.6z"/></svg>
+              <span class="think-title">思考过程</span>
+              <span class="think-summary">将指令拆解为 4 步：打开微信、搜索联系人、输入内容、点击发送</span>
+              <svg class="caret" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6l4 4 4-4"/></svg>
+            </div>
+            <div class="card-body"><div class="card-body-inner">
+              <div class="think-body">收到指令「给奶娃发微信 123」。拆解为 4 个步骤：1) 打开微信（com.tencent.mm）；2) 搜索联系人「奶娃」并确认唯一性；3) 在输入框键入「123」；4) 点击发送。步骤 2 需要视觉观察确认搜索结果，防止误发给同名联系人。</div>
+            </div></div>
+          </div>
+
+          <!-- 工具调用卡 1 -->
+          <div class="card">
+            <div class="card-head">
+              <svg class="card-icon" viewBox="0 0 16 16"><rect x="2.5" y="4" width="11" height="8" rx="1.5"/><path d="M5 7l2 2-2 2"/></svg>
+              <span class="tool-name">am start</span>
+              <span class="tool-args">-n com.tencent.mm/.ui.LauncherUI</span>
+              <span class="tool-status ok"><span class="dot ok"></span>已执行</span>
+              <span class="tool-time">12:03:43</span>
+              <svg class="caret" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6l4 4 4-4"/></svg>
+            </div>
+            <div class="card-body"><div class="card-body-inner">
+              <div class="cmdblock">$ adb shell am start -n com.tencent.mm/.ui.LauncherUI
+Waiting for the process: com.tencent.mm
+Starting: Intent { cmp=com.tencent.mm/.ui.LauncherUI }</div>
+              <div class="cmd-out">→ 启动成功 · 耗时 412ms · 页面 id: com.tencent.mm/.ui.LauncherUI</div>
+            </div></div>
+          </div>
+
+          <!-- 助手消息 1 -->
+          <div class="msg assistant">
+            <div class="avatar-ai">AI</div>
+            <div style="flex:1;min-width:0">
+              <div class="bubble-assistant">
+                <div class="ab-text">已打开微信 <span class="badge success" style="margin-left:4px">已执行</span>，正在定位联系人「奶娃」…</div>
+                <div class="ab-note">视觉观察已启用，将实时核对屏幕状态。</div>
+              </div>
+              <div class="meta">12:03:44 · 助手</div>
+            </div>
+          </div>
+
+          <!-- 工具调用卡 2 -->
+          <div class="card">
+            <div class="card-head">
+              <svg class="card-icon" viewBox="0 0 16 16"><rect x="2.5" y="4" width="11" height="8" rx="1.5"/><path d="M5 7l2 2-2 2"/></svg>
+              <span class="tool-name">input text</span>
+              <span class="tool-args">"奶娃" · 搜索框</span>
+              <span class="tool-status ok"><span class="dot ok"></span>已执行</span>
+              <span class="tool-time">12:03:46</span>
+              <svg class="caret" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6l4 4 4-4"/></svg>
+            </div>
+            <div class="card-body"><div class="card-body-inner">
+              <div class="cmdblock">$ adb shell input text "奶娃"</div>
+              <div class="cmd-out">→ 输入完成 · 视觉观察确认 1 个匹配项「奶娃」</div>
+            </div></div>
+          </div>
+
+          <!-- 思考链卡 2（默认折叠） -->
+          <div class="card">
+            <div class="card-head">
+              <svg class="card-icon" viewBox="0 0 16 16"><path d="M8 2.5l1.6 3.9 3.9 1.6-3.9 1.6L8 13.5 6.4 9.6 2.5 8l3.9-1.6z"/></svg>
+              <span class="think-title">思考过程</span>
+              <span class="think-summary">搜索到 1 个匹配联系人，唯一性确认通过</span>
+              <svg class="caret" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6l4 4 4-4"/></svg>
+            </div>
+            <div class="card-body"><div class="card-body-inner">
+              <div class="think-body">视觉观察确认：搜索结果中「奶娃」仅 1 个匹配项，头像与历史会话一致，可安全发送。若存在多个同名联系人，将改为向用户请求确认。</div>
+            </div></div>
+          </div>
+
+          <!-- 工具调用卡 3 -->
+          <div class="card">
+            <div class="card-head">
+              <svg class="card-icon" viewBox="0 0 16 16"><rect x="2.5" y="4" width="11" height="8" rx="1.5"/><path d="M5 7l2 2-2 2"/></svg>
+              <span class="tool-name">input text</span>
+              <span class="tool-args">"123" · 输入框</span>
+              <span class="tool-status ok"><span class="dot ok"></span>已执行</span>
+              <span class="tool-time">12:03:52</span>
+              <svg class="caret" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6l4 4 4-4"/></svg>
+            </div>
+            <div class="card-body"><div class="card-body-inner">
+              <div class="cmdblock">$ adb shell input text "123"</div>
+              <div class="cmd-out">→ 输入完成 · 视觉观察确认光标位于聊天输入框</div>
+            </div></div>
+          </div>
+
+          <!-- 敏感操作确认卡（P1-3） -->
+          <div class="confirm-card">
+            <div class="confirm-head">
+              <svg class="confirm-icon" viewBox="0 0 16 16"><path d="M8 1.8l5.5 2v4.1c0 3.1-2.3 5.4-5.5 6.3-3.2-.9-5.5-3.2-5.5-6.3V3.8z"/><path d="M8 5.5v3.4M8 11h.01"/></svg>
+              <span class="confirm-title">发送消息为敏感操作</span>
+              <span class="badge warn" style="margin-left:auto">需确认</span>
+            </div>
+            <div class="confirm-body">确认发送「123」给「奶娃」？发送后将无法撤回。</div>
+            <div class="confirm-actions">
+              <button class="btn danger">确认发送</button>
+              <button class="btn secondary">取消</button>
+            </div>
+          </div>
+
+          <!-- 工具调用卡 4 -->
+          <div class="card">
+            <div class="card-head">
+              <svg class="card-icon" viewBox="0 0 16 16"><rect x="2.5" y="4" width="11" height="8" rx="1.5"/><path d="M5 7l2 2-2 2"/></svg>
+              <span class="tool-name">input tap</span>
+              <span class="tool-args">934 1734 · 发送按钮</span>
+              <span class="tool-status wait"><span class="dot warn"></span>待确认</span>
+              <span class="tool-time">12:03:54</span>
+              <svg class="caret" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6l4 4 4-4"/></svg>
+            </div>
+            <div class="card-body"><div class="card-body-inner">
+              <div class="cmdblock">$ adb shell input tap 934 1734</div>
+              <div class="cmd-out">→ 已定位「发送」按钮坐标 (934, 1734) · 等待用户确认后执行</div>
+            </div></div>
+          </div>
+
+          <!-- 任务进度 Activity Card -->
+          <div class="activity">
+            <div class="activity-title">任务进度 <span class="badge warn"><span class="dot warn"></span>需确认</span><span class="meta" style="margin:0 0 0 auto">4 步 · 已完成 3</span></div>
+            <div class="step done">
+              <div class="step-col"><span class="dot ok"></span><span class="line"></span></div>
+              <div class="step-text">打开微信<span class="st-sub">12:03:43 · am start</span></div>
+            </div>
+            <div class="step done">
+              <div class="step-col"><span class="dot ok"></span><span class="line"></span></div>
+              <div class="step-text">搜索联系人「奶娃」<span class="st-sub">12:03:46 · input text</span></div>
+            </div>
+            <div class="step done">
+              <div class="step-col"><span class="dot ok"></span><span class="line"></span></div>
+              <div class="step-text">输入内容「123」<span class="st-sub">12:03:52 · input text</span></div>
+            </div>
+            <div class="step">
+              <div class="step-col"><span class="dot warn"></span></div>
+              <div class="step-text">点击发送<span class="st-sub">待确认</span></div>
+            </div>
+          </div>
+
+          <!-- 助手消息 2（待确认） -->
+          <div class="msg assistant">
+            <div class="avatar-ai">AI</div>
+            <div style="flex:1;min-width:0">
+              <div class="bubble-assistant">
+                <div class="ab-text">「123」已输入，等待你的确认后发送。<span class="badge warn" style="margin-left:8px">需确认</span></div>
+                <div class="ab-note">发送消息为敏感操作，请在确认卡中点击「确认发送」后继续。</div>
+              </div>
+              <div class="meta">12:03:56 · 助手</div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- 底部输入区（钉住） -->
+      <div class="chat-input">
+        <div class="input-row">
+          <button class="icon-btn" title="打开设置" aria-label="打开设置"><svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="2.4"/><path d="M8 2.4v1.8M8 11.8v1.8M2.4 8h1.8M11.8 8h1.8M4.1 4.1l1.3 1.3M10.6 10.6l1.3 1.3M4.1 11.9l1.3-1.3M10.6 5.4l1.3-1.3"/></svg></button>
+          <button class="icon-btn" title="截图识别" aria-label="截图识别"><svg viewBox="0 0 16 16"><path d="M3 6.5h2l1-1.5h4l1 1.5h2a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1v-5a1 1 0 0 1 1-1z"/><circle cx="8" cy="9.5" r="2"/></svg></button>
+          <input class="inp" type="text" placeholder="告诉 AI 你想让手机完成什么..." aria-label="AI 指令输入框">
+          <button class="btn secondary">新任务</button>
+          <button class="btn primary">发送<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8h9M9 4l4 4-4 4"/></svg></button>
+        </div>
+        <div class="input-meta">
+          <span class="meta-item">视觉观察模式 <button class="switch sm" id="inputObsSwitch" role="switch" aria-checked="true" aria-label="切换视觉观察模式"></button><span id="inputObsText">开启</span></span>
+          <span class="meta-item"><span class="dot busy"></span>AI 正在看你的屏幕 · 12:04:32</span>
+        </div>
+        <div class="input-hint">Enter 发送 · Shift+Enter 换行</div>
+      </div>
+    </main>
+
+    <!-- ===== 右侧设备面板 (400px) ===== -->
+    <aside class="rightpanel" id="rightPanel">
+      <div class="panel-head">
+        <h2>设备画面</h2>
+        <button class="icon-btn collapse-btn" title="收起面板" aria-label="收起面板"><svg viewBox="0 0 16 16"><path d="M4 10l4-4 4 4"/></svg></button>
+      </div>
+
+      <div class="devscreen-wrap">
+        <div class="devscreen">
+          <span class="pagepill">com.tencent.mm/.ui.LauncherUI</span>
+          <span class="changedbadge">changed</span>
+          <svg viewBox="0 0 240 440" role="img" aria-label="设备画面占位：微信聊天">
+            <!-- 手机外框 -->
+            <rect x="6" y="6" width="228" height="428" rx="26" fill="#111214" stroke="#2A2D33" stroke-width="2"/>
+            <!-- 屏幕 -->
+            <rect x="16" y="16" width="208" height="408" rx="16" fill="#EDEDED"/>
+            <!-- 状态栏 -->
+            <rect x="16" y="16" width="208" height="26" fill="#FFFFFF"/>
+            <text x="26" y="34" font-size="10" fill="#111" font-family="sans-serif">12:04</text>
+            <g fill="#333"><rect x="182" y="25" width="2" height="3"/><rect x="185" y="23.5" width="2" height="4.5"/><rect x="188" y="22" width="2" height="6"/></g>
+            <rect x="196" y="23" width="15" height="8" rx="2" fill="none" stroke="#333" stroke-width="1"/>
+            <rect x="197.5" y="24.5" width="9" height="5" rx="1" fill="#333"/>
+            <!-- 聊天头部 -->
+            <rect x="16" y="42" width="208" height="38" fill="#FFFFFF"/>
+            <path d="M30 61l8-8 8 8" stroke="#333" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+            <text x="120" y="66" font-size="13" text-anchor="middle" font-weight="600" fill="#111" font-family="sans-serif">奶娃</text>
+            <circle cx="208" cy="59" r="1.6" fill="#333"/><circle cx="208" cy="65" r="1.6" fill="#333"/><circle cx="208" cy="71" r="1.6" fill="#333"/>
+            <!-- 聊天区 -->
+            <rect x="84" y="92" width="72" height="16" rx="8" fill="#D8D8D8"/>
+            <text x="120" y="104" font-size="9" text-anchor="middle" fill="#666" font-family="sans-serif">今天 12:04</text>
+            <circle cx="34" cy="140" r="12" fill="#C9CDD4"/>
+            <circle cx="34" cy="136" r="4.5" fill="#8A919C"/>
+            <path d="M26 148a8 6 0 0 1 16 0" fill="#8A919C"/>
+            <rect x="52" y="126" width="84" height="28" rx="7" fill="#FFFFFF"/>
+            <text x="62" y="144" font-size="12" fill="#111" font-family="sans-serif">在吗？</text>
+            <text x="52" y="196" font-size="10" fill="#999" font-family="sans-serif">对方正在输入…</text>
+            <!-- 底部输入栏（已输入「123」，未发送） -->
+            <rect x="16" y="382" width="208" height="42" fill="#FFFFFF"/>
+            <rect x="26" y="394" width="178" height="20" rx="10" fill="#F2F3F5"/>
+            <text x="36" y="408" font-size="11" fill="#111" font-family="sans-serif">123</text>
+            <path d="M186 401l6 0M189 398l0 6" stroke="#777" stroke-width="1.4" stroke-linecap="round"/>
+          </svg>
+        </div>
+      </div>
+
+      <div class="panel-sec">
+        <!-- 视觉观察模式 -->
+        <div class="obs-card on" id="obsCard">
+          <div class="obs-top">
+            <span class="obs-title">视觉观察模式 <span class="badge ai">BETA</span></span>
+            <button class="switch" id="obsSwitch" role="switch" aria-checked="true" aria-label="切换视觉观察模式"></button>
+          </div>
+          <div class="obs-switch-row">
+            <span class="obs-status"><span class="dot busy"></span><span id="obsStatusText">AI 正在看你的屏幕</span></span>
+            <span class="meta" style="margin:0">观察中</span>
+          </div>
+          <div class="obs-caption">最近观察 12:04:32 · 5s 前 · 每 2s 一帧<br>Page id: com.tencent.mm/.ui.LauncherUI · changed</div>
+        </div>
+
+        <!-- Token 消耗 -->
+        <div class="token-card">
+          <div class="token-head">
+            <span class="token-title">Token 消耗</span>
+            <span class="badge warn">压缩 0 次</span>
+          </div>
+          <div class="meter"><i style="width:35.5%"></i></div>
+          <div class="token-nums"><span>45,449 / 128,000 tokens</span><span>剩余 82,551</span></div>
+        </div>
+      </div>
+
+      <div class="panel-foot">
+        <button class="btn secondary collapse-btn">收起面板</button>
+      </div>
+    </aside>
+
+  </div>
+</div>
+
+<button class="reopen-tab" id="reopenPanel" hidden aria-label="展开设备面板">‹</button>
+
+<script>
+(function(){
+  var root = document.documentElement;
+  // 1) 主题切换（默认 Light）
+  document.getElementById('themeToggle').addEventListener('click', function(){
+    root.setAttribute('data-theme', root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+  });
+  // 2) 工具调用卡 / 思考链卡 折叠与展开（hover 亦展开，click 可钉住）
+  Array.prototype.forEach.call(document.querySelectorAll('.card-head'), function(h){
+    h.addEventListener('click', function(){ h.parentElement.classList.toggle('open'); });
+  });
+  // 3) 视觉观察模式开关（右侧 + 输入区）
+  function bindSwitch(btn, onClass, textEl, text){
+    btn.addEventListener('click', function(){
+      var on = btn.classList.toggle('off') === false;
+      btn.setAttribute('aria-checked', on ? 'true' : 'false');
+      if(onClass){ onClass.classList.toggle('on', on); }
+      if(textEl){ textEl.textContent = on ? text[0] : text[1]; }
+    });
+  }
+  bindSwitch(document.getElementById('obsSwitch'), document.getElementById('obsCard'), document.getElementById('obsStatusText'), ['AI 正在看你的屏幕','已暂停观察']);
+  bindSwitch(document.getElementById('inputObsSwitch'), null, document.getElementById('inputObsText'), ['开启','关闭']);
+  // 4) 右侧面板收合 / 展开
+  var rp = document.getElementById('rightPanel'), reopen = document.getElementById('reopenPanel');
+  Array.prototype.forEach.call(document.querySelectorAll('.collapse-btn'), function(b){
+    b.addEventListener('click', function(){ rp.classList.add('collapsed'); reopen.hidden = false; });
+  });
+  reopen.addEventListener('click', function(){ rp.classList.remove('collapsed'); reopen.hidden = true; });
+})();
+</script>
+</body>
+</html>
