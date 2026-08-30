@@ -33,5 +33,18 @@ plugins {
 }
 
 include(":composeApp")
-include(":qadb-icon-helper")
-include(":qadb-agent-ime")
+
+val includeAndroidHelpers = providers.gradleProperty("qadb.includeAndroidHelpers")
+    .map { value ->
+        when (value.lowercase()) {
+            "true" -> true
+            "false" -> false
+            else -> error("qadb.includeAndroidHelpers must be true or false")
+        }
+    }
+    .getOrElse(true)
+
+if (includeAndroidHelpers) {
+    include(":qadb-icon-helper")
+    include(":qadb-agent-ime")
+}

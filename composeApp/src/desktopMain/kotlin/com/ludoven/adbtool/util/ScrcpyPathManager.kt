@@ -61,7 +61,7 @@ object ScrcpyPathManager {
                 candidates += "/usr/bin/$executable"
                 candidates += "/usr/local/bin/$executable"
                 candidates += "/snap/bin/$executable"
-                candidates += File(userHome, ".local/bin/$executable").path
+                candidates += userHome.path.replace('\\', '/').trimEnd('/') + "/.local/bin/$executable"
             }
         }
 

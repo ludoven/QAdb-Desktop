@@ -117,6 +117,15 @@ val nativeTargetFormats = when {
 val generatedVersionSourceDir = layout.buildDirectory.dir("generated/source/appVersion/desktopMain/kotlin")
 val generatedIconHelperResourcesDir = layout.buildDirectory.dir("generated/resources/iconHelper")
 val generatedAgentImeResourcesDir = layout.buildDirectory.dir("generated/resources/agentIme")
+val includeAndroidHelpers = providers.gradleProperty("qadb.includeAndroidHelpers")
+    .map { value ->
+        when (value.lowercase()) {
+            "true" -> true
+            "false" -> false
+            else -> error("qadb.includeAndroidHelpers must be true or false")
+        }
+    }
+    .getOrElse(true)
 val agentImeReleaseSigningReady = listOf(
     "QADB_HELPER_KEYSTORE",
     "QADB_HELPER_STORE_PASSWORD",
@@ -132,24 +141,38 @@ val generateDesktopAppVersion = tasks.register<GenerateAppVersionTask>("generate
     versionName.set(appVersion)
     outputFile.set(generatedVersionSourceDir.map { it.file("com/ludoven/adbtool/AppVersion.kt") })
 }
-val syncIconHelperResource = tasks.register<Copy>("syncIconHelperResource") {
-    group = "build"
-    description = "Copies qadb-icon-helper into desktop runtime resources."
-    dependsOn(":qadb-icon-helper:assembleIconHelperDex")
-    from(project(":qadb-icon-helper").layout.buildDirectory.file("outputs/qadb-icon-helper.jar"))
-    into(generatedIconHelperResourcesDir.map { it.dir("qadb") })
+val syncIconHelperResource = if (includeAndroidHelpers) {
+    tasks.register<Copy>("syncIconHelperResource") {
+        group = "build"
+        description = "Copies qadb-icon-helper into desktop runtime resources."
+        dependsOn(":qadb-icon-helper:assembleIconHelperDex")
+        from(project(":qadb-icon-helper").layout.buildDirectory.file("outputs/qadb-icon-helper.jar"))
+        into(generatedIconHelperResourcesDir.map { it.dir("qadb") })
+    }
+} else {
+    tasks.register("syncIconHelperResource") {
+        group = "build"
+        description = "Skips qadb-icon-helper for JDK-only desktop verification."
+    }
 }
-val syncAgentImeResource = tasks.register<Copy>("syncAgentImeResource") {
-    group = "build"
-    description = "Copies the QADB Unicode input helper APK into desktop runtime resources."
-    dependsOn(":qadb-agent-ime:assemble${agentImeVariant.replaceFirstChar { it.uppercase() }}")
-    from(
-        project(":qadb-agent-ime").layout.buildDirectory.file(
-            "outputs/apk/$agentImeVariant/qadb-agent-ime-$agentImeVariant.apk"
+val syncAgentImeResource = if (includeAndroidHelpers) {
+    tasks.register<Copy>("syncAgentImeResource") {
+        group = "build"
+        description = "Copies the QADB Unicode input helper APK into desktop runtime resources."
+        dependsOn(":qadb-agent-ime:assemble${agentImeVariant.replaceFirstChar { it.uppercase() }}")
+        from(
+            project(":qadb-agent-ime").layout.buildDirectory.file(
+                "outputs/apk/$agentImeVariant/qadb-agent-ime-$agentImeVariant.apk"
+            )
         )
-    )
-    into(generatedAgentImeResourcesDir.map { it.dir("qadb") })
-    rename { "qadb-agent-ime.apk" }
+        into(generatedAgentImeResourcesDir.map { it.dir("qadb") })
+        rename { "qadb-agent-ime.apk" }
+    }
+} else {
+    tasks.register("syncAgentImeResource") {
+        group = "build"
+        description = "Skips qadb-agent-ime for JDK-only desktop verification."
+    }
 }
 val renameWindowsPackageFiles = tasks.register<RenameWindowsPackageFilesTask>("renameWindowsPackageFiles") {
     group = "compose desktop"
@@ -272,6 +295,15 @@ tasks.matching {
     it.name.startsWith("packageRelease") || it.name == "createReleaseDistributable"
 }.configureEach {
     dependsOn(verifyHelperReleaseSigning)
+}
+tasks.matching {
+    it.name.startsWith("package") || it.name.contains("Distributable")
+}.configureEach {
+    if (!includeAndroidHelpers) {
+        doFirst {
+            throw GradleException("Desktop packaging requires -Pqadb.includeAndroidHelpers=true.")
+        }
+    }
 }
 listOf(
     "packageMsi",

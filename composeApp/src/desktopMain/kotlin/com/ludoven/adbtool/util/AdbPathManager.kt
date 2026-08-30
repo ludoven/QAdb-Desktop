@@ -169,19 +169,20 @@ object AdbPathManager {
         environment: Map<String, String>,
         osName: String
     ): List<String> {
-        val executable = if (osName.lowercase().contains("windows")) "adb.exe" else "adb"
+        val isWindows = osName.lowercase().contains("windows")
+        val executable = if (isWindows) "adb.exe" else "adb"
         val candidates = mutableListOf<String>()
 
         listOf("ANDROID_HOME", "ANDROID_SDK_ROOT")
             .mapNotNull { environment[it]?.takeIf(String::isNotBlank) }
             .forEach { sdkRoot ->
-                candidates += File(sdkRoot, "platform-tools/$executable").path
+                candidates += targetPlatformPath(sdkRoot, "platform-tools/$executable", isWindows)
             }
 
         when {
             osName.lowercase().contains("mac") -> {
-                candidates += File(userHome, "Library/Android/sdk/platform-tools/adb").path
-                candidates += File(userHome, "Library/Android/Sdk/platform-tools/adb").path
+                candidates += targetPlatformPath(userHome.path, "Library/Android/sdk/platform-tools/adb", false)
+                candidates += targetPlatformPath(userHome.path, "Library/Android/Sdk/platform-tools/adb", false)
                 candidates += "/opt/homebrew/bin/adb"
                 candidates += "/usr/local/bin/adb"
             }
@@ -194,14 +195,21 @@ object AdbPathManager {
                 candidates += "C:\\Android\\sdk\\platform-tools\\adb.exe"
             }
             else -> {
-                candidates += File(userHome, "Android/Sdk/platform-tools/adb").path
-                candidates += File(userHome, "Android/sdk/platform-tools/adb").path
+                candidates += targetPlatformPath(userHome.path, "Android/Sdk/platform-tools/adb", false)
+                candidates += targetPlatformPath(userHome.path, "Android/sdk/platform-tools/adb", false)
                 candidates += "/usr/local/bin/adb"
                 candidates += "/usr/bin/adb"
             }
         }
 
         return candidates.distinct()
+    }
+
+    private fun targetPlatformPath(root: String, child: String, windows: Boolean): String {
+        val separator = if (windows) '\\' else '/'
+        val normalizedRoot = root.replace(if (windows) '/' else '\\', separator).trimEnd(separator)
+        val normalizedChild = child.replace(if (windows) '/' else '\\', separator).trimStart(separator)
+        return "$normalizedRoot$separator$normalizedChild"
     }
 
     private fun resolveEnvironment(preferSavedPreference: Boolean): AdbEnvironment {
