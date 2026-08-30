@@ -481,7 +481,10 @@ fun App() {
                                         val selectedDevice by devicesViewModel.selectedDevice.collectAsState()
                                         AppScreen(
                                             viewModel = appViewModel,
-                                            selectedDevice = selectedDevice
+                                            selectedDevice = selectedDevice,
+                                            onRefreshDevices = devicesViewModel::refreshDevices,
+                                            onOpenWirelessConnection = { showWirelessConnectionDialog = true },
+                                            onOpenTroubleshooting = { navigateToRoute("home") }
                                         )
                                     }
                                 }
@@ -490,7 +493,10 @@ fun App() {
                                         val selectedDevice by devicesViewModel.selectedDevice.collectAsState()
                                         FileBrowserScreen(
                                             viewModel = fileBrowserViewModel,
-                                            selectedDevice = selectedDevice
+                                            selectedDevice = selectedDevice,
+                                            onRefreshDevices = devicesViewModel::refreshDevices,
+                                            onOpenWirelessConnection = { showWirelessConnectionDialog = true },
+                                            onOpenTroubleshooting = { navigateToRoute("home") }
                                         )
                                     }
                                 }
@@ -505,7 +511,9 @@ fun App() {
                                         DiagnosticsRoute(
                                             logViewModel = logViewModel,
                                             devicesViewModel = devicesViewModel,
-                                            initialTab = DiagnosticsTab.Logs
+                                            initialTab = DiagnosticsTab.Logs,
+                                            onOpenWirelessConnection = { showWirelessConnectionDialog = true },
+                                            onOpenTroubleshooting = { navigateToRoute("home") }
                                         )
                                     }
                                 }
@@ -514,7 +522,9 @@ fun App() {
                                         DiagnosticsRoute(
                                             logViewModel = logViewModel,
                                             devicesViewModel = devicesViewModel,
-                                            initialTab = DiagnosticsTab.Logs
+                                            initialTab = DiagnosticsTab.Logs,
+                                            onOpenWirelessConnection = { showWirelessConnectionDialog = true },
+                                            onOpenTroubleshooting = { navigateToRoute("home") }
                                         )
                                     }
                                 }
@@ -523,7 +533,9 @@ fun App() {
                                         DiagnosticsRoute(
                                             logViewModel = logViewModel,
                                             devicesViewModel = devicesViewModel,
-                                            initialTab = DiagnosticsTab.Processes
+                                            initialTab = DiagnosticsTab.Processes,
+                                            onOpenWirelessConnection = { showWirelessConnectionDialog = true },
+                                            onOpenTroubleshooting = { navigateToRoute("home") }
                                         )
                                     }
                                 }
@@ -1272,13 +1284,18 @@ private fun DeviceControlRoute(
 private fun DiagnosticsRoute(
     logViewModel: LogViewModel,
     devicesViewModel: DevicesViewModel,
-    initialTab: DiagnosticsTab
+    initialTab: DiagnosticsTab,
+    onOpenWirelessConnection: () -> Unit,
+    onOpenTroubleshooting: () -> Unit
 ) {
     val selectedDevice by devicesViewModel.selectedDevice.collectAsState()
     DiagnosticsScreen(
         logViewModel = logViewModel,
         selectedDevice = selectedDevice,
-        initialTab = initialTab
+        initialTab = initialTab,
+        onRefreshDevices = devicesViewModel::refreshDevices,
+        onOpenWirelessConnection = onOpenWirelessConnection,
+        onOpenTroubleshooting = onOpenTroubleshooting
     )
 }
 

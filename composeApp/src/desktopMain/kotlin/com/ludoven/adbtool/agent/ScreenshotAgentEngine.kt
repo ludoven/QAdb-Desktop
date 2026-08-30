@@ -202,9 +202,13 @@ class ScreenshotAgentEngine(
                     usage = usage,
                     modelCalls = modelCalls,
                     visionCalls = modelCalls,
-                    modelCallLimit = Int.MAX_VALUE,
-                    visionCallLimit = Int.MAX_VALUE,
-                    replanLimit = 0
+                    // The screenshot engine caps device actions instead of model calls;
+                    // zero limits keep the public metrics display in "usage" mode.
+                    modelCallLimit = 0,
+                    visionCallLimit = 0,
+                    replanLimit = 0,
+                    deviceActions = actionCount,
+                    deviceActionLimit = hardActionLimit
                 )
             )
         }

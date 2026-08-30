@@ -32,7 +32,10 @@ enum class DiagnosticsTab {
 fun DiagnosticsScreen(
     logViewModel: LogViewModel,
     selectedDevice: String?,
-    initialTab: DiagnosticsTab = DiagnosticsTab.Logs
+    initialTab: DiagnosticsTab = DiagnosticsTab.Logs,
+    onRefreshDevices: () -> Unit,
+    onOpenWirelessConnection: () -> Unit,
+    onOpenTroubleshooting: () -> Unit
 ) {
     var selectedTab by rememberSaveable(initialTab) { mutableStateOf(initialTab) }
     val tabs = listOf(
@@ -65,9 +68,17 @@ fun DiagnosticsScreen(
                     when (selectedTab) {
                         DiagnosticsTab.Logs -> LogScreen(
                             viewModel = logViewModel,
-                            selectedDevice = selectedDevice
+                            selectedDevice = selectedDevice,
+                            onRefreshDevices = onRefreshDevices,
+                            onOpenWirelessConnection = onOpenWirelessConnection,
+                            onOpenTroubleshooting = onOpenTroubleshooting
                         )
-                        DiagnosticsTab.Processes -> ProcessScreen(selectedDevice = selectedDevice)
+                        DiagnosticsTab.Processes -> ProcessScreen(
+                            selectedDevice = selectedDevice,
+                            onRefreshDevices = onRefreshDevices,
+                            onOpenWirelessConnection = onOpenWirelessConnection,
+                            onOpenTroubleshooting = onOpenTroubleshooting
+                        )
                     }
                 }
             }

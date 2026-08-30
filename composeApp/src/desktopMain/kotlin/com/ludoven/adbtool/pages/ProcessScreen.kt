@@ -77,6 +77,7 @@ import com.ludoven.adbtool.util.l10n
 import com.ludoven.adbtool.widget.DiagnosticsEmptyKind
 import com.ludoven.adbtool.widget.DiagnosticsEmptyState
 import com.ludoven.adbtool.widget.FramedStateSurface
+import com.ludoven.adbtool.widget.DeviceRequiredState
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
@@ -93,7 +94,12 @@ internal data class ProcessItem(
 private enum class SortColumn { NAME, CPU, CPU_TIME, MEMORY, PID, USER }
 
 @Composable
-fun ProcessScreen(selectedDevice: String?) {
+fun ProcessScreen(
+    selectedDevice: String?,
+    onRefreshDevices: () -> Unit,
+    onOpenWirelessConnection: () -> Unit,
+    onOpenTroubleshooting: () -> Unit
+) {
     var keyword by remember { mutableStateOf("") }
     var processes by remember { mutableStateOf(emptyList<ProcessItem>()) }
     var isLoading by remember { mutableStateOf(false) }
@@ -205,10 +211,15 @@ fun ProcessScreen(selectedDevice: String?) {
         }
 
         if (selectedDevice.isNullOrBlank()) {
-            DiagnosticsEmptyState(
-                kind = DiagnosticsEmptyKind.NoDevice,
+            DeviceRequiredState(
                 title = stringResource(Res.string.process_no_device),
-                description = "连接或选择设备后即可读取进程列表。",
+                description = l10n(
+                    "连接或选择设备后即可读取进程列表。",
+                    "Connect or select a device to inspect running processes."
+                ),
+                onRefreshDevices = onRefreshDevices,
+                onOpenWirelessConnection = onOpenWirelessConnection,
+                onOpenTroubleshooting = onOpenTroubleshooting,
                 modifier = Modifier.fillMaxSize()
             )
             return

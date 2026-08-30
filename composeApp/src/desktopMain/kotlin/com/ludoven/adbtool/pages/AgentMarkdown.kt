@@ -1,5 +1,13 @@
 package com.ludoven.adbtool.pages
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -10,11 +18,13 @@ import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ludoven.adbtool.QadbTokens
 import com.ludoven.adbtool.UiTokens
@@ -27,6 +37,17 @@ internal data class AgentMarkdownPalette(
     val codeBackground: Color
 )
 
+internal enum class AgentMarkdownColumnAlign { LEFT, CENTER, RIGHT }
+
+internal sealed interface AgentMarkdownBlock {
+    data class Paragraph(val source: String) : AgentMarkdownBlock
+    data class Table(
+        val header: List<String>,
+        val rows: List<List<String>>,
+        val alignments: List<AgentMarkdownColumnAlign>
+    ) : AgentMarkdownBlock
+}
+
 @Composable
 internal fun AgentMarkdownText(
     text: String,
@@ -38,18 +59,219 @@ internal fun AgentMarkdownText(
         link = QadbTokens.brand,
         codeBackground = QadbTokens.bg3
     )
-    val annotatedText = remember(text, palette) {
-        buildAgentMarkdownAnnotatedString(text, palette)
-    }
+    val blocks = remember(text) { buildAgentMarkdownBlocks(text) }
 
     SelectionContainer {
-        Text(
-            text = annotatedText,
-            modifier = modifier,
-            color = palette.text,
-            fontSize = UiTokens.TextBodyLarge
-        )
+        Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            blocks.forEach { block ->
+                when (block) {
+                    is AgentMarkdownBlock.Paragraph -> {
+                        val annotated = remember(block.source, palette) {
+                            buildAgentMarkdownAnnotatedString(block.source, palette)
+                        }
+                        Text(
+                            text = annotated,
+                            color = palette.text,
+                            fontSize = UiTokens.TextBodyLarge
+                        )
+                    }
+                    is AgentMarkdownBlock.Table -> AgentMarkdownTable(block, palette)
+                }
+            }
+        }
     }
+}
+
+/**
+ * Splits the source into paragraph and table blocks. Fenced code blocks are always kept
+ * inside paragraphs, even when their content contains `|`, so code is never parsed as a table.
+ */
+internal fun buildAgentMarkdownBlocks(source: String): List<AgentMarkdownBlock> {
+    val normalized = source.replace("\r\n", "\n").replace('\r', '\n')
+    val lines = normalized.split('\n')
+    val blocks = mutableListOf<AgentMarkdownBlock>()
+    val paragraph = mutableListOf<String>()
+    var activeFence: String? = null
+
+    fun flushParagraph() {
+        if (paragraph.isNotEmpty()) {
+            blocks += AgentMarkdownBlock.Paragraph(paragraph.joinToString("\n"))
+            paragraph.clear()
+        }
+    }
+
+    var index = 0
+    while (index < lines.size) {
+        val raw = lines[index]
+        val trimmedStart = raw.trimStart()
+        val fence = when {
+            trimmedStart.startsWith("```") -> "```"
+            trimmedStart.startsWith("~~~") -> "~~~"
+            else -> null
+        }
+        if (activeFence != null) {
+            paragraph += raw
+            if (fence == activeFence) activeFence = null
+        } else if (fence != null) {
+            activeFence = fence
+            paragraph += raw
+        } else {
+            val table = parseAgentMarkdownTable(lines, index)
+            if (table != null) {
+                flushParagraph()
+                blocks += table.first
+                index = table.second - 1
+            } else {
+                paragraph += raw
+            }
+        }
+        index++
+    }
+    flushParagraph()
+    return blocks
+}
+
+private fun parseAgentMarkdownTable(
+    lines: List<String>,
+    headerIndex: Int
+): Pair<AgentMarkdownBlock.Table, Int>? {
+    val headerLine = lines[headerIndex]
+    if (headerIndex + 1 >= lines.size || '|' !in headerLine) return null
+    val separatorLine = lines[headerIndex + 1]
+    val separatorCells = splitTableRow(separatorLine)
+    if (separatorCells.isEmpty() || separatorCells.any { !isTableSeparatorCell(it) }) return null
+    if (headerLine.trimStart().startsWith("```") || headerLine.trimStart().startsWith("~~~")) return null
+
+    val alignments = separatorCells.map { cell ->
+        val trimmed = cell.trim()
+        when {
+            trimmed.startsWith(":") && trimmed.endsWith(":") -> AgentMarkdownColumnAlign.CENTER
+            trimmed.endsWith(":") -> AgentMarkdownColumnAlign.RIGHT
+            else -> AgentMarkdownColumnAlign.LEFT
+        }
+    }
+    val header = normalizeRow(splitTableRow(headerLine), alignments.size)
+
+    val rows = mutableListOf<List<String>>()
+    var index = headerIndex + 2
+    while (index < lines.size) {
+        val line = lines[index]
+        val trimmedStart = line.trimStart()
+        if (trimmedStart.startsWith("```") || trimmedStart.startsWith("~~~")) break
+        if ('|' !in line) break
+        rows += normalizeRow(splitTableRow(line), alignments.size)
+        index++
+    }
+    return AgentMarkdownBlock.Table(header, rows, alignments) to index
+}
+
+private fun isTableSeparatorCell(cell: String): Boolean =
+    cell.matches(Regex("^\\s*:?-{3,}:?\\s*$"))
+
+/** Splits a `| a | b |` line into trimmed cells, tolerating a missing outer pipe. */
+private fun splitTableRow(line: String): List<String> {
+    val trimmed = line.trim()
+    if ('|' !in trimmed) return emptyList()
+    val withoutOuterPipes = trimmed.removePrefix("|").removeSuffix("|")
+    return withoutOuterPipes.split('|').map { it.trim() }
+}
+
+private fun normalizeRow(cells: List<String>, columnCount: Int): List<String> {
+    val safeCount = columnCount.coerceAtLeast(1)
+    val padded = cells.take(safeCount).toMutableList()
+    while (padded.size < safeCount) padded += ""
+    return padded
+}
+
+@Composable
+private fun AgentMarkdownTable(
+    table: AgentMarkdownBlock.Table,
+    palette: AgentMarkdownPalette
+) {
+    val weights = remember(table) { tableColumnWeights(table) }
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(palette.codeBackground.copy(alpha = 0.35f))
+            .padding(vertical = 2.dp)
+    ) {
+        Row(Modifier.fillMaxWidth()) {
+            table.header.forEachIndexed { column, cell ->
+                AgentMarkdownTableCell(
+                    cell = cell,
+                    palette = palette,
+                    align = table.alignments[column],
+                    modifier = Modifier.weight(weights[column]),
+                    bold = true
+                )
+            }
+        }
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp)
+                .height(1.dp)
+                .background(palette.codeBackground)
+        )
+        table.rows.forEachIndexed { rowIndex, row ->
+            Row(Modifier.fillMaxWidth()) {
+                row.forEachIndexed { column, cell ->
+                    AgentMarkdownTableCell(
+                        cell = cell,
+                        palette = palette,
+                        align = table.alignments[column],
+                        modifier = Modifier.weight(weights[column]),
+                        bold = false
+                    )
+                }
+            }
+            if (rowIndex != table.rows.lastIndex) {
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 8.dp)
+                        .height(1.dp)
+                        .background(palette.codeBackground)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun AgentMarkdownTableCell(
+    cell: String,
+    palette: AgentMarkdownPalette,
+    align: AgentMarkdownColumnAlign,
+    modifier: Modifier = Modifier,
+    bold: Boolean
+) {
+    val annotated = remember(cell, palette) { buildAgentMarkdownAnnotatedString(cell, palette) }
+    Text(
+        text = annotated,
+        modifier = modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+        color = palette.text,
+        fontSize = 12.5.sp,
+        textAlign = when (align) {
+            AgentMarkdownColumnAlign.LEFT -> TextAlign.Left
+            AgentMarkdownColumnAlign.CENTER -> TextAlign.Center
+            AgentMarkdownColumnAlign.RIGHT -> TextAlign.Right
+        },
+        fontWeight = if (bold) FontWeight.SemiBold else FontWeight.Normal
+    )
+}
+
+/** Column weights follow the widest cell (CJK counted double), clamped to keep narrow columns usable. */
+private fun tableColumnWeights(table: AgentMarkdownBlock.Table): List<Float> {
+    fun displayWidth(value: String): Int = value.sumOf { char ->
+        if (char.code > 0x2E80) 2 else 1
+    }
+    val widths = List(table.alignments.size) { column ->
+        val headerWidth = displayWidth(table.header[column])
+        val bodyWidth = table.rows.maxOfOrNull { displayWidth(it[column]) } ?: 0
+        maxOf(headerWidth, bodyWidth, 1)
+    }
+    return widths.map { width -> width.coerceIn(1, 24).toFloat() }
 }
 
 internal fun buildAgentMarkdownAnnotatedString(

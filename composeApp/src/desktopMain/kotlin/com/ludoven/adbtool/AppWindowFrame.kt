@@ -2,9 +2,12 @@ package com.ludoven.adbtool
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -18,6 +21,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.window.WindowDraggableArea
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -29,15 +33,24 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.FrameWindowScope
 import androidx.compose.ui.window.WindowPlacement
 import androidx.compose.ui.window.WindowState
+import java.awt.Dimension
+import java.awt.event.ComponentAdapter
+import java.awt.event.ComponentEvent
+import java.awt.geom.RoundRectangle2D
 import javax.swing.JFrame
+import com.ludoven.adbtool.util.l10n
 
 private val MacTitleBarHeight = 24.dp
-private val WindowsTitleBarHeight = 40.dp
+private val WindowsTitleBarHeight = 36.dp
 private val WindowsControlWidth = 46.dp
+private val WindowsWindowRadius = 12.dp
+private val WindowsMinimumWidth = 960.dp
+private val WindowsMinimumHeight = 640.dp
 
 @Composable
 fun FrameWindowScope.AppWindowFrame(
@@ -58,6 +71,8 @@ fun FrameWindowScope.AppWindowFrame(
 
     if (isMacOs) {
         ConfigureMacUnifiedTitleBar()
+    } else {
+        ConfigureWindowsRoundedWindow(windowState)
     }
 
     Column(
@@ -89,6 +104,7 @@ fun FrameWindowScope.AppWindowFrame(
         } else {
             WindowsTitleBar(
                 background = background,
+                sidebarBackground = if (useDarkTheme) background else Color(0xFFF9F9FA),
                 foreground = foreground,
                 windowState = windowState,
                 onClose = onClose
@@ -97,6 +113,48 @@ fun FrameWindowScope.AppWindowFrame(
 
         Box(modifier = Modifier.weight(1f)) {
             content()
+        }
+    }
+}
+
+@Composable
+private fun FrameWindowScope.ConfigureWindowsRoundedWindow(windowState: WindowState) {
+    val density = LocalDensity.current
+    val radiusPx = with(density) { WindowsWindowRadius.toPx() }
+    val minimumSize = with(density) {
+        Dimension(WindowsMinimumWidth.roundToPx(), WindowsMinimumHeight.roundToPx())
+    }
+
+    DisposableEffect(window, windowState.placement, radiusPx, minimumSize) {
+        val previousMinimumSize = window.minimumSize
+        window.minimumSize = minimumSize
+        fun updateWindowShape() {
+            window.shape = if (windowState.placement == WindowPlacement.Maximized) {
+                null
+            } else {
+                RoundRectangle2D.Float(
+                    0f,
+                    0f,
+                    window.width.toFloat(),
+                    window.height.toFloat(),
+                    radiusPx * 2f,
+                    radiusPx * 2f
+                )
+            }
+        }
+
+        val resizeListener = object : ComponentAdapter() {
+            override fun componentResized(event: ComponentEvent?) {
+                updateWindowShape()
+            }
+        }
+        window.addComponentListener(resizeListener)
+        updateWindowShape()
+
+        onDispose {
+            window.removeComponentListener(resizeListener)
+            window.shape = null
+            window.minimumSize = previousMinimumSize
         }
     }
 }
@@ -120,6 +178,7 @@ private fun FrameWindowScope.ConfigureMacUnifiedTitleBar() {
 @Composable
 private fun FrameWindowScope.WindowsTitleBar(
     background: Color,
+    sidebarBackground: Color,
     foreground: Color,
     windowState: WindowState,
     onClose: () -> Unit
@@ -127,13 +186,34 @@ private fun FrameWindowScope.WindowsTitleBar(
     Row(
         modifier = Modifier
             .height(WindowsTitleBarHeight)
-            .background(background),
+            .fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically
     ) {
         WindowDraggableArea(
             modifier = Modifier
+                .width(UiTokens.SidebarWidth)
+                .fillMaxHeight()
+                .background(sidebarBackground)
+                .combinedClickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    onClick = {},
+                    onDoubleClick = {
+                        windowState.placement =
+                            if (windowState.placement == WindowPlacement.Maximized) {
+                                WindowPlacement.Floating
+                            } else {
+                                WindowPlacement.Maximized
+                            }
+                    }
+                )
+        )
+
+        WindowDraggableArea(
+            modifier = Modifier
                 .weight(1f)
                 .fillMaxHeight()
+                .background(background)
                 .combinedClickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null,
@@ -153,7 +233,7 @@ private fun FrameWindowScope.WindowsTitleBar(
             type = WindowControlType.Minimize,
             background = background,
             foreground = foreground,
-            contentDescription = "最小化窗口",
+            contentDescription = l10n("最小化窗口", "Minimize window"),
             onClick = { windowState.isMinimized = true }
         )
         WindowControlButton(
@@ -165,9 +245,9 @@ private fun FrameWindowScope.WindowsTitleBar(
             background = background,
             foreground = foreground,
             contentDescription = if (windowState.placement == WindowPlacement.Maximized) {
-                "还原窗口"
+                l10n("还原窗口", "Restore window")
             } else {
-                "最大化窗口"
+                l10n("最大化窗口", "Maximize window")
             },
             onClick = {
                 windowState.placement =
@@ -182,7 +262,7 @@ private fun FrameWindowScope.WindowsTitleBar(
             type = WindowControlType.Close,
             background = background,
             foreground = foreground,
-            contentDescription = "关闭窗口",
+            contentDescription = l10n("关闭窗口", "Close window"),
             onClick = onClose
         )
     }
@@ -196,16 +276,29 @@ private fun WindowControlButton(
     contentDescription: String,
     onClick: () -> Unit
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isHovered by interactionSource.collectIsHoveredAsState()
+    val isFocused by interactionSource.collectIsFocusedAsState()
+    val controlBackground = when {
+        type == WindowControlType.Close && isHovered -> Color(0xFFC42B1C)
+        isHovered -> foreground.copy(alpha = 0.10f)
+        isFocused -> foreground.copy(alpha = 0.06f)
+        else -> background
+    }
+    val controlForeground = if (type == WindowControlType.Close && isHovered) Color.White else foreground
+
     Box(
         modifier = Modifier
             .width(WindowsControlWidth)
             .fillMaxHeight()
+            .background(controlBackground)
+            .then(if (isFocused) Modifier.border(1.dp, foreground.copy(alpha = 0.65f)) else Modifier)
             .semantics {
                 this.contentDescription = contentDescription
                 role = Role.Button
             }
             .clickable(
-                interactionSource = remember { MutableInteractionSource() },
+                interactionSource = interactionSource,
                 indication = null,
                 onClick = onClick
             ),
@@ -220,7 +313,7 @@ private fun WindowControlButton(
             when (type) {
                 WindowControlType.Minimize -> {
                     drawLine(
-                        color = foreground,
+                        color = controlForeground,
                         start = Offset(size.width * 0.2f, size.height * 0.5f),
                         end = Offset(size.width * 0.8f, size.height * 0.5f),
                         strokeWidth = strokeWidth,
@@ -230,7 +323,7 @@ private fun WindowControlButton(
 
                 WindowControlType.Maximize -> {
                     drawRect(
-                        color = foreground,
+                        color = controlForeground,
                         topLeft = Offset(size.width * 0.23f, size.height * 0.23f),
                         size = size.copy(width = size.width * 0.54f, height = size.height * 0.54f),
                         style = Stroke(width = strokeWidth)
@@ -239,18 +332,18 @@ private fun WindowControlButton(
 
                 WindowControlType.Restore -> {
                     drawRect(
-                        color = foreground,
+                        color = controlForeground,
                         topLeft = Offset(size.width * 0.32f, size.height * 0.2f),
                         size = size.copy(width = size.width * 0.48f, height = size.height * 0.48f),
                         style = Stroke(width = strokeWidth)
                     )
                     drawRect(
-                        color = background,
+                        color = controlBackground,
                         topLeft = Offset(size.width * 0.18f, size.height * 0.34f),
                         size = size.copy(width = size.width * 0.48f, height = size.height * 0.48f)
                     )
                     drawRect(
-                        color = foreground,
+                        color = controlForeground,
                         topLeft = Offset(size.width * 0.18f, size.height * 0.34f),
                         size = size.copy(width = size.width * 0.48f, height = size.height * 0.48f),
                         style = Stroke(width = strokeWidth)
@@ -259,14 +352,14 @@ private fun WindowControlButton(
 
                 WindowControlType.Close -> {
                     drawLine(
-                        color = foreground,
+                        color = controlForeground,
                         start = Offset(size.width * 0.25f, size.height * 0.25f),
                         end = Offset(size.width * 0.75f, size.height * 0.75f),
                         strokeWidth = strokeWidth,
                         cap = StrokeCap.Square
                     )
                     drawLine(
-                        color = foreground,
+                        color = controlForeground,
                         start = Offset(size.width * 0.75f, size.height * 0.25f),
                         end = Offset(size.width * 0.25f, size.height * 0.75f),
                         strokeWidth = strokeWidth,

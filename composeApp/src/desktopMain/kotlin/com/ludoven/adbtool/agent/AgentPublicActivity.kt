@@ -173,7 +173,9 @@ data class AgentPublicMetrics(
     val completionTokens: Int = 0,
     val cachedTokens: Int = 0,
     val totalTokens: Int = 0,
-    val estimatedCost: Double = 0.0
+    val estimatedCost: Double = 0.0,
+    val deviceActions: Int = 0,
+    val deviceActionLimit: Int = 0
 )
 
 data class AgentPublicActivityItem(
@@ -431,7 +433,9 @@ fun AgentBudgetStatus.toPublicMetrics(
     completionTokens = usage.completionTokens,
     cachedTokens = usage.cachedTokens,
     totalTokens = usage.totalTokens,
-    estimatedCost = estimatedCost
+    estimatedCost = estimatedCost,
+    deviceActions = deviceActions,
+    deviceActionLimit = deviceActionLimit
 )
 
 fun AgentRunPhase.toPublicStage(): AgentPublicStage = when (this) {

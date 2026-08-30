@@ -121,9 +121,11 @@ import com.ludoven.adbtool.ui.mac.labelLarge
 import com.ludoven.adbtool.ui.mac.labelSmall
 import com.ludoven.adbtool.ui.mac.titleMedium
 import com.ludoven.adbtool.viewmodel.LogViewModel
+import com.ludoven.adbtool.util.l10n
 import com.ludoven.adbtool.widget.DiagnosticsEmptyKind
 import com.ludoven.adbtool.widget.DiagnosticsEmptyState
 import com.ludoven.adbtool.widget.FramedStateSurface
+import com.ludoven.adbtool.widget.DeviceRequiredState
 import com.ludoven.adbtool.widget.InlineStatusBanner
 import com.ludoven.adbtool.widget.InlineStatusTone
 import org.jetbrains.compose.resources.stringResource
@@ -149,7 +151,10 @@ internal fun logCaptureActionsEnabled(selectedDevice: String?): Boolean =
 @Composable
 fun LogScreen(
     viewModel: LogViewModel,
-    selectedDevice: String?
+    selectedDevice: String?,
+    onRefreshDevices: () -> Unit,
+    onOpenWirelessConnection: () -> Unit,
+    onOpenTroubleshooting: () -> Unit
 ) {
     val logs by viewModel.logs.collectAsState()
     val filter by viewModel.filter.collectAsState()
@@ -513,22 +518,36 @@ fun LogScreen(
 
                 if (emptyKind != null || filteredLogs.isEmpty()) {
                     val kind = emptyKind ?: DiagnosticsEmptyKind.NoDevice
-                    val titleRes = when (kind) {
-                        DiagnosticsEmptyKind.WaitingForLogs -> stringResource(Res.string.log_waiting)
-                        else -> stringResource(Res.string.log_empty)
+                    if (kind == DiagnosticsEmptyKind.NoDevice) {
+                        DeviceRequiredState(
+                            title = stringResource(Res.string.log_empty),
+                            description = l10n(
+                                "连接并选择设备后即可开始捕获日志。",
+                                "Connect and select a device to start capturing logs."
+                            ),
+                            onRefreshDevices = onRefreshDevices,
+                            onOpenWirelessConnection = onOpenWirelessConnection,
+                            onOpenTroubleshooting = onOpenTroubleshooting,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    } else {
+                        val titleRes = when (kind) {
+                            DiagnosticsEmptyKind.WaitingForLogs -> stringResource(Res.string.log_waiting)
+                            else -> stringResource(Res.string.log_empty)
+                        }
+                        val desc = when (kind) {
+                            DiagnosticsEmptyKind.NoDevice -> "选择设备并启动捕获后，日志会显示在这里。"
+                            DiagnosticsEmptyKind.WaitingForLogs -> "日志捕获已启动，等待设备输出新日志。"
+                            DiagnosticsEmptyKind.NoMatchingLogs -> "当前筛选条件没有匹配日志，清除筛选后可查看完整输出。"
+                            DiagnosticsEmptyKind.EmptyProcessList -> ""
+                        }
+                        DiagnosticsEmptyState(
+                            kind = kind,
+                            title = titleRes,
+                            description = desc,
+                            modifier = Modifier.fillMaxSize()
+                        )
                     }
-                    val desc = when (kind) {
-                        DiagnosticsEmptyKind.NoDevice -> "选择设备并启动捕获后，日志会显示在这里。"
-                        DiagnosticsEmptyKind.WaitingForLogs -> "日志捕获已启动，等待设备输出新日志。"
-                        DiagnosticsEmptyKind.NoMatchingLogs -> "当前筛选条件没有匹配日志，清除筛选后可查看完整输出。"
-                        DiagnosticsEmptyKind.EmptyProcessList -> ""
-                    }
-                    DiagnosticsEmptyState(
-                        kind = kind,
-                        title = titleRes,
-                        description = desc,
-                        modifier = Modifier.fillMaxSize()
-                    )
                 } else {
                     Box(modifier = Modifier.fillMaxSize()) {
                         SelectionContainer {

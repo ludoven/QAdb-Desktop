@@ -36,6 +36,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -45,6 +49,7 @@ import androidx.compose.ui.unit.sp
 import com.ludoven.adbtool.QadbColors
 import com.ludoven.adbtool.QadbTokens
 import com.ludoven.adbtool.UiTokens
+import com.ludoven.adbtool.util.l10n
 
 enum class InlineStatusTone {
     Info,
@@ -315,6 +320,60 @@ fun FramedStateSurface(
         )
     ) {
         content()
+    }
+}
+
+@Composable
+fun DeviceRequiredState(
+    title: String,
+    description: String,
+    onRefreshDevices: () -> Unit,
+    onOpenWirelessConnection: () -> Unit,
+    onOpenTroubleshooting: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier.fillMaxWidth(),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium),
+            modifier = Modifier
+                .padding(UiTokens.SpaceXXLarge)
+                .semantics { liveRegion = LiveRegionMode.Polite }
+        ) {
+            NoDeviceIllustration()
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.semantics { heading() }
+            )
+            Text(
+                text = description,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.widthIn(max = 360.dp)
+            )
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Button(onClick = onOpenWirelessConnection) {
+                    Text(l10n("无线连接", "Wireless connection"), color = QadbColors.onPrimary)
+                }
+                OutlinedButton(onClick = onRefreshDevices) {
+                    Text(l10n("刷新设备", "Refresh devices"))
+                }
+            }
+            TextButton(onClick = onOpenTroubleshooting) {
+                Text(l10n("返回首页查看排查建议", "Open connection troubleshooting"))
+            }
+        }
     }
 }
 

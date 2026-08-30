@@ -157,11 +157,14 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -181,6 +184,8 @@ import com.ludoven.adbtool.agent.AgentFailureSubsystem
 import com.ludoven.adbtool.agent.AgentFeatureRuntime
 import com.ludoven.adbtool.agent.AgentMessage
 import com.ludoven.adbtool.agent.AgentMessageRole
+import com.ludoven.adbtool.agent.AgentReadiness
+import com.ludoven.adbtool.agent.resolveAgentReadiness
 import com.ludoven.adbtool.agent.AgentObservationMode
 import com.ludoven.adbtool.agent.AgentPublicActivityItem
 import com.ludoven.adbtool.agent.AgentPublicActivityState
@@ -190,21 +195,27 @@ import com.ludoven.adbtool.agent.AgentPublicStage
 import com.ludoven.adbtool.agent.AgentPublicToolKind
 import com.ludoven.adbtool.agent.AgentPublicToolResult
 import com.ludoven.adbtool.agent.AgentPublicToolSummary
+import com.ludoven.adbtool.agent.AgentRunPhase
 import com.ludoven.adbtool.agent.AgentRunPresentation
 import com.ludoven.adbtool.agent.AgentStep
+import com.ludoven.adbtool.agent.SCREENSHOT_AGENT_HARD_ACTION_LIMIT
 import com.ludoven.adbtool.entity.DeviceCenterInfoData
 import com.ludoven.adbtool.entity.DeviceInfoData
+import com.ludoven.adbtool.util.DesktopNotifier
 import com.ludoven.adbtool.util.l10n
 import com.ludoven.adbtool.ui.icons.IconParkIcons
+import com.ludoven.adbtool.ui.mac.AlertDialog
 import com.ludoven.adbtool.ui.mac.Icon
 import com.ludoven.adbtool.ui.mac.MaterialTheme
 import com.ludoven.adbtool.ui.mac.OutlinedButton
 import com.ludoven.adbtool.ui.mac.Surface
 import com.ludoven.adbtool.ui.mac.Switch
 import com.ludoven.adbtool.ui.mac.Text
+import com.ludoven.adbtool.ui.mac.TextButton
 import com.ludoven.adbtool.viewmodel.AiAgentViewModel
 import com.ludoven.adbtool.viewmodel.DevicesViewModel
 import com.ludoven.adbtool.widget.FramedStateSurface
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collect
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
@@ -214,6 +225,16 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
 private const val DEFAULT_CONTEXT_WINDOW_TOKENS = 128_000
+
+/** Phases in which the task actively occupies the agent (used for notifications). */
+private val RUNNING_PHASES = setOf(
+    AgentRunPhase.OBSERVING,
+    AgentRunPhase.THINKING,
+    AgentRunPhase.RETRYING,
+    AgentRunPhase.EXECUTING,
+    AgentRunPhase.VERIFYING,
+    AgentRunPhase.AWAITING_CONFIRMATION
+)
 
 internal enum class AgentScreenLayout {
     SINGLE_COLUMN,
@@ -243,6 +264,7 @@ fun AiAgentScreen(
     val modelConfig by viewModel.modelConfig.collectAsState()
     val apiKeyAvailable by viewModel.apiKeyAvailable.collectAsState()
     val configurationReady by viewModel.configurationReady.collectAsState()
+    val configurationChecked by viewModel.configurationChecked.collectAsState()
     val selectedDevice by devicesViewModel.selectedDevice.collectAsState()
     val devices by devicesViewModel.devices.collectAsState()
     val deviceNames by devicesViewModel.deviceDisplayNames.collectAsState()
@@ -252,14 +274,20 @@ fun AiAgentScreen(
     val reduceMotion by agentFeaturePreferences.reduceMotion.collectAsState()
     var prompt by remember { mutableStateOf("") }
     var showModelDialog by remember { mutableStateOf(false) }
+    var showNewTaskDialog by remember { mutableStateOf(false) }
     var devicePanelCollapsed by remember { mutableStateOf(false) }
     var obsSwitchOn by remember(taskState.observationMode) {
         mutableStateOf(taskState.observationMode == AgentObservationMode.VISION)
     }
     val isConnected = selectedDevice != null && selectedDevice in devices
+    val readiness = resolveAgentReadiness(
+        deviceConnected = isConnected,
+        configurationChecked = configurationChecked,
+        modelReady = configurationReady
+    )
     val contextWindowTokens = modelConfig.contextWindowTokens ?: DEFAULT_CONTEXT_WINDOW_TOKENS
 
-    val canSend = prompt.isNotBlank() && !taskState.isRunning
+    val canSend = prompt.isNotBlank() && !taskState.isRunning && readiness == AgentReadiness.READY
     val recognizePrompt = stringResource(Res.string.agent_prompt_recognize)
 
     LaunchedEffect(Unit) {
@@ -267,12 +295,63 @@ fun AiAgentScreen(
         devicesViewModel.refreshDevices()
     }
 
+    // Tray notifications for state changes the user may miss while the window is in the background.
+    val windowInfo = LocalWindowInfo.current
+    LaunchedEffect(Unit) {
+        var wasAwaitingConfirmation = false
+        var wasRunning = false
+        snapshotFlow {
+                Pair(
+                    taskState.pendingConfirmation != null,
+                    taskState.phase
+                )
+            }
+            .collect { (awaitingConfirmation, phase) ->
+                val focused = windowInfo.isWindowFocused
+                if (awaitingConfirmation && !wasAwaitingConfirmation) {
+                    if (!focused) {
+                        DesktopNotifier.notify(
+                            caption = "QADB · AI Agent",
+                            message = l10n("任务正在等待你的确认", "A task is waiting for your confirmation")
+                        )
+                    }
+                } else if (wasRunning && !awaitingConfirmation) {
+                    when (phase) {
+                        AgentRunPhase.COMPLETED -> if (!focused) {
+                            DesktopNotifier.notify(
+                                caption = "QADB · AI Agent",
+                                message = l10n("任务已完成", "Task completed")
+                            )
+                        }
+                        AgentRunPhase.FAILED -> if (!focused) {
+                            DesktopNotifier.notify(
+                                caption = "QADB · AI Agent",
+                                message = l10n("任务执行失败", "Task failed"),
+                                isError = true
+                            )
+                        }
+                        else -> Unit
+                    }
+                }
+                wasAwaitingConfirmation = awaitingConfirmation
+                wasRunning = phase in RUNNING_PHASES
+            }
+    }
+
     fun submit(task: String) {
         val trimmed = task.trim()
         if (trimmed.isEmpty() || taskState.isRunning) return
-        if (!configurationReady) {
-            showModelDialog = true
-            return
+        when (readiness) {
+            AgentReadiness.DEVICE_REQUIRED -> {
+                onOpenDevices()
+                return
+            }
+            AgentReadiness.MODEL_REQUIRED -> {
+                showModelDialog = true
+                return
+            }
+            AgentReadiness.CHECKING -> return
+            AgentReadiness.READY -> Unit
         }
         // startTask rejects the prompt with an inline error when no device is
         // selected; only clear the input when the task can actually be handed off.
@@ -290,6 +369,15 @@ fun AiAgentScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(QadbTokens.bg1)
+            .onPreviewKeyEvent { event ->
+                // Escape aborts a running task regardless of which descendant holds focus.
+                if (event.type == KeyEventType.KeyDown && event.key == Key.Escape && taskState.isRunning) {
+                    viewModel.cancelTask()
+                    true
+                } else {
+                    false
+                }
+            }
     ) {
         AgentTopStatusBar(
             selectedDevice = selectedDevice,
@@ -322,6 +410,7 @@ fun AiAgentScreen(
                 ) {
                     AgentConversation(
                         messages = taskState.messages,
+                        readiness = readiness,
                         errorMessage = taskState.errorMessage,
                         publicActivity = taskState.publicActivity,
                         pendingConfirmation = taskState.pendingConfirmation,
@@ -341,10 +430,7 @@ fun AiAgentScreen(
                         onPromptChange = { prompt = it },
                         canSend = canSend,
                         running = taskState.isRunning,
-                        configurationReady = configurationReady,
-                        connected = isConnected,
-                        requiresProvider = true,
-                        requiresDevice = true,
+                        readiness = readiness,
                         observationMode = taskState.observationMode,
                         totalTokens = taskState.usage.totalTokens,
                         compactionCount = taskState.compactionCount,
@@ -353,9 +439,16 @@ fun AiAgentScreen(
                         obsSwitchOn = obsSwitchOn,
                         onObsSwitchChange = { obsSwitchOn = it },
                         onSend = { submit(prompt) },
-                        onNewTask = viewModel::newTask,
+                        onNewTask = {
+                            if (taskState.messages.any { it.role != AgentMessageRole.SYSTEM }) {
+                                showNewTaskDialog = true
+                            } else {
+                                viewModel.newTask()
+                            }
+                        },
                         onCancel = viewModel::cancelTask,
                         onOpenSettings = { showModelDialog = true },
+                        onOpenDevices = onOpenDevices,
                         onQuickRecognize = { submit(recognizePrompt) }
                     )
                 }
@@ -453,6 +546,41 @@ fun AiAgentScreen(
             },
             onKeyCleared = viewModel::refreshConfigurationStatus,
             onDismiss = { showModelDialog = false }
+        )
+    }
+
+    if (showNewTaskDialog) {
+        AlertDialog(
+            onDismissRequest = { showNewTaskDialog = false },
+            title = {
+                Text(
+                    text = l10n("开始新会话？", "Start a new session?"),
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 15.sp
+                )
+            },
+            text = {
+                Text(
+                    text = l10n(
+                        "当前对话与运行记录将被清空，且无法恢复。",
+                        "The current conversation and run history will be cleared. This cannot be undone."
+                    ),
+                    style = TextStyle(fontSize = 13.sp, lineHeight = 20.sp)
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    showNewTaskDialog = false
+                    viewModel.newTask()
+                }) {
+                    Text(l10n("清空并开始", "Clear and start"), color = QadbTokens.danger)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showNewTaskDialog = false }) {
+                    Text(l10n("取消", "Cancel"))
+                }
+            }
         )
     }
 }
@@ -619,6 +747,7 @@ private fun TopBarDivider() {
 @Composable
 private fun AgentConversation(
     messages: List<AgentMessage>,
+    readiness: AgentReadiness,
     errorMessage: String?,
     publicActivity: AgentPublicActivityState,
     pendingConfirmation: AgentStep?,
@@ -719,6 +848,7 @@ private fun AgentConversation(
                         contentAlignment = Alignment.Center
                     ) {
                         AgentGuideHero(
+                            readiness = readiness,
                             canSubmit = canSubmitQuickPrompt,
                             onPrompt = onQuickPrompt,
                             modifier = Modifier.widthIn(max = 680.dp)
@@ -888,20 +1018,55 @@ private fun AgentMessageBubble(message: AgentMessage) {
                         fontWeight = FontWeight.Bold
                     )
                 }
-                Surface(
+                Column(
                     modifier = Modifier.weight(1f, fill = false),
-                    shape = RoundedCornerShape(14.dp),
-                    color = QadbTokens.bg1,
-                    border = BorderStroke(1.dp, QadbTokens.border)
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    Column(
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
+                    Surface(
+                        shape = RoundedCornerShape(14.dp),
+                        color = QadbTokens.bg1,
+                        border = BorderStroke(1.dp, QadbTokens.border)
                     ) {
-                        AgentMarkdownText(message.text)
+                        Column(
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
+                        ) {
+                            AgentMarkdownText(message.text)
+                        }
                     }
+                    AgentCopyChip(text = message.text)
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun AgentCopyChip(text: String) {
+    val clipboard = LocalClipboardManager.current
+    var copied by remember { mutableStateOf(false) }
+    LaunchedEffect(copied) {
+        if (copied) {
+            delay(1600)
+            copied = false
+        }
+    }
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(UiTokens.RadiusSmall))
+            .clickable {
+                clipboard.setText(AnnotatedString(text))
+                copied = true
+            }
+            .padding(horizontal = 4.dp, vertical = 2.dp)
+            .semantics {
+                contentDescription = if (copied) l10n("已复制", "Copied") else l10n("复制回复", "Copy reply")
+            }
+    ) {
+        Text(
+            text = if (copied) l10n("已复制", "Copied") else l10n("复制", "Copy"),
+            fontSize = 11.sp,
+            color = if (copied) QadbTokens.success else QadbTokens.textSecondary
+        )
     }
 }
 
@@ -952,6 +1117,7 @@ private fun AgentGuideHeroIcon() {
 
 @Composable
 private fun AgentGuideHero(
+    readiness: AgentReadiness,
     canSubmit: (String) -> Boolean,
     onPrompt: (String) -> Unit,
     modifier: Modifier = Modifier
@@ -1022,6 +1188,8 @@ private fun AgentGuideHero(
                 )
             }
 
+            AgentOnboardingSteps(readiness = readiness)
+
             // 2x2 Grid of Scenario Prompt Cards
             Column(
                 modifier = Modifier.fillMaxWidth(),
@@ -1059,6 +1227,69 @@ private fun AgentGuideHero(
                         enabled = canSubmit(quickScenarios[3].prompt),
                         onClick = { onPrompt(quickScenarios[3].prompt) },
                         modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AgentOnboardingSteps(readiness: AgentReadiness) {
+    val steps = listOf(
+        l10n("连接设备", "Connect device"),
+        l10n("配置视觉模型", "Configure vision model"),
+        l10n("测试连接", "Test connection"),
+        l10n("发送第一条指令", "Send first instruction")
+    )
+    val activeStep = when (readiness) {
+        AgentReadiness.DEVICE_REQUIRED -> 0
+        AgentReadiness.MODEL_REQUIRED -> 1
+        AgentReadiness.CHECKING -> 2
+        AgentReadiness.READY -> 3
+    }
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        steps.forEachIndexed { index, label ->
+            val completed = index < activeStep
+            val active = index == activeStep
+            Surface(
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(UiTokens.RadiusSmall),
+                color = when {
+                    completed -> QadbTokens.success.copy(alpha = 0.10f)
+                    active -> QadbTokens.brand.copy(alpha = 0.10f)
+                    else -> QadbTokens.bg2
+                },
+                border = BorderStroke(
+                    1.dp,
+                    when {
+                        completed -> QadbTokens.success.copy(alpha = 0.35f)
+                        active -> QadbTokens.brand.copy(alpha = 0.40f)
+                        else -> QadbTokens.border
+                    }
+                )
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = if (completed) "✓" else "${index + 1}",
+                        color = if (completed) QadbTokens.success else if (active) QadbTokens.brand else QadbTokens.textSecondary,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = label,
+                        color = if (active || completed) QadbTokens.textPrimary else QadbTokens.textSecondary,
+                        fontSize = 10.5.sp,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
             }
@@ -1475,6 +1706,7 @@ private fun AgentActivityProgressCard(
     val doneCount = steps.count {
         it.result == AgentPublicToolResult.SUCCEEDED || it.result == AgentPublicToolResult.RECOVERED
     }
+    val metrics = run.metrics
     val stageLiveRegion = if (
         run.status == AgentPublicRunStatus.FAILED ||
         run.status == AgentPublicRunStatus.WAITING_CONFIRMATION
@@ -1509,7 +1741,14 @@ private fun AgentActivityProgressCard(
                 AgentBadge(statusBadge)
                 Spacer(Modifier.weight(1f))
                 Text(
-                    text = stringResource(Res.string.agent_activity_steps_done, steps.size, doneCount),
+                    text = if (metrics.deviceActionLimit > 0) {
+                        l10n(
+                            "步骤 %1\$d/%2\$d · 完成 %3\$d",
+                            "Steps %1\$d/%2\$d · %3\$d done"
+                        ).format(metrics.deviceActions, metrics.deviceActionLimit, doneCount)
+                    } else {
+                        stringResource(Res.string.agent_activity_steps_done, steps.size, doneCount)
+                    },
                     color = QadbTokens.textSecondary,
                     fontSize = UiTokens.TextCaption
                 )
@@ -1530,7 +1769,6 @@ private fun AgentActivityProgressCard(
                     )
                 }
             }
-            val metrics = run.metrics
             if (metrics.modelCalls > 0 || metrics.totalTokens > 0) {
                 Box(Modifier.fillMaxWidth().height(1.dp).background(QadbTokens.divider))
                 Text(
@@ -1659,6 +1897,17 @@ private fun AgentRunFailureCard(
         AgentFailureAction.OPEN_DEVICES -> stringResource(Res.string.agent_open_devices)
         AgentFailureAction.NONE -> null
     }
+    val failureDetailText = buildString {
+        append(publicFailureLabel(failure))
+        appendLine()
+        appendLine(
+            l10n(
+                "阶段 ${publicFailureStageLabel(failure)} · 子系统 ${publicFailureSubsystemLabel(failure)} · 代码 ${failure.code.name.lowercase()}",
+                "Stage ${publicFailureStageLabel(failure)} · subsystem ${publicFailureSubsystemLabel(failure)} · code ${failure.code.name.lowercase()}"
+            )
+        )
+        failure.technicalDetail?.takeIf { it.isNotBlank() }?.let { appendLine(it) }
+    }
     Surface(
         modifier = modifier
             .fillMaxWidth()
@@ -1695,16 +1944,36 @@ private fun AgentRunFailureCard(
                 color = QadbTokens.dangerText.copy(alpha = 0.85f),
                 fontSize = UiTokens.TextCaption
             )
-            if (actionLabel != null) {
-                OutlinedButton(
-                    onClick = when (failure.suggestedAction) {
-                        AgentFailureAction.RETRY -> onRetry
-                        AgentFailureAction.OPEN_MODEL_SETTINGS -> onOpenSettings
-                        AgentFailureAction.OPEN_DEVICES -> onOpenDevices
-                        AgentFailureAction.NONE -> ({})
+            if (actionLabel != null || failure.technicalDetail != null) {
+                val clipboard = LocalClipboardManager.current
+                var copied by remember { mutableStateOf(false) }
+                LaunchedEffect(copied) {
+                    if (copied) {
+                        delay(1600)
+                        copied = false
                     }
-                ) {
-                    Text(actionLabel)
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (actionLabel != null) {
+                        OutlinedButton(
+                            onClick = when (failure.suggestedAction) {
+                                AgentFailureAction.RETRY -> onRetry
+                                AgentFailureAction.OPEN_MODEL_SETTINGS -> onOpenSettings
+                                AgentFailureAction.OPEN_DEVICES -> onOpenDevices
+                                AgentFailureAction.NONE -> ({})
+                            }
+                        ) {
+                            Text(actionLabel)
+                        }
+                    }
+                    OutlinedButton(
+                        onClick = {
+                            clipboard.setText(AnnotatedString(failureDetailText))
+                            copied = true
+                        }
+                    ) {
+                        Text(if (copied) l10n("已复制", "Copied") else l10n("复制详情", "Copy details"))
+                    }
                 }
             }
         }
@@ -1797,10 +2066,7 @@ private fun AgentComposer(
     onPromptChange: (String) -> Unit,
     canSend: Boolean,
     running: Boolean,
-    configurationReady: Boolean,
-    connected: Boolean,
-    requiresProvider: Boolean,
-    requiresDevice: Boolean,
+    readiness: AgentReadiness,
     observationMode: AgentObservationMode,
     totalTokens: Int,
     compactionCount: Int,
@@ -1812,6 +2078,7 @@ private fun AgentComposer(
     onNewTask: () -> Unit,
     onCancel: () -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenDevices: () -> Unit,
     onQuickRecognize: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -1850,11 +2117,11 @@ private fun AgentComposer(
                     .padding(14.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                // 1. Text Field Area
+                // 1. Text Field Area (stays editable while a task runs so the next
+                //    message can be drafted; sending is gated by canSend instead)
                 BasicTextField(
                     value = prompt,
                     onValueChange = onPromptChange,
-                    enabled = !running,
                     textStyle = TextStyle(
                         color = QadbTokens.textPrimary,
                         fontSize = 14.sp,
@@ -1867,15 +2134,17 @@ private fun AgentComposer(
                         .heightIn(min = 60.dp, max = 160.dp)
                         .onFocusChanged { focused = it.isFocused }
                         .onPreviewKeyEvent { event ->
-                            if (
-                                event.type == KeyEventType.KeyDown &&
-                                event.key == Key.Enter &&
-                                !event.isShiftPressed
-                            ) {
-                                if (canSend) onSend()
-                                true
-                            } else {
-                                false
+                            when {
+                                event.type != KeyEventType.KeyDown -> false
+                                event.key == Key.Enter && !event.isShiftPressed -> {
+                                    if (canSend) onSend()
+                                    true
+                                }
+                                event.key == Key.Escape && running -> {
+                                    onCancel()
+                                    true
+                                }
+                                else -> false
                             }
                         },
                     maxLines = 8,
@@ -1927,9 +2196,9 @@ private fun AgentComposer(
                         // Model Settings Pill Button
                         ComposerPillButton(
                             icon = IconParkIcons.Setting,
-                            text = if (configurationReady) l10n("模型已就绪", "Model Ready") else l10n("配置模型", "Configure Model"),
+                            text = if (readiness == AgentReadiness.READY) l10n("模型已就绪", "Model Ready") else l10n("配置模型", "Configure Model"),
                             onClick = onOpenSettings,
-                            contentColor = if (configurationReady) QadbTokens.success else QadbTokens.warning
+                            contentColor = if (readiness == AgentReadiness.READY) QadbTokens.success else QadbTokens.warning
                         )
 
                         // Observation Mode Switch Pill
@@ -2033,13 +2302,30 @@ private fun AgentComposer(
                                 }
                             }
                         } else {
+                            val primaryActionEnabled = when (readiness) {
+                                AgentReadiness.CHECKING -> false
+                                AgentReadiness.READY -> canSend
+                                else -> true
+                            }
+                            val primaryAction = when (readiness) {
+                                AgentReadiness.DEVICE_REQUIRED -> onOpenDevices
+                                AgentReadiness.MODEL_REQUIRED -> onOpenSettings
+                                AgentReadiness.READY -> onSend
+                                AgentReadiness.CHECKING -> ({})
+                            }
+                            val primaryLabel = when (readiness) {
+                                AgentReadiness.CHECKING -> l10n("正在检查", "Checking")
+                                AgentReadiness.DEVICE_REQUIRED -> l10n("连接设备", "Connect device")
+                                AgentReadiness.MODEL_REQUIRED -> l10n("配置模型", "Configure model")
+                                AgentReadiness.READY -> l10n("发送指令", "Send")
+                            }
                             Surface(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(UiTokens.RadiusSmall))
-                                    .clickable(enabled = canSend, onClick = onSend),
+                                    .clickable(enabled = primaryActionEnabled, onClick = primaryAction),
                                 shape = RoundedCornerShape(UiTokens.RadiusSmall),
-                                color = if (canSend) QadbTokens.brand else QadbTokens.bg3,
-                                border = if (canSend) null else BorderStroke(1.dp, QadbTokens.border)
+                                color = if (primaryActionEnabled) QadbTokens.brand else QadbTokens.bg3,
+                                border = if (primaryActionEnabled) null else BorderStroke(1.dp, QadbTokens.border)
                             ) {
                                 Row(
                                     modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp),
@@ -2049,14 +2335,14 @@ private fun AgentComposer(
                                     Icon(
                                         imageVector = IconParkIcons.Send,
                                         contentDescription = null,
-                                        tint = if (canSend) Color.White else QadbTokens.textSecondary,
+                                        tint = if (primaryActionEnabled) Color.White else QadbTokens.textSecondary,
                                         modifier = Modifier.size(13.dp)
                                     )
                                     Text(
-                                        text = l10n("发送指令", "Send"),
+                                        text = primaryLabel,
                                         fontSize = 12.5.sp,
                                         fontWeight = FontWeight.SemiBold,
-                                        color = if (canSend) Color.White else QadbTokens.textSecondary
+                                        color = if (primaryActionEnabled) Color.White else QadbTokens.textSecondary
                                     )
                                 }
                             }

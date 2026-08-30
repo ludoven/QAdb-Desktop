@@ -64,24 +64,9 @@ import com.ludoven.adbtool.util.l10n
 import com.ludoven.adbtool.viewmodel.AppViewModel
 import com.ludoven.adbtool.widget.FeedbackToast
 import com.ludoven.adbtool.widget.FramedStateSurface
+import com.ludoven.adbtool.widget.DeviceRequiredState
 import kotlinx.coroutines.flow.distinctUntilChanged
 import org.jetbrains.compose.resources.stringResource
-
-data class AppInfo(
-    val appName: String,
-    val packageName: String,
-    val apkPath: String = "",
-    val isSystemApp: Boolean = false,
-    val isDebuggable: Boolean = false,
-    val isDisabled: Boolean = false,
-    val versionName: String = "-",
-    val installTime: String = "-",
-    val size: String = "-",
-    val sizeBytes: Long? = null,
-    val installTimestamp: Long? = null,
-    val lastUsedTimestamp: Long? = null,
-    val isRunning: Boolean = false
-)
 
 private fun AppInfoData.toAppInfo(): AppInfo = AppInfo(
     appName = appName,
@@ -90,60 +75,6 @@ private fun AppInfoData.toAppInfo(): AppInfo = AppInfo(
     isSystemApp = isSystemApp,
     isRunning = isRunning
 )
-
-internal enum class AppFilter(val key: String) {
-    ALL("all"),
-    USER("user"),
-    SYSTEM("system"),
-    DEBUGGABLE("debug"),
-    RECENT("recent"),
-    RUNNING("running");
-
-    fun matches(app: AppInfo): Boolean {
-        return when (this) {
-            ALL -> true
-            USER -> !app.isSystemApp
-            SYSTEM -> app.isSystemApp
-            DEBUGGABLE -> app.isDebuggable
-            RECENT -> (app.lastUsedTimestamp ?: app.installTimestamp ?: 0L) > 0L
-            RUNNING -> app.isRunning
-        }
-    }
-
-    companion object {
-        fun fromKey(value: String): AppFilter {
-            return entries.firstOrNull { it.key == value } ?: when (value) {
-                "全部应用" -> ALL
-                "用户应用" -> USER
-                "系统应用" -> SYSTEM
-                "可调试应用" -> DEBUGGABLE
-                "最近使用" -> RECENT
-                "运行中" -> RUNNING
-                else -> ALL
-            }
-        }
-    }
-}
-
-private enum class AppSortMode {
-    Name,
-    Size,
-    Version,
-    InstallTime,
-    Recent
-}
-
-private enum class PermissionFilter {
-    ALL,
-    DANGEROUS,
-    PRIVACY,
-    NORMAL
-}
-
-internal enum class AppListEmptyReason {
-    NO_DEVICE,
-    NO_RESULTS
-}
 
 private object AppVisualTokens {
     val Primary: Color @Composable get() = QadbTokens.brand
@@ -558,7 +489,10 @@ private fun AppFilterTabsRow(
 @Composable
 fun AppScreen(
     viewModel: AppViewModel,
-    selectedDevice: String?
+    selectedDevice: String?,
+    onRefreshDevices: () -> Unit,
+    onOpenWirelessConnection: () -> Unit,
+    onOpenTroubleshooting: () -> Unit
 ) {
     val appList by viewModel.appList.collectAsState()
     val searchText by viewModel.searchText.collectAsState()
@@ -744,7 +678,10 @@ fun AppScreen(
                     emptyReason != null -> {
                         AppEmptyState(
                             reason = emptyReason,
-                            onRefresh = { viewModel.getAppList(selectedDevice, forceRefresh = true) }
+                            onRefresh = { viewModel.getAppList(selectedDevice, forceRefresh = true) },
+                            onRefreshDevices = onRefreshDevices,
+                            onOpenWirelessConnection = onOpenWirelessConnection,
+                            onOpenTroubleshooting = onOpenTroubleshooting
                         )
                     }
 
@@ -1582,8 +1519,25 @@ private fun NoMatchingAppsIllustration() {
 @Composable
 private fun AppEmptyState(
     reason: AppListEmptyReason,
-    onRefresh: (() -> Unit)? = null
+    onRefresh: (() -> Unit)? = null,
+    onRefreshDevices: () -> Unit,
+    onOpenWirelessConnection: () -> Unit,
+    onOpenTroubleshooting: () -> Unit
 ) {
+    if (reason == AppListEmptyReason.NO_DEVICE) {
+        DeviceRequiredState(
+            title = l10n("未连接设备", "No device connected"),
+            description = l10n(
+                "连接并选择设备后即可查看、搜索和管理应用。",
+                "Connect and select a device to view, search, and manage apps."
+            ),
+            onRefreshDevices = onRefreshDevices,
+            onOpenWirelessConnection = onOpenWirelessConnection,
+            onOpenTroubleshooting = onOpenTroubleshooting,
+            modifier = Modifier.fillMaxSize()
+        )
+        return
+    }
     Box(
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
@@ -1593,18 +1547,12 @@ private fun AppEmptyState(
             verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium),
             modifier = Modifier.padding(UiTokens.SpaceXXLarge)
         ) {
-            when (reason) {
-                AppListEmptyReason.NO_DEVICE -> NoDeviceAppIllustration()
-                AppListEmptyReason.NO_RESULTS -> NoMatchingAppsIllustration()
-            }
+            NoMatchingAppsIllustration()
 
             Spacer(modifier = Modifier.height(2.dp))
 
             Text(
-                text = when (reason) {
-                    AppListEmptyReason.NO_DEVICE -> l10n("未连接设备", "No device connected")
-                    AppListEmptyReason.NO_RESULTS -> l10n("暂无匹配应用", "No matching apps found")
-                },
+                text = l10n("暂无匹配应用", "No matching apps found"),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
                 color = AppVisualTokens.Text,
@@ -1612,17 +1560,14 @@ private fun AppEmptyState(
             )
 
             Text(
-                text = when (reason) {
-                    AppListEmptyReason.NO_DEVICE -> l10n("连接并选择设备后即可查看、搜索和管理应用。", "Connect and select a device to view, search, and manage apps.")
-                    AppListEmptyReason.NO_RESULTS -> l10n("尝试调整搜索关键字、切换分类筛选或刷新应用列表。", "Try adjusting your search terms, changing filter categories, or refreshing.")
-                },
+                text = l10n("尝试调整搜索关键字、切换分类筛选或刷新应用列表。", "Try adjusting your search terms, changing filter categories, or refreshing."),
                 style = MaterialTheme.typography.bodyMedium,
                 color = AppVisualTokens.Muted,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.widthIn(max = 340.dp)
             )
 
-            if (reason == AppListEmptyReason.NO_RESULTS && onRefresh != null) {
+            if (onRefresh != null) {
                 Spacer(modifier = Modifier.height(UiTokens.SpaceSmall))
                 Button(
                     onClick = onRefresh,

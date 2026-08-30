@@ -16,6 +16,7 @@ import com.ludoven.adbtool.widget.FeedbackToast
 import com.ludoven.adbtool.widget.FileEmptyKind
 import com.ludoven.adbtool.widget.FileEmptyState
 import com.ludoven.adbtool.widget.FramedStateSurface
+import com.ludoven.adbtool.widget.DeviceRequiredState
 import com.ludoven.adbtool.widget.PageHeader
 import androidx.compose.foundation.*
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -63,7 +64,10 @@ internal fun fileBrowserAvailableSpaceCommand(path: String): String =
 @Composable
 fun FileBrowserScreen(
     viewModel: FileBrowserViewModel,
-    selectedDevice: String?
+    selectedDevice: String?,
+    onRefreshDevices: () -> Unit,
+    onOpenWirelessConnection: () -> Unit,
+    onOpenTroubleshooting: () -> Unit
 ) {
     val currentPath by viewModel.currentPath.collectAsState()
     val files by viewModel.files.collectAsState()
@@ -334,10 +338,12 @@ fun FileBrowserScreen(
         }
 
         if (selectedDevice.isNullOrBlank()) {
-            FileEmptyState(
-                kind = FileEmptyKind.NoDevice,
+            DeviceRequiredState(
                 title = l10n("未选择设备", "No device selected"),
                 description = l10n("请先连接并选择设备后查看文件。", "Connect and select a device before browsing files."),
+                onRefreshDevices = onRefreshDevices,
+                onOpenWirelessConnection = onOpenWirelessConnection,
+                onOpenTroubleshooting = onOpenTroubleshooting,
                 modifier = Modifier.fillMaxSize()
             )
             return

@@ -278,7 +278,10 @@ data class AgentBudgetStatus(
     val replanLimit: Int = AgentBudget().maxReplans,
     val mode: AgentBudgetMode = AgentBudgetMode.NORMAL,
     val stopReason: String? = null,
-    val estimatedCost: Double = 0.0
+    val estimatedCost: Double = 0.0,
+    /** Device actions executed so far and the engine's hard cap; 0 limit means not tracked. */
+    val deviceActions: Int = 0,
+    val deviceActionLimit: Int = 0
 )
 
 class AgentBudgetTracker(

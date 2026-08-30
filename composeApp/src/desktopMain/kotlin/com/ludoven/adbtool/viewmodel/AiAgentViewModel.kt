@@ -82,6 +82,8 @@ class AiAgentViewModel(
     val apiKeyAvailable = configRepository.hasApiKeyState
     private val _configurationReady = MutableStateFlow(false)
     val configurationReady: StateFlow<Boolean> = _configurationReady.asStateFlow()
+    private val _configurationChecked = MutableStateFlow(false)
+    val configurationChecked: StateFlow<Boolean> = _configurationChecked.asStateFlow()
     private val _taskLogs = MutableStateFlow(emptyList<AgentTaskLogEntry>())
     val taskLogs: StateFlow<List<AgentTaskLogEntry>> = _taskLogs.asStateFlow()
     private val _runMetrics = MutableStateFlow(emptyList<AgentRunMetrics>())
@@ -98,6 +100,7 @@ class AiAgentViewModel(
     }
 
     fun refreshConfigurationStatus() {
+        _configurationChecked.value = false
         viewModelScope.launch {
             runCatching { configRepository.isReady() }
             val provider = runCatching {
@@ -106,6 +109,7 @@ class AiAgentViewModel(
             }.getOrNull()
             val attestation = provider?.let { providerRepository.capabilityAttestation(it.profile) }
             _configurationReady.value = provider.isReadyForVisualAgent(attestation)
+            _configurationChecked.value = true
         }
     }
 

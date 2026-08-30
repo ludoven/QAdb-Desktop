@@ -203,6 +203,9 @@ private fun TerminalWindowHeader(
     lineCount: Int,
     isRunning: Boolean
 ) {
+    val isMacOs = remember {
+        System.getProperty("os.name").orEmpty().contains("mac", ignoreCase = true)
+    }
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -211,28 +214,27 @@ private fun TerminalWindowHeader(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        // macOS Traffic Light dots
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(10.dp)
-                    .clip(CircleShape)
-                    .background(Color(0xFFFF5F56))
-            )
-            Box(
-                modifier = Modifier
-                    .size(10.dp)
-                    .clip(CircleShape)
-                    .background(Color(0xFFFFBD2E))
-            )
-            Box(
-                modifier = Modifier
-                    .size(10.dp)
-                    .clip(CircleShape)
-                    .background(Color(0xFF27C93F))
+        if (isMacOs) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                listOf(Color(0xFFFF5F56), Color(0xFFFFBD2E), Color(0xFF27C93F)).forEach { color ->
+                    Box(
+                        modifier = Modifier
+                            .size(10.dp)
+                            .clip(CircleShape)
+                            .background(color)
+                    )
+                }
+            }
+        } else {
+            Text(
+                text = ">_",
+                fontFamily = FontFamily.Monospace,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = TerminalTokens.TextMuted
             )
         }
 
@@ -418,6 +420,9 @@ private fun EmptyTerminalIllustration() {
     val brand = QadbTokens.brand
     val success = QadbTokens.success
     val muted = TerminalTokens.TextMuted
+    val isMacOs = remember {
+        System.getProperty("os.name").orEmpty().contains("mac", ignoreCase = true)
+    }
 
     Canvas(modifier = Modifier.size(88.dp, 64.dp)) {
         val w = size.width
@@ -447,11 +452,20 @@ private fun EmptyTerminalIllustration() {
             strokeWidth = 1.2f
         )
 
-        // 3 Traffic dots
+        // Keep traffic-light decoration exclusive to macOS.
         val dotRadius = 2.2f
-        drawCircle(color = Color(0xFFFF5F56).copy(alpha = 0.8f), radius = dotRadius, center = Offset(padX + 7f, padY + headerH / 2))
-        drawCircle(color = Color(0xFFFFBD2E).copy(alpha = 0.8f), radius = dotRadius, center = Offset(padX + 14f, padY + headerH / 2))
-        drawCircle(color = Color(0xFF27C93F).copy(alpha = 0.8f), radius = dotRadius, center = Offset(padX + 21f, padY + headerH / 2))
+        val headerColors = if (isMacOs) {
+            listOf(Color(0xFFFF5F56), Color(0xFFFFBD2E), Color(0xFF27C93F))
+        } else {
+            List(3) { brand.copy(alpha = 0.45f) }
+        }
+        headerColors.forEachIndexed { index, color ->
+            drawCircle(
+                color = color.copy(alpha = 0.8f),
+                radius = dotRadius,
+                center = Offset(padX + 7f + index * 7f, padY + headerH / 2)
+            )
+        }
 
         // Prompt line: `> ` and simulated command blocks
         val promptY = padY + headerH + 12f

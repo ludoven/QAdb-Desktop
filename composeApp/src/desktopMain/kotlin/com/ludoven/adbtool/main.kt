@@ -166,7 +166,7 @@ fun main() = application {
             title = "QADB",
             icon = appIcon,
             decoration = if (isWindows) {
-                WindowDecoration.Undecorated()
+                WindowDecoration.Undecorated(resizerThickness = 12.dp)
             } else {
                 WindowDecoration.SystemDefault
             },

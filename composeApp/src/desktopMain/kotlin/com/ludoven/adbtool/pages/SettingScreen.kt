@@ -196,6 +196,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -214,6 +215,7 @@ import com.ludoven.adbtool.agent.AgentModelRole
 import com.ludoven.adbtool.agent.AiModelConfig
 import com.ludoven.adbtool.agent.AgentInputHelper
 import com.ludoven.adbtool.agent.AgentInputHelperStatus
+import com.ludoven.adbtool.agent.AgentModelCatalog
 import com.ludoven.adbtool.agent.AgentApprovalPolicy
 import com.ludoven.adbtool.agent.AgentApprovalRuntime
 import com.ludoven.adbtool.agent.AgentFeatureRuntime
@@ -253,14 +255,6 @@ import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
 import java.awt.Desktop
 import java.io.File
-
-private enum class SettingSection {
-    OVERVIEW,
-    GENERAL,
-    ADB,
-    AI_AGENT,
-    ABOUT
-}
 
 @Composable
 private fun SettingSection.label(): String = when (this) {
@@ -1825,6 +1819,9 @@ internal fun AiModelConfigDialog(
     var statusMessage by remember { mutableStateOf<String?>(null) }
     var statusIsError by remember { mutableStateOf(false) }
     var capabilityReport by remember { mutableStateOf<AgentCapabilityReport?>(null) }
+    var modelOptions by remember { mutableStateOf<List<String>?>(null) }
+    var isLoadingModels by remember { mutableStateOf(false) }
+    var modelFetchError by remember { mutableStateOf<String?>(null) }
     val testSuccessText = stringResource(Res.string.ai_test_success)
     val keyClearedText = stringResource(Res.string.ai_key_cleared)
     val isBusy = isSaving || isTesting
@@ -1839,6 +1836,41 @@ internal fun AiModelConfigDialog(
     fun invalidateCapabilityResult() {
         capabilityReport = null
         statusMessage = null
+    }
+
+    fun fetchModels() {
+        coroutineScope.launch {
+            isLoadingModels = true
+            modelFetchError = null
+            val result = runCatching {
+                val key = apiKey.trim().ifBlank { repository.loadApiKey().orEmpty() }
+                require(key.isNotBlank()) {
+                    l10n("请先填写 API Key 再获取模型列表", "Enter an API key before fetching models")
+                }
+                AgentModelCatalog.fetchModelIds(providerRepository.legacyPreview(currentConfig(), key))
+            }
+            result.fold(
+                onSuccess = { ids ->
+                    modelOptions = ids
+                    modelFetchError = ids.takeIf { it.isEmpty() }?.let {
+                        l10n("接口未返回任何模型", "The endpoint returned no models")
+                    }
+                },
+                onFailure = { error ->
+                    modelOptions = null
+                    modelFetchError = error.message ?: l10n("获取模型列表失败", "Failed to fetch model list")
+                }
+            )
+            isLoadingModels = false
+        }
+    }
+
+    fun applyPreset(preset: AgentProviderPreset) {
+        baseUrl = preset.baseUrl
+        if (model.isBlank()) model = preset.suggestedModel
+        modelOptions = null
+        modelFetchError = null
+        invalidateCapabilityResult()
     }
 
     Dialog(onDismissRequest = { if (!isBusy) onDismiss() }) {
@@ -1905,9 +1937,28 @@ internal fun AiModelConfigDialog(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .verticalScroll(rememberScrollState())
                         .padding(horizontal = 20.dp, vertical = 16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(
+                            text = l10n("服务商预设", "Provider presets"),
+                            color = SettingColors.SecondaryText,
+                            fontSize = 11.sp
+                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            AGENT_PROVIDER_PRESETS.take(3).forEach { preset ->
+                                AiProviderPresetChip(preset.label) { applyPreset(preset) }
+                            }
+                        }
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            AGENT_PROVIDER_PRESETS.drop(3).forEach { preset ->
+                                AiProviderPresetChip(preset.label) { applyPreset(preset) }
+                            }
+                        }
+                    }
+
                     AiDialogTextField(
                         label = stringResource(Res.string.ai_base_url),
                         value = baseUrl,
@@ -1962,15 +2013,126 @@ internal fun AiModelConfigDialog(
                         }
                     )
 
-                    AiDialogTextField(
-                        label = stringResource(Res.string.ai_model_name),
-                        value = model,
-                        onValueChange = {
-                            model = it
-                            invalidateCapabilityResult()
-                        },
-                        placeholder = stringResource(Res.string.ai_model_name_hint)
-                    )
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = stringResource(Res.string.ai_model_name),
+                                color = SettingColors.Text,
+                                fontWeight = FontWeight.Medium,
+                                fontSize = 12.5.sp
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .pointerHoverIcon(PointerIcon.Hand)
+                                    .clickable(enabled = !isBusy) {
+                                        if (modelOptions != null) {
+                                            modelOptions = null
+                                        } else {
+                                            fetchModels()
+                                        }
+                                    }
+                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                            ) {
+                                Text(
+                                    text = if (modelOptions == null) {
+                                        l10n("获取模型列表", "Fetch model list")
+                                    } else {
+                                        l10n("收起模型列表", "Hide model list")
+                                    },
+                                    color = SettingColors.Primary,
+                                    fontSize = 11.sp
+                                )
+                            }
+                        }
+
+                        AiDialogTextField(
+                            label = "",
+                            value = model,
+                            onValueChange = {
+                                model = it
+                                invalidateCapabilityResult()
+                            },
+                            placeholder = stringResource(Res.string.ai_model_name_hint)
+                        )
+
+                        if (modelOptions != null || isLoadingModels) {
+                            Surface(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(8.dp),
+                                color = SettingColors.SoftSurface,
+                                border = BorderStroke(1.dp, SettingColors.Border),
+                                tonalElevation = 0.dp,
+                                shadowElevation = 0.dp
+                            ) {
+                                when {
+                                    isLoadingModels -> Row(
+                                        modifier = Modifier.padding(12.dp),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        CircularProgressIndicator(
+                                            modifier = Modifier.size(12.dp),
+                                            strokeWidth = 2.dp,
+                                            color = SettingColors.Primary
+                                        )
+                                        Text(
+                                            text = l10n("获取中…", "Loading…"),
+                                            color = SettingColors.SecondaryText,
+                                            fontSize = 11.5.sp
+                                        )
+                                    }
+                                    modelFetchError != null -> Text(
+                                        text = modelFetchError.orEmpty(),
+                                        modifier = Modifier.padding(12.dp),
+                                        color = SettingColors.Danger,
+                                        fontSize = 11.5.sp
+                                    )
+                                    else -> Column(
+                                        modifier = Modifier
+                                            .heightIn(max = 150.dp)
+                                            .verticalScroll(rememberScrollState())
+                                    ) {
+                                        modelOptions.orEmpty().forEach { id ->
+                                            Row(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .clickable {
+                                                        model = id
+                                                        invalidateCapabilityResult()
+                                                        modelOptions = null
+                                                    }
+                                                    .padding(horizontal = 12.dp, vertical = 7.dp),
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Text(
+                                                    text = id,
+                                                    color = SettingColors.Text,
+                                                    fontFamily = FontFamily.Monospace,
+                                                    fontSize = 12.sp,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis,
+                                                    modifier = Modifier.weight(1f)
+                                                )
+                                                if (id == model.trim()) {
+                                                    Icon(
+                                                        imageVector = IconParkIcons.CheckCircle,
+                                                        contentDescription = null,
+                                                        tint = SettingColors.Primary,
+                                                        modifier = Modifier.size(14.dp)
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -2221,13 +2383,15 @@ private fun AiDialogTextField(
     trailingContent: (@Composable () -> Unit)? = null
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodyMedium,
-            color = SettingColors.Text,
-            fontWeight = FontWeight.Medium,
-            fontSize = 12.5.sp
-        )
+        if (label.isNotBlank()) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.bodyMedium,
+                color = SettingColors.Text,
+                fontWeight = FontWeight.Medium,
+                fontSize = 12.5.sp
+            )
+        }
         OutlinedTextField(
             value = value,
             onValueChange = onValueChange,
@@ -2243,6 +2407,41 @@ private fun AiDialogTextField(
             visualTransformation = visualTransformation,
             singleLine = true,
             shape = RoundedCornerShape(6.dp)
+        )
+    }
+}
+
+private data class AgentProviderPreset(
+    val label: String,
+    val baseUrl: String,
+    val suggestedModel: String
+)
+
+private val AGENT_PROVIDER_PRESETS = listOf(
+    AgentProviderPreset("OpenAI", "https://api.openai.com/v1", "gpt-4o"),
+    AgentProviderPreset("DeepSeek", "https://api.deepseek.com/v1", "deepseek-chat"),
+    AgentProviderPreset("智谱 GLM", "https://open.bigmodel.cn/api/paas/v4", "glm-4v-plus"),
+    AgentProviderPreset("通义千问", "https://dashscope.aliyuncs.com/compatible-mode/v1", "qwen-vl-max"),
+    AgentProviderPreset("Kimi", "https://api.moonshot.cn/v1", "moonshot-v1-8k-vision-preview"),
+    AgentProviderPreset("OpenRouter", "https://openrouter.ai/api/v1", "openai/gpt-4o")
+)
+
+@Composable
+private fun AiProviderPresetChip(label: String, onClick: () -> Unit) {
+    Surface(
+        modifier = Modifier
+            .clip(RoundedCornerShape(6.dp))
+            .pointerHoverIcon(PointerIcon.Hand)
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(6.dp),
+        color = SettingColors.SoftSurface,
+        border = BorderStroke(1.dp, SettingColors.Border)
+    ) {
+        Text(
+            text = label,
+            modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp),
+            color = SettingColors.SecondaryText,
+            fontSize = 11.sp
         )
     }
 }

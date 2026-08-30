@@ -3644,27 +3644,6 @@ private fun booleanProperty(description: String): JsonObject = buildJsonObject {
     put("description", description)
 }
 
-private data class ProviderHttpResponse(
-    val body: JsonObject,
-    val billing: AgentModelBilling
-) {
-    val usage: AgentUsage get() = billing.usage
-}
-
-private data class StreamedUserAnswer(
-    val text: String,
-    val usage: AgentUsage
-)
-
-private class SseUserAnswerProgress {
-    @Volatile
-    var usage: AgentUsage = AgentUsage()
-}
-
-private class ProviderResponseTimeoutException(val usage: AgentUsage = AgentUsage()) : Exception()
-private class ProviderResponseLimitException : IOException()
-private data class ProviderDeadlineValue<T>(val value: T)
-
 private const val MODEL_REQUEST_TIMEOUT_SECONDS = 90L
 private const val DEFAULT_PROVIDER_MAX_OUTPUT_TOKENS = 8_192
 private const val MAX_ERROR_MESSAGE_LENGTH = 300
