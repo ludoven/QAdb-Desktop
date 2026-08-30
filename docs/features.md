@@ -8,7 +8,7 @@ QADB 将高频 ADB 工作流拆成清晰模块，覆盖设备连接、应用管�
     <p>展示设备状态、快捷入口和常用操作，进入应用后先确认当前设备是否可用。</p>
   </div>
   <div class="module-card">
-    <h3>常用命令</h3>
+    <h3>命令</h3>
     <p>把截图、录屏、重启、打开设置、查看 Activity 等命令整理成可点击动作。</p>
   </div>
   <div class="module-card">
@@ -16,7 +16,7 @@ QADB 将高频 ADB 工作流拆成清晰模块，覆盖设备连接、应用管�
     <p>内置命令行终端，可直接执行 adb 或 shell 命令。</p>
   </div>
   <div class="module-card">
-    <h3>按键</h3>
+    <h3>设备控制</h3>
     <p>模拟 Android 返回、主页、菜单、音量、方向键等 KeyEvent。</p>
   </div>
   <div class="module-card">
@@ -24,16 +24,20 @@ QADB 将高频 ADB 工作流拆成清晰模块，覆盖设备连接、应用管�
     <p>查看应用列表，支持安装、卸载、清除数据、强制停止和导出 APK。</p>
   </div>
   <div class="module-card">
-    <h3>日志</h3>
-    <p>查看和筛选 Logcat 日志，辅助定位应用运行问题。</p>
+    <h3>文件</h3>
+    <p>浏览设备文件，支持上传、下载和常用文件管理操作。</p>
   </div>
   <div class="module-card">
     <h3>诊断</h3>
     <p>在统一工作区切换日志与进程，支持进程搜索、排序和资源占用查看。</p>
   </div>
   <div class="module-card">
-    <h3>AI Agent Beta</h3>
+    <h3>AI Agent</h3>
     <p>默认关闭；使用单一视觉 Agent 根据每一步最新截图执行一个受控动作，UI 结构只作可选提示。</p>
+  </div>
+  <div class="module-card">
+    <h3>设置</h3>
+    <p>配置 ADB、设备恢复、外观、实验功能、模型 Provider 与更新。</p>
   </div>
 </div>
 
@@ -50,7 +54,7 @@ QADB 将高频 ADB 工作流拆成清晰模块，覆盖设备连接、应用管�
 
 <div class="screenshot-strip">
   <img src="/screenshots/home.png" alt="首页截图">
-  <img src="/screenshots/common.png" alt="常用命令截图">
+  <img src="/screenshots/common.png" alt="命令页面截图">
   <img src="/screenshots/keyevent.png" alt="按键模拟截图">
   <img src="/screenshots/terminal.png" alt="终端截图">
 </div>

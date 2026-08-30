@@ -32,6 +32,14 @@ Linux 版本会优先使用内置 ADB。设备镜像依赖 `scrcpy`，如果安�
 ./gradlew :composeApp:run
 ```
 
+只验证桌面代码时可关闭 Android helper 子项目，使测试仅依赖 JDK：
+
+```powershell
+.\gradlew.bat :composeApp:desktopTest '-Pqadb.includeAndroidHelpers=false'
+```
+
+`qadb.includeAndroidHelpers` 默认为 `true`。正常运行和制作安装包时不要关闭；发布产物仍会同步图标与输入法 helper。
+
 如果只是预览官网，可以执行：
 
 ```bash

@@ -107,13 +107,14 @@ QADB is suitable for:
 | Module | Description |
 |---|---|
 | Home | Device status, quick entries, and common actions |
-| Common | Quick execution for frequently used ADB commands |
-| Terminal | Built-in command terminal for adb / shell commands |
-| Key Events | Simulate Android device key operations |
+| Commands | Quick execution for frequently used ADB commands |
+| Device Control | Simulate Android keys and common device controls |
 | Apps | App list, install, uninstall, clear data, force stop, etc. |
+| Files | Browse, upload, download, and manage device files |
 | Diagnostics | View and filter Logcat, then search, sort, and inspect device processes |
+| Terminal | Built-in command terminal for adb / shell commands |
+| AI Agent | Screenshot-first single-engine execution with local safety confirmation |
 | Settings | Overview plus General, ADB, Experimental, and About sections; configure startup detection, remembered devices, tray behavior, ADB sources, and updates |
-| AI Agent Beta | Off by default; screenshot-first single-engine execution with local safety confirmation |
 
 ---
 
