@@ -319,6 +319,8 @@ fun AppScreen(
     val tabCountMap = remember(appList) {
         appFilterCounts(appList)
     }
+    val isInstalling by viewModel.isInstalling.collectAsState()
+    val installProgress by viewModel.currentInstallingProgress.collectAsState()
 
     Scaffold(containerColor = Color.Transparent) { paddingValues ->
         if (appInfo != null) {
@@ -385,6 +387,35 @@ fun AppScreen(
                         Spacer(Modifier.width(UiTokens.SpaceSmall))
                         Text(
                             text = l10n("刷新", "Refresh"),
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+
+                    OutlinedButton(
+                        onClick = {
+                            viewModel.batchInstallFromFolder(selectedDevice)
+                        },
+                        enabled = hasSelectedDevice && !isInstalling,
+                        shape = RoundedCornerShape(UiTokens.RadiusMedium),
+                        border = BorderStroke(1.dp, AppVisualTokens.BorderStrong),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            containerColor = AppVisualTokens.Surface,
+                            contentColor = AppVisualTokens.Text,
+                            disabledContentColor = AppVisualTokens.Muted.copy(alpha = 0.45f)
+                        ),
+                        contentPadding = PaddingValues(horizontal = UiTokens.SpaceMedium, vertical = 0.dp),
+                        modifier = Modifier.height(36.dp)
+                    ) {
+                        Icon(Icons.Default.Upload, contentDescription = null, modifier = Modifier.size(UiTokens.IconSmall))
+                        Spacer(Modifier.width(UiTokens.SpaceSmall))
+                        Text(
+                            text = if (isInstalling) {
+                                val progress = installProgress?.let { " ($it)" } ?: ""
+                                l10n("安装中", "Installing") + progress
+                            } else {
+                                l10n("批量安装应用", "Batch install")
+                            },
                             style = MaterialTheme.typography.bodySmall,
                             fontWeight = FontWeight.Medium
                         )
