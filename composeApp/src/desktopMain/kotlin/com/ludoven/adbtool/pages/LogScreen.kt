@@ -440,52 +440,77 @@ fun LogScreen(
                         active = selectedQuickChip == QuickKeywordChip.CURRENT_APP,
                         enabled = likelyCurrentPackage != null,
                         onClick = {
-                            selectedQuickChip = QuickKeywordChip.CURRENT_APP
-                            viewModel.updateFilter(filter.copy(packageName = likelyCurrentPackage ?: ""))
+                            if (selectedQuickChip == QuickKeywordChip.CURRENT_APP) {
+                                selectedQuickChip = null
+                                viewModel.updateFilter(filter.copy(packageName = ""))
+                            } else {
+                                selectedQuickChip = QuickKeywordChip.CURRENT_APP
+                                viewModel.updateFilter(filter.copy(packageName = likelyCurrentPackage ?: ""))
+                            }
                         }
                     )
                     QuickFilterChip(
                         text = stringResource(Res.string.log_filter_error),
                         active = selectedQuickChip == QuickKeywordChip.ERROR,
                         onClick = {
-                            selectedQuickChip = QuickKeywordChip.ERROR
-                            viewModel.updateFilter(filter.copy(level = null, onlyErrors = true))
+                            if (selectedQuickChip == QuickKeywordChip.ERROR) {
+                                selectedQuickChip = null
+                                viewModel.updateFilter(filter.copy(onlyErrors = false))
+                            } else {
+                                selectedQuickChip = QuickKeywordChip.ERROR
+                                viewModel.updateFilter(filter.copy(level = null, onlyErrors = true))
+                            }
                         }
                     )
                     QuickFilterChip(
                         text = stringResource(Res.string.log_keyword_chip_warning),
                         active = selectedQuickChip == QuickKeywordChip.WARNING,
                         onClick = {
-                            selectedQuickChip = QuickKeywordChip.WARNING
-                            viewModel.updateFilter(filter.copy(level = LogLevel.WARN, onlyErrors = false))
+                            if (selectedQuickChip == QuickKeywordChip.WARNING) {
+                                selectedQuickChip = null
+                                viewModel.updateFilter(filter.copy(level = null))
+                            } else {
+                                selectedQuickChip = QuickKeywordChip.WARNING
+                                viewModel.updateFilter(filter.copy(level = LogLevel.WARN, onlyErrors = false))
+                            }
                         }
                     )
                     QuickFilterChip(
                         text = stringResource(Res.string.log_keyword_chip_crash),
                         active = selectedQuickChip == QuickKeywordChip.CRASH,
                         onClick = {
-                            selectedQuickChip = QuickKeywordChip.CRASH
-                            viewModel.updateFilter(
-                                filter.copy(
-                                    keyword = "FATAL EXCEPTION|AndroidRuntime",
-                                    isRegex = true,
-                                    onlyErrors = true
+                            if (selectedQuickChip == QuickKeywordChip.CRASH) {
+                                selectedQuickChip = null
+                                viewModel.updateFilter(filter.copy(keyword = "", isRegex = false, onlyErrors = false))
+                            } else {
+                                selectedQuickChip = QuickKeywordChip.CRASH
+                                viewModel.updateFilter(
+                                    filter.copy(
+                                        keyword = "FATAL EXCEPTION|AndroidRuntime",
+                                        isRegex = true,
+                                        onlyErrors = true
+                                    )
                                 )
-                            )
+                            }
                         }
                     )
                     QuickFilterChip(
                         text = stringResource(Res.string.log_keyword_chip_anr),
                         active = selectedQuickChip == QuickKeywordChip.ANR,
                         onClick = {
-                            selectedQuickChip = QuickKeywordChip.ANR
-                            viewModel.updateFilter(
-                                filter.copy(
-                                    keyword = "ANR|Application Not Responding",
-                                    isRegex = true,
-                                    onlyErrors = false
+                            if (selectedQuickChip == QuickKeywordChip.ANR) {
+                                selectedQuickChip = null
+                                viewModel.updateFilter(filter.copy(keyword = "", isRegex = false))
+                            } else {
+                                selectedQuickChip = QuickKeywordChip.ANR
+                                viewModel.updateFilter(
+                                    filter.copy(
+                                        keyword = "ANR|Application Not Responding",
+                                        isRegex = true,
+                                        onlyErrors = false
+                                    )
                                 )
-                            )
+                            }
                         }
                     )
                 }
