@@ -134,6 +134,24 @@ class DevicesViewModel : BaseViewModel() {
         }
     }
 
+    fun connectNetworkDevice(host: String, port: String) {
+        val hostPort = when {
+            host.isBlank() -> return
+            port.isNotBlank() -> "$host:$port"
+            else -> host
+        }
+        viewModelScope.launch {
+            _isLoading.value = true
+            val result = withContext(Dispatchers.IO) { AdbTool.connectDevice(hostPort) }
+            showTipDialog(
+                MsgContent.Text(if (result.success) result.output else (result.errorMessage ?: result.output)),
+                autoDismiss = true
+            )
+            refreshDevices()
+            _isLoading.value = false
+        }
+    }
+
     private fun loadDeviceInfo(deviceId: String) {
         deviceInfoLoadJob?.cancel()
         deviceInfoLoadDeviceId = deviceId
