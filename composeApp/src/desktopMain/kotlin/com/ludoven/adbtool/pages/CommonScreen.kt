@@ -1,4 +1,4 @@
-package com.ludoven.adbtool.pages
+﻿package com.ludoven.adbtool.pages
 
 import com.ludoven.adbtool.UiTokens
 import com.ludoven.adbtool.QadbColors
@@ -659,7 +659,7 @@ private fun loadCommandLibraryFromConfig(): List<CommandItemUi> {
     val stream = Thread.currentThread().contextClassLoader.getResourceAsStream(fileName)
         ?: return emptyList()
 
-    val jsonText = InputStreamReader(stream).use { it.readText() }
+    val jsonText = InputStreamReader(stream, Charsets.UTF_8).use { it.readText() }
     val root = runCatching { Json.parseToJsonElement(jsonText).jsonArray }.getOrElse { return emptyList() }
 
     return root.mapNotNull { entry ->
