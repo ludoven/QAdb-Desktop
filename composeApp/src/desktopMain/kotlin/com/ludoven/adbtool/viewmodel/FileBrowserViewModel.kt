@@ -7,6 +7,7 @@ import com.ludoven.adbtool.entity.FileSortOrder
 import com.ludoven.adbtool.entity.MsgContent
 import com.ludoven.adbtool.util.AdbTool
 import com.ludoven.adbtool.util.FileUtils
+import com.ludoven.adbtool.util.l10n
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -370,6 +371,29 @@ class FileBrowserViewModel : BaseViewModel() {
             } else {
                 showTipDialog(MsgContent.Text("推送失败: ${result.errorMessage ?: result.output}"))
             }
+        }
+    }
+
+    fun pushFiles(localPaths: List<String>, deviceId: String?) {
+        val paths = localPaths.map { it.trim() }.filter { it.isNotEmpty() }.distinct()
+        if (deviceId.isNullOrBlank() || paths.isEmpty()) return
+        viewModelScope.launch {
+            var success = 0
+            var fail = 0
+            for (localPath in paths) {
+                val fileName = localPath.substringAfterLast("/").substringAfterLast("\\")
+                val destPath = "${_currentPath.value}/$fileName"
+                val result = withContext(Dispatchers.IO) {
+                    AdbTool.execAdbAsync("-s", deviceId, "push", localPath, destPath)
+                }
+                if (result.success) success++ else fail++
+            }
+            if (fail > 0) {
+                showTipDialog(MsgContent.Text(l10n("推送完成：成功 $success 个，失败 $fail 个", "Push done: $success ok, $fail failed")), autoDismiss = true)
+            } else {
+                showTipDialog(MsgContent.Text(l10n("推送成功：$success 个文件", "Uploaded $success file(s)")), autoDismiss = true)
+            }
+            loadFiles(deviceId = deviceId, forceRefresh = true)
         }
     }
 
