@@ -319,6 +319,8 @@ fun AppScreen(
     val tabCountMap = remember(appList) {
         appFilterCounts(appList)
     }
+    val isInstalling by viewModel.isInstalling.collectAsState()
+    val installProgress by viewModel.currentInstallingProgress.collectAsState()
 
     Scaffold(containerColor = Color.Transparent) { paddingValues ->
         if (appInfo != null) {
@@ -385,6 +387,35 @@ fun AppScreen(
                         Spacer(Modifier.width(UiTokens.SpaceSmall))
                         Text(
                             text = l10n("刷新", "Refresh"),
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+
+                    OutlinedButton(
+                        onClick = {
+                            viewModel.batchInstallFromFolder(selectedDevice)
+                        },
+                        enabled = hasSelectedDevice && !isInstalling,
+                        shape = RoundedCornerShape(UiTokens.RadiusMedium),
+                        border = BorderStroke(1.dp, AppVisualTokens.BorderStrong),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            containerColor = AppVisualTokens.Surface,
+                            contentColor = AppVisualTokens.Text,
+                            disabledContentColor = AppVisualTokens.Muted.copy(alpha = 0.45f)
+                        ),
+                        contentPadding = PaddingValues(horizontal = UiTokens.SpaceMedium, vertical = 0.dp),
+                        modifier = Modifier.height(36.dp)
+                    ) {
+                        Icon(Icons.Default.Upload, contentDescription = null, modifier = Modifier.size(UiTokens.IconSmall))
+                        Spacer(Modifier.width(UiTokens.SpaceSmall))
+                        Text(
+                            text = if (isInstalling) {
+                                val progress = installProgress?.let { " ($it)" } ?: ""
+                                l10n("安装中", "Installing") + progress
+                            } else {
+                                l10n("批量安装应用", "Batch install")
+                            },
                             style = MaterialTheme.typography.bodySmall,
                             fontWeight = FontWeight.Medium
                         )
@@ -565,7 +596,8 @@ fun AppScreen(
                                         pendingDangerAction = type to app
                                         confirmActionLabel = label
                                         confirmActionMessage = message
-                                    }
+                                    },
+                                    onOpen = { viewModel.openAppInfo(app.packageName) }
                                 )
                             }
                         }
@@ -595,7 +627,8 @@ fun AppScreen(
                                             pendingDangerAction = type to app
                                             confirmActionLabel = label
                                             confirmActionMessage = message
-                                        }
+                                        },
+                                        onOpen = { viewModel.openAppInfo(app.packageName) }
                                     )
                                     Spacer(modifier = Modifier.height(UiTokens.SpaceXSmall))
                                 }
@@ -748,6 +781,8 @@ private fun ViewToggleButton(
     }
 }
 
+private const val DOUBLE_CLICK_DELAY_NANOS = 500_000_000L
+
 @Composable
 private fun AppListColumnHeader() {
     Row(
@@ -885,7 +920,8 @@ private fun AppListRow(
     icon: ImageBitmap?,
     onAction: (AdbFunctionType) -> Unit,
     onCopyPackageName: () -> Unit,
-    onRequestDangerAction: (AdbFunctionType, String, String) -> Unit
+    onRequestDangerAction: (AdbFunctionType, String, String) -> Unit,
+    onOpen: () -> Unit
 ) {
     val rowInteraction = remember { MutableInteractionSource() }
     val isRowHovered by rowInteraction.collectIsHoveredAsState()
@@ -900,15 +936,29 @@ private fun AppListRow(
             .clip(RoundedCornerShape(UiTokens.RadiusMedium))
             .background(if (isRowHovered) AppVisualTokens.Soft else Color.Transparent)
             .pointerInput(app.packageName) {
+                var lastPrimaryPressNanos = 0L
                 awaitPointerEventScope {
                     while (true) {
                         val event = awaitPointerEvent()
-                        if (event.button == PointerButton.Secondary && event.type == PointerEventType.Press) {
-                            val point = event.changes.firstOrNull()?.position
-                            if (point != null) {
-                                contextMenuOffset = with(density) { DpOffset(point.x.toDp(), point.y.toDp()) }
+                        if (event.type != PointerEventType.Press) continue
+                        when (event.button) {
+                            PointerButton.Secondary -> {
+                                val point = event.changes.firstOrNull()?.position
+                                if (point != null) {
+                                    contextMenuOffset = with(density) { DpOffset(point.x.toDp(), point.y.toDp()) }
+                                }
+                                contextMenuExpanded = true
                             }
-                            contextMenuExpanded = true
+                            PointerButton.Primary -> {
+                                val now = System.nanoTime()
+                                if (now - lastPrimaryPressNanos < DOUBLE_CLICK_DELAY_NANOS) {
+                                    onOpen()
+                                    lastPrimaryPressNanos = 0L
+                                } else {
+                                    lastPrimaryPressNanos = now
+                                }
+                            }
+                            else -> {}
                         }
                     }
                 }
@@ -1286,7 +1336,8 @@ private fun AppGridCard(
     icon: ImageBitmap?,
     onAction: (AdbFunctionType) -> Unit,
     onCopyPackageName: () -> Unit,
-    onRequestDangerAction: (AdbFunctionType, String, String) -> Unit
+    onRequestDangerAction: (AdbFunctionType, String, String) -> Unit,
+    onOpen: () -> Unit
 ) {
     var contextMenuExpanded by remember { mutableStateOf(false) }
     var contextMenuOffset by remember { mutableStateOf(DpOffset.Zero) }
@@ -1294,15 +1345,29 @@ private fun AppGridCard(
 
     Box(
         modifier = Modifier.pointerInput(app.packageName) {
+            var lastPrimaryPressNanos = 0L
             awaitPointerEventScope {
                 while (true) {
                     val event = awaitPointerEvent()
-                    if (event.button == PointerButton.Secondary && event.type == androidx.compose.ui.input.pointer.PointerEventType.Press) {
-                        val point = event.changes.firstOrNull()?.position
-                        if (point != null) {
-                            contextMenuOffset = with(density) { DpOffset(point.x.toDp(), point.y.toDp()) }
+                    if (event.type != PointerEventType.Press) continue
+                    when (event.button) {
+                        PointerButton.Secondary -> {
+                            val point = event.changes.firstOrNull()?.position
+                            if (point != null) {
+                                contextMenuOffset = with(density) { DpOffset(point.x.toDp(), point.y.toDp()) }
+                            }
+                            contextMenuExpanded = true
                         }
-                        contextMenuExpanded = true
+                        PointerButton.Primary -> {
+                            val now = System.nanoTime()
+                            if (now - lastPrimaryPressNanos < DOUBLE_CLICK_DELAY_NANOS) {
+                                onOpen()
+                                lastPrimaryPressNanos = 0L
+                            } else {
+                                lastPrimaryPressNanos = now
+                            }
+                        }
+                        else -> {}
                     }
                 }
             }

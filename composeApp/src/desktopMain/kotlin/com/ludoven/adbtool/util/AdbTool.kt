@@ -894,4 +894,11 @@ object AdbTool {
         return executeCommand("disconnect", deviceId)
     }
 
+    /**
+     * 通过 IP:端口 连接网络 ADB 设备
+     */
+    suspend fun connectDevice(hostPort: String): AdbResult {
+        return executeCommand("connect", hostPort)
+    }
+
 }

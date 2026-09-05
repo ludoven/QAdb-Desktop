@@ -15,6 +15,7 @@ import com.ludoven.adbtool.viewmodel.FileBrowserViewModel
 import com.ludoven.adbtool.widget.EmptyStatePanel
 import com.ludoven.adbtool.widget.PageHeader
 import androidx.compose.foundation.*
+import androidx.compose.foundation.draganddrop.dragAndDropTarget
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
@@ -30,6 +31,9 @@ import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.ExperimentalComposeUiApi
+import androidx.compose.ui.draganddrop.DragAndDropEvent
+import androidx.compose.ui.draganddrop.DragAndDropTarget
+import androidx.compose.ui.draganddrop.awtTransferable
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.PointerButton
 import androidx.compose.ui.input.pointer.PointerEventType
@@ -45,6 +49,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
+import java.awt.datatransfer.DataFlavor
+import java.io.File
 import kotlin.math.max
 import org.jetbrains.compose.resources.stringResource
 
@@ -54,6 +60,7 @@ internal fun fileBrowserDeviceActionsEnabled(selectedDevice: String?): Boolean =
 internal fun fileBrowserAvailableSpaceCommand(path: String): String =
     AdbTool.buildShellCommand("df", "-h", path)
 
+@OptIn(ExperimentalComposeUiApi::class, ExperimentalFoundationApi::class)
 @Composable
 fun FileBrowserScreen(
     viewModel: FileBrowserViewModel,
@@ -100,6 +107,29 @@ fun FileBrowserScreen(
     var showAdvancedFields by remember { mutableStateOf(false) }
     var selectedPaths by remember { mutableStateOf(setOf<String>()) }
     var toolbarMenuExpanded by remember { mutableStateOf(false) }
+
+    // Drag-and-drop (upload local files)
+    var isDragActive by remember { mutableStateOf(false) }
+    val dragTarget = remember(selectedDevice) {
+        object : DragAndDropTarget {
+            override fun onStarted(event: DragAndDropEvent) { isDragActive = true }
+            override fun onEntered(event: DragAndDropEvent) { isDragActive = true }
+            override fun onExited(event: DragAndDropEvent) { isDragActive = false }
+            override fun onEnded(event: DragAndDropEvent) { isDragActive = false }
+            override fun onDrop(event: DragAndDropEvent): Boolean {
+                isDragActive = false
+                val transferable = event.awtTransferable
+                if (!transferable.isDataFlavorSupported(DataFlavor.javaFileListFlavor)) return false
+                val fileList = runCatching {
+                    transferable.getTransferData(DataFlavor.javaFileListFlavor)
+                }.getOrNull()
+                val paths = (fileList as? List<*>)?.mapNotNull { (it as? File)?.absolutePath } ?: emptyList()
+                if (paths.isEmpty()) return false
+                viewModel.pushFiles(paths, selectedDevice)
+                return true
+            }
+        }
+    }
 
     val availableSpace by produceState(initialValue = "--", currentPath, selectedDevice) {
         value = "--"
@@ -346,6 +376,7 @@ fun FileBrowserScreen(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth()
+                .dragAndDropTarget(shouldStartDragAndDrop = { selectedDevice != null }, target = dragTarget)
                 .background(
                     color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.28f),
                     shape = RoundedCornerShape(UiTokens.RadiusLarge)
@@ -608,6 +639,26 @@ fun FileBrowserScreen(
                                 )
                             }
                         }
+                    }
+                }
+            }
+            if (isDragActive) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f))
+                        .padding(UiTokens.SpaceLarge),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
+                    ) {
+                        Icon(Icons.Default.Upload, null, modifier = Modifier.size(UiTokens.IconLarge))
+                        Text(
+                            text = l10n("松开鼠标以上传到", "Release to upload into") + " $currentPath",
+                            style = MaterialTheme.typography.titleSmall
+                        )
                     }
                 }
             }

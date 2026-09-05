@@ -131,6 +131,12 @@ class AppViewModel : BaseViewModel() {
     private val _isLoading = MutableStateFlow(false)
     val isLoading = _isLoading.asStateFlow()
 
+    private val _isInstalling = MutableStateFlow(false)
+    val isInstalling = _isInstalling.asStateFlow()
+
+    private val _currentInstallingProgress = MutableStateFlow<String?>(null)
+    val currentInstallingProgress = _currentInstallingProgress.asStateFlow()
+
     // View mode: true = grid, false = list
     private val _isGridView = MutableStateFlow(false)
     val isGridView = _isGridView.asStateFlow()
@@ -236,6 +242,42 @@ class AppViewModel : BaseViewModel() {
                     _isLoading.value = false
                 }
             }
+        }
+    }
+
+    fun batchInstallFromFolder(deviceId: String?) {
+        if (deviceId.isNullOrBlank() || _isInstalling.value) return
+        viewModelScope.launch {
+            val folder = withContext(Dispatchers.IO) { FileUtils.selectFolder() } ?: return@launch
+            val apks = withContext(Dispatchers.IO) {
+                File(folder).walkTopDown()
+                    .filter { it.isFile && it.extension.equals("apk", ignoreCase = true) }
+                    .toList()
+            }
+            if (apks.isEmpty()) {
+                showTipDialog(MsgContent.Text("所选文件夹中没有 APK 文件"))
+                return@launch
+            }
+            _isInstalling.value = true
+            var success = 0
+            var fail = 0
+            for (apk in apks) {
+                val result = withContext(Dispatchers.IO) {
+                    AdbTool.installApkAsync(apk.absolutePath, deviceId)
+                }
+                if (result.success) success++ else fail++
+                _currentInstallingProgress.value = "$success/${apks.size}"
+            }
+            _isInstalling.value = false
+            _currentInstallingProgress.value = null
+            getAppList(forceRefresh = true)
+            showTipDialog(
+                if (fail > 0) {
+                    MsgContent.Text("批量安装完成：成功 $success 个，失败 $fail 个，共 ${apks.size} 个 APK")
+                } else {
+                    MsgContent.Text("批量安装完成：成功安装 $success 个 APK")
+                }
+            )
         }
     }
 

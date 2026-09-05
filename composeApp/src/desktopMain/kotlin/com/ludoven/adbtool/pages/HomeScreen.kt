@@ -364,6 +364,10 @@ fun HomeScreen(
                         .verticalScroll(scrollState),
                     verticalArrangement = Arrangement.spacedBy(spacing)
                 ) {
+                    HomeNetworkConnectCard(
+                        isLoading = isLoading,
+                        onConnect = { ip, port -> viewModel.connectNetworkDevice(ip, port) }
+                    )
                     EmptyDeviceStatePanel(
                         compactLayout = compactLayout,
                         relativeUpdated = relativeUpdated,
@@ -405,6 +409,10 @@ fun HomeScreen(
                             .verticalScroll(scrollState),
                         verticalArrangement = Arrangement.spacedBy(spacing)
                     ) {
+                    HomeNetworkConnectCard(
+                        isLoading = isLoading,
+                        onConnect = { ip, port -> viewModel.connectNetworkDevice(ip, port) }
+                    )
                     HomeTopCommandPanel(
                         compactLayout = compactLayout,
                         denseLayout = mediumLayout,
@@ -522,6 +530,78 @@ fun HomeScreen(
                     port = extractPort(selectedDevice, deviceInfo?.ipAddress),
                     latency = deviceInfo?.latency.orDash(),
                     relativeUpdated = relativeUpdated
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun HomeNetworkConnectCard(
+    isLoading: Boolean,
+    onConnect: (String, String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var ip by remember { mutableStateOf("192.168.1.1") }
+    var port by remember { mutableStateOf("5555") }
+
+    GlassCard(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(UiTokens.RadiusLarge),
+        borderStroke = BorderStroke(1.dp, HomeVisualTokens.Border.copy(alpha = 0.5f))
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(UiTokens.SpaceLarge),
+            verticalArrangement = Arrangement.spacedBy(UiTokens.SpaceMedium)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall)
+            ) {
+                Icon(IconParkIcons.Link, null, tint = HomeVisualTokens.Primary, modifier = Modifier.size(18.dp))
+                Text(
+                    text = l10n("网络连接", "Network connection"),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(UiTokens.SpaceSmall),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                OutlinedTextField(
+                    value = ip,
+                    onValueChange = { ip = it.trim() },
+                    modifier = Modifier.weight(1.4f),
+                    singleLine = true,
+                    placeholder = { Text(l10n("IP 地址", "IP address")) }
+                )
+                OutlinedTextField(
+                    value = port,
+                    onValueChange = { port = it.filter(Char::isDigit) },
+                    modifier = Modifier.width(100.dp),
+                    singleLine = true,
+                    placeholder = { Text(l10n("端口", "Port")) }
+                )
+                PrimaryHomeButton(
+                    text = if (isLoading) l10n("连接中...", "Connecting...") else l10n("连接", "Connect"),
+                    onClick = { if (!isLoading) onConnect(ip, port) }
+                )
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = l10n("连接后自动刷新设备列表", "Device list refreshes after connecting"),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
         }
